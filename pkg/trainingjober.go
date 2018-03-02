@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"time"
 
-	edlresource "github.com/paddlepaddle/edl/pkg/resource"
 	log "github.com/inconshreveable/log15"
+	edlresource "github.com/paddlepaddle/edl/pkg/resource"
 )
 
 const (

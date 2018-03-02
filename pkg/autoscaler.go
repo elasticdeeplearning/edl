@@ -23,8 +23,8 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	edlresource "github.com/paddlepaddle/edl/pkg/resource"
 	log "github.com/inconshreveable/log15"
+	edlresource "github.com/paddlepaddle/edl/pkg/resource"
 )
 
 const (
