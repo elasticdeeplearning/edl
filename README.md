@@ -23,7 +23,7 @@ EDL includes two parts:
 We deployed EDL on a real Kubernetes cluster, dlnel.com, opened for
 graduate students of Tsinghua University.  The performance test report
 of EDL on this cluster is
-[here](https://github.com/PaddlePaddle/cloud/blob/develop/doc/autoscale/experiment/README.md).
+[here](https://github.com/PaddlePaddle/cloud/blob/develop/doc/edl/experiment/README.md).
 
 
 ## Build
