@@ -1,61 +1,34 @@
-# PaddlePaddle Cloud
+# PaddlePaddle EDL: Elastic Deep Learning
 
-[![Build Status](https://travis-ci.org/PaddlePaddle/cloud.svg?branch=develop)](https://travis-ci.org/PaddlePaddle/cloud)
+While many hardware and software manufacturers are working on
+improving the running time of deep learning jobs, EDL optimizes
 
-PaddlePaddle Cloud is a combination of PaddlePaddle and Kubernetes. It
-supports fault-recoverable and fault-tolerant large-scaled distributed
-deep learning. We can deploy it on public cloud and on-premise
-clusters.
+1. the global utilization of the cluster, and
+1. the waiting time of job submitters.
 
-PaddlePaddle Cloud includes the following components:
+For more about the project EDL, please refer to this [invited blog
+post](http://blog.kubernetes.io/2017/12/paddle-paddle-fluid-elastic-learning.html)
+on the Kubernetes official blog.
 
-- paddlectl: A command-line tool that talks to paddlecloud and
-  paddle-fs.
-- paddlecloud: An HTTP server that exposes Kubernetes as a Web
-  service.
-- paddle-fs: An HTTP server that exposes the CephFS distributed
-  filesystem as a Web service.
-- EDL (elastic deep learning): A Kubernetes controller that supports
-  elastic scheduling of deep learning jobs and other jobs.
-- Fault-tolerant distributed deep learning: This part is in
-  the [Paddle](https://github.com/PaddlePaddle/paddle) repo.
+EDL includes two parts:
 
-## Tutorials
+1. a Kubernetes controller for the elastic scheduling of distributed
+   deep learning jobs, and
 
-- [快速开始](./doc/tutorial_cn.md)
-- [中文手册](./doc/usage_cn.md)
+1. making PaddlePaddle a fault-tolerable deep learning framework.
+   This directory contains the Kubernetes controller.  For more
+   information about fault-tolerance, please refer to the
+   [design](https://github.com/PaddlePaddle/Paddle/tree/develop/doc/design/cluster_train).
+
+We deployed EDL on a real Kubernetes cluster, dlnel.com, opened for
+graduate students of Tsinghua University.  The performance test report
+of EDL on this cluster is
+[here](https://github.com/PaddlePaddle/cloud/blob/develop/doc/edl/experiment/README.md).
 
 
-## How To
+## Build
 
-- [Build PaddlePaddle Cloud](./doc/howto/build.md)
-- [Deploy PaddlePaddle Cloud](./doc/howto/deploy.md)
-- [Elastic Deep Learning using EDL](./doc/edl/example/autoscale.md)
-- [PaddlePaddle Cloud on Minikube](./doc/howto/run_on_minikube.md)
-
-## Directory structure
-
-```
-.
-├── demo: distributed version of https://github.com/PaddlePaddle/book programs
-├── doc: documents
-├── docker: scripts to build Docker image to run PaddlePaddle distributed
-├── go
-│   ├── cmd
-│   │   ├── edl: entry of EDL controller binary
-│   │   ├── paddlecloud: the command line client of PaddlePaddle Cloud (will be deprecated)
-│   │   ├── paddlectl: the command line client of PaddlePaddle Cloud
-│   │   └── pfsserver: entry of PaddleFS binary
-│   ├── edl: EDL implementation
-│   ├── filemanager: PaddleFS implementation
-│   ├── paddlecloud: command line client implement (will be deprecated)
-│   ├── paddlectl: command line client implement
-│   ├── scripts: scripts for Go code generation
-├── k8s: YAML files to create different components of PaddlePaddle Cloud
-│   ├── edl: TPR definition and EDL controller for TraningJob resource
-│   │   ├── autoscale_job: A sample TrainingJob that can scale
-│   │   └── autoscale_load: A sample cluster job demonstrating a common workload
-│   ├── minikube: YAML files to deploy on local mini-kube environment
-│   └── raw_job: A demo job demonstrates how to run PaddlePaddle jobs in cluster
-└── python: PaddlePaddle Cloud REST API server
+```bash
+glide install --strip-vendor
+go build -o path/to/output github.com/paddlepaddle/edl/cmd/edl
 ```
