@@ -4,7 +4,6 @@ matrix:
       go: 1.8.x
       sudo: required
       install:
-        - sudo apt-get install -y mercurial
         - go get -u github.com/golang/lint/golint
         - curl https://glide.sh/get | bash
         - sudo pip install pre-commit
@@ -12,17 +11,6 @@ matrix:
         - rm -f .copyright.hook && wget https://raw.githubusercontent.com/PaddlePaddle/Paddle/develop/.copyright.hook
         - bash -x .tools/check_style.sh
         - ln -s $GOPATH/src/github.com/PaddlePaddle $GOPATH/src/github.com/paddlepaddle
-        - mkdir ~/.glide && glide mirror set https://gonum.org/v1/plot https://github.com/gonum/plot
-        - glide install --strip-vendor && go test $(glide novendor)
-    - language: python
-      python: 2.7
-      sudo: required
-      env:
-        - DJANGO_SETTINGS_MODULE="paddlecloud.travis_settings"
-      before_script:
-        - mysql -e 'create database paddlecloud;'
-        - mkdir $HOME/.kube && cp ./k8s/config $HOME/.kube/
-        - pip install -r python/paddlecloud/requirements.txt
-        - cd python/paddlecloud && python manage.py makemigrations && python manage.py migrate
-      script:
-        - python manage.py test
+        - cd $GOPATH/src/github.com/paddlepaddle/edl
+        - glide install --strip-vendor
+        - go test $(glide novendor)

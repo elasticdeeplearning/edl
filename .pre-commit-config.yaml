@@ -1,20 +1,7 @@
--   repo: https://github.com/dnephin/pre-commit-golang
-    sha: e4693a4c282b4fc878eda172a929f7a6508e7d16
-    hooks:
-      -   id: go-fmt
-          files: \.go$
-      -   id: go-lint
-          files: \.go$
-          exclude: (.*\/client\/.*\.go|.*\generated\.deepcopy\.go)$
--   repo: https://github.com/PaddlePaddle/mirrors-yapf.git
-    sha: 0d79c0c469bab64f7229c9aca2b1186ef47f0e37
-    hooks:
-    -   id: yapf
-        files: (.*\.(py|bzl)|BUILD|.*\.BUILD|WORKSPACE)$
--   repo: local
-    hooks:
-    -   id: copyright_checker
-        name: copyright_checker
-        entry: python ./.copyright.hook
-        language: system
-        files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|py)$
+- repo: git://github.com/dnephin/pre-commit-golang
+  sha: HEAD
+  hooks:
+    - id: go-fmt
+    - id: go-vet
+    - id: go-lint
+
