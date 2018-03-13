@@ -48,7 +48,7 @@ So before everything, make sure you have a running Kubernetes v1.7.* cluster and
 If you just trying to play EDL in your laptop, go with `minikube` with the following command is good enough to get you ready.
 
 ``` bash
-minikube start ----kubernetes-version v1.7.5
+minikube start --kubernetes-version v1.7.5
 ```
 
 To verify your `minikube` and `kubectl` works, run the following command:
