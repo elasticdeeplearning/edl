@@ -32,3 +32,116 @@ of EDL on this cluster is
 glide install --strip-vendor
 go build -o path/to/output github.com/paddlepaddle/edl/cmd/edl
 ```
+
+## Usage
+
+To deploy the EDL to your kubernetes cluster, there are 2 major steps:
+
+1. Create a Third Party Resource "Training-job" to allow creating a PaddlePaddle machine learning job in one yaml file.
+1. Deploy the EDL controller to monitor and control overall cluster resource distribution between the online services and the PaddlePaddle training-jobs.
+
+Please note, TPR (Third Party Resource TPR) is deprecated after Kubernetes 1.7. We are working to support CRD (Custom Resource Definitions, the successor of TPR). Stay tuned!
+
+### Prepare your cluster
+So before everything, make sure you have a running Kubernetes v1.7.* cluster and a working `kubectl`.
+
+If you just trying to play EDL in your laptop, go with `minikube` with the following command is good enough to get you ready.
+
+``` bash
+minikube start ----kubernetes-version v1.7.5
+```
+
+To verify your `minikube` and `kubectl` works, run the following command:
+
+``` bash
+kubectl version
+```
+
+if you are able to see both client and server version, AND server version is v1.7.5, you are good to go.
+
+### Create TPR "Training-job"
+
+As simple as running the following command
+
+``` bash
+kubectl create -f thirdpartyresource.yaml
+```
+
+To verify the creation of the resource, run the following command:
+
+``` bash
+kubectl describe ThirdPartyResource training-job
+```
+
+if there is no error returned, this means your training-job TPR is successfully created.
+
+### Deploy EDL controller
+
+EDL is supposed to run as a docker images to run in the Kubernetes cluster in most of the case, but it's always possible to run the EDL binary outside the cluster along Kubernetes config file. In this section we will assume that the EDL runs as docker image in the Kubernetes cluster.
+
+Before we get to the docker image part, we recommend running the EDL controller within a Kubernetes namespace, which provides better isolation among apps. By default, the EDL runs under namespace "paddlecloud". To create it, run the following command if you don't have it created.
+
+``` bash
+kubectl create namespace paddlecloud
+```
+
+There are 2 ways to have the EDL docker image:
+
+1. Directly pull the pre-built image from docker hub's paddle repo
+1. Build your own
+
+If you decide to use the pre-built image, there is nothing you need to do now, you can skip to the deployment part.
+
+To build your own docker images, run the following command:
+
+``` bash
+docker build -t yourRepoName/edl-controller .
+```
+
+This command will take the `Dockerfile`, build the EDL docker image and tag it as `yourRepoName/edl-controller`
+
+Now you want to push it to your docker hub so that Kubernetes cluster is able to pull and deploy it.
+
+``` bash
+docker push yourRepoName/edl-controller
+```
+Before deploying your EDL controller, open `edl_controller.yaml` with any text editor to change the docker image uri from `paddlepaddle/edl-controller` to `yourRepoName/edl-controller`
+
+Now let's deploy the EDL controller:
+
+``` bash
+kubectl create -f `edl_controller.yaml`
+```
+
+To verify the deployment, let's firstly verify the pod is successfully created:
+
+``` bash
+kubectl get pods --namespace paddlecloud
+
+NAME                                       READY     STATUS    RESTARTS   AGE
+training-job-controller-2033113564-w80q6   1/1       Running   0          4m
+```
+Wait until you see `STATUS` is `Running`, run the following command to see controller's working log:
+
+``` bash
+kubectl logs training-job-controller-2033113564-w80q6 --namespace paddlecloud
+```
+
+when you see logs like this:
+
+``` text
+t=2018-03-13T22:13:19+0000 lvl=dbug msg="Cluster.InquiryResource done" resource="{NodeCount:1 GPURequest:0 GPULimit:0 GPUTotal:0 CPURequestMilli:265 CPULimitMilli:0 CPUTotalMilli:2000 MemoryRequestMega:168 MemoryLimitMega:179 MemoryTotalMega:1993 Nodes:{NodesCPUIdleMilli:map[minikube:1735] NodesMemoryFreeMega:map[minikube:1824]}}" stack="[github.com/paddlepaddle/edl/pkg/autoscaler.go:466 github.com/paddlepaddle/edl/pkg/controller.go:72]"
+```
+That means your EDL controller is actively working monitoring and adjusting resource distributions.
+
+## Deploying a training-job
+
+TBD
+
+## FAQ
+
+TBD
+
+## License
+
+PaddlePaddle EDL is provided under the [Apache-2.0 license](LICENSE).
