@@ -131,19 +131,19 @@ func (c *Controller) onAdd(obj interface{}) {
 	log.Debug("create trainer-job:" + string(b))
 
 	// create all resources
-	err := c.clientset.ReplicaSets(m.ObjectMeta.Namespace).Create(m)
+	_, err := c.clientset.ExtensionsV1beta1().ReplicaSets(m.ObjectMeta.Namespace).Create(m)
 	if err != nil {
-		log.Errorf("create master error %v", err)
+		log.Error("create master", "error", err)
 	}
 
-	err = c.clientset.ReplicaSets(p.ObjectMeta.Namespace).Create(p)
+	_, err = c.clientset.ExtensionsV1beta1().ReplicaSets(m.ObjectMeta.Namespace).Create(p)
 	if err != nil {
-		log.Errorf("create pserver error %v", err)
+		log.Error("create pserver", "error", err)
 	}
 
-	err = c.clientset.Jobs(t.ObjectMeta.Namespace).Create(t)
+	_, err = c.clientset.BatchV1().Jobs(t.ObjectMeta.Namespace).Create(t)
 	if err != nil {
-		log.Errorf("create trainer error %v", err)
+		log.Error("create trainer", "error", err)
 	}
 }
 

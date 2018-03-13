@@ -1,0 +1,24 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: training-job-controller
+  namespace: paddlecloud
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: training-job-controller
+    spec:
+      containers:
+      - name: training-job-controller
+        image: typhoon1986/edl-controller
+        imagePullPolicy: Never
+        env:
+        - name: https_proxy
+          value: ""
+        - name: http_proxy
+          value: ""
+        command: ["/usr/local/bin/edl", "-logtostderr", "-log_level", "debug"]
+      #imagePullSecrets:
+      #- name: regsecret

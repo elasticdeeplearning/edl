@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strconv"
 
+	log "github.com/inconshreveable/log15"
 	edlresource "github.com/paddlepaddle/edl/pkg/resource"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
@@ -86,7 +87,10 @@ func (p *DefaultJobParser) ParseToPserver(job *edlresource.TrainingJob) *v1beta1
 			Kind:       "extensions/v1beta1",
 			APIVersion: "ReplicaSet",
 		},
-		ObjectMeta: job.ObjectMeta,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      job.ObjectMeta.Name + "-pserver",
+			Namespace: job.ObjectMeta.Namespace,
+		},
 		Spec: v1beta1.ReplicaSetSpec{
 			Replicas: &replicas,
 			Template: v1.PodTemplateSpec{
@@ -235,14 +239,17 @@ func (p *DefaultJobParser) ParseToMaster(job *edlresource.TrainingJob) *v1beta1.
 // general functions that pserver, trainer use the same
 // -----------------------------------------------------------------------
 func podPorts(job *edlresource.TrainingJob) []v1.ContainerPort {
+	log.Debug("get pod ports", "portsnum", job.Spec.PortsNum, "sparse", job.Spec.PortsNumForSparse)
 	portsTotal := job.Spec.PortsNum + job.Spec.PortsNumForSparse
-	ports := make([]v1.ContainerPort, 8)
+	ports := make([]v1.ContainerPort, portsTotal)
 	basePort := int32(job.Spec.Port)
 	for i := 0; i < portsTotal; i++ {
-		ports = append(ports, v1.ContainerPort{
+		log.Debug("adding port ", "base", basePort,
+			" total ", portsTotal)
+		ports[i] = v1.ContainerPort{
 			Name:          fmt.Sprintf("jobport-%d", basePort),
 			ContainerPort: basePort,
-		})
+		}
 		basePort++
 	}
 	return ports
