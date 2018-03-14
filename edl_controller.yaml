@@ -13,10 +13,9 @@ spec:
       containers:
       - name: training-job-controller
         image: paddlepaddle/edl-controller
-        imagePullPolicy: Never
         env:
         - name: https_proxy
           value: ""
         - name: http_proxy
           value: ""
-        command: ["/usr/local/bin/edl", "-logtostderr", "-log_level", "debug"]
+        command: ["/usr/local/bin/edl", "-logtostderr", "-log_level", "info"]
