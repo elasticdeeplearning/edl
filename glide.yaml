@@ -1,4 +1,4 @@
-package: github.com/paddlepaddle/edl
+package: github.com/PaddlePaddle/edl
 import:
 - package: k8s.io/client-go
   version: kubernetes-1.8.0
@@ -9,3 +9,5 @@ import:
 - package: github.com/inconshreveable/log15
   version: v2.13
 - package: github.com/wangkuiyi/candy
+- package: k8s.io/code-generator
+  version: kubernetes-1.8.6
