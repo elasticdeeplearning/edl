@@ -24,7 +24,7 @@ func main() {
 	candy.Must(err)
 
 	log.Root().SetHandler(
-		log.LvlFilterHandler(lvl, log.CallerStackHandler("%+v", log.StderrHandler)),
+		log.LvlFilterHandler(lvl, log.CallerFileHandler(log.StderrHandler)),
 	)
 
 	// Create the client config. Use kubeconfig if given, otherwise assume in-cluster.
