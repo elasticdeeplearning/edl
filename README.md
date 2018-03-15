@@ -136,6 +136,37 @@ That means your EDL controller is actively working monitoring and adjusting reso
 
 ## Deploying a training-job
 
+Now we have a resource typed `training-job` defined in Kubernetes and we have the EDL watching and optimizing the resource distribution, let's create a training job to see how it works.
+
+Firstly, let's create your training job's docker image, which contains training logic in `example/train_ft.py`
+
+``` bash
+cd example
+docker build -t yourRepoName/my_edl_training_job .
+```
+
+then push it to docker hub to be accessible by Kubernetes:
+
+``` bash
+docker push yourRepoName/my_edl_training_job
+```
+
+Please note, `docker build` uses `Dockerfile` in `example` directory, which indicates our `my_edl_training_job` is based on docker image `paddlepaddle/paddlecloud-job`. This images has PaddlePaddle installed and configured, so that you do not have to install on your own.
+
+Now we have defined "What to run" for Kubernetes, it's time to define "How to run" the training job, which is supposed to configured in a yaml file. please find the example yaml definition of a training job from `example/examplejob.yaml`.
+
+In this file, change the image uri from `paddlepaddle/paddlecloud-job` to `yourRepoName/my_edl_training_job` in this case.
+
+In `spec` section you will see 2 major members `trainer` and `pserver`, their configurations are trying to define how "distributed" this job is. Like trainer and pserver 's `min-instance` and `max-instance` are showing the desired trainer count range, so that EDL will adjust the instance count based on these information. We'll have a separate document to describe these fields soon.
+
+Now let's start the training job by run command below:
+
+``` bash
+kubectl create -f example.yaml
+```
+
+## Resource Adjustments by EDL
+
 TBD
 
 ## FAQ
