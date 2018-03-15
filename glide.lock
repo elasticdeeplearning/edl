@@ -1,5 +1,5 @@
-hash: b583cdcf4c3f9b3a5ad36c509a476690c8ee3c9e96e10b899ce077f5f075cdf9
-updated: 2018-03-02T14:11:31.695488-08:00
+hash: 7dc8fbbd1cdb1f4854c9a8595e5c0abd000df4d255c2887c2eca2af3d5c6edbf
+updated: 2018-03-14T15:56:43.60851653+08:00
 imports:
 - name: github.com/davecgh/go-spew
   version: 782f4967f2dc4564575ca782fe2d04090b5faca8
@@ -76,6 +76,11 @@ imports:
   version: 7dc3415be66d7cc68bf0182f35c8d31f8d2ad8a7
 - name: github.com/mattn/go-isatty
   version: 6ca4dbf54d38eea1a992b3c722a76a5d1c4cb25c
+- name: github.com/paddlepaddle/edl
+  version: 756c0e8b84d9e8256f442f5d337f5c41a72ce82d
+  subpackages:
+  - pkg
+  - pkg/resource
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/PuerkitoBio/purell
@@ -183,24 +188,17 @@ imports:
   - pkg/util/diff
   - pkg/util/errors
   - pkg/util/framer
-  - pkg/util/httpstream
-  - pkg/util/httpstream/spdy
   - pkg/util/intstr
   - pkg/util/json
-  - pkg/util/mergepatch
   - pkg/util/net
-  - pkg/util/remotecommand
   - pkg/util/runtime
   - pkg/util/sets
-  - pkg/util/strategicpatch
   - pkg/util/validation
   - pkg/util/validation/field
   - pkg/util/wait
   - pkg/util/yaml
   - pkg/version
   - pkg/watch
-  - third_party/forked/golang/json
-  - third_party/forked/golang/netutil
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
   version: 35874c597fed17ca62cd197e516d7d5ff9a2958c
@@ -249,12 +247,14 @@ imports:
   - util/flowcontrol
   - util/homedir
   - util/integer
+- name: k8s.io/code-generator
+  version: 25fd8c8ddbf75b223882df4479f8b8e615da05ae
 - name: k8s.io/kube-openapi
   version: 868f2f29720b192240e18284659231b440f9cda5
   subpackages:
   - pkg/common
 - name: k8s.io/kubernetes
-  version: ed7147fdc1fa64981096eb76b86001eac0f00af6
+  version: e7dc539234e0c2fd22270feb0e7c72905333f0a0
   subpackages:
   - pkg/api
 testImports:

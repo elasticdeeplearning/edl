@@ -11,6 +11,9 @@ matrix:
         - rm -f .copyright.hook && wget https://raw.githubusercontent.com/PaddlePaddle/Paddle/develop/.copyright.hook
         - bash -x .tools/check_style.sh
         - ln -s $GOPATH/src/github.com/PaddlePaddle $GOPATH/src/github.com/paddlepaddle
+        - glide install
+        - vendor/k8s.io/code-generator/generate-groups.sh "deepcopy,client,informer,lister" github.com/PaddlePaddle/edl/pkg/client github.com/PaddlePaddle/edl/pkg/apis paddlepaddle:v1 --go-header-file scripts/custom-boilerplate.go.txt
+        - grep "github.com/paddlepaddle/edl" -nR pkg/client | awk -F ':' '{print $1}' | xargs sed -i 's|github.com/paddlepaddle/edl|github.com/PaddlePaddle/edl|g'
         - cd $GOPATH/src/github.com/paddlepaddle/edl
         - glide install --strip-vendor
         - go test $(glide novendor)
