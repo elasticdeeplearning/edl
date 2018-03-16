@@ -4,4 +4,5 @@
     - id: go-fmt
     - id: go-vet
     - id: go-lint
-
+      files: \.go$
+      exclude: (.*\/client\/.*\.go|.*\generated\.deepcopy\.go)$
