@@ -64,6 +64,14 @@ kind: TrainingJob
 metadata:
 	name: job-1
 spec:
+	image: "paddlepaddle/paddlecloud-job"
+	port: 7164
+	ports_num: 1
+	ports_num_for_sparse: 1
+	fault_tolerant: true
+	imagePullSecrets:
+		name: myregistrykey
+	hostNetwork: true
 	trainer:
 		entrypoint: "python train.py"
 		workspace: "/home/job-1/"
@@ -109,14 +117,16 @@ type TrainingJob struct {
 // +k8s:deepcopy-gen=true
 type TrainingJobSpec struct {
 	// General job attributes.
-	Image             string           `json:"image,omitempty"`
-	Port              int              `json:"port,omitempty"`
-	PortsNum          int              `json:"ports_num,omitempty"`
-	PortsNumForSparse int              `json:"ports_num_for_sparse,omitempty"`
-	FaultTolerant     bool             `json:"fault_tolerant,omitempty"`
-	Passes            int              `json:"passes,omitempty"`
-	Volumes           []v1.Volume      `json:"volumes"`
-	VolumeMounts      []v1.VolumeMount `json:"VolumeMounts"`
+	Image             string                    `json:"image,omitempty"`
+	Port              int                       `json:"port,omitempty"`
+	PortsNum          int                       `json:"ports_num,omitempty"`
+	PortsNumForSparse int                       `json:"ports_num_for_sparse,omitempty"`
+	FaultTolerant     bool                      `json:"fault_tolerant,omitempty"`
+	Passes            int                       `json:"passes,omitempty"`
+	Volumes           []v1.Volume               `json:"volumes"`
+	VolumeMounts      []v1.VolumeMount          `json:"VolumeMounts"`
+	ImagePullSecrets  []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	HostNetwork       bool                      `josn:"hostNetwork,omitempty"`
 	// Job components.
 	Trainer TrainerSpec `json:"trainer"`
 	Pserver PserverSpec `json:"pserver"`
