@@ -111,12 +111,12 @@ type TrainerJobScaleStatus struct {
 type TrainingResourceType string
 
 const (
-	// MASTER is the master name of TrainingResourceType.
-	MASTER TrainingResourceType = "MASTER"
-	// PSERVER is the pserver name of TrainingResourceType.
-	PSERVER TrainingResourceType = "PSERVER"
-	// TRAINER is the trainer name of TrainingResourceType.
-	TRAINER TrainingResourceType = "TRAINER"
+	// Master is the master name of TrainingResourceType.
+	Master TrainingResourceType = "MASTER"
+	// Pserver is the pserver name of TrainingResourceType.
+	Pserver TrainingResourceType = "PSERVER"
+	// Trainer is the trainer name of TrainingResourceType.
+	Trainer TrainingResourceType = "TRAINER"
 )
 
 // ResourceState is the state of a type of resource
