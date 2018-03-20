@@ -2,6 +2,9 @@ package updater
 
 import (
 	"fmt"
+	"reflect"
+	"time"
+
 	log "github.com/golang/glog"
 	padv1 "github.com/paddlepaddle/edl/pkg/apis/paddlepaddle/v1"
 	trainingJobClient "github.com/paddlepaddle/edl/pkg/client/clientset/versioned"
@@ -9,8 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"reflect"
-	"time"
 )
 
 const (
@@ -96,9 +97,9 @@ func (updater *TrainingJobUpdater) Modify(nj *padv1.TrainingJob) {
 func (updater *TrainingJobUpdater) releaseResource(tp padv1.TrainingResourceType) error {
 	resource := new(v1beta1.ReplicaSet)
 	switch tp {
-	case padv1.MASTER:
+	case padv1.Master:
 		resource = updater.job.Spec.Master.ReplicaSpec
-	case padv1.PSERVER:
+	case padv1.Pserver:
 		resource = updater.job.Spec.Pserver.ReplicaSpec
 	default:
 		return fmt.Errorf("unknow resource")
@@ -131,11 +132,11 @@ func (updater *TrainingJobUpdater) releaseResource(tp padv1.TrainingResourceType
 }
 
 func (updater *TrainingJobUpdater) releaseMaster() error {
-	return updater.releaseResource(padv1.MASTER)
+	return updater.releaseResource(padv1.Master)
 }
 
 func (updater *TrainingJobUpdater) releasePserver() error {
-	return updater.releaseResource(padv1.PSERVER)
+	return updater.releaseResource(padv1.Pserver)
 }
 
 func (updater *TrainingJobUpdater) releaseTrainer() error {
@@ -206,12 +207,12 @@ func (updater *TrainingJobUpdater) deleteTrainingJob() error {
 func (updater *TrainingJobUpdater) createResource(tp padv1.TrainingResourceType) error {
 	resource := new(v1beta1.ReplicaSet)
 	switch tp {
-	case padv1.MASTER:
+	case padv1.Master:
 		resource = updater.job.Spec.Master.ReplicaSpec
-	case padv1.PSERVER:
+	case padv1.Pserver:
 		resource = updater.job.Spec.Pserver.ReplicaSpec
 	default:
-		return fmt.Errorf("unknow resource")
+		return fmt.Errorf("unknown resource")
 	}
 	for {
 		_, err := updater.kubeClient.ExtensionsV1beta1().ReplicaSets(updater.job.Namespace).Get(resource.Name, v1.GetOptions{})
@@ -279,11 +280,11 @@ func (updater *TrainingJobUpdater) createTrainer() error {
 func (updater *TrainingJobUpdater) createTrainingJob() error {
 	if updater.job.Spec.FaultTolerant {
 
-		if err := updater.createResource(padv1.MASTER); err != nil {
+		if err := updater.createResource(padv1.Master); err != nil {
 			return err
 		}
 	}
-	if err := updater.createResource(padv1.PSERVER); err != nil {
+	if err := updater.createResource(padv1.Pserver); err != nil {
 		return err
 	}
 	return updater.createTrainer()
@@ -312,7 +313,12 @@ func (updater *TrainingJobUpdater) parseTrainingJob() {
 	}
 
 	err := func() error {
-		// TODO(Zhengqi): Parse TrainingJob, this will be submitted in the next pr
+		var parser DefaultJobParser
+		if err := parser.Validate(updater.job); err != nil {
+			return err
+		}
+
+		updater.job = parser.ParseToTrainingJob(updater.job)
 		return nil
 	}()
 
@@ -328,7 +334,7 @@ func (updater *TrainingJobUpdater) parseTrainingJob() {
 func (updater *TrainingJobUpdater) getTrainerReplicaStatuses() ([]*padv1.TrainingResourceStatus, error) {
 	var replicaStatuses []*padv1.TrainingResourceStatus
 	trs := padv1.TrainingResourceStatus{
-		TrainingResourceType: padv1.TRAINER,
+		TrainingResourceType: padv1.Trainer,
 		State:                padv1.ResourceStateNone,
 		ResourceStates:       make(map[padv1.ResourceState]int),
 	}

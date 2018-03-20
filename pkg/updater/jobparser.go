@@ -37,9 +37,6 @@ const (
 type JobParser interface {
 	Validate(job *paddlev1.TrainingJob) error
 	ParseToTrainingJob(job *paddlev1.TrainingJob) *paddlev1.TrainingJob
-	parseToTrainer(job *paddlev1.TrainingJob) *batchv1.Job
-	parseToPserver(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet
-	parseToMaster(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet
 }
 
 // DefaultJobParser implement a basic JobParser.
@@ -76,13 +73,13 @@ func (p *DefaultJobParser) Validate(job *paddlev1.TrainingJob) error {
 func (p *DefaultJobParser) ParseToTrainingJob(job *paddlev1.TrainingJob) *paddlev1.TrainingJob {
 	useHostNetwork := job.Spec.HostNetwork
 	if job.Spec.FaultTolerant {
-		job.Spec.Master.ReplicaSpec = p.parseToMaster(job)
+		job.Spec.Master.ReplicaSpec = parseToMaster(job)
 		if useHostNetwork {
 			job.Spec.Master.ReplicaSpec.Spec.Template.Spec.HostNetwork = true
 		}
 	}
-	job.Spec.Pserver.ReplicaSpec = p.parseToPserver(job)
-	job.Spec.Trainer.ReplicaSpec = p.parseToTrainer(job)
+	job.Spec.Pserver.ReplicaSpec = parseToPserver(job)
+	job.Spec.Trainer.ReplicaSpec = parseToTrainer(job)
 	if useHostNetwork {
 		job.Spec.Pserver.ReplicaSpec.Spec.Template.Spec.HostNetwork = true
 		job.Spec.Trainer.ReplicaSpec.Spec.Template.Spec.HostNetwork = true
@@ -91,7 +88,7 @@ func (p *DefaultJobParser) ParseToTrainingJob(job *paddlev1.TrainingJob) *paddle
 }
 
 // parseToPserver generate a pserver replicaset resource according to "TrainingJob" resource specs.
-func (p *DefaultJobParser) parseToPserver(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet {
+func parseToPserver(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet {
 	replicas := int32(job.Spec.Pserver.MinInstance)
 	command := make([]string, 2, 2)
 	// FIXME: refine these part.
@@ -132,7 +129,7 @@ func (p *DefaultJobParser) parseToPserver(job *paddlev1.TrainingJob) *v1beta1.Re
 }
 
 // parseToTrainer parse TrainingJob to a kubernetes job resource.
-func (p *DefaultJobParser) parseToTrainer(job *paddlev1.TrainingJob) *batchv1.Job {
+func parseToTrainer(job *paddlev1.TrainingJob) *batchv1.Job {
 	replicas := int32(job.Spec.Trainer.MinInstance)
 	command := make([]string, 2)
 	if job.Spec.FaultTolerant {
@@ -211,7 +208,7 @@ func getEtcdPodSpec(job *paddlev1.TrainingJob) *corev1.Container {
 }
 
 // parseToMaster parse TrainingJob to a kubernetes replicaset resource.
-func (p *DefaultJobParser) parseToMaster(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet {
+func parseToMaster(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet {
 	replicas := int32(1)
 	// FIXME: refine these part.
 	command := []string{"paddle_k8s", "start_master"}
