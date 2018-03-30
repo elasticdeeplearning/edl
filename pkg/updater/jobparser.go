@@ -32,18 +32,12 @@ const (
 	imagePullPolicy = "Always"
 )
 
-// JobParser is a interface can parse given simple TrainingJob struct to
-// an integrated TrainingJob
-type JobParser interface {
-	Validate(job *paddlev1.TrainingJob) error
-	ParseToTrainingJob(job *paddlev1.TrainingJob) *paddlev1.TrainingJob
+// DefaultJobParser implement a basic JobParser.
+type DefaultJobParser struct {
 }
 
-// DefaultJobParser implement a basic JobParser.
-type DefaultJobParser int
-
-// Validate updates default values for the added job and validates the fields.
-func (p *DefaultJobParser) Validate(job *paddlev1.TrainingJob) error {
+// setDefaultAndValidate updates default values for the added job and validates the fields.
+func setDefaultAndValidate(job *paddlev1.TrainingJob) error {
 	// Fill in default values
 	// FIXME: Need to test. What is the value if specified "omitempty"
 	if job.Spec.Port == 0 {
@@ -65,12 +59,16 @@ func (p *DefaultJobParser) Validate(job *paddlev1.TrainingJob) error {
 	if !job.Spec.FaultTolerant && job.Elastic() {
 		return errors.New("max-instances should equal to min-instances when fault_tolerant is disabled")
 	}
-	// TODO: add validations.
+	// TODO: add validations.(helin)
 	return nil
 }
 
-// ParseToTrainingJob generates a whole structure of TrainingJob
-func (p *DefaultJobParser) ParseToTrainingJob(job *paddlev1.TrainingJob) *paddlev1.TrainingJob {
+// NewTrainingJob generates a whole structure of TrainingJob
+func (p *DefaultJobParser) NewTrainingJob(job *paddlev1.TrainingJob) (*paddlev1.TrainingJob, error) {
+	if err := setDefaultAndValidate(job); err != nil {
+		return nil, err
+	}
+
 	useHostNetwork := job.Spec.HostNetwork
 	if job.Spec.FaultTolerant {
 		job.Spec.Master.ReplicaSpec = parseToMaster(job)
@@ -84,14 +82,14 @@ func (p *DefaultJobParser) ParseToTrainingJob(job *paddlev1.TrainingJob) *paddle
 		job.Spec.Pserver.ReplicaSpec.Spec.Template.Spec.HostNetwork = true
 		job.Spec.Trainer.ReplicaSpec.Spec.Template.Spec.HostNetwork = true
 	}
-	return job
+	return job, nil
 }
 
 // parseToPserver generate a pserver replicaset resource according to "TrainingJob" resource specs.
 func parseToPserver(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet {
 	replicas := int32(job.Spec.Pserver.MinInstance)
 	command := make([]string, 2, 2)
-	// FIXME: refine these part.
+	// FIXME: refine these part.(typhoonzero)
 	if job.Spec.FaultTolerant {
 		command = []string{"paddle_k8s", "start_pserver"}
 	} else {
@@ -213,7 +211,7 @@ func getEtcdPodSpec(job *paddlev1.TrainingJob) *corev1.Container {
 // parseToMaster parse TrainingJob to a kubernetes replicaset resource.
 func parseToMaster(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet {
 	replicas := int32(1)
-	// FIXME: refine these part.
+	// FIXME: refine these part.(typhoonzero)
 	command := []string{"paddle_k8s", "start_master"}
 
 	return &v1beta1.ReplicaSet{

@@ -1,6 +1,9 @@
 package v1
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Elastic returns true if the job can scale to more workers.
 func (s *TrainingJob) Elastic() bool {
@@ -25,5 +28,5 @@ func (s *TrainingJob) NeedGPU() bool {
 
 func (s *TrainingJob) String() string {
 	b, _ := json.MarshalIndent(s, "", "   ")
-	return string(b[:])
+	return fmt.Sprintf("%s", b)
 }

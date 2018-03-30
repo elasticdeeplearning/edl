@@ -312,19 +312,13 @@ func (updater *TrainingJobUpdater) parseTrainingJob() {
 		return
 	}
 
-	err := func() error {
-		var parser DefaultJobParser
-		if err := parser.Validate(updater.job); err != nil {
-			return err
-		}
+	var parser DefaultJobParser
+	var creatErr error
+	updater.job, creatErr = parser.NewTrainingJob(updater.job)
 
-		updater.job = parser.ParseToTrainingJob(updater.job)
-		return nil
-	}()
-
-	if err != nil {
+	if creatErr != nil {
 		updater.status.Phase = padv1.TrainingJobPhaseFailed
-		updater.status.Reason = err.Error()
+		updater.status.Reason = creatErr.Error()
 	} else {
 		updater.status.Phase = padv1.TrainingJobPhaseCreating
 		updater.status.Reason = ""

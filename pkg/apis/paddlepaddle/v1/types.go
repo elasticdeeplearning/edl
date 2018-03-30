@@ -55,6 +55,7 @@ type TrainingJobSpec struct {
 	Passes            int                  `json:"passes,omitempty"`
 	Volumes           []corev1.Volume      `json:"volumes"`
 	VolumeMounts      []corev1.VolumeMount `json:"VolumeMounts"`
+	//TODO simplify the structure of sub-resource(mengyang)
 	//TrainingJob components.
 	Master  MasterSpec  `json:"master"`
 	Pserver PserverSpec `json:"pserver"`
