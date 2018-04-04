@@ -249,9 +249,7 @@ func parseToMaster(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet {
 	}
 }
 
-// -----------------------------------------------------------------------
 // general functions that pserver, trainer use the same
-// -----------------------------------------------------------------------
 func podPorts(job *paddlev1.TrainingJob) []corev1.ContainerPort {
 	portsTotal := job.Spec.PortsNum + job.Spec.PortsNumForSparse
 	ports := make([]corev1.ContainerPort, 0)
@@ -330,6 +328,4 @@ func podEnv(job *paddlev1.TrainingJob) []corev1.EnvVar {
 	}
 }
 
-// -----------------------------------------------------------------------
 // general functions end
-// -----------------------------------------------------------------------

@@ -6,8 +6,10 @@ import (
 	"time"
 
 	log "github.com/golang/glog"
+
 	padv1 "github.com/paddlepaddle/edl/pkg/apis/paddlepaddle/v1"
 	trainingJobClient "github.com/paddlepaddle/edl/pkg/client/clientset/versioned"
+
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
