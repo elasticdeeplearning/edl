@@ -98,14 +98,41 @@ const (
 	TrainingJobPhaseCreating = "creating"
 	// TrainingJobPhaseRunning is running TrainingJobPhase.
 	TrainingJobPhaseRunning = "running"
+	// TrainingJobPhaseScaling is scaling TrainingJobPhase.
+	TrainingJobPhaseScaling = "scaling"
 	// TrainingJobPhaseSucceeded is succeeded TrainingJobPhase.
 	TrainingJobPhaseSucceeded = "succeeded"
 	// TrainingJobPhaseFailed is failed TrainingJobPhase.
 	TrainingJobPhaseFailed = "failed"
 )
 
-// TrainerJobScaleStatus is status of trainer jobs.
-type TrainerJobScaleStatus struct {
+type ScaleResults string
+
+// These are valid scale statuses. "ScaleTrue" means scale succeed.
+// "ScaleFalse" means scale failed. "ScaleUnknown" means kubernetes
+// can't decide if a scale succeed or not.
+const (
+	ScaleTrue    ScaleResults = "True"
+	ScaleFalse   ScaleResults = "False"
+	ScaleUnknown ScaleResults = "Unknown"
+)
+
+// TrainerJobScaleRecord is record of trainer jobs.
+type TrainerJobScaleRecord struct {
+	// ScaleTimestamp is the time to scale a TrainingJob
+	ScaleTimestamp metav1.Time `json:"scaleTimestamp"`
+	// Additional is the additional the job to scale
+	Additional int32 `json:"additional"`
+	// Status is the result of the scale。
+	Status ScaleResults `json:"status"`
+	// reason is the reason for the scale failed.
+	// +optional
+	Reason string `json:"reason,omitempty"`
+}
+
+// TrainerJobScaleRecords is records of trainer jobs.
+type TrainerJobScaleRecords struct {
+	ScaleRecords []*TrainerJobScaleRecord
 }
 
 // TrainingResourceType the type of TrainingJob resource, include MASTER PSERVER and TRAINER
@@ -154,7 +181,7 @@ type TrainingJobStatus struct {
 	Reason string `json:"reason"`
 	// ScaleStatus is autoscale status of trainer jobs
 	// TODO(ZhengQi): this will used in autoscale mode in future.
-	ScaleStatus TrainerJobScaleStatus `json:"scale_status"`
+	ScaleRecords TrainerJobScaleRecords `json:"scale_records"`
 	// ReplicaStatuses is detail status of resources
 	// TODO(ZhengQi): should we only considered trainer job now?
 	ReplicaStatuses []*TrainingResourceStatus `json:"replica_statuses"`
