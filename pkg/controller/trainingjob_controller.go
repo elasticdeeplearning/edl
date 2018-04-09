@@ -27,6 +27,7 @@ import (
 	paddleinformers "github.com/paddlepaddle/edl/pkg/client/informers/externalversions"
 	paddlelisters "github.com/paddlepaddle/edl/pkg/client/listers/paddlepaddle/v1"
 	"github.com/paddlepaddle/edl/pkg/updater"
+	"github.com/paddlepaddle/edl/pkg/autoscaler"
 )
 
 // TrainingJobController defines the structure to manage TrainingJob resource
@@ -104,7 +105,7 @@ func New(
 // informer caches and starting workers. It will block until stopCh
 // is closed, at which point it will shutdown the workqueue and wait for
 // workers to finish processing their current work items.
-func (c *TrainingJobController) Run(threadiness int, stopCh <-chan struct{}) error {
+func (c *TrainingJobController) Run(threadiness int, maxLoadDesired float64, stopCh <-chan struct{}) error {
 	// TODO add a lock to ensure there is only one controller in the cluster
 	defer runtime.HandleCrash()
 	defer c.workqueue.ShutDown()
@@ -126,6 +127,10 @@ func (c *TrainingJobController) Run(threadiness int, stopCh <-chan struct{}) err
 	}
 
 	log.Info("Started workers")
+
+	as := autoscaler.NewAutoscaler(c.KubeCli, c.jobupdater, autoscaler.WithMaxLoadDesired(maxLoadDesired))
+	as.Run()
+
 	<-stopCh
 	log.Info("Shutting down workers")
 
@@ -197,7 +202,6 @@ func (c *TrainingJobController) runWorker() {
 
 func (c *TrainingJobController) processNextWorkItem() bool {
 	obj, shutdown := c.workqueue.Get()
-
 	if shutdown {
 		return false
 	}

@@ -33,6 +33,8 @@ var (
 func main() {
 	masterURL := flag.String("master", "", "Address of a kube master.")
 	kubeConfig := flag.String("kubeconfig", "", "Path to a kube config. Only required if out-of-cluster.")
+	maxLoadDesired := flag.Float64("max_load_desired", 0.97, `Keep the cluster max resource usage around
+		this value, jobs will scale down if total request is over this level.`)
 	flag.Parse()
 
 	stopCh := signals.SetupSignalHandler()
@@ -75,7 +77,7 @@ func main() {
 
 	run := func(stop <-chan struct{}) {
 		log.Info("I won the leader election")
-		if controller.Run(1, stopCh); err != nil {
+		if controller.Run(1, *maxLoadDesired, stopCh); err != nil {
 			log.Error("Error running paddle trainingjob controller:", err.Error())
 			return
 		}
