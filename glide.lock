@@ -1,5 +1,5 @@
-hash: 296c159ccdd668c756fe41dff9ea9ab17e3594860d9631d09e6cb4c945d2ae4e
-updated: 2018-03-15T13:48:14.132305441+08:00
+hash: 1c149a3466c9c44457b09421c5082134869e1ca80f6d6e292116650887de4514
+updated: 2018-04-08T14:29:39.032876083+08:00
 imports:
 - name: github.com/davecgh/go-spew
   version: 782f4967f2dc4564575ca782fe2d04090b5faca8
@@ -22,7 +22,7 @@ imports:
 - name: github.com/go-openapi/swag
   version: 1d0bd113de87027671077d3c71eb3ac5d7dbba72
 - name: github.com/go-stack/stack
-  version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
+  version: 259ab82a6cad3992b4e21ff5cac294ccb06474bc
 - name: github.com/gogo/protobuf
   version: c0656edd0d9eab7c66d1eb0c568f9039345796f7
   subpackages:
@@ -30,6 +30,10 @@ imports:
   - sortkeys
 - name: github.com/golang/glog
   version: 44145f04b68cf362d9c4df2182967c2275eaefed
+- name: github.com/golang/groupcache
+  version: 02826c3e79038b59d737d3b1c0a1d937f71a4433
+  subpackages:
+  - lru
 - name: github.com/golang/protobuf
   version: 4bd1920723d7b7c925de087aa32e2187708897f7
   subpackages:
@@ -73,7 +77,7 @@ imports:
   - jlexer
   - jwriter
 - name: github.com/mattn/go-colorable
-  version: 7dc3415be66d7cc68bf0182f35c8d31f8d2ad8a7
+  version: efa589957cd060542a26d2dd7832fd6a6c6c3ade
 - name: github.com/mattn/go-isatty
   version: 6ca4dbf54d38eea1a992b3c722a76a5d1c4cb25c
 - name: github.com/peterbourgon/diskv
@@ -123,7 +127,7 @@ imports:
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/api
-  version: 389dfa299845bcf399c16af89987e8775718ea48
+  version: 3c2a58f9923aeb5d27fa4d91249e45a1460ca3bd
   subpackages:
   - admissionregistration/v1alpha1
   - apps/v1beta1
@@ -149,8 +153,16 @@ imports:
   - settings/v1alpha1
   - storage/v1
   - storage/v1beta1
+- name: k8s.io/apiextensions-apiserver
+  version: 996a70a27a0dcf53642ca52601b9107cb2ad810a
+  subpackages:
+  - pkg/apis/apiextensions
+  - pkg/apis/apiextensions/v1beta1
+  - pkg/client/clientset/clientset
+  - pkg/client/clientset/clientset/scheme
+  - pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 - name: k8s.io/apimachinery
-  version: 019ae5ada31de202164b118aee88ee2d14075c31
+  version: 5134afd2c0c91158afac0d8a28bd2177185a3bcc
   subpackages:
   - pkg/api/equality
   - pkg/api/errors
@@ -183,22 +195,30 @@ imports:
   - pkg/util/diff
   - pkg/util/errors
   - pkg/util/framer
+  - pkg/util/httpstream
+  - pkg/util/httpstream/spdy
   - pkg/util/intstr
   - pkg/util/json
+  - pkg/util/mergepatch
   - pkg/util/net
+  - pkg/util/remotecommand
   - pkg/util/runtime
   - pkg/util/sets
+  - pkg/util/strategicpatch
   - pkg/util/validation
   - pkg/util/validation/field
   - pkg/util/wait
   - pkg/util/yaml
   - pkg/version
   - pkg/watch
+  - third_party/forked/golang/json
+  - third_party/forked/golang/netutil
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
-  version: 35874c597fed17ca62cd197e516d7d5ff9a2958c
+  version: 1b75876d45719a84085528ee621939b0c68a4b85
   subpackages:
   - discovery
+  - discovery/fake
   - kubernetes
   - kubernetes/scheme
   - kubernetes/typed/admissionregistration/v1alpha1
@@ -228,20 +248,25 @@ imports:
   - pkg/version
   - rest
   - rest/watch
+  - testing
   - tools/auth
   - tools/cache
   - tools/clientcmd
   - tools/clientcmd/api
   - tools/clientcmd/api/latest
   - tools/clientcmd/api/v1
+  - tools/leaderelection
+  - tools/leaderelection/resourcelock
   - tools/metrics
   - tools/pager
+  - tools/record
   - tools/reference
   - transport
   - util/cert
   - util/flowcontrol
   - util/homedir
   - util/integer
+  - util/workqueue
 - name: k8s.io/code-generator
   version: 25fd8c8ddbf75b223882df4479f8b8e615da05ae
 - name: k8s.io/kube-openapi
@@ -249,7 +274,7 @@ imports:
   subpackages:
   - pkg/common
 - name: k8s.io/kubernetes
-  version: 64d864fe1e881f935c6b1f46641daee7f24552cf
+  version: 4934fa77053c70738f2a81e991b07f773af1c0f0
   subpackages:
   - pkg/api
 testImports:
