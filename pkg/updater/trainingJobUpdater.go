@@ -221,7 +221,7 @@ func (updater *TrainingJobUpdater) createResource(tp padv1.TrainingResourceType)
 	case padv1.Pserver:
 		resource = updater.Job.Spec.Pserver.ReplicaSpec
 	default:
-		return fmt.Errorf("unknow resource")
+		return fmt.Errorf("unknown resource")
 	}
 	for {
 		_, err := updater.KubeClient.ExtensionsV1beta1().ReplicaSets(updater.Job.Namespace).Get(resource.Name, metav1.GetOptions{})

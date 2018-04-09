@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"k8s.io/apimachinery/pkg/api/resource"
+
 )
 
 // Elastic returns true if the job can scale to more workers.
@@ -31,7 +32,6 @@ func (s *TrainingJob) String() string {
 	b, _ := json.MarshalIndent(s, "", "   ")
 	return fmt.Sprintf("%s", b)
 }
-
 func (s *TrainingJob) TrainerGPULimit() int {
 	q := s.Spec.Trainer.Resources.Limits.NvidiaGPU()
 	return int(q.Value())

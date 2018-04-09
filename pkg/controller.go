@@ -117,20 +117,34 @@ func (c *Controller) onAdd(obj interface{}) {
 	//  create trainjob from paddlectl
 	//  scheduler can schedule trainjobs
 	var parser DefaultJobParser
+	m := parser.ParseToMaster(job)
 	p := parser.ParseToPserver(job)
 	t := parser.ParseToTrainer(job)
-	m := parser.ParseToMaster(job)
 
-	b, _ := json.MarshalIndent(p, "", "   ")
+	b, _ := json.MarshalIndent(m, "", "   ")
+	log.Debug("create master:" + string(b))
+
+	b, _ = json.MarshalIndent(p, "", "   ")
 	log.Debug("create pserver:" + string(b))
 
 	b, _ = json.MarshalIndent(t, "", "   ")
 	log.Debug("create trainer-job:" + string(b))
 
-	b, _ = json.MarshalIndent(m, "", "   ")
-	log.Debug("create master:" + string(b))
+	// create all resources
+	_, err := c.clientset.ExtensionsV1beta1().ReplicaSets(m.ObjectMeta.Namespace).Create(m)
+	if err != nil {
+		log.Error("create master", "error", err)
+	}
 
-	// TODO(gongwb): create them
+	_, err = c.clientset.ExtensionsV1beta1().ReplicaSets(m.ObjectMeta.Namespace).Create(p)
+	if err != nil {
+		log.Error("create pserver", "error", err)
+	}
+
+	_, err = c.clientset.BatchV1().Jobs(t.ObjectMeta.Namespace).Create(t)
+	if err != nil {
+		log.Error("create trainer", "error", err)
+	}
 }
 
 func (c *Controller) onUpdate(oldObj, newObj interface{}) {

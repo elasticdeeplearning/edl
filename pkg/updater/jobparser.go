@@ -103,7 +103,6 @@ func parseToPserver(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      job.ObjectMeta.Name + "-pserver",
-
 			Namespace: job.ObjectMeta.Namespace,
 		},
 		Spec: v1beta1.ReplicaSetSpec{
