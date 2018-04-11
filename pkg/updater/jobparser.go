@@ -88,7 +88,7 @@ func (p *DefaultJobParser) NewTrainingJob(job *paddlev1.TrainingJob) (*paddlev1.
 // parseToPserver generate a pserver replicaset resource according to "TrainingJob" resource specs.
 func parseToPserver(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet {
 	replicas := int32(job.Spec.Pserver.MinInstance)
-	command := make([]string, 2, 2)
+	var command []string
 	// FIXME: refine these part.(typhoonzero)
 	if job.Spec.FaultTolerant {
 		command = []string{"paddle_k8s", "start_pserver"}
@@ -132,7 +132,7 @@ func parseToPserver(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet {
 // parseToTrainer parse TrainingJob to a kubernetes job resource.
 func parseToTrainer(job *paddlev1.TrainingJob) *batchv1.Job {
 	replicas := int32(job.Spec.Trainer.MinInstance)
-	command := make([]string, 2)
+	var command []string
 	if job.Spec.FaultTolerant {
 		command = []string{"paddle_k8s", "start_trainer"}
 	} else {
