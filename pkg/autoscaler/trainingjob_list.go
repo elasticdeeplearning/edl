@@ -1,24 +1,26 @@
 package autoscaler
 
-import 	padv1 "github.com/paddlepaddle/edl/pkg/apis/paddlepaddle/v1"
+import (
+	padv1 "github.com/paddlepaddle/edl/pkg/apis/paddlepaddle/v1"
+)
 
-type trainingjobSlice []*padv1.TrainingJob
+type trainingjobList []*padv1.TrainingJob
 
-func (ts trainingjobSlice) Len() int {
+func (ts trainingjobList) Len() int {
 	return len(ts)
 }
 
-func (ts trainingjobSlice) Swap(i, j int) {
-	ts[i], ts[j] = ts[j], ts[i]
+func (ts trainingjobList) Swap(a, b int) {
+	ts[a], ts[b] = ts[b], ts[a]
 }
 
-func (ts trainingjobSlice) Less(i, j int) bool {
-	scoreA := ts[i].Fulfillment()
-	scoreB := ts[j].Fulfillment()
+func (ts trainingjobList) Less(a, b int) bool {
+	scoreA := ts[a].Fulfillment()
+	scoreB := ts[b].Fulfillment()
 
 	if scoreA == scoreB {
-		resA := ts[j].Spec.Trainer.Resources
-		resB := ts[j].Spec.Trainer.Resources
+		resA := ts[a].Spec.Trainer.Resources
+		resB := ts[b].Spec.Trainer.Resources
 		resALimitsGPU := *resA.Limits.NvidiaGPU()
 		resBLimitsGPU := *resB.Limits.NvidiaGPU()
 		if resALimitsGPU.Cmp(resBLimitsGPU) == 0 {

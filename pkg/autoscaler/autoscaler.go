@@ -1,47 +1,61 @@
+/* Copyright (c) 2016 PaddlePaddle Authors All Rights Reserve.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+	 limitations under the License. */
+
 package autoscaler
 
 import (
-	log "github.com/golang/glog"
-	padv1 "github.com/paddlepaddle/edl/pkg/apis/paddlepaddle/v1"
-	"github.com/paddlepaddle/edl/pkg/updater"
+	"sort"
+	"sync"
+	"time"
+
+	log "github.com/inconshreveable/log15"
 	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
-	"sort"
-	"time"
-	"sync"
+
+	padv1 "github.com/paddlepaddle/edl/pkg/apis/paddlepaddle/v1"
+	"github.com/paddlepaddle/edl/pkg/updater"
 )
 
 const (
-	defaultLoopDur = time.Second * 5
+	defaultLoopDur = time.Second * 30
 )
 
 // Autoscaler launches and scales the training jobs.
 type Autoscaler struct {
-	// kubeCli is standard kubernetes client.
-	KubeCli        kubernetes.Interface
-
-	Jobupdater     *sync.Map
-
-	MaxLoadDesired float64
+	kubeCli        kubernetes.Interface
+	jobUpdater     *sync.Map
+	maxLoadDesired float64
 }
 
 // WithMaxLoadDesired init with maxLoadDesired
 func WithMaxLoadDesired(maxLoadDesired float64) func(as *Autoscaler) {
 	return func(as *Autoscaler) {
-		as.MaxLoadDesired = maxLoadDesired
+		as.maxLoadDesired = maxLoadDesired
 	}
 }
 
 // NewAutoscaler creates a new Autoscaler.
-func NewAutoscaler(kubeClient kubernetes.Interface, Jobupdater *sync.Map, options ...func(*Autoscaler)) *Autoscaler {
+func NewAutoscaler(kubeClient kubernetes.Interface, jobUpdater *sync.Map, options ...func(*Autoscaler)) *Autoscaler {
 	c := &Autoscaler{
-		KubeCli:        kubeClient,
-		Jobupdater:     Jobupdater,
-		MaxLoadDesired: 1.0,
+		kubeCli:        kubeClient,
+		jobUpdater:     jobUpdater,
+		maxLoadDesired: 1.0,
 	}
 	for _, option := range options {
 		option(c)
@@ -51,9 +65,7 @@ func NewAutoscaler(kubeClient kubernetes.Interface, Jobupdater *sync.Map, option
 
 // InquiryResource returns the idle and total resources of the k8s cluster.
 func (a *Autoscaler) InquiryResource() (ClusterResource, error) {
-
-	nodes := a.KubeCli.CoreV1().Nodes()
-
+	nodes := a.kubeCli.CoreV1().Nodes()
 	nodeList, err := nodes.List(metav1.ListOptions{})
 	if err != nil {
 		return ClusterResource{}, err
@@ -83,7 +95,7 @@ func (a *Autoscaler) InquiryResource() (ClusterResource, error) {
 		return ClusterResource{}, err
 	}
 
-	allPodsList, err := a.KubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{FieldSelector: fieldSelector.String()})
+	allPodsList, err := a.kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{FieldSelector: fieldSelector.String()})
 	if err != nil {
 		return ClusterResource{}, err
 	}
@@ -125,30 +137,47 @@ func elastic(j *padv1.TrainingJob) bool {
 	return j.Elastic()
 }
 
-// 
+// gpu job filter
+func needGPU(j *padv1.TrainingJob) bool {
+	return j.NeedGPU()
+}
+
 func isRunning(j *padv1.TrainingJob) bool {
 	if j.Status.Phase == padv1.TrainingJobPhaseRunning || j.Status.Phase == padv1.TrainingJobPhaseScaling {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
+func (a *Autoscaler) totalRunningJob(jobName string) bool {
+	v, ok := a.jobUpdater.Load(jobName)
+	if !ok {
+		return false
+	}
+	up, ok := v.(*updater.TrainingJobUpdater)
+	if !ok {
+		return false
+	}
+	job := up.Job
+	totalRunning := job.Status.Phase == padv1.TrainingJobPhaseRunning
+	log.Debug("totalRunningJob", "jobname", jobName, "totalRunning", totalRunning)
+	return totalRunning
+}
 
 // sortedJobs return the names of sorted jobs by fulfillment and
 // tiebreakers in ascending order.
-func sortedJobs(j *sync.Map, filters ...func(*padv1.TrainingJob) bool) []*padv1.TrainingJob {
-	var js trainingjobSlice
-	for _, f := range filters {
-		j.Range(func(k, v interface{}) bool {
-			up := v.(*updater.TrainingJobUpdater)
-			if !f(up.Job) {
-				return true
+func sortedJobs(j []*padv1.TrainingJob, filters ...func(*padv1.TrainingJob) bool) []*padv1.TrainingJob {
+	var js trainingjobList
+nextJob:
+	for _, v := range j {
+		for _, f := range filters {
+			if !f(v) {
+				continue nextJob
 			}
-			js = append(js, up.Job)
-			return true
-		})
+		}
+		js = append(js, v)
 	}
+
 	sort.Sort(js)
 	return js
 }
@@ -163,7 +192,7 @@ func searchAssignableNode(r *ClusterResource, j *padv1.TrainingJob) string {
 	return ""
 }
 
-func scaleDryRun(r *ClusterResource, j *padv1.TrainingJob, curDiff int32, maxLoadDesired float64, scaleDown bool)(additional int) {
+func scaleDryRun(r *ClusterResource, j *padv1.TrainingJob, curDiff int32, maxLoadDesired float64, scaleDown bool) (additional int) {
 	additionalGPUInstance := 0
 	additionalCPUInstance := 0
 	cpuRequestMilli := j.TrainerCPURequestMilli()
@@ -172,12 +201,13 @@ func scaleDryRun(r *ClusterResource, j *padv1.TrainingJob, curDiff int32, maxLoa
 	nodeName := ""
 	// Adjust resource upon return.
 	defer func() {
+		log.Debug("scaleDryRun", "scaledown", scaleDown, "jobns", j.Namespace, "jobname", j.Name, "additional", additional)
 		r.GPULimit += gpuLimit * additional
 		r.CPURequestMilli += cpuRequestMilli * int64(additional)
 		r.MemoryRequestMega += memRequestMega * int64(additional)
 		if nodeName != "" {
-			r.Nodes.NodesCPUIdleMilli[nodeName] += cpuRequestMilli * int64(additional)
-			r.Nodes.NodesMemoryFreeMega[nodeName] += memRequestMega * int64(additional)
+			r.Nodes.NodesCPUIdleMilli[nodeName] -= cpuRequestMilli * int64(additional)
+			r.Nodes.NodesMemoryFreeMega[nodeName] -= memRequestMega * int64(additional)
 		}
 	}()
 
@@ -197,9 +227,16 @@ func scaleDryRun(r *ClusterResource, j *padv1.TrainingJob, curDiff int32, maxLoa
 			additional = -1
 			return
 		}
-		gpuCondition := r.GPULimit > int(float64(r.GPUTotal)*maxLoadDesired)
-		cpuCondition := r.CPURequestMilli > int64(float64(r.CPUTotalMilli)*maxLoadDesired)
-		if gpuCondition || cpuCondition {
+		gpuThreshold := int(float64(r.GPUTotal) * maxLoadDesired)
+		gpuCondition := r.GPULimit > gpuThreshold
+		cpuThreshold := int64(float64(r.CPUTotalMilli) * maxLoadDesired)
+		cpuCondition := r.CPURequestMilli > cpuThreshold
+		memThreshold := int64(float64(r.MemoryTotalMega) * maxLoadDesired)
+		memCondition := r.MemoryRequestMega > memThreshold
+		log.Debug("scaleDryRun", "gpuRequest", r.GPULimit, "threshold", gpuThreshold)
+		log.Debug("scaleDryRun", "cpuRequest", r.CPURequestMilli, "threshold", cpuThreshold)
+		log.Debug("scaleDryRun", "memRequest", r.MemoryRequestMega, "threshold", memThreshold)
+		if gpuCondition || cpuCondition || memCondition {
 			if plannedInstance > instanceMin {
 				additional = -1
 				return
@@ -226,6 +263,8 @@ func scaleDryRun(r *ClusterResource, j *padv1.TrainingJob, curDiff int32, maxLoa
 		additional = 0
 		return
 	}
+
+	// TODO(m3ngyang) this node may not be the one that pod is assigned to in fact.
 	if nodeName = searchAssignableNode(r, j); nodeName == "" {
 		additional = 0
 		return
@@ -256,16 +295,16 @@ func scaleDryRun(r *ClusterResource, j *padv1.TrainingJob, curDiff int32, maxLoa
 }
 
 func (a *Autoscaler) setAdditional(diff map[string]int32) {
-	a.Jobupdater.Range(func(k, v interface{}) bool {
+	a.jobUpdater.Range(func(k, v interface{}) bool {
 		key := k.(string)
 		up := v.(*updater.TrainingJobUpdater)
-		_, ok := diff[key]
-		if !ok {
-			up.Additional = diff[key]
-		} else {
-			up.Additional =  0
+		var additional int32
+		if val, ok := diff[key]; ok {
+			additional = val
 		}
-		a.Jobupdater.Store(k, up)
+		up.Additional = additional
+		log.Debug("setAdditional", "jobname", key, "additional", additional)
+		a.jobUpdater.Store(k, up)
 		return true
 	})
 }
@@ -273,14 +312,14 @@ func (a *Autoscaler) setAdditional(diff map[string]int32) {
 // scaleAllJobsDryRun pretends to rescale all jobs in order to find
 // out the number of pods should be added/deleted for each job, or
 // say, delta.  It returns a map from job name to the delta.
-func (a *Autoscaler) scaleAllJobsDryRun(r ClusterResource, maxLoadDesired float64) {
+func scaleAllJobsDryRun(jobs []*padv1.TrainingJob, r ClusterResource, maxLoadDesired float64) map[string]int32 {
 	// Iteratively calculate scaling diff until nothing changes.
 	diff := make(map[string]int32)
 	for {
 		noChange := true
-		sorted := sortedJobs(a.Jobupdater, elastic, isRunning)
+		sorted := sortedJobs(jobs, elastic)
 		dryRun := func(j *padv1.TrainingJob, isScaleDown bool) {
-			name := j.Namespace + "/" +j.Name
+			name := j.Namespace + "/" + j.Name
 			additional := scaleDryRun(&r, j, diff[name], maxLoadDesired, isScaleDown)
 			diff[name] += int32(additional)
 
@@ -288,7 +327,6 @@ func (a *Autoscaler) scaleAllJobsDryRun(r ClusterResource, maxLoadDesired float6
 				noChange = false
 			}
 		}
-
 		// TODO(typhoonzero): implement GPU priority CFS scheduler from here.
 
 		// scale up from the ones that need scaling up the
@@ -308,14 +346,14 @@ func (a *Autoscaler) scaleAllJobsDryRun(r ClusterResource, maxLoadDesired float6
 		}
 	}
 
-	a.setAdditional(diff)
+	return diff
 }
 
 func (a *Autoscaler) scaleAllJobs() {
-	a.Jobupdater.Range(func(k, v interface{}) bool {
+	a.jobUpdater.Range(func(k, v interface{}) bool {
 		up := v.(*updater.TrainingJobUpdater)
-		if up.Additional != int32(0) {
-			log.Infof("additional of trainingjob %v not equal 0, scale it", k)
+		if up.Additional != 0 {
+			log.Info("additional of trainingjob", "jobname", k, "scalenum", up.Additional)
 			up.Scale()
 		}
 		return true
@@ -327,17 +365,90 @@ func (a *Autoscaler) scaleAllJobs() {
 func (a *Autoscaler) Run() {
 	ticker := time.NewTicker(defaultLoopDur)
 	defer ticker.Stop()
-	log.Infof("start Autoscaler")
+	log.Info("start Autoscaler")
 	for {
 		<-ticker.C
 		r, err := a.InquiryResource()
 		if err != nil {
-			log.Errorf("InquiryResource error=%v", err.Error())
+			log.Error("InquiryResource error", err.Error())
 			continue
 		}
-		log.Infof("Cluster.InquiryResource done", "resource", r)
+		log.Info("Cluster.InquiryResource done", "resource", r)
 
-		a.scaleAllJobsDryRun(r, a.MaxLoadDesired)
+		havePending := a.findPendingJob()
+		log.Debug("pending job", "exist", havePending)
+		diff := scaleAllJobsDryRun(
+			a.findTrainingJobsMightBeRescheduled(havePending),
+			r,
+			a.maxLoadDesired)
+		log.Info("Calculated info", "diff:", diff)
+		a.setAdditional(diff)
 		a.scaleAllJobs()
 	}
+}
+
+func (a *Autoscaler) findPendingJob() bool {
+	havePending := false
+	// TODO(m3ngyang) add a pending status for TrainingJob
+	// how to define a pending job? no trainer pod is scheduled?
+	traverseFunc := func(k, v interface{}) bool {
+		log.Debug("findPendingJob check", "jobname", k)
+		total := 0
+		pending := 0
+		up, ok := v.(*updater.TrainingJobUpdater)
+		if !ok {
+			log.Debug("findPendingJob conversion error", "jobname", k)
+		}
+		job := up.Job
+
+		var labelKey string
+
+		if job.Spec.FaultTolerant {
+			labelKey = "paddle-job-master"
+		} else {
+			labelKey = "paddle-job-pserver"
+		}
+
+		pods, err := a.kubeCli.CoreV1().Pods(job.Namespace).List(metav1.ListOptions{LabelSelector: labelKey + "=" + job.Name})
+		if err != nil {
+			log.Error("findPendingJob failed to list job pods", "error", err)
+			return true
+		}
+		for _, pod := range pods.Items {
+			total++
+			for _, cond := range pod.Status.Conditions {
+				if cond.Type == corev1.PodScheduled && cond.Reason == corev1.PodReasonUnschedulable {
+					pending++
+					break
+				}
+			}
+		}
+		if total == pending && total != 0 {
+			log.Debug("findPendingJob", "jobName", job.Name, "totalNum", total)
+			havePending = true
+			return false
+		}
+		return true
+	}
+	a.jobUpdater.Range(traverseFunc)
+	return havePending
+}
+
+func (a *Autoscaler) findTrainingJobsMightBeRescheduled(havePending bool) (js trainingjobList) {
+	traverseFunc := func(k, v interface{}) bool {
+		jn := k.(string)
+		log.Debug("findTrainingJobsMightBeRescheduled", "jobname", jn)
+
+		up, ok := v.(*updater.TrainingJobUpdater)
+		if !ok {
+			return false
+		}
+		job := up.Job
+		if a.totalRunningJob(jn) || havePending {
+			js = append(js, job)
+		}
+		return true
+	}
+	a.jobUpdater.Range(traverseFunc)
+	return
 }

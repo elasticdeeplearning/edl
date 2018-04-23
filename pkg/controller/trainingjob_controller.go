@@ -22,12 +22,12 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	paddlev1 "github.com/paddlepaddle/edl/pkg/apis/paddlepaddle/v1"
+	"github.com/paddlepaddle/edl/pkg/autoscaler"
 	paddleclient "github.com/paddlepaddle/edl/pkg/client/clientset/versioned"
 	paddlescheme "github.com/paddlepaddle/edl/pkg/client/clientset/versioned/scheme"
 	paddleinformers "github.com/paddlepaddle/edl/pkg/client/informers/externalversions"
 	paddlelisters "github.com/paddlepaddle/edl/pkg/client/listers/paddlepaddle/v1"
 	"github.com/paddlepaddle/edl/pkg/updater"
-	"github.com/paddlepaddle/edl/pkg/autoscaler"
 )
 
 // TrainingJobController defines the structure to manage TrainingJob resource
@@ -106,7 +106,6 @@ func New(
 // is closed, at which point it will shutdown the workqueue and wait for
 // workers to finish processing their current work items.
 func (c *TrainingJobController) Run(threadiness int, maxLoadDesired float64, stopCh <-chan struct{}) error {
-	// TODO add a lock to ensure there is only one controller in the cluster
 	defer runtime.HandleCrash()
 	defer c.workqueue.ShutDown()
 

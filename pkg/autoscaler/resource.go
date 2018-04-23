@@ -1,6 +1,8 @@
 package autoscaler
 
 import (
+	log "github.com/inconshreveable/log15"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -42,6 +44,8 @@ type Nodes struct {
 func getPodsTotalRequestsAndLimits(podList *v1.PodList) (reqs v1.ResourceList, limits v1.ResourceList, err error) {
 	reqs, limits = v1.ResourceList{}, v1.ResourceList{}
 	for _, pod := range podList.Items {
+		podname := pod.Namespace + "/" + pod.Name
+		log.Debug("getPodsTotalRequestsAndLimits", "podName", podname)
 		for _, container := range pod.Spec.Containers {
 			AddResourceList(reqs, container.Resources.Requests)
 			AddResourceList(limits, container.Resources.Limits)
@@ -57,6 +61,8 @@ func getPodsTotalRequestsAndLimits(podList *v1.PodList) (reqs v1.ResourceList, l
 
 func updateNodesIdleResource(podList *v1.PodList, nodesCPUIdleMilli map[string]int64, nodesMemoryFreeMega map[string]int64) (err error) {
 	for _, pod := range podList.Items {
+		podname := pod.Namespace + "/" + pod.Name
+		log.Debug("updateNodesIdleResource", "podName", podname)
 		nodeName := pod.Spec.NodeName
 		if nodeName == "" {
 			continue

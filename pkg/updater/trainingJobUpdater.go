@@ -2,17 +2,19 @@ package updater
 
 import (
 	"fmt"
-	log "github.com/golang/glog"
+	"reflect"
+	"time"
 
-	padv1 "github.com/paddlepaddle/edl/pkg/apis/paddlepaddle/v1"
-	trainingJobClient "github.com/paddlepaddle/edl/pkg/client/clientset/versioned"
+	log "github.com/inconshreveable/log15"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"reflect"
-	"time"
+
+	padv1 "github.com/paddlepaddle/edl/pkg/apis/paddlepaddle/v1"
+	trainingJobClient "github.com/paddlepaddle/edl/pkg/client/clientset/versioned"
 )
 
 const (
@@ -65,9 +67,8 @@ type TrainingJobUpdater struct {
 }
 
 // NewUpdater creates a new TrainingJobUpdater and start a goroutine to control current job.
-func NewUpdater(job *padv1.TrainingJob, kubeClient kubernetes.Interface, trainingJobClient trainingJobClient.Interface) (*TrainingJobUpdater,
-	error) {
-	log.Infof("NewJobber namespace=%v name=%v", job.Namespace, job.Name)
+func NewUpdater(job *padv1.TrainingJob, kubeClient kubernetes.Interface, trainingJobClient trainingJobClient.Interface) (*TrainingJobUpdater, error) {
+	log.Info("NewUpdater", "namespace", job.Namespace, "name", job.Name)
 	updater := &TrainingJobUpdater{
 		Job:               job,
 		KubeClient:        kubeClient,
@@ -85,7 +86,7 @@ func (updater *TrainingJobUpdater) notify(te *trainingJobEvent) {
 	updater.EventCh <- te
 	lene, cape := len(updater.EventCh), cap(updater.EventCh)
 	if lene > int(float64(cape)*factor) {
-		log.Warning("the len of updater eventCh ", updater.Job.Name, " is near to full")
+		log.Warn("event capacity warning", "eventChannel", updater.Job.Name, "length", lene)
 	}
 }
 
@@ -105,6 +106,7 @@ func (updater *TrainingJobUpdater) Scale() {
 	updater.notify(&trainingJobEvent{pet: trainingJobEventScale})
 }
 
+// TODO(m3ngyang) refactor update process
 func (updater *TrainingJobUpdater) releaseResource(tp padv1.TrainingResourceType) error {
 	resource := new(v1beta1.ReplicaSet)
 	switch tp {
@@ -164,48 +166,54 @@ func (updater *TrainingJobUpdater) releaseTrainer() error {
 
 func (updater *TrainingJobUpdater) deleteTrainingJob() error {
 	fault := false
-	log.Infof("Start to delete TrainingJob namespace=%v name=%v", updater.Job.Namespace, updater.Job.Name)
+	log.Info("Start to delete TrainingJob", "namespace", updater.Job.Namespace, "name", updater.Job.Name)
 	if updater.Job.Spec.FaultTolerant {
-		log.Infof("Release master, namespace=%v name=%v", updater.Job.Namespace, updater.Job.Spec.Trainer.ReplicaSpec.Name)
+		log.Info("Releasing master", "namespace", updater.Job.Namespace, "name", updater.Job.Spec.Master.ReplicaSpec.Name)
 		if err := updater.releaseMaster(); err != nil {
 			log.Error(err.Error())
 			fault = true
 		}
 	}
 
-	log.Infof("Release pserver, namespace=%v name=%v", updater.Job.Namespace, updater.Job.Spec.Trainer.ReplicaSpec.Name)
+	log.Info("Releasing pserver", "namespace", updater.Job.Namespace, "name", updater.Job.Spec.Pserver.ReplicaSpec.Name)
 	if err := updater.releasePserver(); err != nil {
 		log.Error(err.Error())
 		fault = true
 	}
 
 	if updater.Job.Spec.FaultTolerant {
-		log.Infof("Deleting TrainingJob matadata, namespace=%v name=%v", updater.Job.Namespace, updater.Job.Spec.Master.ReplicaSpec.Name)
+		log.Info("Deleting TrainingJob master metadata", "namespace", updater.Job.Namespace, "name", updater.Job.Spec.Master.ReplicaSpec.Name)
 		if err := updater.KubeClient.ExtensionsV1beta1().ReplicaSets(updater.Job.Namespace).Delete(updater.Job.Spec.Master.ReplicaSpec.Name, &metav1.DeleteOptions{}); err != nil {
-			log.Error("delete master replicaset error: ", err.Error())
+			if errors.IsNotFound(err) {
+				log.Error("Error deleting master replicaset", "error", err.Error())
+				fault = true
+			}
+		}
+	}
+
+	log.Info("Deleting TrainingJob pserver metadata", "namespace", updater.Job.Namespace, "name", updater.Job.Spec.Pserver.ReplicaSpec.Name)
+	if err := updater.KubeClient.ExtensionsV1beta1().ReplicaSets(updater.Job.Namespace).Delete(updater.Job.Spec.Pserver.ReplicaSpec.Name, &metav1.DeleteOptions{}); err != nil {
+		if !errors.IsNotFound(err) {
+			log.Error("Error deleting pserver replicaset", "error", err.Error())
 			fault = true
 		}
 	}
 
-	log.Infof("Deleting TrainingJob matadata, namespace=%v name=%v", updater.Job.Namespace, updater.Job.Spec.Pserver.ReplicaSpec.Name)
-	if err := updater.KubeClient.ExtensionsV1beta1().ReplicaSets(updater.Job.Namespace).Delete(updater.Job.Spec.Pserver.ReplicaSpec.Name, &metav1.DeleteOptions{}); err != nil {
-		log.Error("delete pserver replicaset error: ", err.Error())
-		fault = true
-	}
-
-	log.Infof("Deleting TrainingJob matadata, namespace=%v name=%v", updater.Job.Namespace, updater.Job.Spec.Trainer.ReplicaSpec.Name)
+	log.Info("Deletging TrainingJob trainer metadata", "namespace", updater.Job.Namespace, "name", updater.Job.Spec.Trainer.ReplicaSpec.Name)
 	if err := updater.KubeClient.BatchV1().Jobs(updater.Job.Namespace).Delete(updater.Job.Spec.Trainer.ReplicaSpec.Name, &metav1.DeleteOptions{}); err != nil {
-		log.Error("delete trainer replicaset error: ", err.Error())
-		fault = true
+		if !errors.IsNotFound(err) {
+			log.Error("Error deleting trainer replicaset", err.Error())
+			fault = true
+		}
 	}
 
-	log.Infof("Release trainer, namespace=%v name=%v", updater.Job.Namespace, updater.Job.Spec.Trainer.ReplicaSpec.Name)
+	log.Info("Releasing TrainingJob trainer", "namespace", updater.Job.Namespace, "name", updater.Job.Spec.Trainer.ReplicaSpec.Name)
 	if err := updater.releaseTrainer(); err != nil {
-		log.Error("release trainer  error: ", err.Error())
+		log.Error("Error releasing trainer", err.Error())
 		fault = true
 	}
 
-	log.Infof("End to delete TrainingJob namespace=%v name=%v", updater.Job.Namespace, updater.Job.Name)
+	log.Info("End to delete TrainingJob", "namespace", updater.Job.Namespace, "name", updater.Job.Name)
 
 	if fault {
 		return fmt.Errorf("delete resource error namespace=%v name=%v", updater.Job.Namespace, updater.Job.Name)
@@ -226,7 +234,7 @@ func (updater *TrainingJobUpdater) createResource(tp padv1.TrainingResourceType)
 	for {
 		_, err := updater.KubeClient.ExtensionsV1beta1().ReplicaSets(updater.Job.Namespace).Get(resource.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
-			log.Infof("Not found to create namespace=%v name=%v resourceName=%v", updater.Job.Namespace, updater.Job.Name, resource.Name)
+			log.Info("TrainingJob Not Found, start to create", "namespace", updater.Job.Namespace, "name", updater.Job.Name, "resourceName", resource.Name)
 			_, err = updater.KubeClient.ExtensionsV1beta1().ReplicaSets(updater.Job.Namespace).Create(resource)
 			if err != nil {
 				updater.Status.Phase = padv1.TrainingJobPhaseFailed
@@ -234,7 +242,7 @@ func (updater *TrainingJobUpdater) createResource(tp padv1.TrainingResourceType)
 				return err
 			}
 		} else if err != nil {
-			log.Errorf("Get resource error, namespace=%v name=%v resourceName=%v error=%v", updater.Job.Namespace, updater.Job.Name, resource.Name, err.Error())
+			log.Error("failed to get resource", "namespace", updater.Job.Namespace, "name", updater.Job.Name, "resourceName", resource.Name, "error", err.Error())
 			time.Sleep(retryTime)
 			continue
 		}
@@ -242,21 +250,21 @@ func (updater *TrainingJobUpdater) createResource(tp padv1.TrainingResourceType)
 		defer ticker.Stop()
 		for v := range ticker.C {
 			rs, err := updater.KubeClient.ExtensionsV1beta1().ReplicaSets(updater.Job.Namespace).Get(resource.Name, metav1.GetOptions{})
-			log.Infof("Current time %v runing pod is %v, resourceName=%v", v.String(), rs.Status.ReadyReplicas, resource.Name)
+			log.Info("current status", "time", v.String(), "resourceName", resource.Name, "runningPodNum", rs.Status.ReadyReplicas)
 			if err != nil && !errors.IsServerTimeout(err) && !errors.IsTooManyRequests(err) {
 				updater.Status.Reason = "Internal error; create resource error:" + err.Error()
 				return err
 			}
 			if errors.IsServerTimeout(err) || errors.IsTooManyRequests(err) {
-				log.Warningf("Connect to kubernetes failed for reasons=%v, retry next ticker", err.Error())
+				log.Warn("failed to connect to kubernetes", "error", err.Error())
 				continue
 			}
 			if *resource.Spec.Replicas == 0 {
-				return fmt.Errorf(" trainingjob is deleting, namespace=%v name=%v ", updater.Job.Namespace, updater.Job.Name)
+				return fmt.Errorf("trainingjob is deleting, namespace=%v name=%v ", updater.Job.Namespace, updater.Job.Name)
 
 			}
 			if rs.Status.ReadyReplicas == *resource.Spec.Replicas {
-				log.Infof("Create resource done , namespace=%v name=%v resourceName=%v", updater.Job.Namespace, updater.Job.Name, resource.Name)
+				log.Info("create resource done", "namespace", updater.Job.Namespace, "name", updater.Job.Name, "resourceName", resource.Name)
 				return nil
 			}
 		}
@@ -268,7 +276,7 @@ func (updater *TrainingJobUpdater) createTrainer() error {
 	for {
 		_, err := updater.KubeClient.BatchV1().Jobs(updater.Job.Namespace).Get(resource.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
-			log.Infof("not found to create trainer namespace=%v name=%v", updater.Job.Namespace, updater.Job.Name)
+			log.Info("TrainingJob Not Found, start to create", "namespace", updater.Job.Namespace, "name", updater.Job.Name)
 			_, err = updater.KubeClient.BatchV1().Jobs(updater.Job.Namespace).Create(resource)
 			if err != nil {
 				updater.Status.Phase = padv1.TrainingJobPhaseFailed
@@ -276,7 +284,7 @@ func (updater *TrainingJobUpdater) createTrainer() error {
 				return err
 			}
 		} else if err != nil {
-			log.Errorf("Get resource error, namespace=%v name=%v resourceName=%v error=%v", updater.Job.Namespace, updater.Job.Name, resource.Name, err.Error())
+			log.Error("failed to get resource", "namespace", updater.Job.Namespace, "name", updater.Job.Name, "resourceName", resource.Name, "error", err.Error())
 			time.Sleep(retryTime)
 			continue
 		}
@@ -288,7 +296,6 @@ func (updater *TrainingJobUpdater) createTrainer() error {
 
 func (updater *TrainingJobUpdater) createTrainingJob() error {
 	if updater.Job.Spec.FaultTolerant {
-
 		if err := updater.createResource(padv1.Master); err != nil {
 			return err
 		}
@@ -314,24 +321,20 @@ func (updater *TrainingJobUpdater) updateCRDStatus() error {
 }
 
 // parseTrainingJob validates the fields and parses the TrainingJob
-func (updater *TrainingJobUpdater) parseTrainingJob() {
-	if updater.Job == nil {
-		updater.Status.Phase = padv1.TrainingJobPhaseFailed
-		updater.Status.Reason = "Internal error; Setup error; job is missing TainingJob"
-		return
-	}
-
+func (updater *TrainingJobUpdater) parseTrainingJob() error {
 	var parser DefaultJobParser
-	var creatErr error
-	updater.Job, creatErr = parser.NewTrainingJob(updater.Job)
+	var createErr error
+	updater.Job, createErr = parser.NewTrainingJob(updater.Job)
 
-	if creatErr != nil {
+	if createErr != nil {
 		updater.Status.Phase = padv1.TrainingJobPhaseFailed
-		updater.Status.Reason = creatErr.Error()
-	} else {
-		updater.Status.Phase = padv1.TrainingJobPhaseCreating
-		updater.Status.Reason = ""
+		updater.Status.Reason = createErr.Error()
+		return createErr
 	}
+
+	updater.Status.Phase = padv1.TrainingJobPhaseCreating
+	updater.Status.Reason = ""
+	return nil
 }
 
 func (updater *TrainingJobUpdater) getTrainerReplicaStatuses() ([]*padv1.TrainingResourceStatus, error) {
@@ -348,9 +351,7 @@ func (updater *TrainingJobUpdater) getTrainerReplicaStatuses() ([]*padv1.Trainin
 
 // GetStatus get TrainingJob status from trainers.
 func (updater *TrainingJobUpdater) GetStatus() (*padv1.TrainingJobStatus, error) {
-
 	status := updater.Status
-
 	j, err := updater.KubeClient.BatchV1().Jobs(updater.Job.Namespace).
 		Get(updater.Job.Spec.Trainer.ReplicaSpec.Name, metav1.GetOptions{})
 	if err != nil {
@@ -390,29 +391,31 @@ func (updater *TrainingJobUpdater) GetStatus() (*padv1.TrainingJobStatus, error)
 
 // Convert is main process to convert TrainingJob to desire status.
 func (updater *TrainingJobUpdater) Convert() {
-	log.Infof("convert status, namespace=%v name=%v: ", updater.Job.Namespace, updater.Job.Name)
+	jobNs := updater.Job.Namespace
+	jobName := updater.Job.Name
+	log.Info("convert status", "namespace", jobNs, "name", jobName)
 
 	if updater.Status.Phase == padv1.TrainingJobPhaseRunning || updater.Status.Phase == padv1.TrainingJobPhaseScaling {
 		status, err := updater.GetStatus()
 		if err != nil {
-			log.Error("get current status of trainer from k8s error:", err.Error())
+			log.Error("failed  to get current status", "namespace", jobNs, "name", jobName)
 			return
 		}
 		updater.Status = *status.DeepCopy()
-		log.Infof("Current status namespace=%v name=%v status=%v : ", updater.Job.Namespace, updater.Job.Name, status)
+		log.Info("Current status", "namespace", jobNs, "name", jobName, "status", status)
 		err = updater.updateCRDStatus()
 		if err != nil {
-			log.Warning("get current status to update trainingJob status error: ", err.Error())
+			log.Error("failed to update current status", "namespace", jobNs, "name", jobName, "error", err.Error())
 		}
 		if updater.Status.Phase == padv1.TrainingJobPhaseSucceeded || updater.Status.Phase == padv1.TrainingJobPhaseFailed {
-			log.Infof("Release Resource namespace=%v name=%v: ", updater.Job.Namespace, updater.Job.Name)
+			log.Info("Releasing Resource", "namespace", jobNs, "name", jobName)
 			if updater.Job.Spec.FaultTolerant {
-				log.Infof("Release master, namespace=%v name=%v", updater.Job.Namespace, updater.Job.Spec.Trainer.ReplicaSpec.Name)
+				log.Info("Release master", "namespace", jobNs, "name", updater.Job.Spec.Master.ReplicaSpec.Name)
 				if err := updater.releaseMaster(); err != nil {
 					log.Error(err.Error())
 				}
 			}
-			log.Infof("Release pserver, namespace=%v name=%v", updater.Job.Namespace, updater.Job.Spec.Trainer.ReplicaSpec.Name)
+			log.Info("Release pserver", "namespace", jobNs, "name", updater.Job.Spec.Pserver.ReplicaSpec.Name)
 			if err := updater.releasePserver(); err != nil {
 				log.Error(err.Error())
 			}
@@ -423,31 +426,32 @@ func (updater *TrainingJobUpdater) Convert() {
 // InitResource is used to parse trainingJob and create trainingJob resources.
 func (updater *TrainingJobUpdater) InitResource() {
 	if updater.Status.Phase == padv1.TrainingJobPhaseNone {
-		log.Infof("set up trainingJob namespace=%v name=%v: ", updater.Job.Namespace, updater.Job.Name)
+		log.Info("set up trainingJob", "namespace", updater.Job.Namespace, "name", updater.Job.Name)
+		// TODO mengyang
 		updater.parseTrainingJob()
 		err := updater.updateCRDStatus()
 		if err != nil {
-			log.Warning("set up trainingJob to update trainingJob status error: ", err.Error())
+			log.Error("failed to set up trainingJob to update trainingJob status", "error", err.Error())
 		}
 	}
 
 	if updater.Status.Phase == padv1.TrainingJobPhaseCreating {
-		log.Infof("create trainingJob namespace=%v name=%v: ", updater.Job.Namespace, updater.Job.Name)
+		log.Info("creating trainingJob", "namespace", updater.Job.Namespace, "name", updater.Job.Name)
 		_ = updater.createTrainingJob()
 		err := updater.updateCRDStatus()
 		if err != nil {
-			log.Warning("create trainingJob to update trainingJob status error: ", err.Error())
+			log.Error("faield to update trainingJob status", "error", err.Error())
 		}
 		if updater.Status.Phase == padv1.TrainingJobPhaseFailed {
-			log.Infof("Release Resource for failed namespace=%v name=%v: ", updater.Job.Namespace, updater.Job.Name)
+			log.Info("failed to release resource", "namespace", updater.Job.Namespace, "name", updater.Job.Name)
 			if updater.Job.Spec.FaultTolerant {
-				log.Infof("Release master, namespace=%v name=%v", updater.Job.Namespace, updater.Job.Spec.Trainer.ReplicaSpec.Name)
+				log.Info("releasing master", "namespace", updater.Job.Namespace, "name", updater.Job.Spec.Master.ReplicaSpec.Name)
 				if err := updater.releaseMaster(); err != nil {
 					log.Error(err.Error())
 				}
 			}
 
-			log.Infof("Release pserver, namespace=%v name=%v", updater.Job.Namespace, updater.Job.Spec.Trainer.ReplicaSpec.Name)
+			log.Info("releasing pserver", "namespace", updater.Job.Namespace, "name", updater.Job.Spec.Pserver.ReplicaSpec.Name)
 			if err := updater.releasePserver(); err != nil {
 				log.Error(err.Error())
 			}
@@ -456,20 +460,39 @@ func (updater *TrainingJobUpdater) InitResource() {
 }
 
 func (updater *TrainingJobUpdater) scale(additional int32) *padv1.TrainerJobScaleRecord {
-
+	// TODO(m3ngyang) use events to record scale info
 	scaleRecord := &padv1.TrainerJobScaleRecord{
 		ScaleTimestamp: metav1.NewTime(time.Now()),
 		Additional:     additional,
 	}
-	resource := updater.Job.Spec.Trainer.ReplicaSpec
-	*resource.Spec.Parallelism = *resource.Spec.Parallelism + additional
-
-	_, err := updater.KubeClient.BatchV1().Jobs(updater.Job.Namespace).Update(resource)
+	jobNs := updater.Job.Namespace
+	jobName := updater.Job.Spec.Trainer.ReplicaSpec.Name
+	jobSpec, err := updater.KubeClient.BatchV1().Jobs(jobNs).Get(jobName, metav1.GetOptions{})
 	if err != nil {
+		log.Error("failed to get current job status", "namespace", jobNs, "name", jobName, "error", err.Error())
+		scaleRecord.Status = padv1.ScaleFalse
+		updater.Status.ScaleRecords.ScaleRecords = append(updater.Status.ScaleRecords.ScaleRecords, scaleRecord)
+		return scaleRecord
+	}
+
+	newParallelism := *jobSpec.Spec.Parallelism + additional
+	// scaledown will cause pods terminiated with error code
+	newBackoffLimit := *jobSpec.Spec.BackoffLimit
+	if additional < 0 {
+		newBackoffLimit -= additional
+	}
+	jobSpec.Spec.Parallelism = &newParallelism
+	jobSpec.Spec.BackoffLimit = &newBackoffLimit
+
+	log.Debug("scaling job", "namespace", jobNs, "name", jobName, "newSpec", jobSpec)
+	_, err = updater.KubeClient.BatchV1().Jobs(jobNs).Update(jobSpec)
+	if err != nil {
+		log.Error("failed to scale job", "namespace", jobNs, "name", jobName, "error", err.Error())
 		scaleRecord.Status = padv1.ScaleFalse
 		scaleRecord.Reason = err.Error()
 	} else {
-		updater.Job.Spec.Trainer.ReplicaSpec.Spec.Parallelism = resource.Spec.Parallelism
+		log.Info("successful to scale job", "namespace", jobNs, "name", jobName)
+		updater.Job.Spec.Trainer.ReplicaSpec.Spec.Parallelism = jobSpec.Spec.Parallelism
 		scaleRecord.Status = padv1.ScaleTrue
 		scaleRecord.Reason = ""
 		updater.Status.Phase = padv1.TrainingJobPhaseScaling
@@ -480,42 +503,40 @@ func (updater *TrainingJobUpdater) scale(additional int32) *padv1.TrainerJobScal
 
 func (updater *TrainingJobUpdater) syncScale() {
 	for {
+	STATUSCHECK:
+		log.Debug("sync scale status", "namespace", updater.Job.Namespace, "name", updater.Job.Name, "status", updater.Job.Status.Phase)
 		if updater.Status.Phase == padv1.TrainingJobPhaseSucceeded || updater.Status.Phase == padv1.TrainingJobPhaseFailed {
-			log.Infof("Omit sync scale for job have done, namespace=%v name=%v", updater.Job.Namespace, updater.Job.Name)
+			log.Info("Omit sync scale for job", "namespace", updater.Job.Namespace, "name", updater.Job.Name)
 			return
 		}
 
-		j, err := updater.KubeClient.BatchV1().Jobs(updater.Job.Namespace).Get(updater.Job.Spec.Trainer.ReplicaSpec.Name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			log.Warning("sync scale trainingJob to update trainingJob status error namespace=%v name=%v error=%v ",
-				updater.Job.Namespace, updater.Job.Name, err.Error())
-			return
-		} else if err != nil {
-			log.Warning("sync scale trainingJob to update trainingJob status error namespace=%v name=%v error=%v ",
-				updater.Job.Namespace, updater.Job.Name, err.Error())
-			continue
+		pods, err := updater.KubeClient.CoreV1().Pods(updater.Job.Namespace).List(metav1.ListOptions{LabelSelector: "paddle-job=" + updater.Job.Name})
+		if err != nil {
+			log.Error("failed to list pods", "namespace", updater.Job.Namespace, "name", updater.Job.Name, "error", err.Error())
 		}
-		if (j.Status.Active + j.Status.Succeeded) >= *updater.Job.Spec.Trainer.ReplicaSpec.Spec.Parallelism {
-			if updater.Status.Phase == padv1.TrainingJobPhaseSucceeded || updater.Status.Phase == padv1.TrainingJobPhaseFailed {
-				return
+		for _, pod := range pods.Items {
+			log.Debug("check pod status", "namespace", pod.Namespace, "pod", pod.Name, "status", pod.Status.Phase)
+			if pod.Status.Phase != corev1.PodRunning {
+				time.Sleep(time.Second)
+				goto STATUSCHECK
 			}
-			updater.Status.Phase = padv1.TrainingJobPhaseRunning
-			err := updater.updateCRDStatus()
-			if err != nil {
-				log.Warning("sync scale trainingJob to update trainingJob status error namespace=%v name=%v error=%v ",
-					updater.Job.Namespace, updater.Job.Name, err.Error())
-			}
-			return
 		}
+
+		log.Info("TrainingJob running now", "namespace", updater.Job.Namespace, "name", updater.Job.Name)
+		updater.Status.Phase = padv1.TrainingJobPhaseRunning
+		if err := updater.updateCRDStatus(); err != nil {
+			log.Error("failed to update trainingJob status", "namespace", updater.Job.Namespace, "name", updater.Job.Name, "error", err.Error())
+		}
+		return
+
 	}
 }
 
 // scaleTrainingJob scale job up or down
 func (updater *TrainingJobUpdater) scaleTrainingJob(additional int32) {
-
 	// The scale action will be omit if job have done.
 	if updater.Status.Phase == padv1.TrainingJobPhaseSucceeded || updater.Status.Phase == padv1.TrainingJobPhaseFailed {
-		log.Infof("Omit scale for job have done, namespace=%v name=%v additional=%v ", updater.Job.Namespace, updater.Job.Name, additional)
+		log.Info("Omit scale for job have done", "namespace", updater.Job.Namespace, "name", updater.Job.Name, "additional", additional)
 		return
 	}
 
@@ -523,7 +544,7 @@ func (updater *TrainingJobUpdater) scaleTrainingJob(additional int32) {
 	scaleRecord := updater.scale(additional)
 	err := updater.updateCRDStatus()
 	if err != nil {
-		log.Warning("scale trainingJob to update trainingJob status error namespace=%v name=%v error=%v ", updater.Job.Namespace, updater.Job.Name, err.Error())
+		log.Warn("failed to scale trainingJob to update trainingJob status", "namespace", updater.Job.Namespace, "name", updater.Job.Name, "error", err.Error())
 	}
 
 	if scaleRecord.Status == padv1.ScaleTrue {
@@ -535,31 +556,31 @@ func (updater *TrainingJobUpdater) scaleTrainingJob(additional int32) {
 // Start is the main process of life cycle of a TrainingJob, including create resources, event process handle and
 // status convert.
 func (updater *TrainingJobUpdater) start() {
-	log.Infof("start updater, namespace=%v name=%v: ", updater.Job.Namespace, updater.Job.Name)
+	log.Info("start updater", "namespace", updater.Job.Namespace, "name", updater.Job.Name)
 	go updater.InitResource()
 
 	ticker := time.NewTicker(convertedTimerTicker)
 	defer ticker.Stop()
-	log.Infof("start ticker, namespace=%v name=%v: ", updater.Job.Namespace, updater.Job.Name)
+	log.Info("start ticker", "namespace", updater.Job.Namespace, "name", updater.Job.Name)
 	for {
 		select {
 		case ev := <-updater.EventCh:
 			switch ev.pet {
 			case trainingJobEventDelete:
-				log.Infof("Delete updater, namespace=%v name=%v: ", updater.Job.Namespace, updater.Job.Name)
+				log.Info("deleting updater", "namespace", updater.Job.Namespace, "name", updater.Job.Name)
 				if err := updater.deleteTrainingJob(); err != nil {
-					log.Errorf(err.Error())
+					log.Error("failed to deleting updater", "namespace", updater.Job.Namespace, "name", updater.Job.Name, "error", err.Error())
 				}
 				return
 			case trainingJobEventScale:
-				log.Infof("Scale job, namespace=%v name=%v additional=%v: ", updater.Job.Namespace, updater.Job.Name, updater.Additional)
+				log.Info("scaling job", "namespace", updater.Job.Namespace, "name", updater.Job.Name, "additional", updater.Additional)
 				updater.scaleTrainingJob(updater.Additional)
 			}
 		case <-ticker.C:
 			updater.Convert()
 			if updater.Status.Phase == padv1.TrainingJobPhaseSucceeded || updater.Status.Phase == padv1.TrainingJobPhaseFailed {
 				if ticker != nil {
-					log.Infof("stop ticker for job has done, namespace=%v name=%v: ", updater.Job.Namespace, updater.Job.Name)
+					log.Info("stopping ticker", "namespace", updater.Job.Namespace, "name", updater.Job.Name)
 					ticker.Stop()
 				}
 			}
