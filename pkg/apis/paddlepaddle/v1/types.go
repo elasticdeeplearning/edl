@@ -106,14 +106,15 @@ const (
 	TrainingJobPhaseFailed = "failed"
 )
 
+// ScaleResults is the result of scale
 type ScaleResults string
 
-// These are valid scale statuses. "ScaleTrue" means scale succeed.
-// "ScaleFalse" means scale failed. "ScaleUnknown" means kubernetes
-// can't decide if a scale succeed or not.
 const (
-	ScaleTrue    ScaleResults = "True"
-	ScaleFalse   ScaleResults = "False"
+	// ScaleTrue means scale succeed.
+	ScaleTrue ScaleResults = "True"
+	// ScaleFalse means scale failed.
+	ScaleFalse ScaleResults = "False"
+	// ScaleUnknown means kubernetes can't decide if a scale succeed or not.
 	ScaleUnknown ScaleResults = "Unknown"
 )
 
