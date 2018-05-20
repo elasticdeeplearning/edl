@@ -6,6 +6,7 @@ import (
 	"time"
 
 	log "github.com/inconshreveable/log15"
+	"github.com/wangkuiyi/candy"
 
 	"k8s.io/api/core/v1"
 	extcli "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -40,34 +41,19 @@ func main() {
 	stopCh := signals.SetupSignalHandler()
 
 	cfg, err := clientcmd.BuildConfigFromFlags(*masterURL, *kubeConfig)
-	if err != nil {
-		log.Error("Error building kubeconfig", "error", err.Error())
-		return
-	}
+	candy.Must(err)
 
 	kubeClient, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		log.Error("Error building kubernetes", "error", err.Error())
-		return
-	}
+	candy.Must(err)
 
 	extapiClient, err := extcli.NewForConfig(cfg)
-	if err != nil {
-		log.Error("Error building kubernetes extension api clientset", "error", err.Error())
-		return
-	}
+	candy.Must(err)
 
 	paddleClient, err := paddleclientset.NewForConfig(cfg)
-	if err != nil {
-		log.Error("Error building paddle clientset", "error", err.Error())
-		return
-	}
+	candy.Must(err)
 
 	hostname, err := os.Hostname()
-	if err != nil {
-		log.Error("Error checking hostname", "error", err.Error())
-		return
-	}
+	candy.Must(err)
 
 	run := func(stop <-chan struct{}) {
 		log.Info("I won the leader election", "hostname", hostname)
