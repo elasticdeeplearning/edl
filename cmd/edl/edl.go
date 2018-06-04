@@ -41,6 +41,7 @@ func main() {
 	stopCh := signals.SetupSignalHandler()
 
 	cfg, err := clientcmd.BuildConfigFromFlags(*masterURL, *kubeConfig)
+	log.Info("Config from Flags", "masterURL", masterURL)
 	candy.Must(err)
 
 	kubeClient, err := kubernetes.NewForConfig(cfg)
