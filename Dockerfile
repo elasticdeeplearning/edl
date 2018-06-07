@@ -1,4 +1,4 @@
-FROM    golang:1.8
+FROM    golang:1.9
 RUN     go get github.com/Masterminds/glide
 RUN     apt-get update && apt-get install -y git
 WORKDIR $GOPATH/src/github.com/paddlepaddle
@@ -10,6 +10,7 @@ ADD     ./glide.yaml ./glide.lock $GOPATH/src/github.com/paddlepaddle/edl/
 WORKDIR $GOPATH/src/github.com/paddlepaddle/edl
 RUN     glide install --strip-vendor
 ADD     . $GOPATH/src/github.com/paddlepaddle/edl
+RUN     echo $http_proxy
 RUN     go build -o /usr/local/bin/edl github.com/paddlepaddle/edl/cmd/edl
 RUN     rm -rf $GOPATH/src/github.com/paddlepaddle/edl
 CMD     ["edl"]

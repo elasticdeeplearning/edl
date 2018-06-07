@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 PaddlePaddle Authors All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -12,17 +12,18 @@
    See the License for the specific language governing permissions and
 	 limitations under the License. */
 
-package edl
+package autoscaler
 
 import (
+	"sync"
 	"testing"
 
-	batchv1 "k8s.io/api/batch/v1"
+	padv1 "github.com/paddlepaddle/edl/pkg/apis/paddlepaddle/v1"
+	"github.com/paddlepaddle/edl/pkg/updater"
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-
-	edlresource "github.com/paddlepaddle/edl/pkg/resource"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -53,7 +54,7 @@ func makePtr(c int) *int32 {
 	return &p
 }
 
-func makeJob(name string, cpuReq, cpuLim, memReq, memLim, gpuLim string, min, max, p int) *job {
+func makeJob(name string, cpuReq, cpuLim, memReq, memLim, gpuLim string, min, max, p int) *padv1.TrainingJob {
 	cr, err := resource.ParseQuantity(cpuReq)
 	if err != nil {
 		panic(err)
@@ -75,22 +76,31 @@ func makeJob(name string, cpuReq, cpuLim, memReq, memLim, gpuLim string, min, ma
 		panic(err)
 	}
 
-	j := &job{
-		Config:     &edlresource.TrainingJob{},
-		TrainerJob: &batchv1.Job{},
+	j := &padv1.TrainingJob{}
+	j.ObjectMeta.Name = name
+	j.ObjectMeta.Namespace = "test"
+	j.Spec.FaultTolerant = true
+	j.Spec.Trainer.Resources.Requests = make(v1.ResourceList)
+	j.Spec.Trainer.Resources.Limits = make(v1.ResourceList)
+	j.Spec.Trainer.Resources.Requests[v1.ResourceCPU] = cr
+	j.Spec.Trainer.Resources.Limits[v1.ResourceCPU] = cl
+	j.Spec.Trainer.Resources.Requests[v1.ResourceMemory] = mr
+	j.Spec.Trainer.Resources.Limits[v1.ResourceMemory] = ml
+	j.Spec.Trainer.Resources.Limits[v1.ResourceNvidiaGPU] = gl
+	j.Spec.Trainer.MaxInstance = max
+	j.Spec.Trainer.MinInstance = min
+
+	parser := &updater.DefaultJobParser{}
+	j, err = parser.NewTrainingJob(j)
+	if err != nil {
+		panic(err)
 	}
-	j.Config.Name = name
-	j.Config.Spec.Trainer.Resources.Requests = make(v1.ResourceList)
-	j.Config.Spec.Trainer.Resources.Limits = make(v1.ResourceList)
-	j.Config.Spec.Trainer.Resources.Requests["cpu"] = cr
-	j.Config.Spec.Trainer.Resources.Limits["cpu"] = cl
-	j.Config.Spec.Trainer.Resources.Requests["memory"] = mr
-	j.Config.Spec.Trainer.Resources.Limits["memory"] = ml
-	j.Config.Spec.Trainer.Resources.Limits[v1.ResourceNvidiaGPU] = gl
-	j.TrainerJob.Spec.Parallelism = makePtr(p)
-	j.Config.Spec.Trainer.MinInstance = min
-	j.Config.Spec.Trainer.MaxInstance = max
+	j.Spec.Trainer.ReplicaSpec.Spec.Parallelism = makePtr(p)
 	return j
+}
+
+func jobName(j *padv1.TrainingJob) string {
+	return j.ObjectMeta.Namespace + "/" + j.ObjectMeta.Name
 }
 
 func TestTrainerRequestLimit(t *testing.T) {
@@ -264,8 +274,8 @@ func TestScaleAllDryRunNoMem(t *testing.T) {
 	}
 
 	j := makeJob("name", "1", "1", "1", "1", "1", 1, 3, 1)
-	scale := scaleAllJobsDryRun([]*job{j}, r, 1.0)["name"]
-	assert.Equal(t, 0, scale)
+	scale := scaleAllJobsDryRun([]*padv1.TrainingJob{j}, r, 1.0)[jobName(j)]
+	assert.Equal(t, int32(0), scale)
 }
 
 func TestScaleAllDryRun(t *testing.T) {
@@ -283,8 +293,8 @@ func TestScaleAllDryRun(t *testing.T) {
 	}
 
 	j := makeJob("name", "1", "1", "100Mi", "100Mi", "0", 1, 3, 1)
-	scale := scaleAllJobsDryRun([]*job{j}, r, 1.0)["name"]
-	assert.Equal(t, 2, scale)
+	scale := scaleAllJobsDryRun([]*padv1.TrainingJob{j}, r, 1.0)[jobName(j)]
+	assert.Equal(t, int32(2), scale)
 }
 
 func TestScaleAllDryRunNotFull(t *testing.T) {
@@ -302,8 +312,8 @@ func TestScaleAllDryRunNotFull(t *testing.T) {
 	}
 
 	j := makeJob("name", "1", "1", "100Mi", "100Mi", "0", 1, 3, 1)
-	scale := scaleAllJobsDryRun([]*job{j}, r, 0.8)["name"]
-	assert.Equal(t, 1, scale)
+	scale := scaleAllJobsDryRun([]*padv1.TrainingJob{j}, r, 0.8)[jobName(j)]
+	assert.Equal(t, int32(1), scale)
 }
 
 func TestScaleAllDryRunDownNotFull(t *testing.T) {
@@ -321,8 +331,8 @@ func TestScaleAllDryRunDownNotFull(t *testing.T) {
 	}
 
 	j := makeJob("name", "1", "1", "100Mi", "100Mi", "0", 1, 3, 3)
-	scale := scaleAllJobsDryRun([]*job{j}, r, 0.8)["name"]
-	assert.Equal(t, -1, scale)
+	scale := scaleAllJobsDryRun([]*padv1.TrainingJob{j}, r, 0.8)[jobName(j)]
+	assert.Equal(t, int32(-1), scale)
 }
 
 func TestScaleAllDryRunLessCPU(t *testing.T) {
@@ -340,8 +350,8 @@ func TestScaleAllDryRunLessCPU(t *testing.T) {
 	}
 
 	j := makeJob("name", "1", "1", "1", "1", "1", 1, 3, 1)
-	scale := scaleAllJobsDryRun([]*job{j}, r, 1.0)["name"]
-	assert.Equal(t, 1, scale)
+	scale := scaleAllJobsDryRun([]*padv1.TrainingJob{j}, r, 1.0)[jobName(j)]
+	assert.Equal(t, int32(1), scale)
 }
 
 func TestScaleAllDryRunLessGPU(t *testing.T) {
@@ -359,8 +369,8 @@ func TestScaleAllDryRunLessGPU(t *testing.T) {
 	}
 
 	j := makeJob("name", "1", "1", "1", "1", "1", 1, 3, 1)
-	scale := scaleAllJobsDryRun([]*job{j}, r, 1.0)["name"]
-	assert.Equal(t, 1, scale)
+	scale := scaleAllJobsDryRun([]*padv1.TrainingJob{j}, r, 1.0)[jobName(j)]
+	assert.Equal(t, int32(1), scale)
 }
 
 func TestFulfillment(t *testing.T) {
@@ -375,64 +385,65 @@ func TestFulfillment(t *testing.T) {
 }
 
 func TestSortedJobs(t *testing.T) {
-	jobs := []*job{
+	jobs := []*padv1.TrainingJob{
 		makeJob("a", "1", "1", "1", "1", "1", 1, 2, 2),
 		makeJob("b", "1", "1", "1", "1", "1", 1, 20, 2),
 		makeJob("c", "1", "1", "1", "1", "1", 1, 10, 2),
 		makeJob("d", "1", "1", "1", "1", "1", 1, 1, 2),
 	}
 
-	expected := []string{"b", "c", "a"}
+	expected := []string{"test/b", "test/c", "test/a"}
 
-	c := newAutoscaler(nil)
+	updater := new(sync.Map)
+	c := NewAutoscaler(nil, updater)
 	for _, j := range jobs {
-		c.jobs[j.Config.Name] = j
+		c.jobUpdater.Store(jobName(j), j)
 	}
 
 	sorted := sortedJobs(jobs, elastic)
 	result := make([]string, len(sorted))
 	for i, j := range sorted {
-		result[i] = j.Config.Name
+		result[i] = jobName(j)
 	}
 	assert.Equal(t, expected, result)
 }
 
 func TestSortedJobsGPUOnly(t *testing.T) {
-	jobs := []*job{
+	jobs := []*padv1.TrainingJob{
 		makeJob("a", "1", "1", "1", "1", "1", 1, 2, 2),
 		makeJob("b", "1", "1", "1", "1", "0", 1, 20, 2),
 		makeJob("c", "1", "1", "1", "1", "0", 1, 10, 2),
 		makeJob("d", "1", "1", "1", "1", "0", 1, 1, 2),
 	}
 
-	expected := []string{"a"}
-	c := newAutoscaler(nil)
+	expected := []string{"test/a"}
+	updater := new(sync.Map)
+	c := NewAutoscaler(nil, updater)
 	for _, j := range jobs {
-		c.jobs[j.Config.Name] = j
+		c.jobUpdater.Store(jobName(j), j)
 	}
 
-	sorted := sortedJobs(jobs, gpu)
+	sorted := sortedJobs(jobs, needGPU)
 	result := make([]string, len(sorted))
 	for i, j := range sorted {
-		result[i] = j.Config.Name
+		result[i] = jobName(j)
 	}
 	assert.Equal(t, expected, result)
 }
 
 func TestSortedJobsWithTie(t *testing.T) {
-	jobs := []*job{
+	jobs := []*padv1.TrainingJob{
 		makeJob("a", "1", "0", "1", "1", "1", 1, 2, 1),
 		makeJob("b", "1", "1", "1", "1", "0", 1, 2, 1),
 		makeJob("c", "10", "10", "1", "1", "0", 1, 2, 1),
 		makeJob("d", "1", "1", "2", "2", "0", 1, 2, 1),
 	}
-	expected := []string{"b", "d", "c", "a"}
+	expected := []string{"test/b", "test/d", "test/c", "test/a"}
 
 	sorted := sortedJobs(jobs, elastic)
 	result := make([]string, len(sorted))
 	for i, j := range sorted {
-		result[i] = j.Config.Name
+		result[i] = jobName(j)
 	}
 	assert.Equal(t, expected, result)
-
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 PaddlePaddle Authors All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
 	 limitations under the License. */
 
-package edl
+package autoscaler
 
 import (
 	"testing"
@@ -22,12 +22,12 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	c := newAutoscaler(nil)
+	c := NewAutoscaler(nil, nil)
 	assert.NotNil(t, c)
 }
 
 func TestRun(t *testing.T) {
-	c := newAutoscaler(nil)
+	c := NewAutoscaler(nil, nil)
 	ch := make(chan struct{})
 
 	go func() {
