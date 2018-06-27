@@ -8,7 +8,7 @@ matrix:
         - curl https://glide.sh/get | bash
         - sudo pip install pre-commit
       script:
-        - rm -f .copyright.hook && wget https://raw.githubusercontent.com/PaddlePaddle/Paddle/develop/.copyright.hook
+        - rm -f .copyright.hook && wget https://raw.githubusercontent.com/PaddlePaddle/Paddle/develop/tools/.copyright.hook
         - bash -x .tools/check_style.sh
         - ln -s $GOPATH/src/github.com/PaddlePaddle $GOPATH/src/github.com/paddlepaddle
         - cd $GOPATH/src/github.com/paddlepaddle/edl
