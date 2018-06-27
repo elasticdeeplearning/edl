@@ -30,7 +30,7 @@ if you are able to see both client and server version, AND server version is v1.
 As simple as running the following command
 
 ``` bash
-kubectl create -f ../thirdpartyresource.yaml
+kubectl create -f ../k8s/thirdpartyresource.yaml
 ```
 
 To verify the creation of the resource, run the following command:
@@ -60,12 +60,12 @@ If you decide to use the pre-built image, there is nothing you need to do now, y
 
 To build your own docker images, please follow [Build EDL Controller Image](./build.md#build-edl-controller-image) and tag the Docker image as `yourRepoName/edl-controller`
 
-Before deploying your EDL controller, open `edl_controller.yaml` with any text editor to change the docker image uri from `paddlepaddle/edl-controller` to `yourRepoName/edl-controller`
+Before deploying your EDL controller, open `../k8s/edl_controller.yaml` with any text editor to change the docker image uri from `paddlepaddle/edl-controller` to `yourRepoName/edl-controller`
 
 Now let's deploy the EDL controller:
 
 ``` bash
-kubectl create -f edl_controller.yaml
+kubectl create -f ../k8s/edl_controller.yaml
 ```
 
 To verify the deployment, let's firstly verify the depolyment's pod is successfully created:
@@ -93,7 +93,7 @@ That means your EDL controller is actively working monitoring and adjusting reso
 
 Now we have a resource typed `training-job` defined in Kubernetes and we have the EDL watching and optimizing the resource distribution, let's create a training job to see how it works.
 
-Firstly, let's create your training job's docker image, which contains training logic in [../example/train_ft.py](../example/train_ft.py)
+Firstly, let's create your training job's docker image, which contains training logic in [../example/train_ft.py](../example/train_ft.py)
 
 ``` bash
 cd ../example
@@ -108,7 +108,7 @@ docker push yourRepoName/my_edl_training_job
 
 Please note, `docker build` uses `Dockerfile` in `example` directory, which indicates our `my_edl_training_job` is based on docker image `paddlepaddle/paddlecloud-job`. This images has PaddlePaddle installed and configured, so that you do not have to install on your own.
 
-Now we have defined "What to run" for Kubernetes, it's time to define "How to run" the training job, which is supposed to configured in a yaml file. please find the example yaml definition of a training job from `example/examplejob.yaml`.
+Now we have defined "What to run" for Kubernetes, it's time to define "How to run" the training job, which is supposed to configured in a yaml file. please find the example yaml definition of a training job from `../example/examplejob.yaml`.
 
 In this file, change the image uri from `paddlepaddle/paddlecloud-job` to `yourRepoName/my_edl_training_job` in this case.
 
@@ -117,5 +117,5 @@ In `spec` section you will see 2 major members `trainer` and `pserver`, their co
 Now let's start the training job by run command below:
 
 ``` bash
-kubectl create -f example.yaml
+kubectl create -f ../example/example.yaml
 ```
