@@ -1,5 +1,7 @@
 # PaddlePaddle EDL: Elastic Deep Learning
 
+<img src="logo/edl.png" width="500">
+
 While many hardware and software manufacturers are working on
 improving the running time of deep learning jobs, EDL optimizes
 
