@@ -28,11 +28,11 @@ of EDL on this cluster is
 ## Tutorials
 
 - [Usage](./doc/usage.md)
-- [Build EDL](./doc/build.md)
+- [How to Build EDL Component](./doc/build.md)
 
 ## Design Docs
 
-- [Support Fault-Tolerant Training in PaddlePaddle](https://github.com/PaddlePaddle/Paddle/tree/develop/doc/v2/design/cluster_train).
+- [Fault-Tolerant Training in PaddlePaddle](https://github.com/PaddlePaddle/Paddle/tree/develop/doc/v2/design/cluster_train).
 - [Elastic Deep Learning Design Doc](./doc/edl_design_doc.md).
 
 ## Future

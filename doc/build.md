@@ -1,7 +1,7 @@
-# Build EDL
+# How to Build EDL Component
 
 This article contains instructions of build EDL and how to pack them into
-Docker image so that EDL components can run in the Kubernetes cluster.
+Docker image so that the EDL component can run in the Kubernetes cluster.
 
 ## Build EDL Controller
 
