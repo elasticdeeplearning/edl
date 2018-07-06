@@ -18,4 +18,4 @@ spec:
           value: ""
         - name: http_proxy
           value: ""
-        command: ["/usr/local/bin/edl", "-logtostderr", "-log_level", "info"]
+        command: ["/usr/local/bin/edl", "-logtostderr", "-log_level", "debug"]

@@ -77,9 +77,9 @@ func (p *DefaultJobParser) ParseToPserver(job *edlresource.TrainingJob) *v1beta1
 	command := make([]string, 2, 2)
 	// FIXME: refine these part.
 	if job.Spec.FaultTolerant {
-		command = []string{"paddle_k8s", "start_pserver"}
-	} else {
 		command = []string{"paddle_k8s", "start_new_pserver"}
+	} else {
+		command = []string{"paddle_k8s", "start_pserver"}
 	}
 
 	return &v1beta1.ReplicaSet{
@@ -122,9 +122,9 @@ func (p *DefaultJobParser) ParseToTrainer(job *edlresource.TrainingJob) *batchv1
 	replicas := int32(job.Spec.Trainer.MinInstance)
 	command := make([]string, 2)
 	if job.Spec.FaultTolerant {
-		command = []string{"paddle_k8s", "start_trainer"}
-	} else {
 		command = []string{"paddle_k8s", "start_new_trainer"}
+	} else {
+		command = []string{"paddle_k8s", "start_trainer", "v2"}
 	}
 
 	return &batchv1.Job{
@@ -328,3 +328,4 @@ func podEnv(job *edlresource.TrainingJob) []v1.EnvVar {
 // -----------------------------------------------------------------------
 // general functions end
 // -----------------------------------------------------------------------
+

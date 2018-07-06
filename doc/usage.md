@@ -7,36 +7,24 @@ To deploy the EDL job to your kubernetes cluster, there are 2 major steps:
 
 Please note, TPR (Third Party Resource) is deprecated after Kubernetes 1.7. We are working to support CRD (Custom Resource Definitions, the successor of TPR). Stay tuned!
 
-## Prepare your cluster
+## Prerequisites
 
-So before everything, make sure you have a running Kubernetes v1.7.* cluster and a working `kubectl`.
-
-If you just trying to play EDL in your laptop, go with `minikube` with the following command is good enough to get you ready.
-
-``` bash
-minikube start --kubernetes-version v1.7.5
-```
-
-To verify your `minikube` and `kubectl` works, run the following command:
-
-``` bash
-kubectl version
-```
-
-if you are able to see both client and server version, AND server version is v1.7.5, you are good to go.
+- [Install Docker on your laptop](https://docs.docker.com/install/)
+- [Install kubectl on your laptop](./install.md#kubectl)
+- [Lunching a Kubernetes](./install.md#kubernetes) or using a production grad Kubernetes cluster directly with version 1.7.*.
 
 ## Create TPR "Training-job"
 
 As simple as running the following command
 
 ``` bash
-kubectl create -f ../k8s/thirdpartyresource.yaml
+kubectl create -f ./k8s/thirdpartyresource.yaml
 ```
 
 To verify the creation of the resource, run the following command:
 
 ``` bash
-kubectl describe ThirdPartyResource training-job
+kubectl describe ThirdPartyResource trainingjobs
 ```
 
 if there is no error returned, that means your training-job TPR is successfully created.
@@ -84,9 +72,10 @@ kubectl logs training-job-controller-2033113564-w80q6 --namespace paddlecloud
 
 when you see logs like this:
 
-``` text
+```text
 t=2018-03-13T22:13:19+0000 lvl=dbug msg="Cluster.InquiryResource done" resource="{NodeCount:1 GPURequest:0 GPULimit:0 GPUTotal:0 CPURequestMilli:265 CPULimitMilli:0 CPUTotalMilli:2000 MemoryRequestMega:168 MemoryLimitMega:179 MemoryTotalMega:1993 Nodes:{NodesCPUIdleMilli:map[minikube:1735] NodesMemoryFreeMega:map[minikube:1824]}}" stack="[github.com/paddlepaddle/edl/pkg/autoscaler.go:466 github.com/paddlepaddle/edl/pkg/controller.go:72]"
 ```
+
 That means your EDL controller is actively working monitoring and adjusting resource distributions.
 
 ## Deploying a training-job
@@ -118,4 +107,12 @@ Now let's start the training job by run command below:
 
 ``` bash
 kubectl create -f ../example/example.yaml
+```
+
+And you can delete the training job by the following commands:
+
+```bash
+kubectl delete -f ../example/example.yaml
+kubectl delete rs {job-name}-master {job-name}-pserver
+kubectl delete job {job-name}-trainer
 ```

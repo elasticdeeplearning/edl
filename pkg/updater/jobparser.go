@@ -91,9 +91,9 @@ func parseToPserver(job *paddlev1.TrainingJob) *v1beta1.ReplicaSet {
 	var command []string
 	// FIXME: refine these part.(typhoonzero)
 	if job.Spec.FaultTolerant {
-		command = []string{"paddle_k8s", "start_pserver"}
-	} else {
 		command = []string{"paddle_k8s", "start_new_pserver"}
+	} else {
+		command = []string{"paddle_k8s", "start_pserver"}
 	}
 
 	return &v1beta1.ReplicaSet{
@@ -134,9 +134,9 @@ func parseToTrainer(job *paddlev1.TrainingJob) *batchv1.Job {
 	replicas := int32(job.Spec.Trainer.MinInstance)
 	var command []string
 	if job.Spec.FaultTolerant {
-		command = []string{"paddle_k8s", "start_trainer"}
-	} else {
 		command = []string{"paddle_k8s", "start_new_trainer"}
+	} else {
+		command = []string{"paddle_k8s", "start_trainer", "v2"}
 	}
 
 	return &batchv1.Job{
