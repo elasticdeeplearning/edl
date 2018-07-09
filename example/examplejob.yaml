@@ -3,7 +3,7 @@ kind: TrainingJob
 metadata:
   name: example
 spec:
-  image: "yancey1989/edl-example"
+  image: "paddlepaddle/edl-example"
   port: 7164
   ports_num: 1
   ports_num_for_sparse: 1

@@ -77,7 +77,7 @@ def convolutional_neural_network(img):
 def main():
     etcd_ip = os.getenv("ETCD_IP")
     etcd_endpoint = "http://" + etcd_ip + ":" + "2379"
-    paddle.init(trainer_count=1)
+    paddle.init()
 
     # define network topology
     images = paddle.layer.data(
