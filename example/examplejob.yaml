@@ -3,13 +3,13 @@ kind: TrainingJob
 metadata:
   name: example
 spec:
-  image: "paddlepaddle/paddlecloud-job"
+  image: "yancey1989/edl-tutorial"
   port: 7164
   ports_num: 1
   ports_num_for_sparse: 1
   fault_tolerant: true
   trainer:
-    entrypoint: "python /workspace/vgg16_v2.py"
+    entrypoint: "python /workspace/train_ft.py"
     workspace: "/workspace"
     passes: 50
     min-instance: 2

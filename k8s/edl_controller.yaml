@@ -12,7 +12,7 @@ spec:
     spec:
       containers:
       - name: training-job-controller
-        image: paddlepaddle/edl-controller
+        image: yancey1989/edl-controller
         env:
         - name: https_proxy
           value: ""
