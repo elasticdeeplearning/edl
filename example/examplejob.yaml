@@ -12,8 +12,8 @@ spec:
     entrypoint: "python /workspace/train_ft.py"
     workspace: "/workspace"
     passes: 50
-    min-instance: 10
-    max-instance: 100
+    min-instance: 2
+    max-instance: 10
     resources:
       limits:
         #alpha.kubernetes.io/nvidia-gpu: 1
