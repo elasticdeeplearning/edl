@@ -16,13 +16,13 @@ from PIL import Image
 import numpy as np
 import paddle.v2 as paddle
 import paddle.v2.dataset.common as common
-import paddle.v2.dataset as dataset
+from paddle.v2.reader.creator import cloud_reader
 import os
 import sys
+import glob
+import pickle
 
-TRAINER_ID = int(os.getenv("PADDLE_INIT_TRAINER_ID", "-1"))
-TOTAL_TRAINERS = int(os.getenv("PADDLE_INIT_NUM_GRADIENT_SERVERS", "-1"))
-
+DATASET_PATH = "/data/mnist/mnist-train-*"
 
 def softmax_regression(img):
     predict = paddle.layer.fc(input=img,
@@ -114,27 +114,16 @@ def main():
                     event.pass_id, event.batch_id, event.cost, event.metrics)
         if isinstance(event, paddle.event.EndPass):
             result = trainer.test(reader=paddle.batch(
-                dataset.mnist.test(),
-                batch_size=2))
+                paddle.dataset.mnist.test(), batch_size=2))
             print "Test with Pass %d, Cost %f, %s\n" % (
                 event.pass_id, result.cost, result.metrics)
 
     trainer.train(
         reader=paddle.batch(
-            dataset.mnist.train(),
-            batch_size=128),
+            cloud_reader([DATASET_PATH], etcd_endpoint), batch_size=10),
         event_handler=event_handler,
-        num_passes=5)
+        num_passes=120)
 
 
 if __name__ == '__main__':
-    usage = "python train.py [prepare|train]"
-    if len(sys.argv) != 2:
-        print usage
-        exit(1)
-
-    if TRAINER_ID == -1 or TOTAL_TRAINERS == -1:
-        print "no cloud environ found, must run on cloud"
-        exit(1)
-    if sys.argv[1] == "train":
-        main()
+    main()
