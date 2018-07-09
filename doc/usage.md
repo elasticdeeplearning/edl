@@ -11,7 +11,7 @@ Please note, TPR (Third Party Resource) is deprecated after Kubernetes 1.7. We a
 
 - [Install Docker on your laptop](https://docs.docker.com/install/)
 - [Install kubectl on your laptop](./install.md#kubectl)
-- [Lunching a Kubernetes](./install.md#kubernetes) or using a production grad Kubernetes cluster directly with version 1.7.*.
+- [Prepare a Kubernetes cluster](./install.md#kubernetes-cluster) or using a production grad Kubernetes cluster directly with version 1.7.*.
 
 ## Create TPR "Training-job"
 
@@ -24,7 +24,7 @@ kubectl create -f ./k8s/thirdpartyresource.yaml
 To verify the creation of the resource, run the following command:
 
 ``` bash
-kubectl describe ThirdPartyResource trainingjobs
+kubectl describe ThirdPartyResource training-job
 ```
 
 if there is no error returned, that means your training-job TPR is successfully created.
@@ -86,33 +86,33 @@ Firstly, let's create your training job's docker image, which contains training 
 
 ``` bash
 cd ../example
-docker build -t yourRepoName/my_edl_training_job .
+docker build -t yourRepoName/edl-example .
 ```
 
 then push it to docker hub to be accessible by Kubernetes:
 
 ``` bash
-docker push yourRepoName/my_edl_training_job
+docker push yourRepoName/edl-example
 ```
 
-Please note, `docker build` uses `Dockerfile` in `example` directory, which indicates our `my_edl_training_job` is based on docker image `paddlepaddle/paddlecloud-job`. This images has PaddlePaddle installed and configured, so that you do not have to install on your own.
+Please note, `docker build` uses `Dockerfile` in `example` directory, which indicates our `edl-example` is based on docker image `paddlepaddle/paddlecloud-job`. This images has PaddlePaddle installed and configured, so that you do not have to install on your own.
 
 Now we have defined "What to run" for Kubernetes, it's time to define "How to run" the training job, which is supposed to configured in a yaml file. please find the example yaml definition of a training job from `../example/examplejob.yaml`.
 
-In this file, change the image uri from `paddlepaddle/paddlecloud-job` to `yourRepoName/my_edl_training_job` in this case.
+In this file, change the image uri from `paddlepaddle/paddlecloud-job` to `yourRepoName/edl-example` in this case.
 
 In `spec` section you will see 2 major members `trainer` and `pserver`, their configurations are trying to define how "distributed" this job is. Like trainer and pserver 's `min-instance` and `max-instance` are showing the desired trainer count range, so that EDL will adjust the instance count based on these information. We'll have a separate document to describe these fields soon.
 
 Now let's start the training job by run command below:
 
 ``` bash
-kubectl create -f ../example/example.yaml
+kubectl create -f ../example/examplejob.yaml
 ```
 
 And you can delete the training job by the following commands:
 
 ```bash
-kubectl delete -f ../example/example.yaml
-kubectl delete rs {job-name}-master {job-name}-pserver
+kubectl delete -f ../example/examplejob.yaml
 kubectl delete job {job-name}-trainer
+kubectl delete rs {job-name}-master {job-name}-pserver
 ```
