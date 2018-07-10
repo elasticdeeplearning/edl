@@ -12,10 +12,10 @@ spec:
     spec:
       containers:
       - name: training-job-controller
-        image: paddlepaddle/edl-controller
+        image: yancey1989/edl-controller
         env:
         - name: https_proxy
           value: ""
         - name: http_proxy
           value: ""
-        command: ["/usr/local/bin/edl", "-logtostderr", "-log_level", "info"]
+        command: ["/usr/local/bin/edl", "-logtostderr", "-log_level", "debug"]

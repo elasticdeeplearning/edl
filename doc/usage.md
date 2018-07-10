@@ -7,30 +7,18 @@ To deploy the EDL job to your kubernetes cluster, there are 2 major steps:
 
 Please note, TPR (Third Party Resource) is deprecated after Kubernetes 1.7. We are working to support CRD (Custom Resource Definitions, the successor of TPR). Stay tuned!
 
-## Prepare your cluster
+## Prerequisites
 
-So before everything, make sure you have a running Kubernetes v1.7.* cluster and a working `kubectl`.
-
-If you just trying to play EDL in your laptop, go with `minikube` with the following command is good enough to get you ready.
-
-``` bash
-minikube start --kubernetes-version v1.7.5
-```
-
-To verify your `minikube` and `kubectl` works, run the following command:
-
-``` bash
-kubectl version
-```
-
-if you are able to see both client and server version, AND server version is v1.7.5, you are good to go.
+- [Install Docker on your laptop](https://docs.docker.com/install/)
+- [Install kubectl on your laptop](./install.md#kubectl)
+- [Prepare a Kubernetes cluster](./install.md#kubernetes-cluster) or using a production grad Kubernetes cluster directly with version 1.7.*.
 
 ## Create TPR "Training-job"
 
 As simple as running the following command
 
 ``` bash
-kubectl create -f ../k8s/thirdpartyresource.yaml
+kubectl create -f ./k8s/thirdpartyresource.yaml
 ```
 
 To verify the creation of the resource, run the following command:
@@ -84,9 +72,10 @@ kubectl logs training-job-controller-2033113564-w80q6 --namespace paddlecloud
 
 when you see logs like this:
 
-``` text
+```text
 t=2018-03-13T22:13:19+0000 lvl=dbug msg="Cluster.InquiryResource done" resource="{NodeCount:1 GPURequest:0 GPULimit:0 GPUTotal:0 CPURequestMilli:265 CPULimitMilli:0 CPUTotalMilli:2000 MemoryRequestMega:168 MemoryLimitMega:179 MemoryTotalMega:1993 Nodes:{NodesCPUIdleMilli:map[minikube:1735] NodesMemoryFreeMega:map[minikube:1824]}}" stack="[github.com/paddlepaddle/edl/pkg/autoscaler.go:466 github.com/paddlepaddle/edl/pkg/controller.go:72]"
 ```
+
 That means your EDL controller is actively working monitoring and adjusting resource distributions.
 
 ## Deploying a training-job
@@ -97,25 +86,33 @@ Firstly, let's create your training job's docker image, which contains training 
 
 ``` bash
 cd ../example
-docker build -t yourRepoName/my_edl_training_job .
+docker build -t yourRepoName/edl-example .
 ```
 
 then push it to docker hub to be accessible by Kubernetes:
 
 ``` bash
-docker push yourRepoName/my_edl_training_job
+docker push yourRepoName/edl-example
 ```
 
-Please note, `docker build` uses `Dockerfile` in `example` directory, which indicates our `my_edl_training_job` is based on docker image `paddlepaddle/paddlecloud-job`. This images has PaddlePaddle installed and configured, so that you do not have to install on your own.
+Please note, `docker build` uses `Dockerfile` in `example` directory, which indicates our `edl-example` is based on docker image `paddlepaddle/paddlecloud-job`. This images has PaddlePaddle installed and configured, so that you do not have to install on your own.
 
 Now we have defined "What to run" for Kubernetes, it's time to define "How to run" the training job, which is supposed to configured in a yaml file. please find the example yaml definition of a training job from `../example/examplejob.yaml`.
 
-In this file, change the image uri from `paddlepaddle/paddlecloud-job` to `yourRepoName/my_edl_training_job` in this case.
+In this file, change the image uri from `paddlepaddle/paddlecloud-job` to `yourRepoName/edl-example` in this case.
 
 In `spec` section you will see 2 major members `trainer` and `pserver`, their configurations are trying to define how "distributed" this job is. Like trainer and pserver 's `min-instance` and `max-instance` are showing the desired trainer count range, so that EDL will adjust the instance count based on these information. We'll have a separate document to describe these fields soon.
 
 Now let's start the training job by run command below:
 
 ``` bash
-kubectl create -f ../example/example.yaml
+kubectl create -f ../example/examplejob.yaml
+```
+
+And you can delete the training job by the following commands:
+
+```bash
+kubectl delete -f ../example/examplejob.yaml
+kubectl delete job {job-name}-trainer
+kubectl delete rs {job-name}-master {job-name}-pserver
 ```
