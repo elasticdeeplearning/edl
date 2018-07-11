@@ -2,17 +2,17 @@
 
 This is a hands-on tutorial used for BOSS workshop 2018. We have two parts in this tutorial:
 - Part-1: Train a simple model by PaddlePaddle Fliud.
-- Part-2: Lunch the EDL training job on a Kuberntes cluster.
+- Part-2: Launch the EDL training job on a Kuberntes cluster.
 
 And please don't forget the necessary preparations before everything.
 
 ## Prerequisites
 
-- Install Docker
-- Install kubectl
-- A production-ready Kubernetes cluster which version is `1.7.x`
-  - minikube would lunch a kubernetes cluster locally.
-  - kops would lunch a Kuberntes cluster on AWS.
+- [Install Docker](https://docs.docker.com/install/)
+- [Install kubectl](./install.md#kubectl)
+- A Kubernetes cluster which version is `1.7.x`
+  - [minikube would launch a kubernetes cluster locally](./install.md#minikube).
+  - [kops would launch a Kuberntes cluster on AWS](./install.md#aws).
 
 Please note, TPR (Third Party Resource) is deprecated after Kubernetes 1.7. We are working to support CRD (Custom Resource Definitions, the successor of TPR). Stay tuned!
 
@@ -34,7 +34,7 @@ import numpy
 
 - Define data feeders for test and train
 
-The feeder reads a BATCH_SIZE of data each time and feed them to the training/testing process.
+The feeder reads a BATCH_SIZE of data each time and feeds them to the training/testing process.
 If the user wants some randomness on the data order, she can define both a BATCH_SIZE and a buf_size.
 That way the data feeder will yield the first BATCH_SIZE data out of a shuffle of the first buf_size data.
 
@@ -157,37 +157,38 @@ trainer.train(
 docker run --rm -it -v $PWD:/work paddlepaddle/paddle:0.14.0 python /work/example/train_fluid.py
 ```
 
-The training process could take up to a few minutes, you can see the training logs
+The training process could take up to a few minutes, and you can see the training logs
 in the meantime which defined in `EventHandler`:
 
 ```text
 ```
 
-## Part-2: Lunch the PaddlePaddle EDL Training Jobs on a Kubernetes Cluster
+## Part-2: Launch the PaddlePaddle EDL Training Jobs on a Kubernetes Cluster
 
 Before launching the EDL training-jobs, we can start-up a monitor program to
 watch the Trainer process changes.
 
-1. Configure kubectl
+### Configure kubectl
 
 If you start up a Kubernetes by `minikube` or `kops`, the kubectl configuration would be ready when
-the cluster is ready, for the other approach, you can contact the administrator to fetch the configuration file.
+the cluster is available, for the other approach, you can contact the administrator to fetch the configuration file.
+
+### Deploying EDL components
 
 1. (Optional) Configure RBAC for EDL controller so that it would have the cluster admin permission.
 
-If you lunch a Kubernetes cluster by kops on AWS, the default authenticating policy is `RBAC`,
-so this step is **necessary**:
+If you launch a Kubernetes cluster by kops on AWS, the default authenticating policy is `RBAC`, so this step is **necessary**:
 
 ```bash
-kubectl create -f kops/paddlecloud_admin.yaml
+kubectl create -f k8s/rbac_admin.yaml
 ```
 
-1. Create TRP "TrainingJobs"
+1. Create TRP "Training-Job"
 
-As simple as running the following command
+As simple as running the following command:
 
 ``` bash
-kubectl create -f ../k8s/thirdpartyresource.yaml
+kubectl create -f k8s/thirdpartyresource.yaml
 ```
 
 To verify the creation of the resource, run the following command:
@@ -196,20 +197,68 @@ To verify the creation of the resource, run the following command:
 kubectl describe ThirdPartyResource training-job
 ```
 
-1. Deploy EDL controller
+- Deploy EDL controller
 
-1. Deploying an EDL training job which name is `example`
-
-You can see the logs in the monitor program
-
-
-
-```text
+```bash
+kubectl create -f k8s/edl_controller.yaml
 ```
 
-1. Deploying another EDL training-job which name is `example2`
+### Launch EDL Training Jobs
 
+1. Run the monitor program
 
-```text
+Please open a new tab in your terminal program and run the monitor Python script `example/collector.py`:
 
+```bash
+docker run --rm -it -v $HOME/.kube/config:/root/.kube/config $PWD:/work paddlepaddle/edl-example python collector.py
 ```
+
+And you can see the following metrics:
+
+``` text
+SUBMITTED-JOBS    PENDING-JOBS    RUNNING-TRAINERS    CPU-UTILS
+0    0    -    18.40%
+0    0    -    18.40%
+0    0    -    18.40%
+...
+```
+
+1. Deploy EDL Training Jobs
+
+As simple as the following commands to launch a training-job on Kubernetes:
+
+```bash
+kubectl create -f example/examplejob.yaml
+```
+
+1. Deploy Multiple Training Jobs and Check the Monitor Logs
+
+You can edit the YAML file and change the `name` field so that you can submit multiple training jobs.
+For example, I submited three jobs which name is `example`, `example1` and `example2`, the monitor logs
+is as follows:
+
+``` text
+SUBMITED-JOBS    PENDING-JOBS    RUNNING-TRAINERS    CPU-UTILS
+0    0    -    18.40%
+0    0    -    18.40%
+1    1    example:0    23.40%
+1    0    example:10    54.40%
+1    0    example:10    54.40%
+2    0    example:10|example1:5    80.40%
+2    0    example:10|example1:8    86.40%
+2    0    example:10|example1:8    86.40%
+2    0    example:10|example1:8    86.40%
+2    0    example:10|example1:8    86.40%
+3    1    example2:0|example:10|example1:8    86.40%
+3    1    example2:0|example:10|example1:8    86.40%
+3    1    example2:0|example:5|example1:4    68.40%
+3    1    example2:0|example:3|example1:4    68.40%
+3    0    example2:4|example:3|example1:4    88.40%
+3    0    example2:4|example:3|example1:4    88.40%
+```
+
+- At the begging, then there is no training job in the cluster except some Kubernetes system components, so the CPU utilization is **18.40%**.
+- After submitting the training job **example**, the CPU utilization rise to **54.40%**, because of the `max-instances` in the YAML file is **10**, so the running trainers is **10**.
+- After submitting the training job **example1**, the CPU utilization rose to **86.40%**.
+- While we submitting the training job **example2**, there is no more resource for it, so EDL auto-scaller would
+scale down the other jobs' trainer process, and eventually the running trainers of **example** dropped down to **3**, **example1** dropped down to **4** and no pending jobs.

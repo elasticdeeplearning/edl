@@ -165,20 +165,6 @@ func (p *DefaultJobParser) ParseToTrainer(job *edlresource.TrainingJob) *batchv1
 	}
 }
 
-func masterResource(job *edlresource.TrainingJob) *v1.ResourceRequirements {
-	// TODO(gongwb): config master resource?
-	return &v1.ResourceRequirements{
-		Limits: v1.ResourceList{
-			"cpu":    *apiresource.NewQuantity(int64(2), apiresource.DecimalSI),
-			"memory": apiresource.MustParse("1Gi"),
-		},
-		Requests: v1.ResourceList{
-			"cpu":    *apiresource.NewQuantity(int64(1), apiresource.DecimalSI),
-			"memory": apiresource.MustParse("500Mi"),
-		},
-	}
-}
-
 func getEtcdPodSpec(job *edlresource.TrainingJob) *v1.Container {
 	command := []string{"etcd", "-name", "etcd0",
 		"-advertise-client-urls", "http://$(POD_IP):2379,http://$(POD_IP):4001",
@@ -229,7 +215,7 @@ func (p *DefaultJobParser) ParseToMaster(job *edlresource.TrainingJob) *v1beta1.
 							Ports:           masterPorts(job),
 							Command:         command,
 							VolumeMounts:    job.Spec.VolumeMounts,
-							Resources:       *masterResource(job),
+							Resources:       job.Spec.Master.Resources,
 						},
 						*getEtcdPodSpec(job),
 					},
