@@ -34,6 +34,7 @@ var (
 func main() {
 	masterURL := flag.String("master", "", "Address of a kube master.")
 	kubeConfig := flag.String("kubeconfig", "", "Path to a kube config. Only required if out-of-cluster.")
+	autoClean := flag.Bool("autoclean", false, "Auto clean pods after terminating job, default false")
 	maxLoadDesired := flag.Float64("max_load_desired", 0.97, `Keep the cluster max resource usage around
 		this value, jobs will scale down if total request is over this level.`)
 	flag.Parse()
@@ -58,7 +59,7 @@ func main() {
 	run := func(stop <-chan struct{}) {
 		log.Info("I won the leader election", "hostname", hostname)
 		paddleInformer := paddleinformers.NewSharedInformerFactory(paddleClient, time.Second*10)
-		controller := paddlecontroller.New(kubeClient, extapiClient, paddleClient, paddleInformer)
+		controller := paddlecontroller.New(kubeClient, extapiClient, paddleClient, paddleInformer, *autoClean)
 		go paddleInformer.Start(stopCh)
 
 		if controller.Run(1, *maxLoadDesired, stopCh); err != nil {

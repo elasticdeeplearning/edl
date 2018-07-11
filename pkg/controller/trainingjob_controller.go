@@ -6,10 +6,9 @@ import (
 	"time"
 
 	log "github.com/inconshreveable/log15"
-
 	corev1 "k8s.io/api/core/v1"
-	extv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	extclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -23,7 +22,7 @@ import (
 
 	paddlev1 "github.com/paddlepaddle/edl/pkg/apis/paddlepaddle/v1"
 	"github.com/paddlepaddle/edl/pkg/autoscaler"
-	paddleclient "github.com/paddlepaddle/edl/pkg/client/clientset/versioned"
+	paddleclientset "github.com/paddlepaddle/edl/pkg/client/clientset/versioned"
 	paddlescheme "github.com/paddlepaddle/edl/pkg/client/clientset/versioned/scheme"
 	paddleinformers "github.com/paddlepaddle/edl/pkg/client/informers/externalversions"
 	paddlelisters "github.com/paddlepaddle/edl/pkg/client/listers/paddlepaddle/v1"
@@ -34,16 +33,16 @@ import (
 type TrainingJobController struct {
 	// KubeCli is a standard kubernetes clientset
 	KubeCli kubernetes.Interface
-	// ExtCli is the extension kubernetes clientset
-	ExtCli extclient.Interface
+	// ApiCli is the extension kubernetes clientset
+	ApiCli apiextensionsclient.Interface
 	// PaddleCli is a clientset for our own API group
-	PaddleCli paddleclient.Interface
+	PaddleCli paddleclientset.Interface
 
 	trainingjobLister paddlelisters.TrainingJobLister
 	trainingjobSynced cache.InformerSynced
 
-	// jobupdater is the collection of job updaters for each training job
-	jobupdater *sync.Map
+	// jobtracker keeps a map from job full name to its updater
+	jobtracker *sync.Map
 
 	// workqueue is a rate limited work queue. This is used to queue work to be
 	// processed instead of performing it as soon as a change happens.
@@ -51,52 +50,73 @@ type TrainingJobController struct {
 	// recorder is an event recorder for recording Event resources to the
 	// Kubernetes API.
 	recorder record.EventRecorder
+
+	// autoclean means whether or not cleaning pods after termination.
+	autoclean bool
 }
 
-// New returns a trainingjob controller
 func New(
 	kubeCli kubernetes.Interface,
-	extCli extclient.Interface,
-	paddleCli paddleclient.Interface,
-	paddleInformers paddleinformers.SharedInformerFactory) *TrainingJobController {
-	trainingjobInformer := paddleInformers.Paddlepaddle().V1().TrainingJobs()
-	paddlescheme.AddToScheme(scheme.Scheme)
+	apiCli apiextensionsclient.Interface,
+	paddleCli paddleclientset.Interface,
+	tjInformer paddleinformers.SharedInformerFactory,
+	auto bool) *TrainingJobController {
 
-	log.Info("Creating trainingjob event broadcaster")
+	traingingjobInformer := tjInformer.Paddlepaddle().V1().TrainingJobs()
+
+	paddlescheme.AddToScheme(scheme.Scheme)
+	log.Debug("Creating trainingjob event broadcaster")
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(log.Info)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeCli.CoreV1().Events("")})
-	workqueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "TrainingJob")
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "TrainingJobController"})
 
 	controller := &TrainingJobController{
 		KubeCli:           kubeCli,
-		ExtCli:            extCli,
+		ApiCli:            apiCli,
 		PaddleCli:         paddleCli,
-		trainingjobLister: trainingjobInformer.Lister(),
-		trainingjobSynced: trainingjobInformer.Informer().HasSynced,
-		jobupdater:        new(sync.Map),
-		workqueue:         workqueue,
+		trainingjobLister: traingingjobInformer.Lister(),
+		trainingjobSynced: traingingjobInformer.Informer().HasSynced,
+		jobtracker:        new(sync.Map),
+		workqueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "TrainingJob"),
 		recorder:          recorder,
+		autoclean:         auto,
 	}
 
 	log.Info("Setting up event handlers")
-	trainingjobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controller.enqueue,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			oldTj := oldObj.(*paddlev1.TrainingJob)
-			newTj := newObj.(*paddlev1.TrainingJob)
-			objNs := oldTj.Namespace
-			objName := oldTj.Name
-			if oldTj.ResourceVersion == newTj.ResourceVersion {
-				log.Debug("same resourceversion for training job", objNs, "/", objName, ", skipped")
-				return
-			}
-			log.Debug("resourceversion for training job", objNs, "/", objName, "updated")
-			controller.enqueue(newObj)
-		},
-		DeleteFunc: controller.dequeue,
-	})
+	traingingjobInformer.Informer().AddEventHandler(
+		cache.FilteringResourceEventHandler{
+			FilterFunc: func(obj interface{}) bool {
+				switch t := obj.(type) {
+				case *paddlev1.TrainingJob:
+					log.Debug("filter trainingjob", "namespace", t.Namespace, "name", t.Name)
+					return true
+				default:
+					return false
+				}
+			},
+
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					log.Debug("AddFunc called")
+					controller.enqueue(obj)
+				},
+				UpdateFunc: func(oldObj, newObj interface{}) {
+					oldTj := oldObj.(*paddlev1.TrainingJob)
+					newTj := newObj.(*paddlev1.TrainingJob)
+					if oldTj.ResourceVersion == newTj.ResourceVersion {
+						log.Debug("same resourceversion skipped", "namespace", oldTj.Namespace, "name", oldTj.Name)
+						return
+					}
+					log.Debug("resourceversion updated", "namespace", oldTj.Namespace, "name", oldTj.Name)
+					controller.enqueue(newObj)
+				},
+				DeleteFunc: func(obj interface{}) {
+					log.Debug("DeleteFunc called")
+					controller.enqueue(obj)
+				},
+			},
+		})
 
 	return controller
 }
@@ -106,9 +126,11 @@ func New(
 // is closed, at which point it will shutdown the workqueue and wait for
 // workers to finish processing their current work items.
 func (c *TrainingJobController) Run(threadiness int, maxLoadDesired float64, stopCh <-chan struct{}) error {
+	// TODO add a lock to ensure there is only one controller in the cluster
 	defer runtime.HandleCrash()
 	defer c.workqueue.ShutDown()
 
+	log.Info("Starting trainingjob controller")
 	log.Info("Starting to create custom resource definition")
 
 	if err := c.createCRD(); err != nil {
@@ -125,9 +147,12 @@ func (c *TrainingJobController) Run(threadiness int, maxLoadDesired float64, sto
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
+	// gc := NewGarbageCollector(c.KubeCli, c.trainingjobLister)
+	// go gc.CleanOrphans(10 * time.Minute)
+
 	log.Info("Started workers")
 
-	as := autoscaler.NewAutoscaler(c.KubeCli, c.jobupdater, autoscaler.WithMaxLoadDesired(maxLoadDesired))
+	as := autoscaler.NewAutoscaler(c.KubeCli, c.jobtracker, autoscaler.WithMaxLoadDesired(maxLoadDesired))
 	as.Run()
 
 	<-stopCh
@@ -137,15 +162,15 @@ func (c *TrainingJobController) Run(threadiness int, maxLoadDesired float64, sto
 }
 
 func (c *TrainingJobController) createCRD() error {
-	crd := &extv1beta1.CustomResourceDefinition{
+	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: paddlev1.CRDName(),
 		},
-		Spec: extv1beta1.CustomResourceDefinitionSpec{
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group:   paddlev1.CRDGroup,
 			Version: paddlev1.CRDVersion,
-			Scope:   extv1beta1.NamespaceScoped,
-			Names: extv1beta1.CustomResourceDefinitionNames{
+			Scope:   apiextensionsv1beta1.NamespaceScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Kind:       paddlev1.CRDKind,
 				Plural:     paddlev1.CRDKindPlural,
 				ShortNames: []string{paddlev1.CRDShortName},
@@ -153,9 +178,9 @@ func (c *TrainingJobController) createCRD() error {
 		},
 	}
 
-	_, err := c.ExtCli.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	_, err := c.ApiCli.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		log.Error("Failed to create crd, error", err.Error())
+		log.Error("Failed to create crd", "err", err.Error())
 		return err
 	}
 
@@ -171,93 +196,113 @@ func (c *TrainingJobController) enqueue(obj interface{}) {
 		runtime.HandleError(err)
 		return
 	}
-	log.Info("enqueue key:", key)
+	log.Info("enqueue", "key", key)
 	c.workqueue.AddRateLimited(key)
 }
 
-func (c *TrainingJobController) dequeue(obj interface{}) {
-	job, ok := obj.(*paddlev1.TrainingJob)
-	if !ok {
-		runtime.HandleError(fmt.Errorf("type conversion error: %+v", obj))
-		return
-	}
-	key := job.Namespace + "/" + job.Name
-	log.Info("dequeue key:", key)
-	jobToDelete, ok := c.jobupdater.Load(key)
-	if !ok {
-		log.Warn("unsafe state.", key, "was never created but we received delete event")
-		return
-	}
-
-	oldtj := jobToDelete.(*updater.TrainingJobUpdater)
-	oldtj.Delete()
-	c.jobupdater.Delete(key)
-}
-
 func (c *TrainingJobController) runWorker() {
+	log.Debug("Run worker again")
 	for c.processNextWorkItem() {
 	}
 }
 
 func (c *TrainingJobController) processNextWorkItem() bool {
-	obj, shutdown := c.workqueue.Get()
+	key, shutdown := c.workqueue.Get()
+
 	if shutdown {
 		return false
 	}
 
-	err := func(obj interface{}) error {
-		defer c.workqueue.Done(obj)
-		var key string
-		var ok bool
-		if key, ok = obj.(string); !ok {
-			c.workqueue.Forget(obj)
-			runtime.HandleError(fmt.Errorf("expected string in workqueue but got %#v", obj))
-			return nil
+	defer c.workqueue.Done(key)
+
+	forget, err := c.syncHandler(key.(string))
+	if err == nil {
+		if forget {
+			c.workqueue.Forget(key)
+			log.Info("Successfully synced", "key", key.(string))
 		}
-
-		if err := c.syncHandler(key); err != nil {
-			return fmt.Errorf("error syncing '%s': %s", key, err.Error())
-		}
-
-		c.workqueue.Forget(obj)
-		log.Info("Successfully synced", key)
-		return nil
-	}(obj)
-
-	if err != nil {
-		runtime.HandleError(err)
 		return true
 	}
+
+	runtime.HandleError(fmt.Errorf("Error syncing job: %v", err))
+	c.workqueue.AddRateLimited(key)
 
 	return true
 }
 
-func (c *TrainingJobController) syncHandler(key string) error {
-	log.Info("syncHandler, key:", key)
+func (c *TrainingJobController) syncHandler(key string) (bool, error) {
+	log.Info("syncHandler", "key", key)
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("invalid resource key: %s", key))
-		return nil
+		return false, nil
 	}
-	log.Info("syncHandler for ", ns, "/", name)
 
-	job, createErr := c.trainingjobLister.TrainingJobs(ns).Get(name)
-	if createErr != nil {
-		log.Error("get trainingjob error:", err.Error())
-		if apierrors.IsNotFound(err) {
-			runtime.HandleError(fmt.Errorf("trainingjob '%s' in the work queue no longer exists", key))
-			return nil
+	jobIsDeleted := false
+	job, getErr := c.trainingjobLister.TrainingJobs(ns).Get(name)
+	if getErr != nil {
+		log.Debug("Error fetching TrainingJob", "key", key, "err", getErr.Error())
+		if apierrors.IsNotFound(getErr) {
+			jobIsDeleted = true
+		} else {
+			return false, nil
+		}
+	} else {
+		log.Debug("TrainingJob fetching status", "namespace", job.Namespace, "name", job.Name, "status", job.Status)
+	}
+
+	var jobUpdater *updater.JobUpdater
+	jobUpdaterObj, exists := c.jobtracker.Load(key)
+
+	if !exists {
+		if jobIsDeleted {
+			log.Debug("key not exist", "key", key)
+			return true, fmt.Errorf("JobNotExists")
+		}
+		log.Debug("TrainingJob new", "namespace", job.Namespace, "name", job.Name)
+		nj := updater.NewJobUpdater(job, c.KubeCli, c.PaddleCli, c.autoclean)
+		c.jobtracker.Store(key, nj)
+		jobUpdater = nj
+	} else {
+		var ok bool
+		jobUpdater, ok = jobUpdaterObj.(*updater.JobUpdater)
+		if !ok {
+			log.Debug("Conversion object error", "object", jobUpdaterObj)
+			return true, fmt.Errorf("ConversionError")
 		}
 
-		return err
+		if jobIsDeleted {
+			// clean job
+			log.Info("Deleting TrainingJob", "name", jobUpdater.FullName())
+			if err := jobUpdater.Delete(); err != nil {
+				log.Error("Error deleting TrainingJob", "name", jobUpdater.FullName(), "err", err.Error())
+				return false, nil
+			}
+			log.Info("Finishing deleting TrainingJob", "name", jobUpdater.FullName())
+			c.jobtracker.Delete(key)
+			return true, nil
+		}
+
+		if jobUpdater.UID() != job.ObjectMeta.UID {
+			// update job
+			log.Debug("TrainingJob UID changed", "namespace", job.Namespace, "name", job.Name)
+			jobUpdater.Update(job)
+		}
 	}
 
-	_, ok := c.jobupdater.Load(key)
-	if !ok {
-		log.Info("create new job updater, key:", key)
-		nj, _ := updater.NewUpdater(job, c.KubeCli, c.PaddleCli)
-		c.jobupdater.Store(key, nj)
+	if err := jobUpdater.Reconcile(); err != nil {
+		log.Error("Error reconciling", "namespace", job.Namespace, "name", job.Name, "err", err.Error())
+		return false, err
 	}
 
-	return nil
+	currentPhase := jobUpdater.GetJob().Status.Phase
+
+	if currentPhase == paddlev1.TrainingJobPhaseCreating ||
+		currentPhase == paddlev1.TrainingJobPhaseRunning ||
+		currentPhase == paddlev1.TrainingJobPhaseScaling {
+		c.workqueue.AddAfter(key, 3*time.Second)
+		log.Debug("TrainingJob put into workqueue again", "key", key, "current statue phase", currentPhase)
+	}
+
+	return false, nil
 }

@@ -62,7 +62,7 @@ func getPodsTotalRequestsAndLimits(podList *v1.PodList) (reqs v1.ResourceList, l
 func updateNodesIdleResource(podList *v1.PodList, nodesCPUIdleMilli map[string]int64, nodesMemoryFreeMega map[string]int64) (err error) {
 	for _, pod := range podList.Items {
 		podname := pod.Namespace + "/" + pod.Name
-		log.Debug("updateNodesIdleResource", "podName", podname)
+		log.Debug("updateNodesIdleResource", "podName", podname, "phase", pod.Status.Phase)
 		nodeName := pod.Spec.NodeName
 		if nodeName == "" {
 			continue
