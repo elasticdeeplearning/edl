@@ -1,10 +1,23 @@
-# PaddlePaddle EDL tutorial
+# PaddlePaddle Elastic Deep Learning
 
-This is a hands-on tutorial used for BOSS workshop 2018. We have two parts in this tutorial:
-- Part-1: Train a simple model by PaddlePaddle Fliud.
-- Part-2: Launch the EDL training job on a Kuberntes cluster.
+While many hardware and software manufacturers are working on improving the training performance
+of deep learning jobs, PaddlePaddle Elastic Deep Learning (EDL) optimize the global utilization
+of the cluster and the waiting time of job submitters. EDL includes two parts, one is a
+Kubernetes controller, PaddlePaddle auto-scaler which changes the number of processes of the 
+distributed jobs according to the idle hardware resource in the cluster,
+and another one is the fault-tolerant distributed training architecture in PaddlePaddle.
 
-And please don't forget the necessary preparations before everything.
+## Tutorial Outline
+
+- Introduction
+  At the introduction session, we will introduce:
+    1. a new version named Fluid on PaddlePaddle; and
+    1. Why we develop PaddlePaddle EDL and how to implement it.
+- Hands-on tutorial
+  Following the introduction, we will prepare a hands-on tutorial so that all the audience can use
+  PaddlePaddle and ask some questions while using PaddlePaddle:
+  - Part-1, Train a simple model using PaddlePaddle Fluid.
+  - Part-2, Launch an EDL training job on a Kubernetes Cluster.
 
 ## Prerequisites
 
@@ -13,16 +26,22 @@ And please don't forget the necessary preparations before everything.
 - A Kubernetes cluster which version is `1.7.x`
   - [minikube would launch a kubernetes cluster locally](./install.md#minikube).
   - [kops would launch a Kuberntes cluster on AWS](./install.md#aws).
+  - We will also prepare a public Kubernetes cluster via Cloud if you don't have an AWS
+    account that you can submit the EDL training jobs using the public cluster.
 
-Please note, TPR (Third Party Resource) is deprecated after Kubernetes 1.7. We are working to support CRD (Custom Resource Definitions, the successor of TPR). Stay tuned!
+## Resources
 
-## Part-1: Train a simple model by PaddlePaddle Fliud
+- [PaddlePaddle](http://github.com/PaddlePaddle/Paddle)
+- [PaddlePaddle EDL](https://github.com/PaddlePaddle/edl)
 
-In this part, we will train a model from a realistic dataset to predict home prices,
-you can check out [fit a line](https://github.com/PaddlePaddle/book/tree/develop/01.fit_a_line) to get
-some concept about Deep Learning, this tutorial would only force on codes:
+## Part-1: Train a Simple Model Using Paddlepaddle Fliud
 
-### Write the codes to train the model
+In this part, we will train a model from a real dataset to predict house prices,
+to learn the concept of this model, you can check out
+[fit a line](https://github.com/PaddlePaddle/book/tree/develop/01.fit_a_line),
+this tutorial will focus on writing the program.
+
+### Write the Codes to Train a Simple Model
 
 - Importing some necessary PaddlePaddle packages at the begging:
 
@@ -151,7 +170,7 @@ trainer.train(
     feed_order=feed_order)
 ```
 
-### Run the Python program
+### Run the Python Program Using Docker
 
 ```bash
 docker run --rm -it -v $PWD:/work paddlepaddle/paddle:0.14.0 python /work/example/train_fluid.py
@@ -163,7 +182,7 @@ in the meantime which defined in `EventHandler`:
 ```text
 ```
 
-## Part-2: Launch the PaddlePaddle EDL Training Jobs on a Kubernetes Cluster
+## Part-2: Launch the Paddlepaddle EDL Training Jobs on a Kubernetes Cluster
 
 Before launching the EDL training-jobs, we can start-up a monitor program to
 watch the Trainer process changes.
@@ -173,7 +192,7 @@ watch the Trainer process changes.
 If you start up a Kubernetes by `minikube` or `kops`, the kubectl configuration would be ready when
 the cluster is available, for the other approach, you can contact the administrator to fetch the configuration file.
 
-### Deploying EDL components
+### Deploy EDL Components
 
 1. (Optional) Configure RBAC for EDL controller so that it would have the cluster admin permission.
 
@@ -203,7 +222,7 @@ kubectl describe ThirdPartyResource training-job
 kubectl create -f k8s/edl_controller.yaml
 ```
 
-### Launch EDL Training Jobs
+### Launch the EDL Training Jobs
 
 1. Run the monitor program
 
