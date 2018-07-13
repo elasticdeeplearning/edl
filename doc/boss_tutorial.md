@@ -1,5 +1,7 @@
 # PaddlePaddle Elastic Deep Learning
 
+<img src="../logo/edl.png" width="500">
+
 While many hardware and software manufacturers are working on improving the training performance
 of deep learning jobs, PaddlePaddle Elastic Deep Learning (EDL) optimize the global utilization
 of the cluster and the waiting time of job submitters. EDL includes two parts, one is a
