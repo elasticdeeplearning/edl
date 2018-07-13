@@ -142,22 +142,19 @@ params_dirname = "fit_a_line.inference.model"
 
 # event_handler to print training and testing info
 def event_handler_plot(event):
-    global step
-    if isinstance(event, fluid.EndStepEvent):
-        if event.step % 10 == 0: # every 10 batches, record a test cost
-            test_metrics = trainer.test(
-                reader=test_reader, feed_order=feed_order)
+    if isinstance(event, fluid.EndEpochEvent):
+        test_metrics = trainer.test(
+            reader=test_reader, feed_order=feed_order)
 
-            if test_metrics[0] < 10.0:
-                # If the accuracy is good enough, we can stop the training.
-                print('loss is less than 10.0, stop')
-                trainer.stop()
+        print("epoch: {0}, loss: {1}".format(event.epoch, test_metrics[0]))
+        if test_metrics[0] < 10.0:
+            # If the accuracy is good enough, we can stop the training.
+            print('loss is less than 10.0, stop')
+            trainer.stop()
 
         # We can save the trained parameters for the inferences later
         if params_dirname is not None:
             trainer.save_params(params_dirname)
-
-        step += 1
 ```
 
 - Start Training
@@ -182,6 +179,17 @@ The training process could take up to a few minutes, and you can see the trainin
 in the meantime which defined in `EventHandler`:
 
 ```text
+epoch: 1, loss: 256.279940796
+epoch: 2, loss: 233.243792725
+epoch: 3, loss: 210.006860352
+epoch: 4, loss: 200.610595703
+epoch: 5, loss: 182.232144165
+epoch: 6, loss: 170.355409241
+epoch: 7, loss: 154.600262451
+epoch: 8, loss: 143.756222534
+epoch: 9, loss: 133.120368958
+epoch: 10, loss: 124.725740051
+...
 ```
 
 ## Part-2: Launch the Paddlepaddle EDL Training Jobs on a Kubernetes Cluster
