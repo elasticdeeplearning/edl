@@ -2,12 +2,20 @@
 
 <img src="../logo/edl.png" width="500">
 
-While many hardware and software manufacturers are working on improving the training performance
-of deep learning jobs, PaddlePaddle Elastic Deep Learning (EDL) optimize the global utilization
-of the cluster and the waiting time of job submitters. EDL includes two parts, one is a
-Kubernetes controller, PaddlePaddle auto-scaler which changes the number of processes of the 
-distributed jobs according to the idle hardware resource in the cluster,
-and another one is the fault-tolerant distributed training architecture in PaddlePaddle.
+PaddlePaddle Elastic Deep Learning (EDL) is a clustering project which leverages Deep Learning training jobs to
+be scalable and fault-tolerant. EDL will greatly boost the parallel distributed training jobs and make good use
+of cluster computing power.
+
+EDL is based on the full fault-tolerant feature of PaddlePaddle, it uses a Kubernetes controller to manage
+the cluster training jobs and an auto-scaler to scale the job's computing resources.
+
+For researchers, EDL with Kuberntes will reduce the waiting time of the job submitted, to help with
+exposing potential algorithmic problems as early as possible.
+
+For enterprises, industrial users tend to run deep learning jobs as a subset of the complete data pipeline,
+including web servers and log collectors. EDL make it possible to run less deep learning job processes during
+periods of high web traffic, more when web traffic is low. EDL would optimize the global utilization
+of a cluster.
 
 ## Tutorial Outline
 
@@ -36,7 +44,7 @@ and another one is the fault-tolerant distributed training architecture in Paddl
 - [PaddlePaddle](http://github.com/PaddlePaddle/Paddle)
 - [PaddlePaddle EDL](https://github.com/PaddlePaddle/edl)
 
-## Part-1: Train a Simple Model Using Paddlepaddle Fliud
+## Part-1: Train a Simple Model Using PaddlePaddle
 
 In this part, we will train a model from a real dataset to predict house prices,
 to learn the concept of this model, you can check out
@@ -193,6 +201,7 @@ epoch: 10, loss: 124.725740051
 ```
 
 ## Part-2: Launch the Paddlepaddle EDL Training Jobs on a Kubernetes Cluster
+
 
 Before launching the EDL training-jobs, we can start-up a monitor program to
 watch the Trainer process changes.

@@ -9,7 +9,7 @@ improving the running time of deep learning jobs, EDL optimizes
 1. the waiting time of job submitters.
 
 For more about the project EDL, please refer to this [invited blog
-post](http://blog.kubernetes.io/2017/12/paddle-paddle-fluid-elastic-learning.html)
+post](https://kubernetes.io/blog/2017/12/paddle-paddle-fluid-elastic-learning/)
 on the Kubernetes official blog.
 
 EDL includes two parts:
