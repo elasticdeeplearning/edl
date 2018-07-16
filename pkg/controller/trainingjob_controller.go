@@ -31,12 +31,12 @@ import (
 
 // TrainingJobController defines the structure to manage TrainingJob resource
 type TrainingJobController struct {
-	// KubeCli is a standard kubernetes clientset
-	KubeCli kubernetes.Interface
-	// ApiCli is the extension kubernetes clientset
-	ApiCli apiextensionsclient.Interface
-	// PaddleCli is a clientset for our own API group
-	PaddleCli paddleclientset.Interface
+	// kubeCli is a standard kubernetes clientset
+	kubeCli kubernetes.Interface
+	// apiCli is the extension kubernetes clientset
+	apiCli apiextensionsclient.Interface
+	// paddleCli is a clientset for our own API group
+	paddleCli paddleclientset.Interface
 
 	trainingjobLister paddlelisters.TrainingJobLister
 	trainingjobSynced cache.InformerSynced
@@ -55,6 +55,7 @@ type TrainingJobController struct {
 	autoclean bool
 }
 
+// New returns a TrainingJobController object
 func New(
 	kubeCli kubernetes.Interface,
 	apiCli apiextensionsclient.Interface,
@@ -72,9 +73,9 @@ func New(
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "TrainingJobController"})
 
 	controller := &TrainingJobController{
-		KubeCli:           kubeCli,
-		ApiCli:            apiCli,
-		PaddleCli:         paddleCli,
+		kubeCli:           kubeCli,
+		apiCli:            apiCli,
+		paddleCli:         paddleCli,
 		trainingjobLister: traingingjobInformer.Lister(),
 		trainingjobSynced: traingingjobInformer.Informer().HasSynced,
 		jobtracker:        new(sync.Map),
@@ -126,7 +127,6 @@ func New(
 // is closed, at which point it will shutdown the workqueue and wait for
 // workers to finish processing their current work items.
 func (c *TrainingJobController) Run(threadiness int, maxLoadDesired float64, stopCh <-chan struct{}) error {
-	// TODO add a lock to ensure there is only one controller in the cluster
 	defer runtime.HandleCrash()
 	defer c.workqueue.ShutDown()
 
@@ -147,12 +147,9 @@ func (c *TrainingJobController) Run(threadiness int, maxLoadDesired float64, sto
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
-	// gc := NewGarbageCollector(c.KubeCli, c.trainingjobLister)
-	// go gc.CleanOrphans(10 * time.Minute)
-
 	log.Info("Started workers")
 
-	as := autoscaler.NewAutoscaler(c.KubeCli, c.jobtracker, autoscaler.WithMaxLoadDesired(maxLoadDesired))
+	as := autoscaler.NewAutoscaler(c.kubeCli, c.jobtracker, autoscaler.WithMaxLoadDesired(maxLoadDesired))
 	as.Run()
 
 	<-stopCh
@@ -178,7 +175,7 @@ func (c *TrainingJobController) createCRD() error {
 		},
 	}
 
-	_, err := c.ApiCli.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	_, err := c.apiCli.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		log.Error("Failed to create crd", "err", err.Error())
 		return err
@@ -260,7 +257,7 @@ func (c *TrainingJobController) syncHandler(key string) (bool, error) {
 			return true, fmt.Errorf("JobNotExists")
 		}
 		log.Debug("TrainingJob new", "namespace", job.Namespace, "name", job.Name)
-		nj := updater.NewJobUpdater(job, c.KubeCli, c.PaddleCli, c.autoclean)
+		nj := updater.NewJobUpdater(job, c.kubeCli, c.paddleCli, c.autoclean)
 		c.jobtracker.Store(key, nj)
 		jobUpdater = nj
 	} else {
