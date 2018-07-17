@@ -26,7 +26,7 @@ of a cluster.
 - Hands-on tutorial
   Following the introduction, we will prepare a hands-on tutorial so that all the audience can use
   PaddlePaddle and ask some questions while using PaddlePaddle:
-    1. Part-1, Train a simple model using PaddlePaddle Fluid.
+    1. Part-1, Train a word embedding model using PaddlePaddle.
     1. Part-2, Launch an EDL training job on a Kubernetes Cluster.
 
 ## Prerequisites
@@ -264,89 +264,89 @@ kubectl create -f k8s/edl_controller.yaml
 
 1. Edit the local training program to be able to run with distributed mode
 
-It's easy to update your local training program to be running with distributing mode:
+    It's easy to update your local training program to be running with distributing mode:
 
 - Pre-process the datase with RecordIO format
 
-We have done this in the Docker image `paddlepaddle/edl-example` using `dataset.covert` API as follows:
+    We have done this in the Docker image `paddlepaddle/edl-example` using `dataset.covert` API as follows:
 
-``` python
-dataset.common.convert('/data/recordio/imikolov/', dataset.imikolov.train(word_dict, 5), 5000, 'imikolov-train')"
-```
+    ``` python
+    dataset.common.convert('/data/recordio/imikolov/', dataset.imikolov.train(word_dict, 5), 5000, 'imikolov-train')"
+    ```
 
-This would generate many recordio files on `/data/recordio/imikolov` folder, and we have prepared these files on Docker image `paddlepaddle/edl-example`.
+    This would generate many recordio files on `/data/recordio/imikolov` folder, and we have prepared these files on Docker image `paddlepaddle/edl-example`.
 
 - Pass in the `etcd_endpoint` to the `Trainer` object so that `Trainer` would know it's a fault-tolerant distributed training job.
 
-``` python
-trainer = paddle.trainer.SGD(cost,
-                              parameters,
-                              adam_optimizer,
-                              is_local=False,
-                              pserver_spec=etcd_endpoint,
-                              use_etcd=True)
-```
+    ``` python
+    trainer = paddle.trainer.SGD(cost,
+                                  parameters,
+                                  adam_optimizer,
+                                  is_local=False,
+                                  pserver_spec=etcd_endpoint,
+                                  use_etcd=True)
+    ```
 
 - Use `cloud_reader` which is a `master_client` instance can fetch the training data from the task queue.
 
-``` python
-trainer.train(
-    paddle.batch(cloud_reader([TRAIN_FILES_PATH], etcd_endpoint), 32),
-    num_passes=30,
-    event_handler=event_handler)
-```
+    ``` python
+    trainer.train(
+        paddle.batch(cloud_reader([TRAIN_FILES_PATH], etcd_endpoint), 32),
+        num_passes=30,
+        event_handler=event_handler)
+    ```
 
 1. Run the monitor program
 
-Please open a new tab in your terminal program and run the monitor Python script `example/collector.py`:
+    Please open a new tab in your terminal program and run the monitor Python script `example/collector.py`:
 
-```bash
-docker run --rm -it -v $HOME/.kube/config:/root/.kube/config $PWD:/work paddlepaddle/edl-example python collector.py
-```
+    ```bash
+    docker run --rm -it -v $HOME/.kube/config:/root/.kube/config $PWD:/work paddlepaddle/edl-example python collector.py
+    ```
 
-And you can see the following metrics:
+    And you can see the following metrics:
 
-``` text
-SUBMITTED-JOBS    PENDING-JOBS    RUNNING-TRAINERS    CPU-UTILS
-0    0    -    18.40%
-0    0    -    18.40%
-0    0    -    18.40%
-...
-```
+    ``` text
+    SUBMITTED-JOBS    PENDING-JOBS    RUNNING-TRAINERS    CPU-UTILS
+    0    0    -    18.40%
+    0    0    -    18.40%
+    0    0    -    18.40%
+    ...
+    ```
 
 1. Deploy EDL Training Jobs
 
-As simple as the following commands to launch a training-job on Kubernetes:
+    As simple as the following commands to launch a training-job on Kubernetes:
 
-```bash
-kubectl create -f example/examplejob.yaml
-```
+    ```bash
+    kubectl create -f example/examplejob.yaml
+    ```
 
 1. Deploy Multiple Training Jobs and Check the Monitor Logs
 
-You can edit the YAML file and change the `name` field so that you can submit multiple training jobs.
-For example, I submited three jobs which name is `example`, `example1` and `example2`, the monitor logs
-is as follows:
+    You can edit the YAML file and change the `name` field so that you can submit multiple training jobs.
+    For example, I submited three jobs which name is `example`, `example1` and `example2`, the monitor logs
+    is as follows:
 
-``` text
-SUBMITED-JOBS    PENDING-JOBS    RUNNING-TRAINERS    CPU-UTILS
-0    0    -    18.40%
-0    0    -    18.40%
-1    1    example:0    23.40%
-1    0    example:10    54.40%
-1    0    example:10    54.40%
-2    0    example:10|example1:5    80.40%
-2    0    example:10|example1:8    86.40%
-2    0    example:10|example1:8    86.40%
-2    0    example:10|example1:8    86.40%
-2    0    example:10|example1:8    86.40%
-3    1    example2:0|example:10|example1:8    86.40%
-3    1    example2:0|example:10|example1:8    86.40%
-3    1    example2:0|example:5|example1:4    68.40%
-3    1    example2:0|example:3|example1:4    68.40%
-3    0    example2:4|example:3|example1:4    88.40%
-3    0    example2:4|example:3|example1:4    88.40%
-```
+    ``` text
+    SUBMITED-JOBS    PENDING-JOBS    RUNNING-TRAINERS    CPU-UTILS
+    0    0    -    18.40%
+    0    0    -    18.40%
+    1    1    example:0    23.40%
+    1    0    example:10    54.40%
+    1    0    example:10    54.40%
+    2    0    example:10|example1:5    80.40%
+    2    0    example:10|example1:8    86.40%
+    2    0    example:10|example1:8    86.40%
+    2    0    example:10|example1:8    86.40%
+    2    0    example:10|example1:8    86.40%
+    3    1    example2:0|example:10|example1:8    86.40%
+    3    1    example2:0|example:10|example1:8    86.40%
+    3    1    example2:0|example:5|example1:4    68.40%
+    3    1    example2:0|example:3|example1:4    68.40%
+    3    0    example2:4|example:3|example1:4    88.40%
+    3    0    example2:4|example:3|example1:4    88.40%
+    ```
 
 - At the begging, then there is no training job in the cluster except some Kubernetes system components, so the CPU utilization is **18.40%**.
 - After submitting the training job **example**, the CPU utilization rise to **54.40%**, because of the `max-instances` in the YAML file is **10**, so the running trainers is **10**.
