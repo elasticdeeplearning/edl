@@ -46,162 +46,179 @@ of a cluster.
 
 ## Part-1: Train a Simple Model Using PaddlePaddle
 
-In this part, we will train a model from a real dataset to predict house prices,
-to learn the concept of this model, you can check out
-[fit a line](https://github.com/PaddlePaddle/book/tree/develop/01.fit_a_line),
-this tutorial will focus on writing the program.
+In this part, we will train a **word embedding** model, to learn the concept of this
+model, you can check out [word2vec](https://github.com/PaddlePaddle/book/tree/develop/04.word2vec), this 
+tutorial will focus on writing the program.
 
-### Write the Codes to Train a Simple Model
+### Training Codes
 
 - Importing some necessary PaddlePaddle packages at the begging:
 
 ```python
-import paddle
-import paddle.fluid as fluid
+import math
+import os
+
 import numpy
+import paddle.v2 as paddle
 ```
 
-- Define data feeders for test and train
+- functions used to save and load word dict and embedding table
 
-The feeder reads a BATCH_SIZE of data each time and feeds them to the training/testing process.
-If the user wants some randomness on the data order, she can define both a BATCH_SIZE and a buf_size.
-That way the data feeder will yield the first BATCH_SIZE data out of a shuffle of the first buf_size data.
+``` python
+# save and load word dict and embedding table
+def save_dict_and_embedding(word_dict, embeddings):
+    with open("word_dict", "w") as f:
+        for key in word_dict:
+            f.write(key + " " + str(word_dict[key]) + "\n")
+    with open("embedding_table", "w") as f:
+        numpy.savetxt(f, embeddings, delimiter=',', newline='\n')
 
-```python
-BATCH_SIZE = 20
 
-train_reader = paddle.batch(
-    paddle.reader.shuffle(
-        paddle.dataset.uci_housing.train(), buf_size=500),
-    batch_size=BATCH_SIZE)
+def load_dict_and_embedding():
+    word_dict = dict()
+    with open("word_dict", "r") as f:
+        for line in f:
+            key, value = line.strip().split(" ")
+            word_dict[key] = int(value)
 
-test_reader = paddle.batch(
-    paddle.reader.shuffle(
-        paddle.dataset.uci_housing.test(), buf_size=500),
-    batch_size=BATCH_SIZE)
+    embeddings = numpy.loadtxt("embedding_table", delimiter=",")
+    return word_dict, embeddings
+
 ```
 
-- Train Program Configuration
+-  Map the $n-1$ words $w_{t-n+1},...w_{t-1}$ before $w_t$ to a D-dimensional vector though matrix of dimention $|V|\times D$ (D=32 in this example).
 
-`train_program` sets up the network structure of this current training model.
-For linear regression, it is merely a fully connected layer from the input to the output.
-The train_program must return an avg_loss as its first returned parameter because it is needed in backpropagation.
-
-```python
-def train_program():
-    y = fluid.layers.data(name='y', shape=[1], dtype='float32')
-
-    # feature vector of length 13
-    x = fluid.layers.data(name='x', shape=[13], dtype='float32')
-    y_predict = fluid.layers.fc(input=x, size=1, act=None)
-
-    loss = fluid.layers.square_error_cost(input=y_predict, label=y)
-    avg_loss = fluid.layers.mean(loss)
-
-    return avg_loss
+``` python
+def wordemb(inlayer):
+    wordemb = paddle.layer.table_projection(
+        input=inlayer,
+        size=embsize,
+        param_attr=paddle.attr.Param(
+            name="_proj",
+            initial_std=0.001,
+            learning_rate=1,
+            l2_rate=0)
+    return wordemb
 ```
 
-- Optimizer Function Configuration
+- Define name and type for input to data layer.
 
-In the following SGD optimizer, learning_rate specifies the learning rate in the optimization procedure.
+``` python
+paddle.init(use_gpu=False, trainer_count=1)
+word_dict = paddle.dataset.imikolov.build_dict()
+dict_size = len(word_dict)
+# Every layer takes integer value of range [0, dict_size)
+firstword = paddle.layer.data(
+    name="firstw", type=paddle.data_type.integer_value(dict_size))
+secondword = paddle.layer.data(
+    name="secondw", type=paddle.data_type.integer_value(dict_size))
+thirdword = paddle.layer.data(
+    name="thirdw", type=paddle.data_type.integer_value(dict_size))
+fourthword = paddle.layer.data(
+    name="fourthw", type=paddle.data_type.integer_value(dict_size))
+nextword = paddle.layer.data(
+    name="fifthw", type=paddle.data_type.integer_value(dict_size))
 
-```python
-def optimizer_program():
-    return fluid.optimizer.SGD(learning_rate=0.001)
+Efirst = wordemb(firstword)
+Esecond = wordemb(secondword)
+Ethird = wordemb(thirdword)
+Efourth = wordemb(fourthword)
 ```
 
-- Specify Place
+- Concatenate n-1 word embedding vectors into a single feature vector.
 
-Specify your training envionment if the training is on CPU or GPU: 
-
-```bash
-use_cuda = False
-place = fluid.CUDAPlace(0) if use_cuda else fluid.CPUPlace()
+``` python
+contextemb = paddle.layer.concat(input=[Efirst, Esecond, Ethird, Efourth])
 ```
 
-- Crete Trainer Object
+- Feature vector will go through a fully connected layer which outputs a hidden feature vector.
 
-The trainer will take the train_program as input.
-
-```python
-trainer = fluid.Trainer(
-    train_func=train_program,
-    place=place,
-    optimizer_func=optimizer_program)
+``` python
+hidden1 = paddle.layer.fc(input=contextemb,
+                          size=hiddensize,
+                          act=paddle.activation.Sigmoid(),
+                          layer_attr=paddle.attr.Extra(drop_rate=0.5),
+                          bias_attr=paddle.attr.Param(learning_rate=2),
+                          param_attr=paddle.attr.Param(
+                                initial_std=1. / math.sqrt(embsize * 8),
+                                learning_rate=1))
 ```
 
-- Feeding Data
+- Hidden feature vector will go through another fully connected layer, turn into a $|V|$ dimensional vector. At the same time softmax will be applied to get the probability of each word being generated.
 
-PaddlePaddle provides the reader mechanism for loading the training data.
-A reader may return multiple columns, and we need a Python dictionary to specify
-the mapping from column index to data layers.
-
-```python
-feed_order=['x', 'y']
+``` python
+predictword = paddle.layer.fc(input=hidden1,
+                              size=dict_size,
+                              bias_attr=paddle.attr.Param(learning_rate=2),
+                              act=paddle.activation.Softmax())
 ```
 
-- Event Handler
+- We will use cross-entropy cost function.
 
-An event handler is provided to print the training progress:
-
-```python
-# Specify the directory path to save the parameters
-params_dirname = "fit_a_line.inference.model"
-
-# event_handler to print training and testing info
-def event_handler_plot(event):
-    if isinstance(event, fluid.EndEpochEvent):
-        test_metrics = trainer.test(
-            reader=test_reader, feed_order=feed_order)
-
-        print("epoch: {0}, loss: {1}".format(event.epoch, test_metrics[0]))
-        if test_metrics[0] < 10.0:
-            # If the accuracy is good enough, we can stop the training.
-            print('loss is less than 10.0, stop')
-            trainer.stop()
-
-        # We can save the trained parameters for the inferences later
-        if params_dirname is not None:
-            trainer.save_params(params_dirname)
+``` python
+cost = paddle.layer.classification_cost(input=predictword, label=nextword)
 ```
 
-- Start Training
+- Create parameters, optimizer and trainer.
 
-The following codes would start the training as the belove configuration:
+``` python
+parameters = paddle.parameters.create(cost)
+adagrad = paddle.optimizer.AdaGrad(
+    learning_rate=3e-3,
+    regularization=paddle.optimizer.L2Regularization(8e-4))
+trainer = paddle.trainer.SGD(cost, parameters, adagrad)
+```
 
-```python
+Next, we will begin the training process. `paddle.dataset.imikolov.train(word_dict, N)`
+and `paddle.dataset.imikolov.test(word_dict, N)` is our training and testing dataset.
+Both of the function will return a reader: In PaddlePaddle, `reader` is a python function which
+returns a Python iterator which output a single data instance at a time.
+
+`paddle.batch` takes reader as input, outputs a **batched reader**: In PaddlePaddle, a reader
+outputs a single data instance at a time but batched reader outputs a minibatch of data instances.
+
+``` python
+def event_handler(event):
+    if isinstance(event, paddle.event.EndIteration):
+        if event.batch_id % 100 == 0:
+            print "Pass %d, Batch %d, Cost %f, %s" % (
+                event.pass_id, event.batch_id, event.cost, event.metrics)
+
+    if isinstance(event, paddle.event.EndPass):
+        result = trainer.test(
+                    paddle.batch(
+                        paddle.dataset.imikolov.test(word_dict, N), 32))
+        print "Pass %d, Testing metrics %s" % (event.pass_id, result.metrics)
+        with open("model_%d.tar"%event.pass_id, 'w') as f:
+            trainer.save_parameter_to_tar(f)
+
 trainer.train(
-    reader=train_reader,
-    num_epochs=100,
-    event_handler=event_handler_plot,
-    feed_order=feed_order)
+    paddle.batch(paddle.dataset.imikolov.train(word_dict, N), 32),
+    num_passes=100,
+    event_handler=event_handler)
 ```
 
-### Run the Python Program Using Docker
+- Run the Python program using Docker image `paddlepaddle/paddle:0.11.0`
 
-```bash
-docker run --rm -it -v $PWD:/work paddlepaddle/paddle:0.14.0 python /work/example/train_fluid.py
+Start training with the following command:
+
+``` bash
+cd example
+docker run --rm -it -v $PWD:/work paddlepaddle/paddle:0.11.0 python work/train_local.py
 ```
 
-The training process could take up to a few minutes, and you can see the training logs
-in the meantime which defined in `EventHandler`:
+The output of `event_handler` will be similar to following:
 
-```text
-epoch: 1, loss: 256.279940796
-epoch: 2, loss: 233.243792725
-epoch: 3, loss: 210.006860352
-epoch: 4, loss: 200.610595703
-epoch: 5, loss: 182.232144165
-epoch: 6, loss: 170.355409241
-epoch: 7, loss: 154.600262451
-epoch: 8, loss: 143.756222534
-epoch: 9, loss: 133.120368958
-epoch: 10, loss: 124.725740051
-...
+``` text
+Pass 0, Batch 0, Cost 7.870579, {'classification_error_evaluator': 1.0}
+Pass 0, Batch 100, Cost 6.052320, {'classification_error_evaluator': 0.84375}
+Pass 0, Batch 200, Cost 5.795257, {'classification_error_evaluator': 0.8125}
+Pass 0, Batch 300, Cost 5.458374, {'classification_error_evaluator': 0.90625}
 ```
 
-## Part-2: Launch the Paddlepaddle EDL Training Jobs on a Kubernetes Cluster
+After 30 passes, we can get an average error rate around 0.735611.
 
+## Part-2: Launch the PaddlePaddle EDL Training Jobs on a Kubernetes Cluster
 
 Before launching the EDL training-jobs, we can start-up a monitor program to
 watch the Trainer process changes.
@@ -212,6 +229,8 @@ If you start up a Kubernetes by `minikube` or `kops`, the kubectl configuration 
 the cluster is available, for the other approach, you can contact the administrator to fetch the configuration file.
 
 ### Deploy EDL Components
+
+**NOTE**: there is only one EDL controller in a Kubernetes cluster, so if you're using a public cluster, you can skip this step.
 
 1. (Optional) Configure RBAC for EDL controller so that it would have the cluster admin permission.
 
@@ -242,6 +261,40 @@ kubectl create -f k8s/edl_controller.yaml
 ```
 
 ### Launch the EDL Training Jobs
+
+1. Edit the local training program to be able to run with distributed mode
+
+It's easy to update your local training program to be running with distributing mode:
+
+- Pre-process the datase with RecordIO format
+
+We have done this in the Docker image `paddlepaddle/edl-example` using `dataset.covert` API as follows:
+
+``` python
+dataset.common.convert('/data/recordio/imikolov/', dataset.imikolov.train(word_dict, 5), 5000, 'imikolov-train')"
+```
+
+This would generate many recordio files on `/data/recordio/imikolov` folder, and we have prepared these files on Docker image `paddlepaddle/edl-example`.
+
+- Pass in the `etcd_endpoint` to the `Trainer` object so that `Trainer` would know it's a fault-tolerant distributed training job.
+
+``` python
+trainer = paddle.trainer.SGD(cost,
+                              parameters,
+                              adam_optimizer,
+                              is_local=False,
+                              pserver_spec=etcd_endpoint,
+                              use_etcd=True)
+```
+
+- Use `cloud_reader` which is a `master_client` instance can fetch the training data from the task queue.
+
+``` python
+trainer.train(
+    paddle.batch(cloud_reader([TRAIN_FILES_PATH], etcd_endpoint), 32),
+    num_passes=30,
+    event_handler=event_handler)
+```
 
 1. Run the monitor program
 
