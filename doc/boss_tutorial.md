@@ -21,13 +21,13 @@ of a cluster.
 
 - Introduction
   At the introduction session, we will introduce:
-    1. a new version named Fluid on PaddlePaddle; and
-    1. Why we develop PaddlePaddle EDL and how to implement it.
+    - The latest PaddlePaddle version Fluid; and
+    - Why we develop PaddlePaddle EDL and how we implement it.
 - Hands-on tutorial
   Following the introduction, we will prepare a hands-on tutorial so that all the audience can use
   PaddlePaddle and ask some questions while using PaddlePaddle:
-  - Part-1, Train a simple model using PaddlePaddle Fluid.
-  - Part-2, Launch an EDL training job on a Kubernetes Cluster.
+    1. Part-1, Train a simple model using PaddlePaddle Fluid.
+    1. Part-2, Launch an EDL training job on a Kubernetes Cluster.
 
 ## Prerequisites
 
