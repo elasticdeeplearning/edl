@@ -72,31 +72,31 @@ the cluster is available, for the other approach, you can contact the administra
 
 1. (Optional) Configure RBAC for EDL controller so that it would have the cluster admin permission.
 
-If you launch a Kubernetes cluster by kops on AWS, the default authenticating policy is `RBAC`, so this step is **necessary**:
+    If you launch a Kubernetes cluster by kops on AWS, the default authenticating policy is `RBAC`, so this step is **necessary**:
 
-```bash
-kubectl create -f k8s/rbac_admin.yaml
-```
+    ```bash
+    kubectl create -f k8s/rbac_admin.yaml
+    ```
 
 1. Create TRP "Training-Job"
 
-As simple as running the following command:
+    As simple as running the following command:
 
-``` bash
-kubectl create -f k8s/thirdpartyresource.yaml
-```
+    ``` bash
+    kubectl create -f k8s/thirdpartyresource.yaml
+    ```
 
-To verify the creation of the resource, run the following command:
+    To verify the creation of the resource, run the following command:
 
-``` bash
-kubectl describe ThirdPartyResource training-job
-```
+    ``` bash
+    kubectl describe ThirdPartyResource training-job
+    ```
 
 - Deploy EDL controller
 
-```bash
-kubectl create -f k8s/edl_controller.yaml
-```
+    ```bash
+    kubectl create -f k8s/edl_controller.yaml
+    ```
 
 ### Launch the EDL Training Jobs
 
