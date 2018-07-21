@@ -2,6 +2,11 @@
 
 <img src="../logo/edl.png" width="500">
 
+PaddlePaddle (PArallel Distributed Deep LEarning) is an easy-to-use, efficient,
+flexible and scalable deep learning platform, which is originally developed by
+Baidu scientists and engineers for the purpose of applying deep learning to many
+products at Baidu.
+
 PaddlePaddle Elastic Deep Learning (EDL) is a clustering project which leverages Deep Learning training jobs to
 be scalable and fault-tolerant. EDL will greatly boost the parallel distributed training jobs and make good use
 of cluster computing power.
@@ -24,204 +29,37 @@ of a cluster.
     - The latest PaddlePaddle version Fluid; and
     - Why we develop PaddlePaddle EDL and how we implement it.
 - Hands-on tutorial
-  Following the introduction, we will prepare a hands-on tutorial so that all the audience can use
-  PaddlePaddle and ask some questions while using PaddlePaddle:
-    1. Part-1, Train a word embedding model using PaddlePaddle.
-    1. Part-2, Launch an EDL training job on a Kubernetes Cluster.
+  Following the introduction, we have a hands-on tutorial after each introduction
+  session so that all the audience can use PaddlePaddle and ask some questions
+  while using PaddlePaddle:
+    - Training models using PaddlePaddle Fluid.
+    - Launch EDL training jobs on a Kubernetes cluster.
 
 ## Prerequisites
 
 - [Install Docker](https://docs.docker.com/install/)
 - [Install kubectl](./install.md#kubectl)
-- A Kubernetes cluster which version is `1.7.x`
-  - [minikube would launch a kubernetes cluster locally](./install.md#minikube).
-  - [kops would launch a Kuberntes cluster on AWS](./install.md#aws).
-  - We will also prepare a public Kubernetes cluster via Cloud if you don't have an AWS
-    account that you can submit the EDL training jobs using the public cluster.
+- [Install Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
+- A Kubernetes cluster which version is `1.7.x`:
+    - [minikube would launch a kubernetes cluster locally](./install.md#minikube).
+    - [kops would launch a Kuberntes cluster on AWS](./install.md#aws).
+    - We will also prepare a public Kubernetes cluster via Cloud if you don't have an AWS
+      account that you can submit the EDL training jobs using the public cluster.
 
 ## Resources
 
 - [PaddlePaddle](http://github.com/PaddlePaddle/Paddle)
+- [PaddlePaddle Book](http://github.com/PaddlePaddle/book)
 - [PaddlePaddle EDL](https://github.com/PaddlePaddle/edl)
 
-## Part-1: Train a Simple Model Using PaddlePaddle
+## Part-1 Training Models on Your Laptop using PaddlePaddle Fluid
 
-In this part, we will train a **word embedding** model, to learn the concept of this
-model, you can check out [word2vec](https://github.com/PaddlePaddle/book/tree/develop/04.word2vec), this 
-tutorial will focus on writing the program.
-
-### Training Codes
-
-- Importing some necessary PaddlePaddle packages at the begging:
-
-```python
-import math
-import os
-
-import numpy
-import paddle.v2 as paddle
-```
-
-- functions used to save and load word dict and embedding table
-
-``` python
-# save and load word dict and embedding table
-def save_dict_and_embedding(word_dict, embeddings):
-    with open("word_dict", "w") as f:
-        for key in word_dict:
-            f.write(key + " " + str(word_dict[key]) + "\n")
-    with open("embedding_table", "w") as f:
-        numpy.savetxt(f, embeddings, delimiter=',', newline='\n')
-
-
-def load_dict_and_embedding():
-    word_dict = dict()
-    with open("word_dict", "r") as f:
-        for line in f:
-            key, value = line.strip().split(" ")
-            word_dict[key] = int(value)
-
-    embeddings = numpy.loadtxt("embedding_table", delimiter=",")
-    return word_dict, embeddings
-
-```
-
--  Map the $n-1$ words $w_{t-n+1},...w_{t-1}$ before $w_t$ to a D-dimensional vector though matrix of dimention $|V|\times D$ (D=32 in this example).
-
-``` python
-def wordemb(inlayer):
-    wordemb = paddle.layer.table_projection(
-        input=inlayer,
-        size=embsize,
-        param_attr=paddle.attr.Param(
-            name="_proj",
-            initial_std=0.001,
-            learning_rate=1,
-            l2_rate=0)
-    return wordemb
-```
-
-- Define name and type for input to data layer.
-
-``` python
-paddle.init(use_gpu=False, trainer_count=1)
-word_dict = paddle.dataset.imikolov.build_dict()
-dict_size = len(word_dict)
-# Every layer takes integer value of range [0, dict_size)
-firstword = paddle.layer.data(
-    name="firstw", type=paddle.data_type.integer_value(dict_size))
-secondword = paddle.layer.data(
-    name="secondw", type=paddle.data_type.integer_value(dict_size))
-thirdword = paddle.layer.data(
-    name="thirdw", type=paddle.data_type.integer_value(dict_size))
-fourthword = paddle.layer.data(
-    name="fourthw", type=paddle.data_type.integer_value(dict_size))
-nextword = paddle.layer.data(
-    name="fifthw", type=paddle.data_type.integer_value(dict_size))
-
-Efirst = wordemb(firstword)
-Esecond = wordemb(secondword)
-Ethird = wordemb(thirdword)
-Efourth = wordemb(fourthword)
-```
-
-- Concatenate n-1 word embedding vectors into a single feature vector.
-
-``` python
-contextemb = paddle.layer.concat(input=[Efirst, Esecond, Ethird, Efourth])
-```
-
-- Feature vector will go through a fully connected layer which outputs a hidden feature vector.
-
-``` python
-hidden1 = paddle.layer.fc(input=contextemb,
-                          size=hiddensize,
-                          act=paddle.activation.Sigmoid(),
-                          layer_attr=paddle.attr.Extra(drop_rate=0.5),
-                          bias_attr=paddle.attr.Param(learning_rate=2),
-                          param_attr=paddle.attr.Param(
-                                initial_std=1. / math.sqrt(embsize * 8),
-                                learning_rate=1))
-```
-
-- Hidden feature vector will go through another fully connected layer, turn into a $|V|$ dimensional vector. At the same time softmax will be applied to get the probability of each word being generated.
-
-``` python
-predictword = paddle.layer.fc(input=hidden1,
-                              size=dict_size,
-                              bias_attr=paddle.attr.Param(learning_rate=2),
-                              act=paddle.activation.Softmax())
-```
-
-- We will use cross-entropy cost function.
-
-``` python
-cost = paddle.layer.classification_cost(input=predictword, label=nextword)
-```
-
-- Create parameters, optimizer and trainer.
-
-``` python
-parameters = paddle.parameters.create(cost)
-adagrad = paddle.optimizer.AdaGrad(
-    learning_rate=3e-3,
-    regularization=paddle.optimizer.L2Regularization(8e-4))
-trainer = paddle.trainer.SGD(cost, parameters, adagrad)
-```
-
-Next, we will begin the training process. `paddle.dataset.imikolov.train(word_dict, N)`
-and `paddle.dataset.imikolov.test(word_dict, N)` is our training and testing dataset.
-Both of the function will return a reader: In PaddlePaddle, `reader` is a python function which
-returns a Python iterator which output a single data instance at a time.
-
-`paddle.batch` takes reader as input, outputs a **batched reader**: In PaddlePaddle, a reader
-outputs a single data instance at a time but batched reader outputs a minibatch of data instances.
-
-``` python
-def event_handler(event):
-    if isinstance(event, paddle.event.EndIteration):
-        if event.batch_id % 100 == 0:
-            print "Pass %d, Batch %d, Cost %f, %s" % (
-                event.pass_id, event.batch_id, event.cost, event.metrics)
-
-    if isinstance(event, paddle.event.EndPass):
-        result = trainer.test(
-                    paddle.batch(
-                        paddle.dataset.imikolov.test(word_dict, N), 32))
-        print "Pass %d, Testing metrics %s" % (event.pass_id, result.metrics)
-        with open("model_%d.tar"%event.pass_id, 'w') as f:
-            trainer.save_parameter_to_tar(f)
-
-trainer.train(
-    paddle.batch(paddle.dataset.imikolov.train(word_dict, N), 32),
-    num_passes=100,
-    event_handler=event_handler)
-```
-
-- Run the Python program using Docker image `paddlepaddle/paddle:0.11.0`
-
-Start training with the following command:
-
-``` bash
-cd example
-docker run --rm -it -v $PWD:/work paddlepaddle/paddle:0.11.0 python work/train_local.py
-```
-
-The output of `event_handler` will be similar to following:
-
-``` text
-Pass 0, Batch 0, Cost 7.870579, {'classification_error_evaluator': 1.0}
-Pass 0, Batch 100, Cost 6.052320, {'classification_error_evaluator': 0.84375}
-Pass 0, Batch 200, Cost 5.795257, {'classification_error_evaluator': 0.8125}
-Pass 0, Batch 300, Cost 5.458374, {'classification_error_evaluator': 0.90625}
-```
-
-After 30 passes, we can get an average error rate around 0.735611.
+Please checkout [PaddlePaddle Book](http://github.com/PaddlePaddle/book)
 
 ## Part-2: Launch the PaddlePaddle EDL Training Jobs on a Kubernetes Cluster
 
-Before launching the EDL training-jobs, we can start-up a monitor program to
-watch the Trainer process changes.
+Please note, EDL only support the early PaddlePaddle version so the fault-tolerant model is
+written by PaddlePaddle v2 API.
 
 ### Configure kubectl
 
@@ -266,35 +104,35 @@ kubectl create -f k8s/edl_controller.yaml
 
     It's easy to update your local training program to be running with distributing mode:
 
-- Pre-process the datase with RecordIO format
+    - Pre-process the datase with RecordIO format
 
-    We have done this in the Docker image `paddlepaddle/edl-example` using `dataset.covert` API as follows:
+        We have done this in the Docker image `paddlepaddle/edl-example` using `dataset.covert` API as follows:
 
-    ``` python
-    dataset.common.convert('/data/recordio/imikolov/', dataset.imikolov.train(word_dict, 5), 5000, 'imikolov-train')"
-    ```
+        ``` python
+        dataset.common.convert('/data/recordio/imikolov/', dataset.imikolov.train(word_dict, 5), 5000, 'imikolov-train')"
+        ```
 
-    This would generate many recordio files on `/data/recordio/imikolov` folder, and we have prepared these files on Docker image `paddlepaddle/edl-example`.
+        This would generate many recordio files on `/data/recordio/imikolov` folder, and we have prepared these files on Docker image `paddlepaddle/edl-example`.
 
-- Pass in the `etcd_endpoint` to the `Trainer` object so that `Trainer` would know it's a fault-tolerant distributed training job.
+    - Pass in the `etcd_endpoint` to the `Trainer` object so that `Trainer` would know it's a fault-tolerant distributed training job.
 
-    ``` python
-    trainer = paddle.trainer.SGD(cost,
-                                  parameters,
-                                  adam_optimizer,
-                                  is_local=False,
-                                  pserver_spec=etcd_endpoint,
-                                  use_etcd=True)
-    ```
+        ``` python
+        trainer = paddle.trainer.SGD(cost,
+                                      parameters,
+                                      adam_optimizer,
+                                      is_local=False,
+                                      pserver_spec=etcd_endpoint,
+                                      use_etcd=True)
+        ```
 
-- Use `cloud_reader` which is a `master_client` instance can fetch the training data from the task queue.
+    - Use `cloud_reader` which is a `master_client` instance can fetch the training data from the task queue.
 
-    ``` python
-    trainer.train(
-        paddle.batch(cloud_reader([TRAIN_FILES_PATH], etcd_endpoint), 32),
-        num_passes=30,
-        event_handler=event_handler)
-    ```
+        ``` python
+        trainer.train(
+            paddle.batch(cloud_reader([TRAIN_FILES_PATH], etcd_endpoint), 32),
+            num_passes=30,
+            event_handler=event_handler)
+        ```
 
 1. Run the monitor program
 
