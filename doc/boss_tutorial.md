@@ -1,7 +1,6 @@
 # PaddlePaddle Elastic Deep Learning
 
 <img src="../logo/edl.png" width="500">
-<img src="../logo/paddlepaddle.png" width="500">
 
 PaddlePaddle (PArallel Distributed Deep LEarning) is an easy-to-use, efficient,
 flexible and scalable deep learning platform, which is originally developed by
