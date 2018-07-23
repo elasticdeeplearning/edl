@@ -7,7 +7,7 @@ flexible and scalable deep learning platform, which is originally developed by
 Baidu scientists and engineers for the purpose of applying deep learning to many
 products at Baidu.
 
-PaddlePaddle Elastic Deep Learning (EDL) is a clustering project which leverages Deep Learning training jobs to
+PaddlePaddle Elastic Deep Learning (EDL) is a clustering project which leverages PaddlePaddle training jobs to
 be scalable and fault-tolerant. EDL will greatly boost the parallel distributed training jobs and make good use
 of cluster computing power.
 
@@ -17,10 +17,11 @@ the cluster training jobs and an auto-scaler to scale the job's computing resour
 For researchers, EDL with Kuberntes will reduce the waiting time of the job submitted, to help with
 exposing potential algorithmic problems as early as possible.
 
-For enterprises, industrial users tend to run deep learning jobs as a subset of the complete data pipeline,
-including web servers and log collectors. EDL make it possible to run less deep learning job processes during
-periods of high web traffic, more when web traffic is low. EDL would optimize the global utilization
-of a cluster.
+For enterprises, a complete data pipeline includes training jobs, web servers,
+log collector and so on. These components often run on a distributed operation system
+like k8s. EDL make it possible to run less deep learning job processes during
+periods of high web traffic, more when web traffic is low. EDL would optimize the global
+utilization of a cluster.
 
 ## Tutorial Outline
 
@@ -28,7 +29,7 @@ of a cluster.
   At the introduction session, we will introduce:
     - The latest PaddlePaddle version Fluid; and
     - Why we develop PaddlePaddle EDL and how we implement it.
-- Hands-on tutorial
+- Hands-on Tutorial
   Following the introduction, we have a hands-on tutorial after each introduction
   session so that all the audience can use PaddlePaddle and ask some questions
   while using PaddlePaddle:
@@ -52,18 +53,19 @@ of a cluster.
 - [PaddlePaddle Book](http://github.com/PaddlePaddle/book)
 - [PaddlePaddle EDL](https://github.com/PaddlePaddle/edl)
 
-## Part-1 Training Models on Your Laptop using PaddlePaddle Fluid
+## Part-1 Training Models on Your Laptop using PaddlePaddle
 
-Please checkout [PaddlePaddle Book](http://github.com/PaddlePaddle/book)
+Please checkout [PaddlePaddle Book](http://github.com/PaddlePaddle/book), steps to run
+the training process and example output.
 
 ## Part-2: Launch the PaddlePaddle EDL Training Jobs on a Kubernetes Cluster
 
 Please note, EDL only support the early PaddlePaddle version so the fault-tolerant model is
-written by PaddlePaddle v2 API.
+written with PaddlePaddle v2 API.
 
 ### Configure kubectl
 
-If you start up a Kubernetes by `minikube` or `kops`, the kubectl configuration would be ready when
+If you start up a Kubernetes instance by `minikube` or `kops`, the kubectl configuration would be ready when
 the cluster is available, for the other approach, you can contact the administrator to fetch the configuration file.
 
 ### Deploy EDL Components
@@ -78,9 +80,7 @@ the cluster is available, for the other approach, you can contact the administra
     kubectl create -f k8s/rbac_admin.yaml
     ```
 
-1. Create TRP "Training-Job"
-
-    As simple as running the following command:
+1. Create TPR "Training-Job"
 
     ``` bash
     kubectl create -f k8s/thirdpartyresource.yaml
@@ -104,8 +104,9 @@ the cluster is available, for the other approach, you can contact the administra
 
     It's easy to update your local training program to be running with distributing mode:
 
-    - Pre-process the datase with RecordIO format
+    - Dataset
 
+        Pre-process the dataset to convert to RecordIO format,
         We have done this in the Docker image `paddlepaddle/edl-example` using `dataset.covert` API as follows:
 
         ``` python
@@ -114,7 +115,7 @@ the cluster is available, for the other approach, you can contact the administra
 
         This would generate many recordio files on `/data/recordio/imikolov` folder, and we have prepared these files on Docker image `paddlepaddle/edl-example`.
 
-    - Pass in the `etcd_endpoint` to the `Trainer` object so that `Trainer` would know it's a fault-tolerant distributed training job.
+    - Pass the `etcd_endpoint` to the `Trainer` object so that `Trainer` would know it's a fault-tolerant distributed training job.
 
         ``` python
         trainer = paddle.trainer.SGD(cost,
@@ -153,8 +154,6 @@ the cluster is available, for the other approach, you can contact the administra
     ```
 
 1. Deploy EDL Training Jobs
-
-    As simple as the following commands to launch a training-job on Kubernetes:
 
     ```bash
     kubectl create -f example/examplejob.yaml
