@@ -1,0 +1,6 @@
+#!/bin/bash
+PADDLE_PSERVER_EPS=127.0.0.1:6789 \
+PADDLE_TRAINERS=2 \
+PADDLE_TRAINING_ROLE=trainer \
+PADDLE_TRAINER_ID=0 \
+python dist_word2vec.py train

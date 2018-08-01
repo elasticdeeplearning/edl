@@ -55,8 +55,62 @@ utilization of a cluster.
 
 ## Part-1 Training Models on Your Laptop using PaddlePaddle
 
-Please checkout [PaddlePaddle Book](http://github.com/PaddlePaddle/book), steps to run
-the training process and example output.
+### Deep 
+
+    Please checkout [PaddlePaddle Book](http://github.com/PaddlePaddle/book), steps to run
+    the training process and example output.
+
+### Launch a Distributed Training Job on Your Laptop
+
+1. Launch PaddlePaddle production Docker containe:
+
+    ``` bash
+    > cd example/fluid
+    > docker run --name paddle --rm -it -v $PWD:/work paddlepaddle/paddle /bin/bash
+    ```
+
+1. Prepare trianing data for multiple Trainer nodes:
+  
+    ``` python
+    > cd example/fluid
+    > python dist_word2vec.py prepare
+    ```
+
+    would split the `imikolov` data into multiple parts like:
+
+    ``` bash
+    ./output/
+    ./output/mnist-train-00000.pickle
+    ./output/mnist-train-00001.pickle
+    ./output/mnist-train-00002.pickle
+    ./output/mnist-train-00003.pickle
+    ./output/mnist-train-00004.pickle
+    ...
+    ```
+
+1. Luanch **two** PServer process and **two** Trainer processes:
+
+  Start PServer process:
+
+  ``` python
+  > PADDLE_PSERVER_EPS=127.0.0.1:6789 PADDLE_TRAINERS=2 \
+    PADDLE_TRAINING_ROLE=pserver PADDLE_CURRENT_ENDPOINT=127.0.0.1:6789 \
+    python dist_word2vec.py train
+  ```
+
+  Start Trainer process which `trainer_id=0`:
+
+  ``` python
+  > PADDLE_PSERVER_EPS=127.0.0.1:6789 PADDLE_TRAINERS=2 \
+    PADDLE_TRAINING_ROLE=trainer PADDLE_TRAINER_ID=0 python dist_word2vec.py train
+  ```
+
+  Start Trainer process which `trainer_id=1`:
+
+  ``` python
+  > PADDLE_PSERVER_EPS=127.0.0.1:6789 PADDLE_TRAINERS=2 \
+    PADDLE_TRAINING_ROLE=trainer PADDLE_TRAINER_ID=1 python dist_word2vec.py train
+  ```
 
 ## Part-2: Launch the PaddlePaddle EDL Training Jobs on a Kubernetes Cluster
 
