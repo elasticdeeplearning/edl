@@ -62,14 +62,14 @@ utilization of a cluster.
 
 ### Launch a Distributed Training Job on Your Laptop
 
-1. Launch PaddlePaddle production Docker containe:
+1. Launch the PaddlePaddle Production Docker Container:
 
     ``` bash
     > cd example/fluid
     > docker run --name paddle --rm -it -v $PWD:/work paddlepaddle/paddle /bin/bash
     ```
 
-1. Prepare trianing data for multiple Trainer nodes:
+1. Split training data into multiple parts:
   
     ``` python
     > cd example/fluid
@@ -88,9 +88,9 @@ utilization of a cluster.
     ...
     ```
 
-1. Luanch **two** PServer process and **two** Trainer processes:
+1. Luanch **two** PServer instances and **two** Trainer instances:
 
-  Start PServer process:
+  Start PServer instance:
 
   ``` python
   > PADDLE_PSERVER_EPS=127.0.0.1:6789 PADDLE_TRAINERS=2 \
@@ -98,14 +98,14 @@ utilization of a cluster.
     python dist_word2vec.py train
   ```
 
-  Start Trainer process which `trainer_id=0`:
+  Start Trainer instance which `trainer_id=0`:
 
   ``` python
   > PADDLE_PSERVER_EPS=127.0.0.1:6789 PADDLE_TRAINERS=2 \
     PADDLE_TRAINING_ROLE=trainer PADDLE_TRAINER_ID=0 python dist_word2vec.py train
   ```
 
-  Start Trainer process which `trainer_id=1`:
+  Start Trainer instance which `trainer_id=1`:
 
   ``` python
   > PADDLE_PSERVER_EPS=127.0.0.1:6789 PADDLE_TRAINERS=2 \
