@@ -55,7 +55,7 @@ utilization of a cluster.
 
 ## Part-1 Training Models on Your Laptop using PaddlePaddle
 
-### Deep 
+### PaddlePaddle Book
 
     Please checkout [PaddlePaddle Book](http://github.com/PaddlePaddle/book), steps to run
     the training process and example output.
