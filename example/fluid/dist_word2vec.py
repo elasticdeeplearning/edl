@@ -10,7 +10,7 @@ import os
 import sys
 import math
 
-OUTPUT_PATH="./data/mnist/"
+OUTPUT_PATH="./dataset/mnist/"
 NAME_PREFIX="mnist-train"
 LINE_PER_FILE=1000
 N = 5
@@ -159,6 +159,7 @@ def main():
                 loss = np.array(avg_loss_np).mean()
                 print("Pass: {0}, Batch: {1}, Loss: {2}".format(pass_id, batch_id, loss))
                 if float(loss) < 5.0:
+                    exe.close()
                     return
                 if math.isnan(loss):
                     assert ("Got Nan loss, training failed")
@@ -179,5 +180,3 @@ if __name__ == "__main__":
         main()
     else:
         print(usage)
-    
-

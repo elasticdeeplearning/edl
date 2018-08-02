@@ -57,22 +57,24 @@ utilization of a cluster.
 
 ### PaddlePaddle Book
 
-    Please checkout [PaddlePaddle Book](http://github.com/PaddlePaddle/book), steps to run
-    the training process and example output.
+Please checkout [PaddlePaddle Book](http://github.com/PaddlePaddle/book), steps to run
+the training process and example output.
 
 ### Launch a Distributed Training Job on Your Laptop
 
 1. Launch the PaddlePaddle Production Docker Container:
 
     ``` bash
-    > cd example/fluid
-    > docker run --name paddle --rm -it -v $PWD:/work paddlepaddle/paddle /bin/bash
+    > git clone https://github.com/PaddlePaddle/edl.git
+    > cd edl/example/fluid
+    > docker run --name paddle -d -it -v $PWD:/work paddlepaddle/paddle /bin/bash
     ```
 
 1. Split training data into multiple parts:
-  
+
     ``` python
-    > cd example/fluid
+    > docker exec -it paddle /bin/bash
+    > cd work
     > python dist_word2vec.py prepare
     ```
 
