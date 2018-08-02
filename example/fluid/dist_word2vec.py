@@ -49,6 +49,7 @@ def cluster_reader(trainers, trainer_id):
                 my_file_list.append(fn)
 
         for fn in my_file_list:
+            print("processing file: ", fn)
             with open(fn, "r") as f:
                 lines = cPickle.load(f)
                 for line in lines:
