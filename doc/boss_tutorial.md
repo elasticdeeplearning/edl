@@ -7,8 +7,8 @@ flexible and scalable deep learning platform, which is originally developed by
 Baidu scientists and engineers for the purpose of applying deep learning to many
 products at Baidu.
 
-Fluid is the latest version of PaddlePaddle, which describes the "process" of training
-or inference using concept of model.
+Fluid is the latest version of PaddlePaddle, it describes the model for training 
+or inference using the representation of "Program".
 
 PaddlePaddle Elastic Deep Learning (EDL) is a clustering project which leverages
 PaddlePaddle training jobs to be scalable and fault-tolerant.
@@ -38,7 +38,7 @@ to manage the cluster training jobs and an auto-scaler to scale the job's comput
 
 - Intended audience
 
-    Peopol who are interested in know the deep learning system architecture.
+    People who are interested in deep learning system architecture.
   
 
 ## Prerequisites
