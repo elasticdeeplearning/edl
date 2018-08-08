@@ -1,40 +1,45 @@
-# PaddlePaddle Elastic Deep Learning
+# PaddlePaddle Tutorial for BOSS Workshop 2018
 
-<img src="../logo/edl.png" width="500">
+<img src="../logo/paddle.png" width="300">
 
 PaddlePaddle (PArallel Distributed Deep LEarning) is an easy-to-use, efficient,
 flexible and scalable deep learning platform, which is originally developed by
 Baidu scientists and engineers for the purpose of applying deep learning to many
 products at Baidu.
 
-PaddlePaddle Elastic Deep Learning (EDL) is a clustering project which leverages PaddlePaddle training jobs to
-be scalable and fault-tolerant. EDL will greatly boost the parallel distributed training jobs and make good use
+Fluid is the latest version of PaddlePaddle, it describes the model for training 
+or inference using the representation of "Program".
+
+PaddlePaddle Elastic Deep Learning (EDL) is a clustering project which leverages
+PaddlePaddle training jobs to be scalable and fault-tolerant.
+EDL will greatly boost the parallel distributed training jobs and make good use
 of cluster computing power.
 
-EDL is based on the full fault-tolerant feature of PaddlePaddle, it uses a Kubernetes controller to manage
-the cluster training jobs and an auto-scaler to scale the job's computing resources.
-
-For researchers, EDL with Kuberntes will reduce the waiting time of the job submitted, to help with
-exposing potential algorithmic problems as early as possible.
-
-For enterprises, a complete data pipeline includes training jobs, web servers,
-log collector and so on. These components often run on a distributed operation system
-like k8s. EDL make it possible to run less deep learning job processes during
-periods of high web traffic, more when web traffic is low. EDL would optimize the global
-utilization of a cluster.
+EDL is based on the full fault-tolerant feature of PaddlePaddle, it uses a Kubernetes controller
+to manage the cluster training jobs and an auto-scaler to scale the job's computing resources.
 
 ## Tutorial Outline
 
 - Introduction
-  At the introduction session, we will introduce:
-    - The latest PaddlePaddle version Fluid; and
+
+    At the introduction session, we will introduce:
+    - PaddlePaddle Fluid design overview.
+    - Fluid Distributed Training.
     - Why we develop PaddlePaddle EDL and how we implement it.
+
 - Hands-on Tutorial
-  Following the introduction, we have a hands-on tutorial after each introduction
-  session so that all the audience can use PaddlePaddle and ask some questions
-  while using PaddlePaddle:
-    - Training models using PaddlePaddle Fluid.
-    - Launch EDL training jobs on a Kubernetes cluster.
+
+    We have some hands-on tutorials after each introduction
+    session so that all the audience can use PaddlePaddle and ask some questions
+    while using PaddlePaddle:
+    - Training models using PaddlePaddle Fluid in a Jupyter Notebook (PaddlePaddle Book).
+    - Launch a Distributed Training Job on your laptop.
+    - Launch the EDL training job on a Kubernetes cluster.
+
+- Intended audience
+
+    People who are interested in deep learning system architecture.
+  
 
 ## Prerequisites
 
