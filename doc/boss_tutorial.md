@@ -33,7 +33,7 @@ to manage the cluster training jobs and an auto-scaler to scale the job's comput
     session so that all the audience can use PaddlePaddle and ask some questions
     while using PaddlePaddle:
     - Training models using PaddlePaddle Fluid in a Jupyter Notebook (PaddlePaddle Book).
-    - Laucnh a Distributed Training Job on your laptop.
+    - Launch a Distributed Training Job on your laptop.
     - Launch the EDL training job on a Kubernetes cluster.
 
 - Intended audience
