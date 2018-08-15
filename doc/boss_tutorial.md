@@ -80,18 +80,17 @@ the training process and example output.
     ``` python
     > docker exec -it paddle /bin/bash
     > cd work
-    > python dist_word2vec.py prepare
+    > python recognize_digits.py prepare
     ```
 
-    would split the `imikolov` data into multiple parts like:
+    would split the `mnist` data into multiple parts as follows:
 
     ``` bash
-    ./output/
-    ./output/mnist-train-00000.pickle
-    ./output/mnist-train-00001.pickle
-    ./output/mnist-train-00002.pickle
-    ./output/mnist-train-00003.pickle
-    ./output/mnist-train-00004.pickle
+    ./dataset/mnist/
+    ./dataset/mnist/mnist-train-00000.pickle
+    ./dataset/mnist/mnist-train-00001.pickle
+    ./dataset/mnist/mnist-train-00002.pickle
+    ./dataset/mnist/mnist-train-00003.pickle
     ...
     ```
 
@@ -100,23 +99,34 @@ the training process and example output.
   Start PServer instance:
 
   ``` python
-  > PADDLE_PSERVER_EPS=127.0.0.1:6789 PADDLE_TRAINERS=2 \
-    PADDLE_TRAINING_ROLE=pserver PADDLE_CURRENT_ENDPOINT=127.0.0.1:6789 \
-    python dist_word2vec.py train
+  > docker exec -it paddle /bin/bash
+  > PADDLE_PSERVER_EPS=127.0.0.1:6789 \
+    PADDLE_TRAINERS=2 \
+    PADDLE_TRAINING_ROLE=PSERVER \
+    PADDLE_CURRENT_ENDPOINT=127.0.0.1:6789 \
+    python recognize_digits.py train
   ```
 
   Start Trainer instance which `trainer_id=0`:
 
   ``` python
-  > PADDLE_PSERVER_EPS=127.0.0.1:6789 PADDLE_TRAINERS=2 \
-    PADDLE_TRAINING_ROLE=trainer PADDLE_TRAINER_ID=0 python dist_word2vec.py train
+  > docker exec -it paddle /bin/bash
+  > PADDLE_PSERVER_EPS=127.0.0.1:6789 \
+    PADDLE_TRAINERS=2 \
+    PADDLE_TRAINING_ROLE=TRAINER \
+    PADDLE_TRAINER_ID=0 \
+    python recognize_digits.py train
   ```
 
   Start Trainer instance which `trainer_id=1`:
 
   ``` python
-  > PADDLE_PSERVER_EPS=127.0.0.1:6789 PADDLE_TRAINERS=2 \
-    PADDLE_TRAINING_ROLE=trainer PADDLE_TRAINER_ID=1 python dist_word2vec.py train
+  > docker exec -it paddle /bin/bash
+  > PADDLE_PSERVER_EPS=127.0.0.1:6789 \
+    PADDLE_TRAINERS=2 \
+    PADDLE_TRAINING_ROLE=TRAINER \
+    PADDLE_TRAINER_ID=1 \
+    python recognize_digits.py train
   ```
 
 ## Part-2: Launch the PaddlePaddle EDL Training Jobs on a Kubernetes Cluster
