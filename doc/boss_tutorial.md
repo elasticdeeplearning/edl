@@ -135,8 +135,8 @@ the training process and example output.
 
   ``` python
   > docker exec -it paddle /bin/bash -c "cd /work && python recognize_digits.py infer"
+  ```
 
-  
 ## Part-2: Launch the PaddlePaddle EDL Training Jobs on a Kubernetes Cluster
 
 Please note, EDL only support the early PaddlePaddle version so the fault-tolerant model is
