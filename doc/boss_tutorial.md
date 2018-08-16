@@ -40,7 +40,6 @@ to manage the cluster training jobs and an auto-scaler to scale the job's comput
 
     People who are interested in deep learning system architecture.
   
-
 ## Prerequisites
 
 - [Install Docker](https://docs.docker.com/install/)
@@ -79,7 +78,7 @@ the training process and example output.
 
     ``` python
     > docker exec -it paddle /bin/bash
-    > cd work
+    > cd /work
     > python recognize_digits.py prepare
     ```
 
@@ -100,6 +99,7 @@ the training process and example output.
 
   ``` python
   > docker exec -it paddle /bin/bash
+  > cd /work
   > PADDLE_PSERVER_EPS=127.0.0.1:6789 \
     PADDLE_TRAINERS=2 \
     PADDLE_TRAINING_ROLE=PSERVER \
@@ -111,6 +111,7 @@ the training process and example output.
 
   ``` python
   > docker exec -it paddle /bin/bash
+  > cd /work
   > PADDLE_PSERVER_EPS=127.0.0.1:6789 \
     PADDLE_TRAINERS=2 \
     PADDLE_TRAINING_ROLE=TRAINER \
@@ -122,6 +123,7 @@ the training process and example output.
 
   ``` python
   > docker exec -it paddle /bin/bash
+  > cd /work
   > PADDLE_PSERVER_EPS=127.0.0.1:6789 \
     PADDLE_TRAINERS=2 \
     PADDLE_TRAINING_ROLE=TRAINER \
@@ -132,8 +134,7 @@ the training process and example output.
 1. Inference
 
   ``` python
-  > docker exec -it paddle /bin/bash
-  > python recognize_digits.py infer
+  > docker exec -it paddle /bin/bash -c "cd /work && python recognize_digits.py infer"
 
   
 ## Part-2: Launch the PaddlePaddle EDL Training Jobs on a Kubernetes Cluster
