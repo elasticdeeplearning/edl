@@ -40,7 +40,6 @@ to manage the cluster training jobs and an auto-scaler to scale the job's comput
 
     People who are interested in deep learning system architecture.
   
-
 ## Prerequisites
 
 - [Install Docker](https://docs.docker.com/install/)
@@ -79,45 +78,88 @@ the training process and example output.
 
     ``` python
     > docker exec -it paddle /bin/bash
-    > cd work
-    > python dist_word2vec.py prepare
+    > cd /work
+    > python recognize_digits.py prepare
     ```
 
-    would split the `imikolov` data into multiple parts like:
+    would split the `mnist` data into multiple parts as follows:
 
     ``` bash
-    ./output/
-    ./output/mnist-train-00000.pickle
-    ./output/mnist-train-00001.pickle
-    ./output/mnist-train-00002.pickle
-    ./output/mnist-train-00003.pickle
-    ./output/mnist-train-00004.pickle
+    ./dataset/mnist/
+    ./dataset/mnist/mnist-train-00000.pickle
+    ./dataset/mnist/mnist-train-00001.pickle
+    ./dataset/mnist/mnist-train-00002.pickle
+    ./dataset/mnist/mnist-train-00003.pickle
     ...
     ```
 
 1. Luanch **two** PServer instances and **two** Trainer instances:
 
-  Start PServer instance:
+    Start PServer instance:
 
-  ``` python
-  > PADDLE_PSERVER_EPS=127.0.0.1:6789 PADDLE_TRAINERS=2 \
-    PADDLE_TRAINING_ROLE=pserver PADDLE_CURRENT_ENDPOINT=127.0.0.1:6789 \
-    python dist_word2vec.py train
-  ```
+    ``` python
+    > docker exec -it paddle /bin/bash
+    > cd /work
+    > PADDLE_PSERVER_EPS=127.0.0.1:6789 \
+      PADDLE_TRAINERS=2 \
+      PADDLE_TRAINING_ROLE=PSERVER \
+      PADDLE_CURRENT_ENDPOINT=127.0.0.1:6789 \
+      python recognize_digits.py train
+    ```
 
-  Start Trainer instance which `trainer_id=0`:
+    Start Trainer instance which `trainer_id=0`:
 
-  ``` python
-  > PADDLE_PSERVER_EPS=127.0.0.1:6789 PADDLE_TRAINERS=2 \
-    PADDLE_TRAINING_ROLE=trainer PADDLE_TRAINER_ID=0 python dist_word2vec.py train
-  ```
+    ``` python
+    > docker exec -it paddle /bin/bash
+    > cd /work
+    > PADDLE_PSERVER_EPS=127.0.0.1:6789 \
+      PADDLE_TRAINERS=2 \
+      PADDLE_TRAINING_ROLE=TRAINER \
+      PADDLE_TRAINER_ID=0 \
+      python recognize_digits.py train
+    ```
 
-  Start Trainer instance which `trainer_id=1`:
+    Start Trainer instance which `trainer_id=1`:
 
-  ``` python
-  > PADDLE_PSERVER_EPS=127.0.0.1:6789 PADDLE_TRAINERS=2 \
-    PADDLE_TRAINING_ROLE=trainer PADDLE_TRAINER_ID=1 python dist_word2vec.py train
-  ```
+    ``` python
+    > docker exec -it paddle /bin/bash
+    > cd /work
+    > PADDLE_PSERVER_EPS=127.0.0.1:6789 \
+      PADDLE_TRAINERS=2 \
+      PADDLE_TRAINING_ROLE=TRAINER \
+      PADDLE_TRAINER_ID=1 \
+      python recognize_digits.py train
+    ```
+
+    The Trainer instance would print the training logs as follows:
+
+    ``` text
+    append file for current trainer: dataset/mnist/mnist-train-00000.pickle
+    append file for current trainer: dataset/mnist/mnist-train-00002.pickle
+    append file for current trainer: dataset/mnist/mnist-train-00004.pickle
+    append file for current trainer: dataset/mnist/mnist-train-00006.pickle
+    append file for current trainer: dataset/mnist/mnist-train-00008.pickle
+    append file for current trainer: dataset/mnist/mnist-train-00010.pickle
+    append file for current trainer: dataset/mnist/mnist-train-00012.pickle
+    append file for current trainer: dataset/mnist/mnist-train-00014.pickle
+    ('processing file: ', 'dataset/mnist/mnist-train-00000.pickle')
+    Epoch: 0, Batch: 10, Test Loss: 0.24518635296, Acc: 0.923899995804 
+    ```
+
+1. Inference
+
+    Execut the following command to load the models and infer the input image `img/infer_3.png`:
+
+    ``` python
+    > docker exec -it paddle /bin/bash -c "cd /work && python recognize_digits.py infer"
+    ```
+
+    The inference result is as follows:
+
+    ``` text
+    ('Inference result of img/infer_3.png is: ', 3)
+    ```
+
 
 ## Part-2: Launch the PaddlePaddle EDL Training Jobs on a Kubernetes Cluster
 
