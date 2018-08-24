@@ -1,7 +1,7 @@
 apiVersion: paddlepaddle.org/v1
 kind: TrainingJob
 metadata:
-  name: example2
+  name: example
 spec:
   image: "paddlepaddle/edl-example"
   port: 7164
@@ -35,7 +35,7 @@ spec:
   master:
     resources:
         limits:
-          cpu: "1Gi"
+          cpu: "1"
           memory: "1Gi"
         requests:
           cpu: "500m"

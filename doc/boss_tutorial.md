@@ -43,8 +43,8 @@ to manage the cluster training jobs and an auto-scaler to scale the job's comput
 ## Prerequisites
 
 - [Install Docker](https://docs.docker.com/install/)
-- [Install kubectl](./install.md#kubectl)
 - [Install Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
+- [Install kubectl](./install.md#kubectl)
 - A Kubernetes cluster which version is `1.7.x`:
     - [minikube would launch a kubernetes cluster locally](./install.md#minikube).
     - [kops would launch a Kuberntes cluster on AWS](./install.md#aws).
@@ -160,7 +160,6 @@ the training process and example output.
     ('Inference result of img/infer_3.png is: ', 3)
     ```
 
-
 ## Part-2: Launch the PaddlePaddle EDL Training Jobs on a Kubernetes Cluster
 
 Please note, EDL only support the early PaddlePaddle version so the fault-tolerant model is
@@ -174,6 +173,12 @@ the cluster is available, for the other approach, you can contact the administra
 ### Deploy EDL Components
 
 **NOTE**: there is only one EDL controller in a Kubernetes cluster, so if you're using a public cluster, you can skip this step.
+
+1. Create a `paddlecloud` namespace to run EDL components
+
+    ``` python
+    > kubectl create namespace paddlecloud
+    ```
 
 1. (Optional) Configure RBAC for EDL controller so that it would have the cluster admin permission.
 
