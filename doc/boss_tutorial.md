@@ -248,7 +248,8 @@ the cluster is available, for the other approach, you can contact the administra
     Please open a new tab in your terminal program and run the monitor Python script `example/collector.py`:
 
     ```bash
-    docker run --rm -it -v $HOME/.kube/config:/root/.kube/config $PWD:/work paddlepaddle/edl-example python collector.py
+    > cd edl/example
+    > docker run --rm -it -v $HOME/.kube/config:/root/.kube/config -v $PWD:/work paddlepaddle/edl-example python /work/collector.py
     ```
 
     And you can see the following metrics:
