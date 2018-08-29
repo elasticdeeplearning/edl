@@ -55,6 +55,7 @@ type TrainingJobSpec struct {
 	Passes            int                  `json:"passes,omitempty"`
 	Volumes           []corev1.Volume      `json:"volumes"`
 	VolumeMounts      []corev1.VolumeMount `json:"VolumeMounts"`
+	NodeSelector      map[string]string    `json:"NodeSelector"`
 	//TODO(m3ngyang) simplify the structure of sub-resource(mengyang)
 	//TrainingJob components.
 	Master  MasterSpec  `json:"master"`
