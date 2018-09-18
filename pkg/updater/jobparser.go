@@ -200,7 +200,7 @@ func getEtcdPodSpec(job *paddlev1.TrainingJob) *corev1.Container {
 
 	return &corev1.Container{
 		Name:            "etcd",
-		Image:           "quay.io/coreos/etcd:v3.2.1",
+		Image:           "m3ngyang/etcd:v3.2.1",
 		ImagePullPolicy: imagePullPolicy,
 		// TODO(gongwb): etcd ports?
 		Env:     podEnv(job),

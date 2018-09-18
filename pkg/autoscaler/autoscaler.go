@@ -154,7 +154,7 @@ func (a *Autoscaler) totalRunningJob(jobName string) bool {
 	if !ok {
 		return false
 	}
-	up, ok := v.(*updater.TrainingJobUpdater)
+	up, ok := v.(*updater.JobUpdater)
 	if !ok {
 		return false
 	}
@@ -201,7 +201,7 @@ func scaleDryRun(r *ClusterResource, j *padv1.TrainingJob, curDiff int32, maxLoa
 	nodeName := ""
 	// Adjust resource upon return.
 	defer func() {
-		log.Debug("scaleDryRun", "scaledown", scaleDown, "jobns", j.Namespace, "jobname", j.Name, "additional", additional)
+		log.Debug("scaleDryRun", "scaledown", scaleDown, "namespace", j.Namespace, "jobname", j.Name, "additional", additional)
 		r.GPULimit += gpuLimit * additional
 		r.CPURequestMilli += cpuRequestMilli * int64(additional)
 		r.MemoryRequestMega += memRequestMega * int64(additional)
@@ -219,6 +219,7 @@ func scaleDryRun(r *ClusterResource, j *padv1.TrainingJob, curDiff int32, maxLoa
 	plannedInstance := int(*j.Spec.Trainer.ReplicaSpec.Spec.Parallelism) + int(curDiff)
 	instanceMax := j.Spec.Trainer.MaxInstance
 	instanceMin := j.Spec.Trainer.MinInstance
+	log.Debug("scaleDryRun instance num", "min", instanceMin, "max", instanceMax, "planned", plannedInstance)
 
 	// TODO(typhoonzero): refine below code to remove direction
 	// ======================= scaleDown ======================
@@ -236,6 +237,7 @@ func scaleDryRun(r *ClusterResource, j *padv1.TrainingJob, curDiff int32, maxLoa
 		log.Debug("scaleDryRun", "gpuRequest", r.GPULimit, "threshold", gpuThreshold)
 		log.Debug("scaleDryRun", "cpuRequest", r.CPURequestMilli, "threshold", cpuThreshold)
 		log.Debug("scaleDryRun", "memRequest", r.MemoryRequestMega, "threshold", memThreshold)
+		log.Debug("scaleDryRun conditions", "gpuCondition", gpuCondition, "cpuCondition", cpuCondition, "memCondition", memCondition)
 		if gpuCondition || cpuCondition || memCondition {
 			if plannedInstance > instanceMin {
 				additional = -1
@@ -297,7 +299,7 @@ func scaleDryRun(r *ClusterResource, j *padv1.TrainingJob, curDiff int32, maxLoa
 func (a *Autoscaler) setAdditional(diff map[string]int32) {
 	a.jobUpdater.Range(func(k, v interface{}) bool {
 		key := k.(string)
-		up := v.(*updater.TrainingJobUpdater)
+		up := v.(*updater.JobUpdater)
 		var additional int32
 		if val, ok := diff[key]; ok {
 			additional = val
@@ -349,17 +351,6 @@ func scaleAllJobsDryRun(jobs []*padv1.TrainingJob, r ClusterResource, maxLoadDes
 	return diff
 }
 
-func (a *Autoscaler) scaleAllJobs() {
-	a.jobUpdater.Range(func(k, v interface{}) bool {
-		up := v.(*updater.TrainingJobUpdater)
-		if up.Additional != 0 {
-			log.Info("additional of trainingjob", "jobname", k, "scalenum", up.Additional)
-			up.Scale()
-		}
-		return true
-	})
-}
-
 // Run monitors the cluster resources and training jobs in a loop,
 // scales the training jobs according to the cluster resource.
 func (a *Autoscaler) Run() {
@@ -381,9 +372,8 @@ func (a *Autoscaler) Run() {
 			a.findTrainingJobsMightBeRescheduled(havePending),
 			r,
 			a.maxLoadDesired)
-		log.Info("Calculated info", "diff:", diff)
+		log.Info("Calculated info", "diff", diff)
 		a.setAdditional(diff)
-		a.scaleAllJobs()
 	}
 }
 
@@ -395,7 +385,7 @@ func (a *Autoscaler) findPendingJob() bool {
 		log.Debug("findPendingJob check", "jobname", k)
 		total := 0
 		pending := 0
-		up, ok := v.(*updater.TrainingJobUpdater)
+		up, ok := v.(*updater.JobUpdater)
 		if !ok {
 			log.Debug("findPendingJob conversion error", "jobname", k)
 		}
@@ -439,7 +429,7 @@ func (a *Autoscaler) findTrainingJobsMightBeRescheduled(havePending bool) (js tr
 		jn := k.(string)
 		log.Debug("findTrainingJobsMightBeRescheduled", "jobname", jn)
 
-		up, ok := v.(*updater.TrainingJobUpdater)
+		up, ok := v.(*updater.JobUpdater)
 		if !ok {
 			return false
 		}
