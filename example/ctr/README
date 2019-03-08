@@ -1,0 +1,18 @@
+
+CTR分布式训练
+
+这是一个paddlepaddle分布式训练任务的示例和安装教程，在一个标准k8s集群上可以通过脚本直接构建一个分布式训练CTR任务。
+
+整个工程分为三部分
+
+1。镜像文件
+Dockerfile -- docker构建文件
+script -- 构建docker用到的脚本
+ctr -- paddlepaddle分布式训练CTR例子
+
+2。部署文件
+ps-train -- 部署k8s的yaml文件
+
+3。其它
+screenshot -- 任务图例
+百度云部署ctr分布式训练任务.doc -- 百度云搭建CTR任务说明
