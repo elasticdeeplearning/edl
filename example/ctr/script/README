@@ -1,0 +1,1 @@
+please copy the edl/docker/k8s_tools and edl/docker/paddle_k8s into this folder if want to build the docker image by yourself.

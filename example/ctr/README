@@ -7,12 +7,12 @@ CTR分布式训练
 
 1。镜像文件
 Dockerfile -- docker构建文件
-script -- 构建docker用到的脚本
+script -- 构建docker用到的脚本, 拷贝 edl/docker/k8s_tools 和 edl/docker/paddle_k8s 到此目录
 ctr -- paddlepaddle分布式训练CTR例子
 
 2。部署文件
 ps-train -- 部署k8s的yaml文件
 
 3。其它
-screenshot -- 任务图例
-百度云部署ctr分布式训练任务.doc -- 百度云搭建CTR任务说明
+image -- 任务图例
+百度云部署ctr分布式训练任务.rst -- 百度云搭建CTR任务说明
