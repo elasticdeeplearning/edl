@@ -74,15 +74,11 @@ start_fluid_process() {
   fi
 
   export PADDLE_PSERVERS=$(python /root/k8s_tools.py fetch_endpoints ${pserver_label} ${PADDLE_PORT})
-  # export PADDLE_TRAINER_IPS=$(python /root/k8s_tools.py fetch_ips ${trainer_label})
+  export PADDLE_TRAINER_IPS=$(python /root/k8s_tools.py fetch_ips ${trainer_label})
 
   if [ "${PADDLE_TRAINING_ROLE}" == "TRAINER" ] || [ "${PADDLE_TRAINING_ROLE}" == "WORKER" ]; then
     check_failed_cnt 1
     task_index=$(python /root/k8s_tools.py fetch_id ${trainer_label})
-    # download training materials for trainer task_index=0-9
-    file_index=$(( 10$task_index%10 ))
-    address="https://paddle-ctr-data.bj.bcebos.com/dac${file_index}.tar.gz"
-    cd /workspace/ctr/data/raw && curl -o dac.tar.gz ${address} && tar zxf dac.tar.gz && rm dac.tar.gz
   else
     task_index=$(python /root/k8s_tools.py fetch_id ${pserver_label})
   fi

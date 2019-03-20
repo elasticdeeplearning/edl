@@ -14,7 +14,6 @@ spec:
         env:
         - {name: GLOG_v, value: '0'}
         - {name: GLOG_logtostderr, value: '1'}
-        #- {name: GLOG_vmodule, value: 'executor=4,operator=4'}
         - {name: TOPOLOGY, value: ''}
         - {name: TRAINER_PACKAGE, value: /workspace}
         - {name: PADDLE_INIT_NICS, value: eth2}

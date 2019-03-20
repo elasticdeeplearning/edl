@@ -3,6 +3,7 @@ from __future__ import print_function
 import argparse
 import logging
 import os
+import subprocess
 import time
 
 import numpy as np
@@ -29,12 +30,12 @@ def parse_args():
     parser.add_argument(
         '--train_data_path',
         type=str,
-        default='./data/raw/train.txt',
+        default='./data/train.txt',
         help="The path of training dataset")
     parser.add_argument(
         '--test_data_path',
         type=str,
-        default='./data/raw/valid.txt',
+        default='./data/valid.txt',
         help="The path of testing dataset")
     parser.add_argument(
         '--batch_size',
@@ -217,6 +218,13 @@ def train():
             exe.run(startup)
             exe.run(prog)
         elif args.role == "trainer" or args.role == "TRAINER":
+            logger.info("download the training materials")
+            file_index = args.trainer_id % 10
+            address = "https://paddle-ctr-data.bj.bcebos.com/dac" + str(file_index) + ".tar.gz"
+            cmd = "cd /workspace/ctr/data/ && curl -o dac.tar.gz " + address + " && tar zxf dac.tar.gz && rm dac.tar.gz"
+            exit_code = subprocess.call(cmd, shell=True)
+            if exit_code != 0:
+                raise Exception("The download command failed, please check the network settings")
             logger.info("run trainer")
             train_prog = t.get_trainer_program()
             train_loop(args, train_prog, py_reader, loss, auc_var, batch_auc_var,
