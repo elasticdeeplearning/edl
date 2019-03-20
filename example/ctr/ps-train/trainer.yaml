@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata: {name: fluid-ctr-trainer}
+spec:
+  completions: 2
+  parallelism: 2
+  template:
+    metadata:
+      labels: {paddle-job: fluid-ctr}
+    spec:
+      restartPolicy: "OnFailure"
+      containers:
+      - command: [paddle_k8s, start_fluid]
+        env:
+        - {name: GLOG_v, value: '0'}
+        - {name: GLOG_logtostderr, value: '1'}
+        - {name: TOPOLOGY, value: ''}
+        - {name: TRAINER_PACKAGE, value: /workspace}
+        - {name: PADDLE_INIT_NICS, value: eth2}
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef: {fieldPath: metadata.namespace}
+        - name: POD_IP
+          valueFrom:
+            fieldRef: {fieldPath: status.podIP}
+        - name: POD_NAME
+          valueFrom:
+            fieldRef: {fieldPath: metadata.name}
+        - name: PADDLE_CURRENT_IP
+          valueFrom:
+            fieldRef: {fieldPath: status.podIP}
+        - {name: PADDLE_JOB_NAME, value: fluid-ctr}
+        - {name: PADDLE_IS_LOCAL, value: '0'}
+        - {name: FLAGS_rpc_deadline, value: '36000000'}
+        - {name: PADDLE_PORT, value: '30236'}
+        - {name: PADDLE_PSERVERS_NUM, value: '2'}
+        - {name: PADDLE_TRAINERS_NUM, value: '2'}
+        - {name: PADDLE_TRAINING_ROLE, value: TRAINER}
+        - {name: TRAINING_ROLE, value: TRAINER}
+        - {name: LD_LIBRARY_PATH, value: '/usr/local/lib:/usr/local/nvidia/lib64:/usr/local/rdma/lib64:/usr/lib64/mlnx_ofed/valgrind'}
+        - {name: ENTRY, value: cd /workspace/ctr && python train.py --is_local 0 --cloud_train 1}
+        image: wopeizl/paddle_ctr_distribute
+        imagePullPolicy: Always
+        name: trainer
+        volumeMounts:
+        - {mountPath: /mnt/seqdata, name: seqdata}
+        resources:
+          limits: {cpu: '10', memory: 30Gi}
+          requests: {cpu: '1', memory: 100M}
+      hostNetwork: true
+      imagePullSecrets:
+      - {name: regcred}
+      volumes:
+      - hostPath: {path: /home/work/}
+        name: seqdata

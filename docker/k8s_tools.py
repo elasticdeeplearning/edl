@@ -63,7 +63,7 @@ def fetch_pods_info(label_selector, phase=None):
         if phase is not None and get_pod_status(item) != phase:
             continue
 
-        pod_list.append((item.status.phase, item.status.pod_ip))
+        pod_list.append((item.status.phase, item.status.pod_ip, item.metadata.name))
     return pod_list
 
 
@@ -98,27 +98,57 @@ def fetch_ips_list(label_selector, phase=None):
     ips.sort()
     return ips
 
+def fetch_name_list(label_selector, phase=None):
+    pod_list = fetch_pods_info(label_selector, phase)
+    names = [item[2] for item in pod_list]
+    names.sort()
+    return names
+
 
 def fetch_ips_string(label_selector, phase=None):
     ips = fetch_ips_list(label_selector, phase)
     return ",".join(ips)
 
 
-def fetch_endpoints_string(label_selector, port, phase=None):
+def fetch_endpoints_string(label_selector, port, phase=None, sameport=True):
     ips = fetch_ips_list(label_selector, phase)
-    ips = ["{0}:{1}".format(ip, port) for ip in ips]
+    if sameport:
+        ips = ["{0}:{1}".format(ip, port) for ip in ips]
+    else:
+        srcips = ips
+        ips = []
+        port = int(port)
+        for ip in srcips:
+            ips.append("{0}:{1}".format(ip, port))
+            port = port + 1
     return ",".join(ips)
 
 
-def fetch_pod_id(label_selector, phase=None):
-    ips = fetch_ips_list(label_selector, phase=phase)
+def fetch_pod_id(label_selector, phase=None, byname=True):
+    if byname:
+        names = fetch_name_list(label_selector, phase=phase)
 
-    local_ip = socket.gethostbyname(socket.gethostname())
-    for i in xrange(len(ips)):
-        if ips[i] == local_ip:
-            return i
+        local_name = os.getenv('POD_NAME')
+        for i in xrange(len(names)):
+            if names[i] == local_name:
+                return i
 
-    return None
+        return None
+    else:
+        ips = fetch_ips_list(label_selector, phase=phase)
+
+        local_ip = socket.gethostbyname(socket.gethostname())
+        for i in xrange(len(ips)):
+            if ips[i] == local_ip:
+                return i
+
+        # in minikube there can be one node only
+        local_ip = os.getenv("POD_IP")
+        for i in xrange(len(ips)):
+            if ips[i] == local_ip:
+                return i
+
+        return None
 
 
 def fetch_ips(label_selector):
@@ -126,7 +156,7 @@ def fetch_ips(label_selector):
 
 
 def fetch_endpoints(label_selector, port):
-    return fetch_endpoints_string(label_selector, port=port, phase="Running")
+    return fetch_endpoints_string(label_selector, port=port, phase="Running", sameport=False)
 
 
 def fetch_id(label_selector):
