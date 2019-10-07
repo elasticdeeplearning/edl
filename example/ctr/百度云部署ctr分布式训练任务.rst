@@ -3,11 +3,26 @@
 百度云分布式训练CTR
 =========================
 
-Fluid支持数据并行的分布式训练，也支持基于Kubernetes的分布式部署。本文以百度云为例，说明如何通过在云服务器上分布式训练Click-Through-Rate（以下简称ctr）任务。
 
-1. 使用前的准备
+
+1. Overview
 ----------------
-百度云容器引擎的使用流程基本概念可以参考 `官网文档 <https://cloud.baidu.com/doc/CCE/GettingStarted/24.5C.E6.93.8D.E4.BD.9C.E6.B5.81.E7.A8.8B.html#.E6.93.8D.E4.BD.9C.E6.B5.81.E7.A8.8B>`_ 做了解
+本项目提供了端到端的CTR训练和二次开发的解决方案，它具有如下特点。
+
+- 使用K8S集群解决来解决原来在物理集群上训练时，会出现类似于配置参数冗杂，环境搭建繁复等问题。
+- 使用基于Kube-batch开发的Volcano框架来进行任务提交和弹性调度。
+- 使用Paddle Serving来进行模型的上线和预测。
+- 使用Cube作为稀疏参数的分布式存储，在预测对接Paddle Serving使用。
+
+以上组件就可以一键完成从训练到部署的所有流程。
+
+此外，我们在各个环节也提供了二次开发的指导。具体有如下方式
+
+- 指定数据集的输入和读取方式，来feed不同的数据集和数据集格式
+- 通过指定训练的规模，包括参数服务器的数量和训练节点的数量。
+- 通过指定Cube参数服务器的分片数量和副本数量。
+- 指定Serving的模型信息
+
 
 2. 创建集群
 ----------------
@@ -22,6 +37,8 @@ Fluid支持数据并行的分布式训练，也支持基于Kubernetes的分布�
 .. image:: image/ctr_node.png
 
 创建完成后，即可查看 `集群信息 <https://cloud.baidu.com/doc/CCE/GettingStarted.html#.E6.9F.A5.E7.9C.8B.E9.9B.86.E7.BE.A4>`_ 。
+
+
 
 3. 操作集群
 ----------------
@@ -52,45 +69,95 @@ Fluid支持数据并行的分布式训练，也支持基于Kubernetes的分布�
 
 	kubectl get node
 
-4. 设置访问权限
+
+
+4. 部署任务
 ----------------
-建立分布式任务需要pod间有API互相访问的权限，可以按如下步骤
 
-.. code-block:: bash
+- 安装Volcano，kubectl apply -f https://raw.githubusercontent.com/volcano-sh/volcano/master/installer/volcano-development.yaml
 
-	sudo kubectl create rolebinding default-view --clusterrole=view --serviceaccount=default:default --namespace=default
+.. image:: image/ctr_volcano_install.png
 
-* 注意：  --namespace 指定的default 为创建集群时候的名称
 
-5. 部署任务
-----------------
+- 执行bash paddle-suite.sh 来一步完成所有的工作。
+为方便理解，也将该脚本的每一步执行过程给出说明
+
+
 任务的所有脚本文件可以访问 `这里 <https://github.com/PaddlePaddle/edl/tree/develop/example/ctr>`_ 获取。
 
-- ctr：ctr任务对应的python脚本
-- ps-train：k8s任务对应的yaml文件
-
-	+ pserver.yaml: 部署psever任务
-
-	+ trainer.yaml: 部署trainer任务
-
-- Dockerfile：pod文件的docker镜像生成文件
-- Script：pod文件docker镜像中包含的脚本
-
-通过执行
+- 选择一个node作为输出节点
 
 .. code-block:: bash
 
-	kubectl apply -f ps-train
+        kubectl label nodes $NODE_NAME nodeType=model
 
-即可以成功提交任务
 
-6. 查看结果
+这句话的意思是给这个node做一个标记，之后的文件服务和模型产出都被强制分配在这个node上进行，把NAME的一串字符 替换 $NODE_NAME即可。
+
+- 启动文件服务器
+
+.. code-block:: bash
+
+	kubectl apply -f fileserver.yaml
+
+运行file server的启动脚本kubectl apply -f ftp.yaml，启动文件服务器
+
+.. image:: image/file_server_pod.png
+
+.. image:: image/file_server_svc.png
+
+- 启动Cube稀疏参数服务器
+
+.. code-block:: bash
+
+	kubectl apply -f cube.yaml
+
+如果在Service中发现了cube-0/1，在kubectl get svc中发现了相关的服务，则说明cube server/agent启动成功。
+
+.. image:: image/cube.png
+
+- 启动Paddle Serving
+
+.. code-block:: bash
+
+	kubectl apply -f paddleserving.yaml
+
+- 启动Cube稀疏参数服务器配送工具
+
+.. code-block:: bash
+
+	kubectl apply -f transfer.yaml
+
+.. image:: image/transfer.png
+
+这个cube-transfer配送工具会把训练好的模型从下面要介绍的edl-demo-trainer-0上通过file server拉取，再进行装载。最终目的是给Paddle Serving来进行稀疏参数查询。如果出现最后wait 5 min这样的字样，说明上一轮的模型已经配送成功了，接下来就可以做最后Paddle Serving的测试了。
+
+
+- 启动Paddle Serving
+
+如果在Service中发现了paddle serving，在kubectl get svc中发现了相关的服务，则说明paddle serving启动成功。
+
+.. image:: image/paddleserving_pod.png
+
+.. image:: image/paddleserving_svc.png
+
+- 执行 Paddle CTR 分布式训练
+
+.. code-block:: bash
+
+	kubectl apply -f ctr.yaml
+
+接下来需要等待一段时间，我们可以通过kubectl logs edl-demo-trainer-0来查看训练的进度，如果pass 一直为0就继续等待，通常需要大概3-5分钟的之间会完成第一轮pass，这时候就会生成inference_model。
+
+.. image:: image/ctr.png
+
+
+
+5. 查看结果
 ----------------
 百度云容器引擎CCE提供了web操作台方便查看pod的运行状态。
 
-本次训练任务将启动2个pserver节点，2个trainer节点，示例图如下
-
-.. image:: image/ctr_pods.png
+本次训练任务将启动3个pserver节点，3个trainer节点。
 
 可以通过检查pserver和trainer的log来检查任务运行状态。
 Trainer日志示例：
@@ -100,3 +167,68 @@ Trainer日志示例：
 pserver日志示例：
 
 .. image:: image/ctr_pserver_log.png
+
+
+6. 二次开发指南
+----------------
+
+- 指定数据集的输入和读取方式
+
+现有的数据的输入是从edldemo镜像当中的/workspace/ctr/data/download.sh目录进行下载。下载之后会解压在/workspace/ctr/data/raw文件夹当中，包含train.txt和test.txt。所有的数据的每一行通过空格隔开40个属性。
+
+然后在train.py当中给出数据集的读取方式
+
+.. image:: image/pyreader.png
+
+这里面包含了连续数据和离散数据。
+连续数据是index [1, 14)，离散数据是index [14, 40)，label是index 0，分别对应最后yield [dense_feature] + sparse_feature + [label]。用户可以在这里进行指定。当离散的数据和连续的数据格式和样例有不同，需要用户在这里进行指定，并且可以在__init__函数当中参考样例的写法对连续数据进行归一化。
+
+对于数据的来源，文章给出的是download.sh从Criteo官方去下载数据集，然后解压后放在raw文件夹。
+
+可以用HDFS/AFS或是其他方式来配送数据集，在启动项中加入相关命令。
+
+在改动之后，记得保存相关的docker镜像并推送到云端
+
+
+.. code-block:: bash
+
+	docker commit ${DOCKER_CONTAINER_NAME} ${DOCKER_IMAGE_NAME}
+        docker push  ${DOCKER_IMAGE_NAME}
+
+也可以在Dockerfile当中进行修改
+
+.. code-block:: bash
+
+	docker build -t ${DOCKER_IMAGE_NAME} .
+        docker push  ${DOCKER_IMAGE_NAME}
+
+- 指定训练规模
+
+在ctr.yaml文件当中，我们会发现这个是在volcano的框架下定义的Job。在Job里面，我们给出了很多Pserver和Trainer的定义，在总体的Job也给出了MinAvailable数量的定义。Pserver和Trainer下面有自己的Replicas，环境变量当中有PSERVER_NUM和TRAINER_MODEL和TRAINER_NUM的数量。通常MinAvailable = PServer Num + Trainer Num，这样我们就可以启动相应的服务。
+
+.. image:: image/ctryaml1.png
+
+如上图所示，我们需要在min_available处设置合理的数字。例如一个POD占用一个CPU，那么我们就要对集群的总CPU数有一个预估，不要过于接近或事超过集群CPU总和的上限。否则无法满足Volcano的Gang-Schedule机制，就会出现无法分配资源，一直处于Pending的情况。然后第二个红框当中是
+
+.. image:: image/ctryaml2.png
+
+如上图所示，这个部分是用来专门做模型的输出，这里我们不需要做任何的改动，只要保留一个副本就可以。
+
+.. image:: image/ctryaml3.png
+
+如上图所示
+
+- 指定cube参数服务器的分片数量和副本数量
+在cube.yaml文件当中，我们可以看到每一个cube的节点的定义，有一个cube server pod和cube server service。如果我们需要增加cube的副本数和分片数，只需要在yaml文件中复制相关的定义和环境变量即可。
+
+.. image:: image/cube_config1.png
+
+.. image:: image/cube_config2.png
+
+以上两个图片，一个是对cube POD的定义，一个是对cube SERVICE的定义。如果需要扩展Cube分片数量，可以复制POD和SERVICE的定义，并重命名它们。示例程序给出的是2个分片，复制之后第3个可以命名为cube-2。
+
+
+- Serving适配新的模型
+在本示例中，所有训练的模型，都可以自动地被Serving获取，但是，我们如果需要别的模型，就需要自行去配置相关的信息。具体可以参见 `Serving从零开始写一个预测服务 <https://github.com/PaddlePaddle/Serving/blob/develop/doc/CREATING.md>`_ 
+
+
