@@ -74,16 +74,25 @@
 4. 部署任务
 ----------------
 
-- 安装Volcano，kubectl apply -f https://raw.githubusercontent.com/volcano-sh/volcano/master/installer/volcano-development.yaml
+- 安装Volcano，执行
+
+.. code-block:: bash
+
+        kubectl apply -f https://raw.githubusercontent.com/volcano-sh/volcano/master/installer/volcano-development.yaml
 
 .. image:: image/ctr_volcano_install.png
 
 
-- 执行bash paddle-suite.sh 来一步完成所有的工作。
-为方便理解，也将该脚本的每一步执行过程给出说明
+- 一键完成所有的工作，执行
+
+.. code-block:: bash
+
+        bash paddle-suite.sh
+	
+为方便理解，接下来会将该脚本的每一步执行过程给出说明
 
 
-任务的所有脚本文件可以访问 `这里 <https://github.com/PaddlePaddle/edl/tree/develop/example/ctr>`_ 获取。
+任务的所有脚本文件可以访问 `这里 <https://github.com/PaddlePaddle/edl/tree/develop/example/ctr/script>`_ 获取。
 
 - 选择一个node作为输出节点
 
