@@ -122,6 +122,12 @@
 
 	kubectl apply -f paddleserving.yaml
 
+如果在Service中发现了paddle serving，在kubectl get svc中发现了相关的服务，则说明paddle serving启动成功。
+
+.. image:: image/paddleserving_pod.png
+
+.. image:: image/paddleserving_svc.png
+
 - 启动Cube稀疏参数服务器配送工具
 
 .. code-block:: bash
@@ -131,15 +137,6 @@
 .. image:: image/transfer.png
 
 这个cube-transfer配送工具会把训练好的模型从下面要介绍的edl-demo-trainer-0上通过file server拉取，再进行装载。最终目的是给Paddle Serving来进行稀疏参数查询。如果出现最后wait 5 min这样的字样，说明上一轮的模型已经配送成功了，接下来就可以做最后Paddle Serving的测试了。
-
-
-- 启动Paddle Serving
-
-如果在Service中发现了paddle serving，在kubectl get svc中发现了相关的服务，则说明paddle serving启动成功。
-
-.. image:: image/paddleserving_pod.png
-
-.. image:: image/paddleserving_svc.png
 
 - 执行 Paddle CTR 分布式训练
 
