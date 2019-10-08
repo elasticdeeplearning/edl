@@ -3,10 +3,11 @@
 百度云分布式训练CTR
 =========================
 
-
-
-1. Overview
+1. 总体概览
 ----------------
+
+.. image:: image/overview.png
+
 本项目提供了端到端的CTR训练和二次开发的解决方案，它具有如下特点。
 
 - 使用K8S集群解决来解决原来在物理集群上训练时，会出现类似于配置参数冗杂，环境搭建繁复等问题。
@@ -74,7 +75,10 @@
 4. 部署任务
 ----------------
 
-- 安装Volcano，执行
+安装Volcano
+>>>>>>>>>>>>>
+
+执行
 
 .. code-block:: bash
 
@@ -83,7 +87,10 @@
 .. image:: image/ctr_volcano_install.png
 
 
-- 一键完成所有的工作，执行
+一键完成部署
+>>>>>>>>>>>>>>
+
+执行
 
 .. code-block:: bash
 
@@ -94,7 +101,8 @@
 
 任务的所有脚本文件可以访问 `这里 <https://github.com/PaddlePaddle/edl/tree/develop/example/ctr/script>`_ 获取。
 
-- 选择一个node作为输出节点
+选择一个node作为输出节点
+:::::::::::::
 
 .. code-block:: bash
 
@@ -103,7 +111,8 @@
 
 这句话的意思是给这个node做一个标记，之后的文件服务和模型产出都被强制分配在这个node上进行，把NAME的一串字符 替换 $NODE_NAME即可。
 
-- 启动文件服务器
+启动文件服务器
+::::::::::::
 
 .. code-block:: bash
 
@@ -115,7 +124,8 @@
 
 .. image:: image/file_server_svc.png
 
-- 启动Cube稀疏参数服务器
+启动Cube稀疏参数服务器
+:::::::::::
 
 .. code-block:: bash
 
@@ -125,7 +135,8 @@
 
 .. image:: image/cube.png
 
-- 启动Paddle Serving
+启动Paddle Serving
+:::::::::::
 
 .. code-block:: bash
 
@@ -137,7 +148,8 @@
 
 .. image:: image/paddleserving_svc.png
 
-- 启动Cube稀疏参数服务器配送工具
+启动Cube稀疏参数服务器配送工具
+:::::::::::::
 
 .. code-block:: bash
 
@@ -147,7 +159,8 @@
 
 这个cube-transfer配送工具会把训练好的模型从下面要介绍的edl-demo-trainer-0上通过file server拉取，再进行装载。最终目的是给Paddle Serving来进行稀疏参数查询。如果出现最后wait 5 min这样的字样，说明上一轮的模型已经配送成功了，接下来就可以做最后Paddle Serving的测试了。
 
-- 执行 Paddle CTR 分布式训练
+执行 Paddle CTR 分布式训练
+::::::::::::::
 
 .. code-block:: bash
 
@@ -158,9 +171,12 @@
 .. image:: image/ctr.png
 
 
-
 5. 查看结果
 ----------------
+
+查看训练日志
+>>>>>>>>>>>>
+
 百度云容器引擎CCE提供了web操作台方便查看pod的运行状态。
 
 本次训练任务将启动3个pserver节点，3个trainer节点。
@@ -174,6 +190,24 @@ pserver日志示例：
 
 .. image:: image/ctr_pserver_log.png
 
+验证Paddle Serving预测结果
+>>>>>>>>>>>>
+
+执行
+
+.. code-block:: bash
+
+	kubectl apply -f paddleclient.yaml
+
+在/client/ctr_prediction目录下，执行
+
+.. code-block:: bash
+
+	bin/ctr_prediction
+
+如果运行正常的话，会在一段时间后退出，紧接着就可以在log/ctr_prediction.INFO的最后几行看到类似于这样的日志
+
+.. image:: image/paddleclient.png
 
 6. 二次开发指南
 ----------------
@@ -187,7 +221,7 @@ pserver日志示例：
 .. image:: image/pyreader.png
 
 这里面包含了连续数据和离散数据。
-连续数据是index [1, 14)，离散数据是index [14, 40)，label是index 0，分别对应最后yield [dense_feature] + sparse_feature + [label]。用户可以在这里进行指定。当离散的数据和连续的数据格式和样例有不同，需要用户在这里进行指定，并且可以在__init__函数当中参考样例的写法对连续数据进行归一化。
+连续数据是index [1, 14)，离散数据是index [14, 40)，label是index 0，分别对应最后yield [dense_feature] + sparse_feature + [label]。当离散的数据和连续的数据格式和样例有不同，需要用户在这里进行指定，并且可以在__init__函数当中参考样例的写法对连续数据进行归一化。
 
 对于数据的来源，文章给出的是download.sh从Criteo官方去下载数据集，然后解压后放在raw文件夹。
 
