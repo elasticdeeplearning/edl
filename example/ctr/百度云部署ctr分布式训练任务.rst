@@ -212,7 +212,8 @@ pserver日志示例：
 6. 二次开发指南
 ----------------
 
-- 指定数据集的输入和读取方式
+指定数据集的输入和读取方式
+>>>>>>>>>>>>
 
 现有的数据的输入是从edldemo镜像当中的/workspace/ctr/data/download.sh目录进行下载。下载之后会解压在/workspace/ctr/data/raw文件夹当中，包含train.txt和test.txt。所有的数据的每一行通过空格隔开40个属性。
 
@@ -242,7 +243,8 @@ pserver日志示例：
 	docker build -t ${DOCKER_IMAGE_NAME} .
         docker push  ${DOCKER_IMAGE_NAME}
 
-- 指定训练规模
+指定训练规模
+>>>>>>>>>>>>
 
 在ctr.yaml文件当中，我们会发现这个是在volcano的框架下定义的Job。在Job里面，我们给出了很多Pserver和Trainer的定义，在总体的Job也给出了MinAvailable数量的定义。Pserver和Trainer下面有自己的Replicas，环境变量当中有PSERVER_NUM和TRAINER_MODEL和TRAINER_NUM的数量。通常MinAvailable = PServer Num + Trainer Num，这样我们就可以启动相应的服务。
 
@@ -258,7 +260,9 @@ pserver日志示例：
 
 如上图所示
 
-- 指定cube参数服务器的分片数量和副本数量
+指定cube参数服务器的分片数量和副本数量
+>>>>>>>>>>>>
+
 在cube.yaml文件当中，我们可以看到每一个cube的节点的定义，有一个cube server pod和cube server service。如果我们需要增加cube的副本数和分片数，只需要在yaml文件中复制相关的定义和环境变量即可。
 
 .. image:: image/cube_config1.png
@@ -268,7 +272,9 @@ pserver日志示例：
 以上两个图片，一个是对cube POD的定义，一个是对cube SERVICE的定义。如果需要扩展Cube分片数量，可以复制POD和SERVICE的定义，并重命名它们。示例程序给出的是2个分片，复制之后第3个可以命名为cube-2。
 
 
-- Serving适配新的模型
+Serving适配新的模型
+>>>>>>>>>>>>>>
+
 在本示例中，所有训练的模型，都可以自动地被Serving获取，但是，我们如果需要别的模型，就需要自行去配置相关的信息。具体可以参见 `Serving从零开始写一个预测服务 <https://github.com/PaddlePaddle/Serving/blob/develop/doc/CREATING.md>`_ 
 
 
