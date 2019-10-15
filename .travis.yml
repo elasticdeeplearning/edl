@@ -4,7 +4,7 @@ matrix:
       go: 1.8.x
       sudo: required
       install:
-        - go get -u github.com/golang/lint/golint
+        - go get -u golang.org/x/lint/golint
         - curl https://glide.sh/get | bash
         - sudo pip install pre-commit
       script:
