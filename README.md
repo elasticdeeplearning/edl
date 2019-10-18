@@ -31,6 +31,7 @@ of EDL on this cluster is
 
 - [Usage](./doc/usage.md)
 - [How to Build EDL Component](./doc/build.md)
+- [Run CTR Training and Deployment on Baidu Cloud](./example/ctr/deploy_ctr_on_baidu_cloud_cn.rst)
 
 ## Design Docs
 

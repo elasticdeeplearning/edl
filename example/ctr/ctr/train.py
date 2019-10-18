@@ -3,7 +3,6 @@ from __future__ import print_function
 import argparse
 import logging
 import os
-import subprocess
 import time
 
 import numpy as np
@@ -30,12 +29,12 @@ def parse_args():
     parser.add_argument(
         '--train_data_path',
         type=str,
-        default='./data/train.txt',
+        default='./data/raw/train.txt',
         help="The path of training dataset")
     parser.add_argument(
         '--test_data_path',
         type=str,
-        default='./data/valid.txt',
+        default='./data/raw/valid.txt',
         help="The path of testing dataset")
     parser.add_argument(
         '--batch_size',
@@ -102,23 +101,28 @@ def parse_args():
         '--trainer_id',
         type=int,
         default=0,
-        help='The trainer id (default: models)')
-    parser.add_argument(
-        '--pserver_id',
-        type=int,
-        default=0,
-        help='The pserver id (default: models)')
+        help='The path for model to store (default: models)')
     parser.add_argument(
         '--trainers',
         type=int,
         default=1,
         help='The num of trianers, (default: 1)')
+    parser.add_argument(
+        '--enable_ce',
+        action='store_true',
+        help='If set, run the task with continuous evaluation logs.')
 
     return parser.parse_args()
 
 
 def train_loop(args, train_program, py_reader, loss, auc_var, batch_auc_var,
                trainer_num, trainer_id):
+    
+    if args.enable_ce:
+        SEED = 102
+        train_program.random_seed = SEED
+        fluid.default_startup_program().random_seed = SEED
+
     dataset = reader.CriteoDataset(args.sparse_feature_dim)
     train_reader = paddle.batch(
         paddle.reader.shuffle(
@@ -143,6 +147,7 @@ def train_loop(args, train_program, py_reader, loss, auc_var, batch_auc_var,
         fluid.BuildStrategy.ReduceStrategy.Reduce if cpu_num > 1 \
             else fluid.BuildStrategy.ReduceStrategy.AllReduce
 
+    exe.run(fluid.default_startup_program())
     pe = fluid.ParallelExecutor(
         use_cuda=False,
         loss_name=loss.name,
@@ -150,8 +155,7 @@ def train_loop(args, train_program, py_reader, loss, auc_var, batch_auc_var,
         build_strategy=build_strategy,
         exec_strategy=exec_strategy)
 
-    exe.run(fluid.default_startup_program())
-
+    total_time = 0
     for pass_id in range(args.num_passes):
         pass_start = time.time()
         batch_id = 0
@@ -169,16 +173,33 @@ def train_loop(args, train_program, py_reader, loss, auc_var, batch_auc_var,
                 if batch_id % 1000 == 0 and batch_id != 0:
                     model_dir = args.model_output_dir + '/batch-' + str(batch_id)
                     if args.trainer_id == 0:
-                        fluid.io.save_inference_model(model_dir, data_name_list, [loss, auc_var], exe)
+                        fluid.io.save_persistables(executor=exe, dirname=model_dir,
+                                                   main_program=fluid.default_main_program())
                 batch_id += 1
         except fluid.core.EOFException:
             py_reader.reset()
         print("pass_id: %d, pass_time_cost: %f" % (pass_id, time.time() - pass_start))
 
+        total_time += time.time() - pass_start
+
         model_dir = args.model_output_dir + '/pass-' + str(pass_id)
         if args.trainer_id == 0:
-            fluid.io.save_inference_model(model_dir, data_name_list, [loss, auc_var], exe)
+            fluid.io.save_persistables(executor=exe, dirname=model_dir,
+                                       main_program=fluid.default_main_program())
 
+    # only for ce
+    if args.enable_ce:
+        threads_num, cpu_num = get_cards(args)
+        epoch_idx = args.num_passes 
+        print("kpis\teach_pass_duration_cpu%s_thread%s\t%s" %
+                (cpu_num, threads_num, total_time / epoch_idx))
+        print("kpis\ttrain_loss_cpu%s_thread%s\t%s" %
+                (cpu_num, threads_num, loss_val/args.batch_size))
+        print("kpis\ttrain_auc_val_cpu%s_thread%s\t%s" %
+                (cpu_num, threads_num, auc_val))
+        print("kpis\ttrain_batch_auc_val_cpu%s_thread%s\t%s" %
+                (cpu_num, threads_num, batch_auc_val))
+        
 
 def train():
     args = parse_args()
@@ -186,7 +207,7 @@ def train():
     if not os.path.isdir(args.model_output_dir):
         os.mkdir(args.model_output_dir)
 
-    loss, auc_var, batch_auc_var, py_reader = ctr_dnn_model(args.embedding_size, args.sparse_feature_dim)
+    loss, auc_var, batch_auc_var, py_reader, _ = ctr_dnn_model(args.embedding_size, args.sparse_feature_dim)
     optimizer = fluid.optimizer.Adam(learning_rate=1e-4)
     optimizer.minimize(loss)
     if args.cloud_train:
@@ -195,13 +216,16 @@ def train():
         # comma separated ips of all pservers, needed by trainer and
 
         args.endpoints = os.getenv("PADDLE_PSERVERS", "")
+        ep_list = args.endpoints.split(',')
         args.trainers = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
         args.pserver_id = int(os.getenv("PADDLE_PSERVER_ID", "0"))
-        args.current_endpoint = os.getenv("POD_IP", "localhost") + ":" + str(port + args.pserver_id)
+        for ep in ep_list:
+            if os.getenv("POD_IP", "localhost") in ep:
+                args.current_endpoint = ep
+                break
         args.role = os.getenv("TRAINING_ROLE", "TRAINER")
         args.trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
         args.is_local = bool(int(os.getenv("PADDLE_IS_LOCAL", 0)))
-
     if args.is_local:
         logger.info("run local training")
         main_program = fluid.default_main_program()
@@ -218,13 +242,6 @@ def train():
             exe.run(startup)
             exe.run(prog)
         elif args.role == "trainer" or args.role == "TRAINER":
-            logger.info("download the training materials")
-            file_index = args.trainer_id % 10
-            address = "https://paddle-ctr-data.bj.bcebos.com/dac" + str(file_index) + ".tar.gz"
-            cmd = "cd /workspace/ctr/data/ && curl -o dac.tar.gz " + address + " && tar zxf dac.tar.gz && rm dac.tar.gz"
-            exit_code = subprocess.call(cmd, shell=True)
-            if exit_code != 0:
-                raise Exception("The download command failed, please check the network settings")
             logger.info("run trainer")
             train_prog = t.get_trainer_program()
             train_loop(args, train_prog, py_reader, loss, auc_var, batch_auc_var,
@@ -233,6 +250,12 @@ def train():
             raise ValueError(
                 'PADDLE_TRAINING_ROLE environment variable must be either TRAINER or PSERVER'
             )
+
+
+def get_cards(args):
+    threads_num = os.environ.get('NUM_THREADS', 1)
+    cpu_num = os.environ.get('CPU_NUM', 1)
+    return int(threads_num), int(cpu_num)
 
 
 if __name__ == '__main__':

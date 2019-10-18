@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pdservingclient
+  labels: 
+    app: pdservingclient
+spec:
+  containers:
+  - name: pdservingclient
+    image: hub.baidubce.com/ctr/pdservingclient:latest
+    workingDir: /
+    command: ['bash']
+    args: ['nonstop.sh']
+
