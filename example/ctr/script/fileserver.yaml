@@ -5,6 +5,8 @@ metadata:
   labels:
     app: file-server
 spec:
+  nodeSelector:
+    nodeType: model
   volumes:
   - hostPath:
       path: /home/work
@@ -12,19 +14,17 @@ spec:
     name: file-home
   containers:
   - name: file-server
-    image: hub.baidubce.com/ctr/file-server:latest
+    image: halverneus/static-file-server
     ports:
     - containerPort: 8080
     volumeMounts:
     - mountPath: /web
       name: file-home
-  nodeSelector:
-    nodeType: model
 ---
 kind: Service
 apiVersion: v1
 metadata:
-  name: file-server
+  name: loadbalancer
 spec:
   type: LoadBalancer
   ports:
