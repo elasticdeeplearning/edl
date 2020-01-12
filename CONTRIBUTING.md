@@ -1,7 +1,7 @@
 # Contribute Code
 
 You are welcome to contribute to project PaddlePaddle EDL. To contribute to EDL, you have to agree with the 
-[PaddlePaddle Contributor License Agreement](https://gist.github.com/guru4elephant/d0207d374c0ddfa11b70751dca97703b).
+[PaddlePaddle EDL Contributor License Agreement](https://gist.github.com/guru4elephant/d0207d374c0ddfa11b70751dca97703b).
 
 We sincerely appreciate your contribution.  This document explains our workflow and work style.
 
