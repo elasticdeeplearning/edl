@@ -44,15 +44,15 @@ This survey investigates current elastic deep learning frontiers. We focus on sy
 
     * Scaling Conditions 1: throughput scaling efficiency
 
-      <img src="/Users/dongdaxiang/Library/Application Support/typora-user-images/image-20200308154346960.png" alt="image-20200308154346960" style="zoom:50%;" />
+      <img src="image-20200308154346960.png" alt="image-20200308154346960" style="zoom:50%;" />
 
     * Scaling Conditions 2: utility v.s cost. useful for cloud users.
 
     * Straggler detection: persistent workers will be replaced if the straggler detection algorithm find stragglers.
 
-    <img src="/Users/dongdaxiang/Library/Application Support/typora-user-images/image-20200308151820712.png" alt="image-20200308151820712" style="zoom:50%;" />
+    <img src="image-20200308151820712.png" alt="image-20200308151820712" style="zoom:50%;" />
 
-    <img src="/Users/dongdaxiang/Library/Application Support/typora-user-images/image-20200308151915259.png" style="zoom:60%;" />
+    <img src="image-20200308151915259.png" style="zoom:60%;" />
 
   * Limitation of AutoScaling Engine:
 
@@ -66,7 +66,7 @@ This survey investigates current elastic deep learning frontiers. We focus on sy
 
     * Stop-free scaling
 
-      <img src="/Users/dongdaxiang/Library/Application Support/typora-user-images/image-20200308160255565.png" alt="image-20200308160255565" style="zoom:50%;" />
+      <img src="image-20200308160255565.png" alt="image-20200308160255565" style="zoom:50%;" />
 
     * Dynamic data pipeline
 
@@ -75,7 +75,7 @@ This survey investigates current elastic deep learning frontiers. We focus on sy
 
     * EDL API: somehow like horovod or fleet
 
-      <img src="/Users/dongdaxiang/Library/Application Support/typora-user-images/image-20200308161157926.png" alt="image-20200308161157926" style="zoom:50%;" />
+      <img src="image-20200308161157926.png" alt="image-20200308161157926" style="zoom:50%;" />
 
     * Limitation of this work: 
 
@@ -106,16 +106,16 @@ This survey investigates current elastic deep learning frontiers. We focus on sy
 
       * When training with mini-batch SGD on computer vision tasks such as image classification, object detection, momentum with SGD is used commonly.
 
-        <img src="/Users/dongdaxiang/Library/Application Support/typora-user-images/image-20200308164211734.png" alt="image-20200308164211734" style="zoom:50%;" />
+        <img src="image-20200308164211734.png" alt="image-20200308164211734" style="zoom:50%;" />
 
       * When batch size is changed, the optimization algorithm becomes
 
-        <img src="/Users/dongdaxiang/Library/Application Support/typora-user-images/image-20200308164409066.png" style="zoom:50%;" />
+        <img src="image-20200308164409066.png" style="zoom:50%;" />
 
-        <img src="/Users/dongdaxiang/Library/Application Support/typora-user-images/image-20200308164512597.png" alt="image-20200308164512597" style="zoom:50%;" />
+        <img src="image-20200308164512597.png" alt="image-20200308164512597" style="zoom:50%;" />
 
       * Since the $v_t$ keeps the exponentially weighted past gradient estimates, the noise of momentum is $k^2$ factor. Thus, to do momentum compensation, the authors propose
 
-        <img src="/Users/dongdaxiang/Library/Application Support/typora-user-images/image-20200308165440964.png" alt="image-20200308165440964" style="zoom:50%;" />
+        <img src="image-20200308165440964.png" alt="image-20200308165440964" style="zoom:50%;" />
 
         $T=8$ works well in practice
