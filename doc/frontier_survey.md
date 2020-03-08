@@ -50,7 +50,7 @@ This survey investigates current elastic deep learning frontiers. We focus on sy
 
     * Straggler detection: persistent workers will be replaced if the straggler detection algorithm find stragglers.
 
-    <img src="image-20200308151820712.png" alt="image-20200308151820712" style="zoom:50%;" />
+    <img src="image-20200308133648706.png" style="zoom:50%;" />
 
     <img src="image-20200308151915259.png" style="zoom:60%;" />
 
