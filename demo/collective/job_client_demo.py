@@ -92,15 +92,11 @@ class PodManager(object):
 
     def start_local_pods(self, job_server, job_id, pods):
         host_name, host_ip = get_host_name_ip()
-        #gpu_rank = 0
         for pod in pods:
-            print("pod.addr:", pod.addr, "host_name:", host_name, "host_ip:",
-                  host_ip)
             if pod.addr == "127.0.0.1" or \
                     pod.addr==host_name or \
                     pod.addr == host_ip:
                 self._start_local_pod(job_server, job_id, pod)
-                #gpu_rank += 1
 
     def _start_local_pod(self, job_server, job_id, pod):
         assert pod.id not in self.local_pods, "pod_id:{} local_pods:{}".format(
@@ -136,18 +132,15 @@ class PodManager(object):
             pod_path = args.pod_path + "/{}".format(pod.id)
             os.chdir(pod_path)
 
-        #cmd = [sys.executable, "-u", args.training_script
-        #       ] + args.training_script_args
         cmd = ["bash", args.training_script]
 
         logger.info("start pod proc env:{} cmd:{}".format(pod_env, cmd))
 
         if args.log_dir is not None:
-            #os.system("mkdir -p {}".format(args.log_dir))
-            #fn = open("%s/pod_%s.log" % (args.log_dir, pod.id), "w")
             proc = subprocess.Popen(cmd, env=current_env, stdout=fn, stderr=fn)
         else:
-            proc = subprocess.Popen(cmd, env=current_env)
+            proc = subprocess.Popen(
+                cmd, env=current_env, stdout=stdout, stderr=stderr)
 
         os.chdir(wd)
 
@@ -163,7 +156,6 @@ class PodManager(object):
     def kill_local_pod(self, pod_id):
         if pod_id not in self.local_pods:
             return
-            #"pod_id:{} local_pods:{}".format(pod_id, [k for k, _ in self.local_pods.items()])
 
         procs = [self.local_pods[pod_id]]
         logger.info("kill pod_id:{} pod:{}".format(
