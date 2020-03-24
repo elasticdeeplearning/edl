@@ -45,11 +45,11 @@ REQUIRED_PACKAGES = [
 if not find_package("paddlepaddle") and not find_package("paddlepaddle-gpu"):
     REQUIRED_PACKAGES.append("paddlepaddle")
 
-packages=['collective']
+packages=['collective', "demo"]
 package_dir={'collective':
-             './PADDLE_EDL_BINARY_DIR/python/collective',
+             '${PADDLE_EDL_BINARY_DIR}/python/collective',
 	     'demo':
-	     './PADDLE_EDL_BINARY_DIR/python/demo'}
+	     '${PADDLE_EDL_BINARY_DIR}/python/demo'}
 
 setup(
     name='paddle-edl',
