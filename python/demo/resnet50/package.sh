@@ -15,7 +15,7 @@ while true ; do
 done
 
 
-src_dir=/root/github.com/PaddlePaddle/Fleet/benchmark/collective/resnet
+src_dir=../../../example/collective/resnet50
 dst_dir=resnet50_pod/${pod_id}
 
 echo "mkdir resnet50_pod/${pod_id}"

@@ -164,7 +164,7 @@ def launch(args):
     edl_env = edl_utils.Edlenv()
     assert edl_env.is_under_edl(), "edl launch must run under edl env"
 
-    hdfs = get_hdfs_from_args(args)
+    hdfs = edl_utils.get_hdfs_from_args(args)
     cluster, pod = edl_barrier(edl_env, hdfs, timeout=15 * 60)
     logger.info("get cluster from edl:{}".format(cluster))
 

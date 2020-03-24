@@ -104,7 +104,7 @@ class PodManager(object):
 
         if args.package_sh is not None:
             cmd = args.package_sh + " -pod_id {}".format(pod.id)
-            print("execute cmd:", cmd)
+            logger.info("execute cmd:{}".format(cmd))
             ret = os.system(cmd)
             assert ret == 0, "execute {} error!".format(cmd)
 
