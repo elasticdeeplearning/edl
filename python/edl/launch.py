@@ -48,9 +48,7 @@ import paddle.fluid as fluid
 from contextlib import closing
 import socket
 
-from utils import *
-
-import cloud_utils
+from paddle.distributed.utils import *
 import edl_utils
 from http_store import kv_server
 
@@ -60,32 +58,6 @@ def _print_arguments(args):
     for arg, value in sorted(six.iteritems(vars(args))):
         print("%s: %s" % (arg, value))
     print("------------------------------------------------")
-
-
-def find_free_ports(num):
-    def __free_port():
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            s.bind(('', 0))
-            return s.getsockname()[1]
-
-    port_set = set()
-    step = 0
-    while True:
-        port = __free_port()
-        if port not in port_set:
-            port_set.add(port)
-
-        if len(port_set) >= num:
-            return port_set
-
-        step += 1
-        if step > 100:
-            print(
-                "can't find avilable port and use the specified static port now!"
-            )
-            return None
-
-    return None
 
 
 def _parse_args():
@@ -184,203 +156,31 @@ POD_IP (current node ip address, not needed for local training)
     parser.add_argument('training_script_args', nargs=REMAINDER)
     return parser.parse_args()
 
-
-def get_gpus():
-    if args.selected_gpus is None:
-        gpus_num = fluid.core.get_cuda_device_count()
-        selected_gpus = [str(x) for x in range(0, gpus_num)]
-    else:
-        cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES")
-        if cuda_visible_devices is None or cuda_visible_devices == "":
-            selected_gpus = [x.strip() for x in args.selected_gpus.split(',')]
-        else:
-            # change selected_gpus into relative values
-            # e.g. CUDA_VISIBLE_DEVICES=4,5,6,7; args.selected_gpus=4,5,6,7;
-            # therefore selected_gpus=0,1,2,3
-            cuda_visible_devices_list = cuda_visible_devices.split(',')
-            for x in args.selected_gpus.split(','):
-                assert x in cuda_visible_devices_list, "Can't find "\
-                "your selected_gpus %s in CUDA_VISIBLE_DEVICES[%s]."\
-                % (x, cuda_visible_devices)
-            selected_gpus = [
-                cuda_visible_devices_list.index(x.strip())
-                for x in args.selected_gpus.split(',')
-            ]
-
-    return selected_gpus
-
-
-class TrainerProc(object):
-    def __init__(self):
-        self.proc = None
-        self.log_fn = None
-        self.rank = None
-        self.cmd = None
-
-
-def start_local_trainers(cluster, pod):
-    current_env = copy.copy(os.environ.copy())
-    #paddle broadcast ncclUniqueId use socket, and
-    #proxy maybe make trainers unreachable, so delete them.
-    #if we set them to "", grpc will log error message "bad uri"
-    #so just delete them.
-    current_env.pop("http_proxy", None)
-    current_env.pop("https_proxy", None)
-
-    procs = []
-    for idx, t in enumerate(pod.trainers):
-        proc_env = {
-            "FLAGS_selected_gpus": "%s" % ",".join([str(g) for g in t.gpus]),
-            "PADDLE_TRAINER_ID": "%d" % t.rank,
-            "PADDLE_CURRENT_ENDPOINT": "%s" % t.endpoint,
-            "PADDLE_TRAINERS_NUM": "%d" % cluster.trainers_nranks(),
-            "PADDLE_TRAINER_ENDPOINTS": ",".join(cluster.trainers_endpoints())
-        }
-
-        current_env.update(proc_env)
-
-        logger.debug("trainer proc env:{}".format(current_env))
-
-        cmd = [sys.executable, "-u", args.training_script
-               ] + args.training_script_args
-
-        logger.info("start trainer proc:{} env:{}".format(cmd, proc_env))
-
-        fn = None
-        if args.log_dir is not None:
-            os.system("mkdir -p {}".format(args.log_dir))
-            fn = open("%s/workerlog.%d" % (args.log_dir, idx), "a")
-            proc = subprocess.Popen(cmd, env=current_env, stdout=fn, stderr=fn)
-        else:
-            proc = subprocess.Popen(cmd, env=current_env)
-
-        tp = TrainerProc()
-        tp.proc = proc
-        tp.rank = t.rank
-        tp.log_fn = fn
-        tp.cmd = cmd
-
-        procs.append(tp)
-
-    return procs
-
-
-def watch_local_trainers(procs, nranks):
-    try:
-        error = False
-        error_rank = []
-        # wait all process finish or one error
-        alive = False
-        for p in procs:
-            ret = p.proc.poll()
-            if ret is None:
-                alive = True
-            elif ret != 0:
-                error = True
-                error_rank.append(p.rank)
-
-        if error:
-            terminate_local_procs(procs)
-            exit(1)
-
-    except KeyboardInterrupt:
-        logger.warning("KeyboardInterrupt, exit")
-        terminate_local_procs(procs)
-        raise
-    except SystemExit:
-        logger.error(
-            "ABORT!!! Out of all {} trainers, the trainer process with rank={} was aborted. Please check its log.".
-            format(nranks, error_rank))
-        terminate_local_procs(procs)
-        raise
-    except:
-        logger.error(
-            "ABORT!!! Out of all {} trainers, the trainer process with rank={} was aborted. Please check its log.".
-            format(nranks, error_rank))
-        terminate_local_procs(procs)
-        raise
-
-    return alive
-
-
-def get_cluster_from_args(args, selected_gpus):
-    node_ips = [x.strip() for x in args.cluster_node_ips.split(',')]
-    node_ip = args.node_ip
-    node_rank = node_ips.index(node_ip)
-
-    logger.debug("parsed from args:node_ips:{} node_ip:{} node_rank:{}".format(
-        node_ips, node_ip, node_rank))
-
-    free_ports = None
-    if not args.use_paddlecloud and len(
-            node_ips) <= 1 and args.started_port is None:
-        free_ports = find_free_ports(len(selected_gpus))
-        if free_ports is not None:
-            free_ports = list(free_ports)
-            #args.started_port = free_ports[0]
-    else:
-        free_ports = [
-            x
-            for x in range(args.started_port, args.started_port + len(
-                selected_gpus))
-        ]
-
-    return get_cluster(node_ips, node_ip, free_ports, selected_gpus)
-
-
-def get_hdfs_from_args(args):
-    hdfs = Hdfs()
-    hdfs.hdfs_name = args.hdfs_name
-    hdfs.hdfs_ugi = args.hdfs_ugi
-    hdfs.hdfs_path = args.hdfs_path
-
-    return hdfs
-
 def launch(args):
-    # parse arguments, used for cloud-single-machine and local
-    selected_gpus = get_gpus()
-    trainers_num = cloud_utils.get_trainers_num()
-    logger.debug("parsed from args trainerss_num:{} selected_gpus:{}".format(
-        trainers_num, selected_gpus))
-
     cluster = None
     pod = None
-    #comm = None
     hdfs = None
 
     edl_env = edl_utils.Edlenv()
-    use_edl = edl_env.is_under_edl()
+    assert edl_env.is_under_edl(), "edl launch must run under edl env"
 
-    if args.use_paddlecloud and not use_edl and trainers_num != 1:
-        cluster, pod = cloud_utils.get_cloud_cluster(
-            arges.node_ips, args.node_ip, args.started_port, selected_gpus)
-        logger.info("get cluster from cloud:{}".format(cluster))
-    elif use_edl:
-        hdfs = get_hdfs_from_args(args)
-        cluster, pod = edl_barrier(edl_env, hdfs, timeout=15 * 60)
-        logger.info("get cluster from edl:{}".format(cluster))
-    else:
-        cluster, pod = get_cluster_from_args(args, selected_gpus)
-        logger.info("get cluster from args:{}".format(cluster))
+    hdfs = get_hdfs_from_args(args)
+    cluster, pod = edl_barrier(edl_env, hdfs, timeout=15 * 60)
+    logger.info("get cluster from edl:{}".format(cluster))
 
-    if use_edl:
-        procs = start_local_trainers(cluster, pod)
-    else:
-        procs = start_local_trainers(cluster, pod)
+    procs = start_local_trainers(cluster, pod)
 
-    #try_step=0
     while True:
-        if use_edl:
-            cluster2, pod = edl_env.get_cluster(hdfs)
+        cluster2, pod = edl_env.get_cluster(hdfs)
 
-            if cluster2 != cluster:
-                logger.info("Cluster changed. New cluster:{}. Old Cluster:{}".
-                            format(cluster2, cluster))
-                terminate_local_procs(procs)
+        if cluster2 != cluster:
+            logger.info("Cluster changed. New cluster:{}. Old Cluster:{}".
+                        format(cluster2, cluster))
+            terminate_local_procs(procs)
 
-                cluster, pod = edl_barrier(edl_env, hdfs, timeout=30 * 60)
+            cluster, pod = edl_barrier(edl_env, hdfs, timeout=30 * 60)
 
-                procs = start_local_trainers(cluster, pod)
+            procs = start_local_trainers(cluster, pod)
 
         alive = watch_local_trainers(procs, cluster.trainers_nranks())
 
