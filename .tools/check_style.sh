@@ -18,9 +18,4 @@ if ! pre-commit run -a ; then
   exit 1
 fi
 
-cd cmd/edl
-if ! go vet ; then
-    exit 1
-fi
-
 trap : 0
