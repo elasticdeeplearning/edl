@@ -11,8 +11,8 @@ matrix:
       script:
         - rm -f .copyright.hook && wget https://raw.githubusercontent.com/PaddlePaddle/Paddle/develop/tools/codestyle/copyright.hook
         - bash -x .tools/check_style.sh
-        - ln -s $GOPATH/src/github.com/PaddlePaddle $GOPATH/src/github.com/paddlepaddle
-        - cd $GOPATH/src/github.com/paddlepaddle/edl
-        - glide install --strip-vendor
-        - go test $(glide novendor)
-        - cd cmd/edl & go vet
+        #- ln -s $GOPATH/src/github.com/PaddlePaddle $GOPATH/src/github.com/paddlepaddle
+        #- cd $GOPATH/src/github.com/paddlepaddle/edl
+        #- glide install --strip-vendor
+        #- go test $(glide novendor)
+        #- cd cmd/edl & go vet
