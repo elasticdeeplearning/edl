@@ -32,3 +32,6 @@ func AddResourceList(a v1.ResourceList, b v1.ResourceList) {
 
 	return
 }
+
+func EtcdClient() {
+}
