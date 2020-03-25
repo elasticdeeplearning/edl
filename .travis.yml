@@ -1,12 +1,13 @@
 matrix:
   include:
-   - language: python
-     python: 3.5
-     sudo: required
-     install:
-       - sudo pip install --upgrad pip 
-       - sudo pip install pre-commit pylint pytest astroid
-
+    - language: python
+      python: 2.7
+      sudo: required
+      install:
+        - sudo pip install --upgrad pip 
+        - sudo pip install pre-commit pylint pytest astroid isort
+      script:
+        - rm -f .copyright.hook && wget https://raw.githubusercontent.com/PaddlePaddle/Paddle/develop/tools/codestyle/copyright.hook
 
     - language: go
       go: 1.14.x
@@ -14,7 +15,6 @@ matrix:
       install:
         - go get -u golang.org/x/lint/golint
         - curl https://glide.sh/get | bash
-        - sudo pip install pre-commit
       script:
         - rm -f .copyright.hook && wget https://raw.githubusercontent.com/PaddlePaddle/Paddle/develop/tools/codestyle/copyright.hook
         - bash -x .tools/check_style.sh
