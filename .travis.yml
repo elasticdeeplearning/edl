@@ -14,7 +14,3 @@ matrix:
         - cd $GOPATH/src/github.com/paddlepaddle/edl
         - glide install --strip-vendor
         - go test $(glide novendor)
-     - language: python
-       sudo: required
-       # For pylint dockstring checker
-       before_install: sudo pip install  pylint pytest astroid isort
