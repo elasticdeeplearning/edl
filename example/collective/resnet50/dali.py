@@ -24,13 +24,15 @@ from nvidia.dali.plugin.paddle import DALIGenericIterator
 import paddle
 from paddle import fluid
 
+
 def convert_data_layout(data_layout):
-    if data_layout=='NCHW':
+    if data_layout == 'NCHW':
         return types.NCHW
-    elif data_layout=='NHWC':
+    elif data_layout == 'NHWC':
         return types.NHWC
     else:
         assert False, "not supported data_layout:{}".format(data_layout)
+
 
 class HybridTrainPipe(Pipeline):
     """
@@ -38,6 +40,7 @@ class HybridTrainPipe(Pipeline):
     https://docs.nvidia.com/deeplearning/sdk/dali-master-branch-user-guide/docs/plugins/paddle_tutorials.html
     Note: You may need to find the newest DALI version.
     """
+
     def __init__(self,
                  file_root,
                  file_list,
@@ -58,7 +61,11 @@ class HybridTrainPipe(Pipeline):
                  seed=42,
                  data_layout="NCHW"):
         super(HybridTrainPipe, self).__init__(
-            batch_size, num_threads, device_id, seed=seed, prefetch_queue_depth=8)
+            batch_size,
+            num_threads,
+            device_id,
+            seed=seed,
+            prefetch_queue_depth=8)
         self.input = ops.FileReader(
             file_root=file_root,
             file_list=file_list,
@@ -106,6 +113,7 @@ class HybridValPipe(Pipeline):
     """
     Create validate pipe line.
     """
+
     def __init__(self,
                  file_root,
                  file_list,
@@ -154,12 +162,12 @@ class HybridValPipe(Pipeline):
         return self.epoch_size("Reader")
 
 
-def build(settings, 
-          mode='train', 
-          pass_id_as_seed = 42,
-          trainer_id=None, 
-          trainers_num=None, 
-          gpu_id=0, 
+def build(settings,
+          mode='train',
+          pass_id_as_seed=42,
+          trainer_id=None,
+          trainers_num=None,
+          gpu_id=0,
           data_layout='NCHW'):
     env = os.environ
     assert settings.use_gpu, "gpu training is required for DALI"
@@ -222,9 +230,10 @@ def build(settings,
         file_root = os.path.join(file_root, 'train')
 
     if trainer_id is not None and trainers_num is not None:
-        print("dali gpu_id:", gpu_id, "shard_id:", trainer_id, "num_shard:", trainers_num)
-        shard_id=trainer_id
-        num_shards=trainers_num
+        print("dali gpu_id:", gpu_id, "shard_id:", trainer_id, "num_shard:",
+              trainers_num)
+        shard_id = trainer_id
+        num_shards = trainers_num
         pipe = HybridTrainPipe(
             file_root,
             file_list,
@@ -240,7 +249,7 @@ def build(settings,
             device_id=gpu_id,
             shard_id=shard_id,
             num_shards=num_shards,
-            seed=pass_id_as_seed + shard_id, 
+            seed=pass_id_as_seed + shard_id,
             data_layout=data_layout,
             num_threads=4)
         pipe.build()
@@ -280,9 +289,31 @@ def build(settings,
         pipelines, ['feed_image', 'feed_label'], size=sample_per_shard)
 
 
-def train(settings, pass_id_as_seed, trainer_id=None, trainers_num=None, gpu_id=0, data_layout="NCHW"):
-    return build(settings, mode='train', pass_id_as_seed = pass_id_as_seed, trainer_id=trainer_id, trainers_num=trainers_num, gpu_id=gpu_id, data_layout=data_layout)
+def train(settings,
+          pass_id_as_seed,
+          trainer_id=None,
+          trainers_num=None,
+          gpu_id=0,
+          data_layout="NCHW"):
+    return build(
+        settings,
+        mode='train',
+        pass_id_as_seed=pass_id_as_seed,
+        trainer_id=trainer_id,
+        trainers_num=trainers_num,
+        gpu_id=gpu_id,
+        data_layout=data_layout)
 
 
-def val(settings, trainer_id=None, trainers_num=None, gpu_id=0, data_layout="NCHW"):
-    return build(settings, mode='val', trainer_id=trainer_id, trainers_num=trainers_num, gpu_id=gpu_id, data_layout=data_layout)
+def val(settings,
+        trainer_id=None,
+        trainers_num=None,
+        gpu_id=0,
+        data_layout="NCHW"):
+    return build(
+        settings,
+        mode='val',
+        trainer_id=trainer_id,
+        trainers_num=trainers_num,
+        gpu_id=gpu_id,
+        data_layout=data_layout)

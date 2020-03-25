@@ -26,4 +26,3 @@ case "$1" in
       delete_job $1
       ;;
 esac
-

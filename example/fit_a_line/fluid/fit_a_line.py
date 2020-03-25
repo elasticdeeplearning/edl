@@ -1,3 +1,17 @@
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import paddle
 import paddle.fluid as fluid
 import os
@@ -5,13 +19,14 @@ import sys
 import numpy
 from common import prepare_dataset, cluster_reader
 
-OUTPUT_PATH="./dataset/fit_a_line/"
-NAME_PREFIX="fit_a_line-train"
+OUTPUT_PATH = "./dataset/fit_a_line/"
+NAME_PREFIX = "fit_a_line-train"
 
 USE_CUDA = False
 BATCH_SIZE = 20
 EPOCH_NUM = 100
 params_dirname = "fit_a_line.inference.model"
+
 
 def train():
     # add forward pass
@@ -38,10 +53,10 @@ def train():
     def train_loop(trainer_prog, train_reader):
         for epoch in range(EPOCH_NUM):
             fluid.io.save_inference_model(
-                dirname = params_dirname,
-                feeded_var_names = ["x"],
-                target_vars = [y_predict],
-                executor = exe)
+                dirname=params_dirname,
+                feeded_var_names=["x"],
+                target_vars=[y_predict],
+                executor=exe)
 
             for batch_id, batch_data in enumerate(train_reader()):
                 avg_loss_value, = exe.run(trainer_prog,
@@ -65,48 +80,54 @@ def train():
     else:
         print("launch distributed training:")
         # distributed training
-        pserver_endpoints = os.getenv("PADDLE_PSERVER_EPS")     # the pserver server endpoint list
-        trainers = int(os.getenv("PADDLE_TRAINERS"))            # total trainer count
-        trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))   # current trainer id
-        current_endpoint = os.getenv("PADDLE_CURRENT_ENDPOINT") # current pserver endpoint
+        pserver_endpoints = os.getenv(
+            "PADDLE_PSERVER_EPS")  # the pserver server endpoint list
+        trainers = int(os.getenv("PADDLE_TRAINERS"))  # total trainer count
+        trainer_id = int(os.getenv("PADDLE_TRAINER_ID",
+                                   "0"))  # current trainer id
+        current_endpoint = os.getenv(
+            "PADDLE_CURRENT_ENDPOINT")  # current pserver endpoint
         print("training role: {0}\nps endpoint list: {1}\n"
               "trainers: {2}\ntrainer_id: {3}\n"
               "current ps endpoint: {4}\n".format(
-                  training_role, pserver_endpoints, trainers, trainer_id, current_endpoint))
+                  training_role, pserver_endpoints, trainers, trainer_id,
+                  current_endpoint))
         t = fluid.DistributeTranspiler()
         t.transpile(
-            trainer_id = trainer_id,                   
-            program = fluid.default_main_program(),    
-            pservers = pserver_endpoints,             
-            trainers = trainers)          
+            trainer_id=trainer_id,
+            program=fluid.default_main_program(),
+            pservers=pserver_endpoints,
+            trainers=trainers)
 
         if training_role == "PSERVER":
             pserver_prog = t.get_pserver_program(current_endpoint)
-            startup_prog = t.get_startup_program(current_endpoint, pserver_prog)
+            startup_prog = t.get_startup_program(current_endpoint,
+                                                 pserver_prog)
             exe.run(startup_prog)
             exe.run(pserver_prog)
         elif training_role == "TRAINER":
             cluster_train_reader = paddle.batch(
-                paddle.reader.shuffle(cluster_reader(trainers, trainer_id), buf_size=500), BATCH_SIZE)
+                paddle.reader.shuffle(
+                    cluster_reader(trainers, trainer_id), buf_size=500),
+                BATCH_SIZE)
             trainer_prog = t.get_trainer_program()
             exe.run(fluid.default_startup_program())
             train_loop(trainer_prog, cluster_train_reader)
+
 
 def infer():
     place = fluid.CUDAPlace(0) if USE_CUDA else fluid.CPUPlace()
     exe = fluid.Executor(place)
     batch_size = 10
     [inference_program, feed_target_names,
-         fetch_targets] = fluid.io.load_inference_model(params_dirname, exe)
+     fetch_targets] = fluid.io.load_inference_model(params_dirname, exe)
 
     test_reader = paddle.batch(
         paddle.dataset.uci_housing.test(), batch_size=batch_size)
 
     test_data = test_reader().next()
-    test_feat = numpy.array(
-        [data[0] for data in test_data]).astype("float32")
-    test_label = numpy.array(
-        [data[1] for data in test_data]).astype("float32")
+    test_feat = numpy.array([data[0] for data in test_data]).astype("float32")
+    test_label = numpy.array([data[1] for data in test_data]).astype("float32")
 
     assert feed_target_names[0] == 'x'
     results = exe.run(inference_program,
@@ -116,6 +137,7 @@ def infer():
     print("infer results: ", results[0])
     print("ground truth: ", test_label)
 
+
 if __name__ == "__main__":
     usage = "python fit_a_line.py [prepare|train|infer]"
     if len(sys.argv) != 2:
@@ -123,7 +145,11 @@ if __name__ == "__main__":
         exit(0)
     act = sys.argv[1]
     if act == 'prepare':
-        prepare_dataset(OUTPUT_PATH, NAME_PREFIX, paddle.dataset.uci_housing.train(), sample_count=128)
+        prepare_dataset(
+            OUTPUT_PATH,
+            NAME_PREFIX,
+            paddle.dataset.uci_housing.train(),
+            sample_count=128)
     elif act == "train":
         train()
     elif act == "infer":

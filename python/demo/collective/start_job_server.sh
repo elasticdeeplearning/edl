@@ -13,4 +13,3 @@ nohup python -u ${BASEDIR}/job_server_demo.py \
     --pod_num_of_node 2 \
     --time_interval_to_change 900 \
     --gpu_num_of_node 8 > job_server.log 2>&1 &
-

@@ -55,7 +55,8 @@ class Collector(object):
 
     def __init__(self):
         config.load_kube_config()
-        self.namespace = config.list_kube_config_contexts()[1]['context'].get("namespace", "default")
+        self.namespace = config.list_kube_config_contexts()[1]['context'].get(
+            "namespace", "default")
         self.cpu_allocatable = 0
         self.gpu_allocatable = 0
         self.cpu_requests = 0
@@ -109,11 +110,17 @@ class Collector(object):
                 continue
             for k, v in item.metadata.labels.items():
                 if k.startswith("paddle-job") and v not in self._job_phases:
-                    self._job_phases.update({v:{"master": list(), "pserver": list(), "trainer": list()}})
+                    self._job_phases.update({
+                        v: {
+                            "master": list(),
+                            "pserver": list(),
+                            "trainer": list()
+                        }
+                    })
                 if k == "paddle-job-master":
-                    self._job_phases[v]["master"].append(item.status.phase)             
+                    self._job_phases[v]["master"].append(item.status.phase)
                 elif k == "paddle-job-pserver":
-                    self._job_phases[v]["pserver"].append(item.status.phase)             
+                    self._job_phases[v]["pserver"].append(item.status.phase)
                 elif k == "paddle-job":
                     self._job_phases[v]["trainer"].append(item.status.phase)
 
@@ -143,13 +150,14 @@ class Collector(object):
             if "Pending" in v["pserver"] or \
                 "Pending" in v["master"]:
                 continue
-            cnt = 0 
+            cnt = 0
             for p in v["trainer"]:
                 if p == "Running":
-                    cnt += 1            
+                    cnt += 1
             job_running_trainers[k] = cnt
         if job_running_trainers:
-            return "|".join(["%s:%d" % (k, v) for k, v in job_running_trainers.items()])
+            return "|".join(
+                ["%s:%d" % (k, v) for k, v in job_running_trainers.items()])
         else:
             return "-"
 
@@ -212,15 +220,14 @@ class Collector(object):
 
         return pods
 
+
 if __name__ == "__main__":
     c = Collector()
     print("SUBMITED-JOBS\tPENDING-JOBS\tRUNNING-TRAINERS\tCPU-UTILS")
     while True:
         c.run_once()
         print "\t".join([
-          str(c.get_submitted_jobs()),
-          str(c.get_pending_jobs()),
-          c.get_running_trainers(),
-          c.cpu_utils() + "%"
+            str(c.get_submitted_jobs()), str(c.get_pending_jobs()),
+            c.get_running_trainers(), c.cpu_utils() + "%"
         ])
         time.sleep(10)

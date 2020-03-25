@@ -26,8 +26,7 @@ def cast_fp16_to_fp32(i, o, prog):
         attrs={
             "in_dtype": fluid.core.VarDesc.VarType.FP16,
             "out_dtype": fluid.core.VarDesc.VarType.FP32
-        }
-    )
+        })
 
 
 def cast_fp32_to_fp16(i, o, prog):
@@ -38,8 +37,7 @@ def cast_fp32_to_fp16(i, o, prog):
         attrs={
             "in_dtype": fluid.core.VarDesc.VarType.FP32,
             "out_dtype": fluid.core.VarDesc.VarType.FP16
-        }
-    )
+        })
 
 
 def copy_to_master_param(p, block):
@@ -77,15 +75,20 @@ def _update_role_var_grad(prog, params_grads):
             allreduce_role_var = []
             for input_varname in op.input_arg_names:
                 if input_varname in gradname_to_paramname:
-                    allreduce_role_var.append(gradname_to_paramname[input_varname])
+                    allreduce_role_var.append(gradname_to_paramname[
+                        input_varname])
                     allreduce_role_var.append(input_varname)
             print("updating role var: ", allreduce_role_var)
             op._set_attr("op_role_var", allreduce_role_var)
 
 
 #def create_master_params_grads(params_grads, main_prog, startup_prog, scale_loss, reduce_master_grad=True):
-def create_master_params_grads(params_grads, main_prog, startup_prog, scale_loss, reduce_master_grad=False):
-    master_params_grads = []      # master p, g on local device
+def create_master_params_grads(params_grads,
+                               main_prog,
+                               startup_prog,
+                               scale_loss,
+                               reduce_master_grad=False):
+    master_params_grads = []  # master p, g on local device
     #params_grads_to_apply = []    # master p, g after allreduced, if reduce_master_grad is enabled
     #tmp_role = main_prog._current_role
     #OpRole = fluid.core.op_proto_and_checker_maker.OpRole
@@ -94,7 +97,8 @@ def create_master_params_grads(params_grads, main_prog, startup_prog, scale_loss
         for p, g in params_grads:
             # create master parameters
             master_param = copy_to_master_param(p, main_prog.global_block())
-            startup_master_param = startup_prog.global_block()._clone_variable(master_param)
+            startup_master_param = startup_prog.global_block()._clone_variable(
+                master_param)
             startup_p = startup_prog.global_block().var(p.name)
             # fp16 -> fp32
             cast_fp16_to_fp32(startup_p, startup_master_param, startup_prog)

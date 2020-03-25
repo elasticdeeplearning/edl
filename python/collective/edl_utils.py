@@ -158,6 +158,7 @@ def barrier(cluster, pod):
 
     return True
 
+
 def edl_barrier(edl_env, hdfs, timeout=-1):
     cluster = None
     pod = None
@@ -186,6 +187,7 @@ def edl_barrier(edl_env, hdfs, timeout=-1):
 
     logger.info("edl_barrier_start ok!")
     return cluster, pod
+
 
 def get_hdfs_from_args(args):
     hdfs = Hdfs()

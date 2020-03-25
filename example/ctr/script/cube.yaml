@@ -71,5 +71,3 @@ spec:
       protocol: TCP
   selector:
     app: cube-1
-
-
