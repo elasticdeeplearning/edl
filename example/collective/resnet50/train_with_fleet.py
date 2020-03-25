@@ -39,7 +39,7 @@ from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy, T
 import paddle.fluid.incubate.fleet.base.role_maker as role_maker
 from paddle.fluid import compiler
 import paddle.fluid.profiler as profiler
-from paddle.distributed.fs_wrapper import BDFS,LocalFS
+from paddle.distributed.fs_wrapper import BDFS, LocalFS
 
 num_trainers = int(os.environ.get('PADDLE_TRAINERS_NUM', 1))
 trainer_id = int(os.environ.get('PADDLE_TRAINER_ID'))
@@ -288,13 +288,13 @@ def build_program(is_train, main_prog, startup_prog, args, dist_strategy=None, d
         with fluid.unique_name.guard():
             if is_train and  use_mixup:
                 image, y_a, y_b, lam = data[0], data[1], data[2], data[3]
-                avg_cost = net_config(image=image, y_a=y_a, y_b=y_b, lam=lam, model=model, 
+                avg_cost = net_config(image=image, y_a=y_a, y_b=y_b, lam=lam, model=model,
                                       args=args, label=0, is_train=True, data_format=data_layout)
                 avg_cost.persistable = True
                 build_program_out = [data_loader, avg_cost]
             else:
                 image, label = data[0], data[1],
-                avg_cost, acc_top1, acc_top5 = net_config(image, model, args, 
+                avg_cost, acc_top1, acc_top5 = net_config(image, model, args,
                                                           label=label, is_train=is_train, data_format=data_layout)
                 avg_cost.persistable = True
                 acc_top1.persistable = True
@@ -320,9 +320,9 @@ def build_program(is_train, main_prog, startup_prog, args, dist_strategy=None, d
                                                                        init_loss_scaling=args.scale_loss,
                                                                        use_dynamic_loss_scaling=args.use_dynamic_loss_scaling)
                 if args.use_recompute:
-                   dist_strategy.forward_recompute = True
-                   dist_strategy.enable_sequential_execution=True
-                   dist_strategy.recompute_checkpoints = model.checkpoints
+                    dist_strategy.forward_recompute = True
+                    dist_strategy.enable_sequential_execution=True
+                    dist_strategy.recompute_checkpoints = model.checkpoints
                 dist_optimizer = fleet.distributed_optimizer(optimizer, strategy=dist_strategy)
                 _, param_grads = dist_optimizer.minimize(avg_cost)
 
@@ -455,8 +455,8 @@ def train(args):
 
     if args.use_dali:
         import dali
-        train_iter = dali.train(settings=args, 
-                                pass_id_as_seed=train_status.next(), 
+        train_iter = dali.train(settings=args,
+                                pass_id_as_seed=train_status.next(),
                                 trainer_id=trainer_id, trainers_num=num_trainers,
                                 gpu_id=gpu_id, data_layout=args.data_format)
     else:
@@ -502,7 +502,7 @@ def train(args):
             t1 = time.time()
 
             if batch_id % args.fetch_steps != 0:
-                    train_exe.run(train_prog, feed=data)
+                train_exe.run(train_prog, feed=data)
             else:
                 if use_mixup:
                     loss, lr = train_exe.run(train_prog, feed=data, fetch_list=train_fetch_list)
@@ -630,7 +630,7 @@ def train(args):
 
         sys.stdout.flush()
 
- 
+
     # save in last epoch
     if trainer_id == 0 and pass_id is not None:
         model_path = os.path.join(model_save_dir + '/' + model_name, str(pass_id))

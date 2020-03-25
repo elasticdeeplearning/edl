@@ -11,25 +11,30 @@ import time
 import sys
 import struct
 import random
+
+
 class Stream(object):
     """ bytes stream like sys.stdin
     """
+
     def __init__(self, source=None, cache=None):
         """ init
         """
         self._src = source
         self._cache_to = cache
         self._cache_fd = None
+
     def read_bytes(self, num):
         """read bytes"""
         data = self._src.read(num)
         if len(data) < num:
             if self._cache_fd is not None:
                 #this should not happen in practice, just for completeness
-                if len(data) > 0: 
+                if len(data) > 0:
                     self._cache_fd.write(data)
                 self._cache_fd.close()
-                print >> sys.stderr, 'succeed to cache file[%s]' % (self._cache_to)
+                print >> sys.stderr, 'succeed to cache file[%s]' % (
+                    self._cache_to)
                 self._cache_fd = None
             raise EOFError
         else:
@@ -38,21 +43,26 @@ class Stream(object):
                     self._cache_fd = open(self._cache_to, 'wb')
                 self._cache_fd.write(data)
         return data
+
     def read_int(self):
         """read int"""
         data = self.read_bytes(4)
         return struct.unpack('!i', data)[0]
+
     def read_byte(self):
         """read byte"""
         byte = self.read_bytes(1)
         return struct.unpack('!b', byte)[0]
+
     def read_string(self):
         """read string"""
         str_len = self.read_vint()
         return unicode(self.read_bytes(str_len), 'utf-8')
+
     def read_bool(self):
         """read bool"""
         return bool(self.read_byte())
+
     def read_vint(self):
         """read vint"""
         first = self.read_byte()
@@ -67,9 +77,11 @@ class Stream(object):
         if self._is_negative_vint(first):
             return x ^ -1
         return x
+
     def _is_negative_vint(self, val):
         """check is negative vint"""
         return val < -120 or (val >= -122 and val < 0)
+
     def _decode_vint_size(self, val):
         """decode vint size"""
         if val >= -122:
@@ -77,20 +89,26 @@ class Stream(object):
         elif val < -120:
             return -119 - val
         return -111 - val
+
     def tell(self):
         """ tell """
         return self._src.tell()
+
     def seek(self, pos):
         """ seek """
         self._src.seek(pos)
+
+
 class KvFileReader(object):
     """ a reader for kv data
     """
+
     def __init__(self, kvfile=None):
         self.type = 'rawkv'
         if kvfile is None:
             kvfile = sys.stdin
         self.kvfile = kvfile
+
     def __iter__(self):
         """ facilitate 'for i in reader:'
         """
@@ -100,10 +118,12 @@ class KvFileReader(object):
             except EOFError:
                 raise StopIteration
             yield next
+
     def get_type(self):
         """ get type of this reader
         """
         return self.type
+
     def load(self):
         """ read raw kv data
         """
@@ -118,9 +138,12 @@ class KvFileReader(object):
         valuelen = struct.unpack('I', f.read(4))[0]
         value = f.read(valuelen)
         return key, value
+
+
 class SequenceFileReader(KvFileReader):
     """ a reader for sequencefile
     """
+
     def __init__(self, seqfile=None, cache=None):
         """ init
         """
@@ -140,6 +163,7 @@ class SequenceFileReader(KvFileReader):
         if self.compression or self.block_compression:
             raise NotImplementedError(
                 "reading of seqfiles with compression is not implemented.")
+
     def _read_header(self):
         """ read sequencefile header
         """
@@ -160,6 +184,7 @@ class SequenceFileReader(KvFileReader):
             val = stream.read_string()
             self.meta[key] = val
         self.sync = stream.read_bytes(16)
+
     def __iter__(self):
         """ facilitate 'for i in reader:'
         """
@@ -169,10 +194,12 @@ class SequenceFileReader(KvFileReader):
             except EOFError:
                 raise StopIteration
             yield next
+
     def get_type(self):
         """ get type of this reader
         """
         return self.type
+
     def load(self):
         """ read one record
         """
@@ -186,14 +213,18 @@ class SequenceFileReader(KvFileReader):
         key_len = stream.read_int()
         buf = stream.read_bytes(buf_len)
         return buf[:key_len], buf[key_len:]
+
     def tell(self):
         """ tell the position of currently readed
         """
         return self.stream.tell()
+
     def seek(self, pos):
         """ seek to the specified position
         """
         self.stream.seek(pos)
+
+
 #a writer for sequencefile
 #copied from: http://icode.baidu.com/repos/baidu/aiflow-datarepo/normalize/blob/master:utils/seqfile_writer.py
 class SequenceFileWriter(object):
@@ -206,6 +237,7 @@ class SequenceFileWriter(object):
                    "\x00\x00\x00\x00\x00\x00"
     # after writing how many bytes of actual data we insert a sync marker
     SYNC_INTERVAL = 2000
+
     def __init__(self, f):
         """ Construct a sequencefile writer for specified file-like object f
         """
@@ -214,6 +246,7 @@ class SequenceFileWriter(object):
             [chr(random.randint(0, 255)) for k in range(0, 16)])
         self._write_seq_header()
         self._bytes_to_prev_sync = 0
+
     def write(self, key, value):
         """Write key-value record to this sequence file
         Args:
@@ -233,16 +266,20 @@ class SequenceFileWriter(object):
         if self._bytes_to_prev_sync >= SequenceFileWriter.SYNC_INTERVAL:
             self._write_sync_marker()
             self._bytes_to_prev_sync = 0
+
     def _write_seq_header(self):
         """Write sequence file header to the underlying file
         """
         self._f.write(SequenceFileWriter.SEQ_HEADER)
         self._f.write(self._sync_marker)
+
     def _write_sync_marker(self):
         """Write sync marker to this sequence file
         """
         self._f.write("\xff\xff\xff\xff")
         self._f.write(self._sync_marker)
+
+
 def writekv(key, val, f):
     """ write kv """
     klen = len(key)
@@ -250,6 +287,8 @@ def writekv(key, val, f):
     klenByte = struct.pack('i', klen)
     vlenByte = struct.pack('i', vlen)
     f.write((klenByte + key + vlenByte + val))
+
+
 def get_reader(f=None, type="seqfile", cache=None):
     """ get a kv reader for a stream 'f'
         and the type can be 'kvfile' or 'seqfile'
@@ -258,6 +297,8 @@ def get_reader(f=None, type="seqfile", cache=None):
         return SequenceFileReader(f, cache=cache)
     else:
         return KvFileReader(f)
+
+
 def test_reader():
     """ test reader of sequencefile
     """
@@ -274,6 +315,8 @@ def test_reader():
         if ct % 100 == 0:
             print >> sys.stderr, "read a record with klen:%d,vlen:%d with count:%d" \
                         % (len(k), len(v), ct)
+
+
 def test_writer():
     """ test writer of sequencefile
     """
@@ -284,6 +327,8 @@ def test_writer():
         for i in range(num):
             f_w.write('key' + str(i), 'val' + str(i))
     print('write %d kvs to seqfile[%s]' % (num, seqfile))
+
+
 if __name__ == "__main__":
     """ main
     """

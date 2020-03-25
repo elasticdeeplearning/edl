@@ -11,4 +11,3 @@ spec:
     workingDir: /
     command: ['bash']
     args: ['nonstop.sh']
-

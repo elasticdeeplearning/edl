@@ -36,6 +36,7 @@ logger.setLevel(logging.INFO)
 NOW_TIMESTAMP = time.time()
 NOW_DATETIME = datetime.datetime.now().strftime("%Y%m%d")
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="PaddlePaddle DeepFM example")
     parser.add_argument(
@@ -67,6 +68,7 @@ def parse_args():
 
     return parser.parse_args()
 
+
 def write_donefile(base_datafile, base_donefile):
     dict = OrderedDict()
     dict["id"] = str(int(NOW_TIMESTAMP))
@@ -78,8 +80,10 @@ def write_donefile(base_datafile, base_donefile):
     donefile_str = ''
     with open(base_donefile, "a") as f:
         jsonstr = json.dumps(dict) + '\n'
-        f.write(jsonstr);
+        f.write(jsonstr)
     f.close()
+
+
 def dump():
     args = parse_args()
 
@@ -108,7 +112,8 @@ def dump():
             main_program=fluid.default_main_program())
 
         # Dump embedding
-        t = np.array(fluid.global_scope().find_var('SparseFeatFactors').get_tensor())
+        t = np.array(fluid.global_scope().find_var('SparseFeatFactors')
+                     .get_tensor())
 
         if not os.access(os.path.dirname(base_datafile), os.F_OK):
             os.makedirs(os.path.dirname(base_datafile))
@@ -122,6 +127,7 @@ def dump():
         f.close()
 
     write_donefile(base_datafile, base_donefile)
+
 
 if __name__ == '__main__':
     dump()

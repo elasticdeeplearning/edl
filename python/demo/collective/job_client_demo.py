@@ -60,7 +60,9 @@ def _parse_args():
 
     #positional
     parser.add_argument(
-        "training_script", type=str, help="The full path to start trainer proc")
+        "training_script",
+        type=str,
+        help="The full path to start trainer proc")
 
     #rest from the training program
     parser.add_argument('training_script_args', nargs=REMAINDER)

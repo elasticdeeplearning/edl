@@ -469,4 +469,3 @@ spec:
                 - name: ENTRY
                   value: (/postprocess &) && cd /workspace/ctr && python train.py --is_local 0 --cloud_train 1
           restartPolicy: OnFailure
-

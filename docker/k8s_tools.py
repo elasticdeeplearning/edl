@@ -63,7 +63,8 @@ def fetch_pods_info(label_selector, phase=None):
         if phase is not None and get_pod_status(item) != phase:
             continue
 
-        pod_list.append((item.status.phase, item.status.pod_ip, item.metadata.name))
+        pod_list.append(
+            (item.status.phase, item.status.pod_ip, item.metadata.name))
     return pod_list
 
 
@@ -97,6 +98,7 @@ def fetch_ips_list(label_selector, phase=None):
     ips = [item[1] for item in pod_list]
     ips.sort()
     return ips
+
 
 def fetch_name_list(label_selector, phase=None):
     pod_list = fetch_pods_info(label_selector, phase)
@@ -156,7 +158,8 @@ def fetch_ips(label_selector):
 
 
 def fetch_endpoints(label_selector, port):
-    return fetch_endpoints_string(label_selector, port=port, phase="Running", sameport=False)
+    return fetch_endpoints_string(
+        label_selector, port=port, phase="Running", sameport=False)
 
 
 def fetch_id(label_selector):

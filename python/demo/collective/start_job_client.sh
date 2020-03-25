@@ -20,5 +20,3 @@ nohup python -u ${BASEDIR}/job_client_demo.py \
     --package_sh ./resnet50/package.sh \
     --pod_path ./resnet50_pod \
     ./train_pretrain.sh > job_client.log 2>&1 &
-
-

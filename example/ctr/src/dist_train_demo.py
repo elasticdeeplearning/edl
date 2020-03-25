@@ -27,12 +27,14 @@ import paddle.fluid as fluid
 BATCH_SIZE = 64
 PASS_NUM = 1
 
+
 def loss_net(hidden, label):
     prediction = fluid.layers.fc(input=hidden, size=10, act='softmax')
     loss = fluid.layers.cross_entropy(input=prediction, label=label)
     avg_loss = fluid.layers.mean(loss)
     acc = fluid.layers.accuracy(input=prediction, label=label)
     return prediction, avg_loss, acc
+
 
 def conv_net(img, label):
     conv_pool_1 = fluid.nets.simple_img_conv_pool(
@@ -89,19 +91,23 @@ def train(use_cuda, role, endpoints, current_endpoint, trainer_id, trainers):
         for pass_id in range(PASS_NUM):
             for batch_id, data in enumerate(train_reader()):
                 acc_np, avg_loss_np = exe.run(prog,
-                                            feed=feeder.feed(data),
-                                            fetch_list=[acc, avg_loss])
+                                              feed=feeder.feed(data),
+                                              fetch_list=[acc, avg_loss])
                 if (batch_id + 1) % 10 == 0:
                     print(
                         'PassID {0:1}, BatchID {1:04}, Loss {2:2.2}, Acc {3:2.2}'.
                         format(pass_id, batch_id + 1,
-                                float(avg_loss_np.mean()), float(acc_np.mean())))
+                               float(avg_loss_np.mean()), float(acc_np.mean(
+                               ))))
+
 
 if __name__ == '__main__':
     if len(sys.argv) != 6:
-        print("Usage: python %s role endpoints current_endpoint trainer_id trainers" % sys.argv[0])
+        print(
+            "Usage: python %s role endpoints current_endpoint trainer_id trainers"
+            % sys.argv[0])
         exit(0)
     role, endpoints, current_endpoint, trainer_id, trainers = \
         sys.argv[1:]
-    train(True, role, endpoints, current_endpoint, int(trainer_id), int(trainers))
-
+    train(True, role, endpoints, current_endpoint,
+          int(trainer_id), int(trainers))

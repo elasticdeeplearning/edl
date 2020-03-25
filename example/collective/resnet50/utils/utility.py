@@ -24,6 +24,7 @@ import six
 import paddle
 import paddle.fluid as fluid
 
+
 def print_arguments(args):
     """Print argparse's arguments.
 
@@ -64,6 +65,7 @@ def add_arguments(argname, type, default, help, argparser, **kwargs):
         help=help + ' Default: %(default)s.',
         **kwargs)
 
+
 def check_gpu(use_gpu):
     """
     Log error and exit when set use_gpu=true in paddlepaddle
@@ -82,16 +84,18 @@ def check_gpu(use_gpu):
     except Exception as e:
         pass
 
+
 def get_median(data):
     data = sorted(data)
     size = len(data)
     if size == 2:
-        median = data[size-1]
+        median = data[size - 1]
     elif size % 2 == 0:
-        median = (data[size//2]+data[size//2-1])/2
+        median = (data[size // 2] + data[size // 2 - 1]) / 2
     elif size % 2 == 1:
-        median = data[(size-1)//2]
+        median = data[(size - 1) // 2]
     return median
+
 
 def create_data_loader(is_train, args, data_layout='NCHW'):
     """create data_loader
@@ -105,7 +109,7 @@ def create_data_loader(is_train, args, data_layout='NCHW'):
     """
     image_shape = [int(m) for m in args.image_shape.split(",")]
     if data_layout == "NHWC":
-        image_shape=[image_shape[1], image_shape[2], image_shape[0]]
+        image_shape = [image_shape[1], image_shape[2], image_shape[0]]
         feed_image = fluid.data(
             name="feed_image",
             shape=[None] + image_shape,
@@ -147,5 +151,3 @@ def create_data_loader(is_train, args, data_layout='NCHW'):
             iterable=True)
 
         return data_loader, [feed_image, feed_label]
-
-

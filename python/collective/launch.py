@@ -134,7 +134,10 @@ POD_IP (current node ip address, not needed for local training)
         help="The hdfs_name used for edl.")
 
     parser.add_argument(
-        "--hdfs_ugi", type=str, default=None, help="The hdfs_ugi used for edl.")
+        "--hdfs_ugi",
+        type=str,
+        default=None,
+        help="The hdfs_ugi used for edl.")
 
     # checkpoint will saved here
     parser.add_argument(
@@ -155,6 +158,7 @@ POD_IP (current node ip address, not needed for local training)
     #rest from the training program
     parser.add_argument('training_script_args', nargs=REMAINDER)
     return parser.parse_args()
+
 
 def launch(args):
     cluster = None

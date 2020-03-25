@@ -1,3 +1,17 @@
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import print_function
 
 import argparse
@@ -21,12 +35,12 @@ from multiprocessing import cpu_count
 # disable gpu training for this example
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("fluid")
 logger.setLevel(logging.INFO)
 
 dense_feature_dim = 13
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="PaddlePaddle CTR example")
@@ -57,8 +71,8 @@ def parse_args():
         help='The path for model to store (default: models)')
     return parser.parse_args()
 
-def ctr_dnn_model(embedding_size, sparse_feature_dim, use_py_reader=True):
 
+def ctr_dnn_model(embedding_size, sparse_feature_dim, use_py_reader=True):
     def embedding_layer(input):
         emb = fluid.layers.embedding(
             input=input,
@@ -67,8 +81,9 @@ def ctr_dnn_model(embedding_size, sparse_feature_dim, use_py_reader=True):
             # if you want to set is_distributed to True
             is_distributed=False,
             size=[sparse_feature_dim, embedding_size],
-            param_attr=fluid.ParamAttr(name="SparseFeatFactors",
-                                       initializer=fluid.initializer.Uniform()))
+            param_attr=fluid.ParamAttr(
+                name="SparseFeatFactors",
+                initializer=fluid.initializer.Uniform()))
         seq = fluid.layers.sequence_pool(input=emb, pool_type='average')
         return emb, seq
 
@@ -76,8 +91,10 @@ def ctr_dnn_model(embedding_size, sparse_feature_dim, use_py_reader=True):
         name="dense_input", shape=[dense_feature_dim], dtype='float32')
 
     sparse_input_ids = [
-        fluid.layers.data(name="C" + str(i), shape=[1], lod_level=1, dtype='int64')
-        for i in range(1, 27)]
+        fluid.layers.data(
+            name="C" + str(i), shape=[1], lod_level=1, dtype='int64')
+        for i in range(1, 27)
+    ]
 
     label = fluid.layers.data(name='label', shape=[1], dtype='int64')
 
@@ -92,18 +109,30 @@ def ctr_dnn_model(embedding_size, sparse_feature_dim, use_py_reader=True):
     train_feed_vars = words
     inference_feed_vars = emb_list + words[0:1]
 
-    fc1 = fluid.layers.fc(input=concated, size=400, act='relu',
-                          param_attr=fluid.ParamAttr(initializer=fluid.initializer.Normal(
-                              scale=1 / math.sqrt(concated.shape[1]))))
-    fc2 = fluid.layers.fc(input=fc1, size=400, act='relu',
-                          param_attr=fluid.ParamAttr(initializer=fluid.initializer.Normal(
-                              scale=1 / math.sqrt(fc1.shape[1]))))
-    fc3 = fluid.layers.fc(input=fc2, size=400, act='relu',
-                          param_attr=fluid.ParamAttr(initializer=fluid.initializer.Normal(
-                              scale=1 / math.sqrt(fc2.shape[1]))))
-    predict = fluid.layers.fc(input=fc3, size=2, act='softmax',
-                              param_attr=fluid.ParamAttr(initializer=fluid.initializer.Normal(
-                                  scale=1 / math.sqrt(fc3.shape[1]))))
+    fc1 = fluid.layers.fc(input=concated,
+                          size=400,
+                          act='relu',
+                          param_attr=fluid.ParamAttr(
+                              initializer=fluid.initializer.Normal(
+                                  scale=1 / math.sqrt(concated.shape[1]))))
+    fc2 = fluid.layers.fc(input=fc1,
+                          size=400,
+                          act='relu',
+                          param_attr=fluid.ParamAttr(
+                              initializer=fluid.initializer.Normal(
+                                  scale=1 / math.sqrt(fc1.shape[1]))))
+    fc3 = fluid.layers.fc(input=fc2,
+                          size=400,
+                          act='relu',
+                          param_attr=fluid.ParamAttr(
+                              initializer=fluid.initializer.Normal(
+                                  scale=1 / math.sqrt(fc2.shape[1]))))
+    predict = fluid.layers.fc(input=fc3,
+                              size=2,
+                              act='softmax',
+                              param_attr=fluid.ParamAttr(
+                                  initializer=fluid.initializer.Normal(
+                                      scale=1 / math.sqrt(fc3.shape[1]))))
 
     cost = fluid.layers.cross_entropy(input=predict, label=words[-1])
     avg_cost = fluid.layers.reduce_sum(cost)
@@ -113,6 +142,7 @@ def ctr_dnn_model(embedding_size, sparse_feature_dim, use_py_reader=True):
 
     fetch_vars = [predict]
     return avg_cost, auc_var, batch_auc_var, train_feed_vars, inference_feed_vars, fetch_vars
+
 
 def train_loop(args, train_program, feed_vars, loss, auc_var, batch_auc_var,
                trainer_num, trainer_id):
@@ -135,9 +165,10 @@ def train_loop(args, train_program, feed_vars, loss, auc_var, batch_auc_var,
 
     feeder = fluid.DataFeeder(feed_var_names, place)
     for data in train_reader():
-        loss_val, auc_val, batch_auc_val = exe.run(fluid.default_main_program(),
-                                            feed = feeder.feed(data),
-                                            fetch_list=[loss.name, auc_var.name, batch_auc_var.name])
+        loss_val, auc_val, batch_auc_val = exe.run(
+            fluid.default_main_program(),
+            feed=feeder.feed(data),
+            fetch_list=[loss.name, auc_var.name, batch_auc_var.name])
         break
 
     loss_val = np.mean(loss_val)
@@ -145,7 +176,9 @@ def train_loop(args, train_program, feed_vars, loss, auc_var, batch_auc_var,
     batch_auc_val = np.mean(batch_auc_val)
 
     logger.info("TRAIN --> pass: {} batch: {} loss: {} auc: {}, batch_auc: {}"
-                      .format(pass_id, batch_id, loss_val/args.batch_size, auc_val, batch_auc_val))
+                .format(pass_id, batch_id, loss_val / args.batch_size, auc_val,
+                        batch_auc_val))
+
 
 def save_program():
     args = parse_args()
@@ -153,7 +186,8 @@ def save_program():
     if not os.path.isdir(args.model_output_dir):
         os.mkdir(args.model_output_dir)
 
-    loss, auc_var, batch_auc_var, train_feed_vars, inference_feed_vars, fetch_vars = ctr_dnn_model(args.embedding_size, args.sparse_feature_dim, use_py_reader=False)
+    loss, auc_var, batch_auc_var, train_feed_vars, inference_feed_vars, fetch_vars = ctr_dnn_model(
+        args.embedding_size, args.sparse_feature_dim, use_py_reader=False)
 
     optimizer = fluid.optimizer.Adam(learning_rate=1e-4)
     optimizer.minimize(loss)
@@ -162,10 +196,13 @@ def save_program():
     place = fluid.CPUPlace()
     exe = fluid.Executor(place)
 
-    train_loop(args, main_program, train_feed_vars, loss, auc_var, batch_auc_var, 1, 0)
+    train_loop(args, main_program, train_feed_vars, loss, auc_var,
+               batch_auc_var, 1, 0)
     model_dir = args.model_output_dir + "/inference_only"
     feed_var_names = [var.name for var in inference_feed_vars]
-    fluid.io.save_inference_model(model_dir, feed_var_names, fetch_vars, exe, fluid.default_main_program())
+    fluid.io.save_inference_model(model_dir, feed_var_names, fetch_vars, exe,
+                                  fluid.default_main_program())
+
 
 def prune_program():
     args = parse_args()
@@ -191,11 +228,13 @@ def prune_program():
         f.write(text_format.MessageToString(proto))
     f.close()
 
+
 def remove_embedding_param_file():
     args = parse_args()
     model_dir = args.model_output_dir + "/inference_only"
     embedding_file = model_dir + "/SparseFeatFactors"
     os.remove(embedding_file)
+
 
 if __name__ == '__main__':
     save_program()

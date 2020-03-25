@@ -2,3 +2,4 @@
 vendor/
 .glide/
 .vscode/
+*.pyc

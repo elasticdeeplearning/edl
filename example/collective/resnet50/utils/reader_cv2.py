@@ -21,7 +21,8 @@ import paddle.fluid as fluid
 import random
 
 from .img_tool import process_image
-DATA_DIR=""
+DATA_DIR = ""
+
 
 def _reader_creator(settings,
                     file_list,
@@ -32,7 +33,7 @@ def _reader_creator(settings,
                     data_dir=DATA_DIR,
                     pass_id_as_seed=0,
                     threads=4,
-                    buf_size=4000, 
+                    buf_size=4000,
                     data_layout='NCHW'):
     def _reader():
         with open(file_list) as flist:
@@ -44,15 +45,17 @@ def _reader_creator(settings,
                 print("reader shuffle seed", _reader.seed)
                 if _reader.seed is not None:
                     _reader.seed += 1
-            
+
             if mode == 'train':
                 trainer_id = int(os.getenv("PADDLE_TRAINER_ID", "0"))
                 if os.getenv("PADDLE_TRAINER_ENDPOINTS"):
-                    trainer_count = len(os.getenv("PADDLE_TRAINER_ENDPOINTS").split(","))
+                    trainer_count = len(
+                        os.getenv("PADDLE_TRAINER_ENDPOINTS").split(","))
                 else:
                     trainer_count = int(os.getenv("PADDLE_TRAINERS", "1"))
 
-                per_node_lines = int(math.ceil(len(full_lines) * 1.0 / trainer_count))
+                per_node_lines = int(
+                    math.ceil(len(full_lines) * 1.0 / trainer_count))
                 total_lines = per_node_lines * trainer_count
 
                 # aligned full_lines so that it can evenly divisible
@@ -87,25 +90,29 @@ def _reader_creator(settings,
                     img_path = os.path.join(data_dir, line)
                     yield [img_path]
 
-
     image_mapper = functools.partial(
         process_image,
         settings=settings,
         mode=mode,
         color_jitter=color_jitter,
         rotate=rotate,
-        crop_size=224, mean=settings.image_mean, std=settings.image_std, data_layout=data_layout)
+        crop_size=224,
+        mean=settings.image_mean,
+        std=settings.image_std,
+        data_layout=data_layout)
     reader = paddle.reader.xmap_readers(
         image_mapper, _reader, threads, buf_size, order=False)
     return reader
+
 
 def train(settings,
           data_dir=DATA_DIR,
           pass_id_as_seed=0,
           threads=4,
-          buf_size=4000, data_layout='NCHW'):
+          buf_size=4000,
+          data_layout='NCHW'):
     file_list = os.path.join(data_dir, 'train.txt')
-    reader =  _reader_creator(
+    reader = _reader_creator(
         settings,
         file_list,
         'train',
@@ -116,17 +123,34 @@ def train(settings,
         pass_id_as_seed=pass_id_as_seed,
         threads=threads,
         buf_size=buf_size,
-        data_layout=data_layout
-        )
+        data_layout=data_layout)
     return reader
 
-def val(settings, data_dir=DATA_DIR, threads=16, buf_size=4000, data_layout='NCHW'):
+
+def val(settings,
+        data_dir=DATA_DIR,
+        threads=16,
+        buf_size=4000,
+        data_layout='NCHW'):
     file_list = os.path.join(data_dir, 'val.txt')
-    return _reader_creator(settings ,file_list, 'val', shuffle=False, 
-            data_dir=data_dir, threads=threads, buf_size=buf_size, data_layout=data_layout)
+    return _reader_creator(
+        settings,
+        file_list,
+        'val',
+        shuffle=False,
+        data_dir=data_dir,
+        threads=threads,
+        buf_size=buf_size,
+        data_layout=data_layout)
 
 
 def test(data_dir=DATA_DIR, threads=4, buf_size=4000, data_layout='NCHW'):
     file_list = os.path.join(data_dir, 'val.txt')
-    return _reader_creator(file_list, 'test', shuffle=False,
-            data_dir=data_dir, threads=threads, buf_size=buf_size, data_layout=data_layout)
+    return _reader_creator(
+        file_list,
+        'test',
+        shuffle=False,
+        data_dir=data_dir,
+        threads=threads,
+        buf_size=buf_size,
+        data_layout=data_layout)

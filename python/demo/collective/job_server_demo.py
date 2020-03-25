@@ -104,7 +104,8 @@ class JobInfoManager(object):
             pod_num += pod_num_of_node
 
         pods = self._make_new_pods(0, pod_num)
-        self._assign_pods_to_nodes(pods, self._ip_pod_num, self._gpu_num_of_pod)
+        self._assign_pods_to_nodes(pods, self._ip_pod_num,
+                                   self._gpu_num_of_pod)
         self.job[self._job_id] = pods
 
         thread = threading.Thread(target=self.run)
@@ -170,7 +171,11 @@ def get_job_pods():
     except:
         return jsonify({'job_id': {}})
     job_pods, flag = job_manager.get_job_pods("test_job_id_1234")
-    return jsonify({'job_id': job_id, "pods": job_pods, "job_stage_flag": flag})
+    return jsonify({
+        'job_id': job_id,
+        "pods": job_pods,
+        "job_stage_flag": flag
+    })
 
 
 @app.route('/rest/1.0/post/job_runtime_static', methods=['POST'])
