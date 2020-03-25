@@ -13,6 +13,7 @@
           - glide install --strip-vendor
           - go test $(glide novendor)
 - language: python
+  python: 2.7.x
   sudo: required
   install:
           - sudo pip install pylint pytest astroid isort
