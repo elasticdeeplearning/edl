@@ -6,7 +6,7 @@ matrix:
       install:
         - go get -u golang.org/x/lint/golint
         - curl https://glide.sh/get | bash
-        - sudo pip install pre-commit pylint pytest astroid isort
+        - sudo pip install pre-commit pylint pytest astroid
       script:
         - rm -f .copyright.hook && wget https://raw.githubusercontent.com/PaddlePaddle/Paddle/develop/tools/codestyle/copyright.hook
         - bash -x .tools/check_style.sh
