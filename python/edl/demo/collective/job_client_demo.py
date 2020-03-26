@@ -14,7 +14,7 @@
 
 import os
 import sys
-from edl.collecitve.edl_utils import Edlenv
+from edl.collective.edl_utils import Edlenv
 from edl.collective.utils import logger, get_logger, terminate_local_procs, get_host_name_ip
 from argparse import ArgumentParser, REMAINDER
 import six

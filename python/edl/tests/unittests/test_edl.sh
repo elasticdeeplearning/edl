@@ -27,14 +27,14 @@ export PADDLE_POD_ID="not set"
 nohup python -m edl.demo.collective.job_client_demo \
     --log_level 20 \
     --log_dir ./edl_demo_log \
-    ./start_edl_demo.py > job_client.log 2>&1 &
+    ./start_edl_demo.sh > job_client.log 2>&1 &
 
 job_client_pid=$!
 echo "launcher_pid:${job_client_pid}"
 sleep 30s
 
 echo "test request and response"
-str="trainers_0"
+str="pod_0_0"
 file=./edl_demo_log/pod_pod_0_0.log
 
 kill ${server_pid} ${job_client_pid}

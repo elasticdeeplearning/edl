@@ -16,3 +16,4 @@ matrix:
         - glide install --strip-vendor
         - go test $(glide novendor)
         - cd cmd/edl && go vet
+        - cd $GOPATH/src/github.com/paddlepaddle/edl && bash ./scripts/build.sh
