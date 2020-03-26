@@ -33,8 +33,6 @@ function(bash_test_modules TARGET_NAME)
         return()
     endif()
 
-    message(STATUS "reach bash_test_modules" ${CMAKE_CURRENT_BINARY_DIR} ${EDL_BINARY_DIR})
-
     set(options SERIAL)
     set(oneValueArgs "")
     set(multiValueArgs MODULES DEPS ENVS LABELS)
@@ -53,7 +51,6 @@ function(bash_test_modules TARGET_NAME)
             bash ${CMAKE_CURRENT_BINARY_DIR}/${bash_test_modules_MODULES}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     else()
-        message(STATUS "reach add_test:" ${TARGET_NAME})
         add_test(NAME ${TARGET_NAME}
             COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${EDL_BINARY_DIR}/python 
             TEST_TARGET_NAME=${TARGET_NAME} TEST_TIMEOUT=${timeout} ${bash_test_modules_ENVS}
@@ -77,7 +74,6 @@ set(dist_ENVS http_proxy="" https_proxy="")
 # python unit test
 file(GLOB TEST_OPS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "test_*.py")
 string(REPLACE ".py" "" TEST_OPS "${TEST_OPS}")
-message(STATUS "find python_test_ops:" ${TEST_OPS})
 foreach(TEST_OP ${TEST_OPS})
     py_test_modules(${TEST_OP} MODULES ${TEST_OP})
 endforeach(TEST_OP)
@@ -85,7 +81,6 @@ endforeach(TEST_OP)
 # bash unit test
 file(GLOB TEST_OPS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "test_*.sh")
 string(REPLACE ".sh" "" TEST_OPS "${TEST_OPS}")
-message(STATUS "find bash_test_ops:" ${TEST_OPS})
 foreach(TEST_OP ${TEST_OPS})
     bash_test_modules(${TEST_OP} MODULES "${TEST_OP}.sh")
 endforeach(TEST_OP)
