@@ -7,7 +7,7 @@ unset http_proxy https_proxy
 BASEDIR=$(dirname $(readlink -f $0))
 echo "${BASEDIR}"
 
-nohup python ${BASEDIR}/job_server_demo.py --pod_num_of_node 2 \
+nohup python -m edl.demo.job_server_demo.py --pod_num_of_node 2 \
     --time_interval_to_change 900 \
     --gpu_num_of_node 2 \
     --pod_num_of_node 2 \
@@ -23,7 +23,7 @@ export PADDLE_JOBSERVER="http://127.0.0.1:8180"
 export PADDLE_JOB_ID="test_job_id_1234"
 export PADDLE_POD_ID="not set"
 
-nohup python -u ${BASEDIR}/job_client_demo.py \
+nohup python -m edl.demo.job_client_demo.py \
     --log_level 20 \
     --log_dir ./edl_demo_log \
     ./start_edl_demo.py > job_client.log 2>&1 &

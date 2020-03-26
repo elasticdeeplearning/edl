@@ -11,4 +11,8 @@ include(python)
 option(WITH_TESTING     "Compile EDL with unit testing"        ON)
 option(WITH_COVERAGE    "Compile EDL with code coverage"       OFF)
 
+IF(WITH_TESTING)
+    ENABLE_TESTING()
+ENDIF()
+
 add_subdirectory(python)
