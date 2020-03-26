@@ -7,12 +7,13 @@ matrix:
         - go get -u golang.org/x/lint/golint
         - curl https://glide.sh/get | bash
         - sudo pip install --upgrade pip 
-        - sudo pip install pre-commit pylint --ignore-installed enum34
+        - sudo pip install pre-commit pylint --ignore-installed enum34 flask pathlib
       script:
         - rm -f .copyright.hook && wget https://raw.githubusercontent.com/PaddlePaddle/Paddle/develop/tools/codestyle/copyright.hook
         - bash -x .tools/check_style.sh
         - ln -s $GOPATH/src/github.com/PaddlePaddle $GOPATH/src/github.com/paddlepaddle
-        - cd $GOPATH/src/github.com/paddlepaddle/edl
-        - glide install --strip-vendor
-        - go test $(glide novendor)
-        - cd cmd/edl && go vet
+        #- cd $GOPATH/src/github.com/paddlepaddle/edl
+        #- glide install --strip-vendor
+        #- go test $(glide novendor)
+        #- cd cmd/edl && go vet
+        - cd $GOPATH/src/github.com/paddlepaddle/edl && bash ./scripts/build.sh

@@ -1,13 +1,14 @@
 #!/bin/bash
 set -e
 
+echo "python_path:${PYTHONPATH}"
 unset http_proxy https_proxy
 
 # start job_server
 BASEDIR=$(dirname $(readlink -f $0))
 echo "${BASEDIR}"
 
-nohup python ${BASEDIR}/job_server_demo.py --pod_num_of_node 2 \
+nohup python -m edl.demo.collective.job_server_demo --pod_num_of_node 2 \
     --time_interval_to_change 900 \
     --gpu_num_of_node 2 \
     --pod_num_of_node 2 \
@@ -23,17 +24,17 @@ export PADDLE_JOBSERVER="http://127.0.0.1:8180"
 export PADDLE_JOB_ID="test_job_id_1234"
 export PADDLE_POD_ID="not set"
 
-nohup python -u ${BASEDIR}/job_client_demo.py \
+nohup python -m edl.demo.collective.job_client_demo \
     --log_level 20 \
     --log_dir ./edl_demo_log \
-    ./start_edl_demo.py > job_client.log 2>&1 &
+    ./start_edl_demo.sh > job_client.log 2>&1 &
 
 job_client_pid=$!
 echo "launcher_pid:${job_client_pid}"
 sleep 30s
 
 echo "test request and response"
-str="trainers_0"
+str="pod_0_0"
 file=./edl_demo_log/pod_pod_0_0.log
 
 kill ${server_pid} ${job_client_pid}

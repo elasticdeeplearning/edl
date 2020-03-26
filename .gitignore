@@ -3,3 +3,4 @@ vendor/
 .glide/
 .vscode/
 *.pyc
+build/

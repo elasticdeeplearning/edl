@@ -39,24 +39,21 @@ edl_version = "0.0.1"
 max_version, mid_version, min_version = python_version()
 
 REQUIRED_PACKAGES = [
-    'six >= 1.10.0', 'protobuf >= 3.1.0', "flask"
+    'six >= 1.10.0', 'protobuf >= 3.1.0', "flask", "pathlib", "paddlepaddle-gpu"
 ]
 
-if not find_package("paddlepaddle") and not find_package("paddlepaddle-gpu"):
-    REQUIRED_PACKAGES.append("paddlepaddle")
-
-packages=['collective', "demo"]
-package_dir={'collective':
-             '${PADDLE_EDL_BINARY_DIR}/python/collective',
-	     'demo':
-	     '${PADDLE_EDL_BINARY_DIR}/python/demo'}
+packages=['edl', 
+          'edl.collective', 
+          'edl.demo', 
+          'edl.demo.collective']
+package_dir={'': '${EDL_BINARY_DIR}/python'}
 
 setup(
     name='paddle-edl',
     version=edl_version.replace('-', ''),
     description=
     ('Paddle Serving Package for saved model with PaddlePaddle'),
-    url='https://github.com/PaddlePaddle/Serving',
+    url='https://github.com/PaddlePaddle/edl',
     author='PaddlePaddle Author',
     author_email='guru4elephant@gmail.com',
     install_requires=REQUIRED_PACKAGES,
