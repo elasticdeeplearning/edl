@@ -39,14 +39,14 @@ edl_version = "0.0.1"
 max_version, mid_version, min_version = python_version()
 
 REQUIRED_PACKAGES = [
-    'six >= 1.10.0', 'protobuf >= 3.1.0', "flask", "pathlib"
+    'six >= 1.10.0', 'protobuf >= 3.1.0', "flask", "pathlib", "paddlepaddle-gpu"
 ]
 
-if not find_package("paddlepaddle") and not find_package("paddlepaddle-gpu"):
-    REQUIRED_PACKAGES.append("paddlepaddle")
-
-packages=['edl']
-package_dir={'edl':'${EDL_BINARY_DIR}/python/edl'}
+packages=['edl', 
+          'edl.collective', 
+          'edl.demo', 
+          'edl.demo.collective']
+package_dir={'': '${EDL_BINARY_DIR}/python'}
 
 setup(
     name='paddle-edl',

@@ -9,5 +9,5 @@ mkdir -p  ${build_dir}
 cd ${build_dir}
 
 cmake ..
-make -j
+make clean && make -j
 ctest -V -R test_*
