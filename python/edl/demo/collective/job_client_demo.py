@@ -14,8 +14,8 @@
 
 import os
 import sys
-from paddle.distributed.edl_utils import Edlenv
-from paddle.distributed.utils import logger, get_logger, terminate_local_procs, get_host_name_ip
+from edl.collecitve.edl_utils import Edlenv
+from edl.collective.utils import logger, get_logger, terminate_local_procs, get_host_name_ip
 from argparse import ArgumentParser, REMAINDER
 import six
 import copy
