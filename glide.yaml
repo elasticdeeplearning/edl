@@ -11,3 +11,10 @@ import:
 - package: github.com/wangkuiyi/candy
 - package: k8s.io/code-generator
   version: kubernetes-1.8.6
+- package: github.com/etcd-io/etcd
+  version: ^3.2.1
+  subpackages:
+  - clientv3
+  - clientv3/concurrency
+  - embed
+  - etcdserver
