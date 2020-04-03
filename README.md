@@ -20,7 +20,7 @@ EDL includes two parts:
 1. making PaddlePaddle a fault-tolerable deep learning framework.
    This directory contains the Kubernetes controller.  For more
    information about fault-tolerance, please refer to the
-   [design](https://github.com/PaddlePaddle/Paddle/tree/develop/doc/v2/design/cluster_train).
+   [design](./doc/fault_tolerance.md).
 
 We deployed EDL on a real Kubernetes cluster, dlnel.com, opened for
 graduate students of Tsinghua University.  The performance test report
