@@ -6,7 +6,7 @@
 1. Paddle本身的checkpoint
 Paddle本身提供`save_persistables `保存所有持久的变量。
 
-2. 用户python端的逻辑的checkpoint问题
+2. 用户python端逻辑的checkpoint问题
 主要是当前epoch number，数据切分方法和位置等。
 
 3. checkpoint保存的问题  
@@ -58,4 +58,4 @@ if args.checkpoint is not None:
 
 
 #  异步训练的FaultTolerance
-TBD
+TBDopen 
