@@ -61,3 +61,6 @@ if args.checkpoint is not None:
 for pass_id in range(train_status.next(), params["num_epochs"]):
     train()
 ```
+
+# Async training
+TBD
