@@ -36,7 +36,7 @@ of EDL on this cluster is
 ## Design Docs
 - Collective communication pattern
   -  [Fault-Tolerant Training in PaddlePaddle](./doc/fault_tolerance.md).
-  -  [Elastic Deep Learning Design Doc:compute engine](./doc/edl_design_doc.md).
+  -  [Elastic Deep Learning Design Doc:compute engine](./doc/edl_collective_design_doc.md).
   -  [Elastic Deep Learning Design Doc:Scheduler](./doc/edl_design_doc.md).
 
 ## FAQ
