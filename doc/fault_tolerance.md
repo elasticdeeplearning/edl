@@ -19,7 +19,7 @@ Such as current epoch number, step number in an epoch, and the data slice and of
     
   - How to guarantee the checkpoint's integrity and correctness?  
     It's a process to save a file and it's not an atomic action but `rm` `rename` `mv` and others should be.
-    We can use it and don't change any checkpoint when it's written with a version number. All checkpoints will be saved to the file system with an increment version number. The interface generates a temporay checkpoint file and then `rename` it to valid when it has done.
+    We can use it and don't change any checkpoint when it's written with a version number. All checkpoints will be saved to the file system with an increment version number. The interface generates a temporary checkpoint file and then `rename` it to valid when it has done.
     
   - when is the checkpoint saved?
     Now the trainer saves checkpoint every epoch and it need not save the data offset, it's very simple. Of course, this method is not friendly when an epoch takes a too long time. We will implement a step level(time-limited) checkpoint interface the next version.
