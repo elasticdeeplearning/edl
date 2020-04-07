@@ -34,14 +34,10 @@ of EDL on this cluster is
 - [Run CTR Training and Deployment on Baidu Cloud](./example/ctr/deploy_ctr_on_baidu_cloud_cn.rst)
 
 ## Design Docs
-
-- [Fault-Tolerant Training in PaddlePaddle](https://github.com/PaddlePaddle/Paddle/tree/develop/doc/v2/design/cluster_train).
-- [Elastic Deep Learning Design Doc](./doc/edl_design_doc.md).
-
-## Future
-
-- Resource Adjustments by EDL
-- Support Full-Tolerant Distributed Training in PadldePaddle Fluid.
+- Collective communication pattern
+  -  [Fault-Tolerant Training in PaddlePaddle](./doc/fault_tolerance.md).
+  -  [Elastic Deep Learning Design Doc:compute engine](./doc/edl_design_doc.md).
+  -  [Elastic Deep Learning Design Doc:Scheduler](./doc/edl_design_doc.md).
 
 ## FAQ
 
