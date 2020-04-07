@@ -2,31 +2,31 @@
 ## Design
 In the process of training, we may meet that one or more trainers crash. We use checkpoints to continue training.  
 
-There may be several design-trick for it:
+There may be several design-tricks for it:
 
-1. How Paddle saves checkpoint itself?  
-Paddle implments `save_persitables` to save all persistable variable.
+1. How does Paddle save checkpoint itself?  
+Paddle implements `save_persistables` to save all persistable variables.
 
-2. How to save user's Python end logic?  
+2. How to save user's Python frontend logic?  
 Such as current epoch number, step number in an epoch, and the data slice and offset and so on.
 
 3. How to save checkpoints?
   - Which trainer saves the checkpoint?  
     If there are many trainers, the trainer who `rank`==0 will do it.
     
-  - Where to save the checkpoint?  
+  - Where do we save the checkpoint?  
     It can be saved to the local file system, but eventually, it should be saved to a file-system that can be seen by all trainers such as a distributed HDFS.
     
   - How to guarantee the checkpoint's integrity and correctness?  
     It's a process to save a file and it's not an atomic action but `rm` `rename` `mv` and others should be.
-    We can use it and don't change any checkpoint when it's written with a version number. All checkpoints will be saved to the file system with an increment version number. The interface generates a temp checkpoint file and then `rename` it to valid when it has done.
+    We can use it and don't change any checkpoint when it's written with a version number. All checkpoints will be saved to the file system with an increment version number. The interface generates a temporay checkpoint file and then `rename` it to valid when it has done.
     
-  - when to save the checkpoint?
-    We suggest that the trainer save checkpoint every epoch because it will have no relation between epochs and we need not save the data slice or offset, it's simple. Of course, this method is not friendly when an epoch takes a too long time. We will implement a step level(time-limited) checkpoint interface the next version.
+  - when is the checkpoint saved?
+    Now the trainer saves checkpoint every epoch and it need not save the data offset, it's very simple. Of course, this method is not friendly when an epoch takes a too long time. We will implement a step level(time-limited) checkpoint interface the next version.
     
 ## Interface
-There are to interfaces `save_check_point` and `load_check_point` to save/load a checkpoint.
-There a two-parameter should be careful:
+There are two interfaces `save_check_point` and `load_check_point` to save/load a checkpoint.
+There are two arguments should be careful:
 
 1. fs:  
 It's an abstract interface to file system and there are two implementations: local file system and HDFS.
