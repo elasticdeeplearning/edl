@@ -29,10 +29,9 @@ cp -r ${src_dir}/models ${dst_dir}/models
 cp -r ${src_dir}/scripts ${dst_dir}/scripts
 
 if [[ ! -d "${dst_dir}/ImageNet" ]]; then
-    ln -s /root/go/dataset/ImageNet/ ${dst_dir}/
+    ln -s ${PADDLE_EDL_IMAGENET_PATH} ${dst_dir}/
 fi
 
-
 if [[ ! -d "${dst_dir}/fleet_checkpoints" ]]; then
-    ln -s /root/go/checkpoints/resnet50/fleet_checkpoints ${dst_dir}/fleet_checkpoints
+    ln -s ${PADDLE_EDL_FLEET_CHECKPOINT_PATH} ${dst_dir}/fleet_checkpoints
 fi

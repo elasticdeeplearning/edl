@@ -35,7 +35,9 @@ def find_package(pkgname):
     except DistributionNotFound:
         return False
 
-edl_version = "0.2.0"
+edl_version = "0.0.0"
+if os.getenv("PADDLE_EDL_VERSION"):
+    edl_version=os.getenv("PADDLE_EDL_VERSION")
 max_version, mid_version, min_version = python_version()
 
 REQUIRED_PACKAGES = [
