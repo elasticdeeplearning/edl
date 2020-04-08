@@ -48,11 +48,6 @@ packages=['paddle_edl',
           'paddle_edl.collective', 
           'paddle_edl.demo', 
           'paddle_edl.demo.collective']
-#package_dir={'': '${EDL_BINARY_DIR}/python/paddle_edl'}
-
-class BinaryDistribution(Distribution):
-    def has_ext_modules(foo):
-        return True
 
 setup(
     name='paddle_edl',
@@ -64,9 +59,7 @@ setup(
     author_email='guru4elephant@gmail.com',
     install_requires=REQUIRED_PACKAGES,
     packages=packages,
-    #package_dir=package_dir,
     python_requires='>=2.7',
-    distclass=BinaryDistribution,
     # PyPI package information.
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -85,7 +78,6 @@ setup(
         'Topic :: Software Development',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules',
-        'Operating System :: OS Independent',
     ],
     license='Apache 2.0',
     keywords=('paddle_edl deployment industrial easy-to-use'))
