@@ -35,7 +35,7 @@ def find_package(pkgname):
     except DistributionNotFound:
         return False
 
-edl_version = "0.0.1"
+edl_version = "0.2.0"
 max_version, mid_version, min_version = python_version()
 
 REQUIRED_PACKAGES = [
@@ -52,13 +52,14 @@ setup(
     name='paddle-edl',
     version=edl_version.replace('-', ''),
     description=
-    ('Paddle Serving Package for saved model with PaddlePaddle'),
+    ('Paddle EDL Package'),
     url='https://github.com/PaddlePaddle/edl',
     author='PaddlePaddle Author',
     author_email='guru4elephant@gmail.com',
     install_requires=REQUIRED_PACKAGES,
     packages=packages,
     package_dir=package_dir,
+    python_requires='>=2.7',
     # PyPI package information.
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -77,6 +78,7 @@ setup(
         'Topic :: Software Development',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules',
+        'Operating System :: OS Independent',
     ],
     license='Apache 2.0',
     keywords=('paddle-edl deployment industrial easy-to-use'))
