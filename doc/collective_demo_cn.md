@@ -27,13 +27,11 @@ cd python/paddle_edl/demo/collective
 2. 我们需要在(各个)节点上启动一个JobClient的demo，用来管理训练的Pod进程。  
 
 ```
+#指定ImageNet的数据目录路径
+export PADDLE_EDL_IMAGENET_PATH=<your path>
+#指定`checkpoint`的目录，用来保存checkpoint
+export PADDLE_EDL_FLEET_CHECKPOINT_PATH=<your path>
+
 mkdir -p resnet50_pod
 ./start_job_client.sh
 ```
-
-`resnet50`目录下有一个`package.sh`是用来打包训练脚本和数据的，这里说明一下：  
- 2.1 指定ImageNet的数据目录路径  
-  `export PADDLE_EDL_IMAGENET_PATH=<your path>`   
-  
- 2.2 指定`checkpoint`的目录，用来保存checkpoint   
- `export PADDLE_EDL_FLEET_CHECKPOINT_PATH=<your path>`

@@ -28,14 +28,11 @@ cd python/edl/demo/collective
 2. Start a Jobclient on every node. Jobclient controls the POD process.
 
 ```
+#Set the ImageNet data path
+export PADDLE_EDL_IMAGENET_PATH=<your path>
+#Set the checkpoint path
+export PADDLE_EDL_FLEET_CHECKPOINT_PATH=<your path>
+
 mkdir -p resnet50_pod
 ./start_job_client.sh
 ```
-
-There is a bash script file `package.sh`. It's for preparing the environment for training.
-
-  -  Set the ImageNet data path:  
-  `export PADDLE_EDL_IMAGENET_PATH=<your path>`
-  
-  -  Set the `checkpoint` path:
-  `export PADDLE_EDL_FLEET_CHECKPOINT_PATH=<your path>`
