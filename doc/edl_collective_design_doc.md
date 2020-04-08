@@ -26,6 +26,7 @@ There are still many online or offline cluster systems in production although th
 5. How to prevent meaningless scaling.   
   - When a training job is nearing its end, it's meaningless to scale it(scale_in or scale_out). It will decrease the job's efficiency.
   - In most scenes, it's better to scale_out jobs with high resource utilization instead of the lowers.
+So Paddle should report his job performance information to the scheduler and then the scheduler can adjust his scheduling strategy.
 
 6. How to split the data between nodes.
 Changes in nodes number may need data to adjust segmentation. So a node needs to see all the data. One choice is that download all of them and the other is to mount a distributed file system(such as Ceph).
