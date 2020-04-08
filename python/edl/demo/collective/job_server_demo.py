@@ -9,7 +9,7 @@ import time
 import argparse
 import copy
 import functools
-import edl.collective.utils as utils
+import paddle_edl.collective.utils as utils
 
 parser = argparse.ArgumentParser(description=__doc__)
 add_arg = functools.partial(utils.add_arguments, argparser=parser)

@@ -18,7 +18,7 @@ if [[ ${use_dali} == "True" ]]; then
     export FLAGS_fraction_of_gpu_memory_to_use=0.8
 fi
 
-python -m paddle-edl.launch ${distributed_args} \
+python -m paddle_edl.collective.launch ${distributed_args} \
        --log_dir log \
        --log_level 20 \
        ./train_with_fleet.py \

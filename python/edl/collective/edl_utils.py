@@ -16,7 +16,8 @@ import os
 import requests
 import time
 import sys
-from utils import Cluster, Pod, Trainer, logger
+from utils import Cluster, Pod, Trainer, logger, Hdfs
+from http_store import kv_server
 
 
 class Edlenv(object):
@@ -173,7 +174,7 @@ def edl_barrier(edl_env, hdfs, timeout=-1):
         if pod.rank == 0 and not kv_server.is_alive():
             kv_server.start("0.0.0.0", pod.port)
 
-        ret = edl_utils.barrier(cluster=cluster, pod=pod)
+        ret = barrier(cluster=cluster, pod=pod)
         if ret:
             break
 

@@ -169,10 +169,11 @@ def launch(args):
     assert edl_env.is_under_edl(), "edl launch must run under edl env"
 
     hdfs = edl_utils.get_hdfs_from_args(args)
-    cluster, pod = edl_barrier(edl_env, hdfs, timeout=15 * 60)
+    cluster, pod = edl_utils.edl_barrier(edl_env, hdfs, timeout=15 * 60)
     logger.info("get cluster from edl:{}".format(cluster))
 
-    procs = start_local_trainers(cluster, pod)
+    procs = start_local_trainers(cluster, pod, args.training_script,
+                                 args.training_script_args)
 
     while True:
         cluster2, pod = edl_env.get_cluster(hdfs)
@@ -182,9 +183,11 @@ def launch(args):
                         format(cluster2, cluster))
             terminate_local_procs(procs)
 
-            cluster, pod = edl_barrier(edl_env, hdfs, timeout=30 * 60)
+            cluster, pod = edl_utils.edl_barrier(
+                edl_env, hdfs, timeout=30 * 60)
 
-            procs = start_local_trainers(cluster, pod)
+            procs = start_local_trainers(cluster, pod, args.training_script,
+                                         args.training_script_args)
 
         alive = watch_local_trainers(procs, cluster.trainers_nranks())
 
@@ -194,7 +197,7 @@ def launch(args):
 
         time.sleep(3)
 
-    edl_barrier(edl_env, hdfs)
+    edl_utils.edl_barrier(edl_env, hdfs)
 
 
 if __name__ == "__main__":
