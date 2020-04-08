@@ -44,18 +44,18 @@ REQUIRED_PACKAGES = [
     'six >= 1.10.0', 'protobuf >= 3.1.0', "flask", "pathlib", "paddlepaddle-gpu"
 ]
 
-packages=['edl', 
-          'edl.collective', 
-          'edl.demo', 
-          'edl.demo.collective']
-package_dir={'': '${EDL_BINARY_DIR}/python'}
+packages=['paddle_edl', 
+          'paddle_edl.collective', 
+          'paddle_edl.demo', 
+          'paddle_edl.demo.collective']
+package_dir={'paddle_edl': '${EDL_BINARY_DIR}/python/edl'}
 
 class BinaryDistribution(Distribution):
     def has_ext_modules(foo):
         return True
 
 setup(
-    name='paddle-edl',
+    name='paddle_edl',
     version=edl_version.replace('-', ''),
     description=
     ('Paddle EDL Package'),
@@ -88,4 +88,4 @@ setup(
         'Operating System :: OS Independent',
     ],
     license='Apache 2.0',
-    keywords=('paddle-edl deployment industrial easy-to-use'))
+    keywords=('paddle_edl deployment industrial easy-to-use'))

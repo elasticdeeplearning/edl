@@ -4,7 +4,7 @@ set(EDL_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(EDL_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 SET(EDL_INSTALL_DIR ${CMAKE_BINARY_DIR}/output)
 SET(CMAKE_INSTALL_RPATH "$ORIGIN" "${CMAKE_INSTALL_RPATH}")
-project(paddle-edl)
+project(paddle_edl)
 
 include(python)
 

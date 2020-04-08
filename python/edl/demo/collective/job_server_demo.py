@@ -22,7 +22,7 @@ add_arg('pod_num_of_node', int, 1, "")
 add_arg('del_pods_one_step', int, 1, "")
 add_arg('add_pods_one_step', int, 1, "")
 add_arg('time_interval_to_change', int, 900, "")
-add_arg('server_port', int, 6070, "")
+add_arg('server_port', int, 8180, "")
 
 random.seed(10)
 

@@ -15,7 +15,7 @@ while true ; do
 done
 
 
-src_dir=../../../example/collective/resnet50
+src_dir=../../../../example/collective/resnet50
 dst_dir=resnet50_pod/${pod_id}
 
 echo "mkdir resnet50_pod/${pod_id}"
