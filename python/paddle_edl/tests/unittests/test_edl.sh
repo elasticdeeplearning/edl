@@ -49,5 +49,9 @@ else
     cat job_server.log
     echo "job_client.log"
     cat job_client.log
+    echo "pod pod 0"
+    cat edl_demo_log/pod_pod_0_0.log
+    echo "pod pod 1"
+    cat edl_demo_log/pod_pod_1_0.log
     exit -1
 fi
