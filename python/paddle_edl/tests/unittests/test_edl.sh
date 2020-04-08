@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+#set -x
 
 echo "python_path:${PYTHONPATH}"
 unset http_proxy https_proxy
@@ -7,6 +7,8 @@ unset http_proxy https_proxy
 # start job_server
 BASEDIR=$(dirname $(readlink -f $0))
 echo "${BASEDIR}"
+
+rm -rf job_server.log job_client.log ./edl_demo_log
 
 nohup python -m paddle_edl.demo.collective.job_server_demo --pod_num_of_node 2 \
     --time_interval_to_change 900 \
@@ -34,7 +36,7 @@ echo "launcher_pid:${job_client_pid}"
 sleep 30s
 
 echo "test request and response"
-str="pod_0_0"
+str="pod_0_0__edl_demo__"
 file=./edl_demo_log/pod_pod_0_0.log
 
 kill ${server_pid} ${job_client_pid}
@@ -47,5 +49,9 @@ else
     cat job_server.log
     echo "job_client.log"
     cat job_client.log
+    echo "pod pod 0"
+    cat edl_demo_log/pod_pod_0_0.log
+    echo "pod pod 1"
+    cat edl_demo_log/pod_pod_1_0.log
     exit -1
 fi

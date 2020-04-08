@@ -37,5 +37,3 @@ mkdir -p resnet50_pod
   
  2.2 指定`checkpoint`的目录，用来保存checkpoint
  `export PADDLE_EDL_FLEET_CHECKPOINT_PATH=<your path>`
-
-
