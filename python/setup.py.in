@@ -35,30 +35,31 @@ def find_package(pkgname):
     except DistributionNotFound:
         return False
 
-edl_version = "0.0.1"
+edl_version = "0.0.0"
+if os.getenv("PADDLE_EDL_VERSION"):
+    edl_version=os.getenv("PADDLE_EDL_VERSION")
 max_version, mid_version, min_version = python_version()
 
 REQUIRED_PACKAGES = [
     'six >= 1.10.0', 'protobuf >= 3.1.0', "flask", "pathlib", "paddlepaddle-gpu"
 ]
 
-packages=['edl', 
-          'edl.collective', 
-          'edl.demo', 
-          'edl.demo.collective']
-package_dir={'': '${EDL_BINARY_DIR}/python'}
+packages=['paddle_edl', 
+          'paddle_edl.collective', 
+          'paddle_edl.demo', 
+          'paddle_edl.demo.collective']
 
 setup(
-    name='paddle-edl',
+    name='paddle_edl',
     version=edl_version.replace('-', ''),
     description=
-    ('Paddle Serving Package for saved model with PaddlePaddle'),
+    ('Paddle EDL Package'),
     url='https://github.com/PaddlePaddle/edl',
     author='PaddlePaddle Author',
     author_email='guru4elephant@gmail.com',
     install_requires=REQUIRED_PACKAGES,
     packages=packages,
-    package_dir=package_dir,
+    python_requires='>=2.7',
     # PyPI package information.
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -79,4 +80,4 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
     license='Apache 2.0',
-    keywords=('paddle-edl deployment industrial easy-to-use'))
+    keywords=('paddle_edl deployment industrial easy-to-use'))

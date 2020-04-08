@@ -10,4 +10,4 @@ cd ${build_dir}
 
 cmake ..
 make clean && make -j
-ctest -V -R test_*
+ctest -V -R *

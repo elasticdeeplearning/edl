@@ -10,6 +10,6 @@ echo "${BASEDIR}"
 
 nohup python -u ${BASEDIR}/job_server_demo.py \
     --node_ips ${node_ips} \
-    --pod_num_of_node 2 \
+    --pod_num_of_node 8 \
     --time_interval_to_change 900 \
     --gpu_num_of_node 8 > job_server.log 2>&1 &

@@ -113,7 +113,7 @@ class HttpServer(object):
         current_env["PYTHONUNBUFFERED"] = "1"
 
         self._cmd = [
-            sys.executable, "-m", "paddle.distributed.http_store",
+            sys.executable, "-m", "paddle_edl.collective.http_store",
             "--host={}".format(host), "--port={}".format(port)
         ]
         logger.info("start http store:{}".format(self._cmd))

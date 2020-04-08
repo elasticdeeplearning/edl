@@ -4,3 +4,6 @@ vendor/
 .vscode/
 *.pyc
 build/
+*.log
+resnet50_pod/
+.*.swp

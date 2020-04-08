@@ -9,7 +9,7 @@ import time
 import argparse
 import copy
 import functools
-import edl.collective.utils as utils
+import paddle_edl.collective.utils as utils
 
 parser = argparse.ArgumentParser(description=__doc__)
 add_arg = functools.partial(utils.add_arguments, argparser=parser)
@@ -22,7 +22,7 @@ add_arg('pod_num_of_node', int, 1, "")
 add_arg('del_pods_one_step', int, 1, "")
 add_arg('add_pods_one_step', int, 1, "")
 add_arg('time_interval_to_change', int, 900, "")
-add_arg('server_port', int, 6070, "")
+add_arg('server_port', int, 8180, "")
 
 random.seed(10)
 
