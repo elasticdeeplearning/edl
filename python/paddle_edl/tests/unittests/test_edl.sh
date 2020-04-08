@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+#set -x
 
 echo "python_path:${PYTHONPATH}"
 unset http_proxy https_proxy
@@ -36,7 +36,7 @@ echo "launcher_pid:${job_client_pid}"
 sleep 30s
 
 echo "test request and response"
-str="pod_0_0"
+str="pod_0_0__edl_demo__"
 file=./edl_demo_log/pod_pod_0_0.log
 
 kill ${server_pid} ${job_client_pid}
