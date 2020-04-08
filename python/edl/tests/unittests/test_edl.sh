@@ -8,6 +8,8 @@ unset http_proxy https_proxy
 BASEDIR=$(dirname $(readlink -f $0))
 echo "${BASEDIR}"
 
+rm -rf job_server.log job_client.log ./edl_demo_log
+
 nohup python -m paddle_edl.demo.collective.job_server_demo --pod_num_of_node 2 \
     --time_interval_to_change 900 \
     --gpu_num_of_node 2 \
