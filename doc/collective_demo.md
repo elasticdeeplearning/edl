@@ -11,7 +11,7 @@ git clone https://github.com/PaddlePaddle/edl
 cd edl
 mkdir build & cd build
 cmake ..
-pip install ./python/dist/paddle_edl-0.0.0-cp27-cp27mu-linux_x86_64.whl
+pip install ./python/dist/paddle_edl-0.0.0-py2-none-any.whl
 ```
 
 2. Install EDL using `pip install paddle_edl`.  
