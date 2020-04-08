@@ -21,7 +21,7 @@ pip install ./python/dist/paddle_edl-0.0.0-cp27-cp27mu-linux_x86_64.whl
 
 ```
 git clone https://github.com/PaddlePaddle/edl
-cd python/edl/demo/collective
+cd python/paddle_edl/demo/collective
 ./start_job_server.sh
 ```
 2. 我们需要在(各个)节点上启动一个JobClient的demo，用来管理训练的Pod进程。  
@@ -32,8 +32,8 @@ mkdir -p resnet50_pod
 ```
 
 `resnet50`目录下有一个`package.sh`是用来打包训练脚本和数据的，这里说明一下：  
- 2.1 指定ImageNet的数据目录路径
-  `export PADDLE_EDL_IMAGENET_PATH=<your path>`
+ 2.1 指定ImageNet的数据目录路径  
+  `export PADDLE_EDL_IMAGENET_PATH=<your path>`   
   
- 2.2 指定`checkpoint`的目录，用来保存checkpoint
+ 2.2 指定`checkpoint`的目录，用来保存checkpoint   
  `export PADDLE_EDL_FLEET_CHECKPOINT_PATH=<your path>`
