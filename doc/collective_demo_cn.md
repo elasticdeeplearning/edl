@@ -14,7 +14,7 @@ cmake ..
 pip install ./python/dist/paddle_edl-0.0.0-cp27-cp27mu-linux_x86_64.whl
 ```
 
-2. 也可以直接使用`pip`安装我们发布的版本`pip install paddle-edl`
+2. 也可以直接使用`pip`安装我们发布的版本`pip install paddle_edl`
 
 # demo搭建步骤：以单节点为例
 1. 我们需要在一个节点上启动JobServer的demo，用来记录训练任务的Pod信息。
