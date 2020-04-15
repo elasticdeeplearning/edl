@@ -21,11 +21,17 @@ from http_store import kv_server
 
 
 class Edlenv(object):
-    def __init__(self):
-        self.running_env = os.getenv("PADDLE_RUNING_ENV", "")
-        self.job_server = os.getenv("PADDLE_JOBSERVER")
-        self.job_id = os.getenv("PADDLE_JOB_ID")
-        self.pod_id = os.getenv("PADDLE_POD_ID")
+    def __init__(self,
+                 running_env=None,
+                 job_server=None,
+                 job_id=None,
+                 pod_id=None):
+        self.running_env = os.getenv(
+            "PADDLE_RUNING_ENV", "") if running_env is None else running_env
+        self.job_server = os.getenv(
+            "PADDLE_JOBSERVER") if job_server is None else job_server
+        self.job_id = os.getenv("PADDLE_JOB_ID") if job_id is None else job_id
+        self.pod_id = os.getenv("PADDLE_POD_ID") if pod_id is None else pod_id
 
     def __str__(self):
         return "runing_env:{} job_server:{} job_id:{} pod_id:{}".format(
@@ -90,7 +96,7 @@ class Edlenv(object):
 
         return self._parse_response_pods(pods), flag
 
-    def get_cluster(self, hdfs):
+    def get_cluster(self, hdfs=None):
         assert self.is_under_edl(), "Edlenv only used under edl environments"
 
         pods, flag = self._get_pods_from_job_server()
@@ -112,7 +118,7 @@ class Edlenv(object):
 def _post_kv(url, scope, key, value):
     kv = {"scope": scope, "key": key, "value": value}
     url = "http://{}/rest/1.0/post/pod".format(url)
-    print("post:", kv)
+    #print("post:", kv)
     try:
         r = requests.get(url, params=kv)
         d = r.json()
