@@ -18,9 +18,13 @@ import "common.proto" package data_server;
 
 message DataRequest { string uid = 1; }
 
+message Data { required Data data = 1; }
+
+message Datas { repeated Data datas = 1; }
+
 message DataResponse {
-  common.RPCRet ret = 1;
-  string data = 2;
+  required common.RPCRet ret = 1;
+  required Datas datas = 2;
 }
 
 service RemoteExecutor {
