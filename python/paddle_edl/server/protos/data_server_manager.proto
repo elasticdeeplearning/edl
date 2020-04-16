@@ -1,0 +1,55 @@
+// Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+import "common.proto" package server_manager;
+
+message DataSource { required string path = 1; }
+
+message TaskDataRequest {
+  required int32 batch_size = 1;
+  required int32 step = 2;
+}
+
+message TaskData {
+  required string uid = 2;
+  repeated bytes datas = 3;
+}
+
+message TaskDataResponse {
+  required common.RPCRet ret = 1;
+  required TaskData task_data = 2;
+}
+
+/*
+message Checkpoint{
+    required string uid = 1;
+    required string path = 2;
+}
+*/
+
+service DataServerManager {
+  // Set new data resource
+  rpc AssignDataResource(DataSource) returns (common.RPCRet) {}
+  // New epoch: go through the whole data again
+  rpc NewEpoch() returns (common.RPCRet) {}
+  // Get a new batch * step data.
+  rpc GetTaskData(TaskDataRequest) returns (TaskDataResponse) {}
+
+  /*
+  rpc SaveCheckpoint(Checkpoint) returns (common.RPCRet) {}
+  rpc RollBack(Checkpoint) returns (common.RPCRet) {}
+  */
+}

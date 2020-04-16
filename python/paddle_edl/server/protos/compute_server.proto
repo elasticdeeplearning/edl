@@ -13,11 +13,20 @@
 // limitations under the License.
 
 syntax = "proto3";
-package server;
 
-message DataRequest {
-  string uid = 1;
-  string data = 2;
+import "common.proto" package compute_server;
+
+message Record { required bytes data = 1; }
+
+message Batch {
+  required int32 batch_size = 2;
+  repeated Record data = 3;
+}
+
+message Task {
+  required string uid = 1;
+  required int32 step_num = 2;
+  repeated Batch data = 3;
 }
 
 message DataResponse {
@@ -25,6 +34,7 @@ message DataResponse {
   int32 user_num = 2;
 }
 
-service RemoteExecutor {
-  rpc SendData(DataRequest) returns (DataResponse) {}
+message Checkpoint {
+  required string uid = 1;
+  required string path = 2;
 }

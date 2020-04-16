@@ -13,14 +13,14 @@
 // limitations under the License.
 
 syntax = "proto3";
-package server;
+
+import "common.proto" package data_server;
 
 message DataRequest { string uid = 1; }
 
 message DataResponse {
-  int32 err_code = 1;
-  int32 err_info = 2;
-  string data = 3;
+  common.RPCRet ret = 1;
+  string data = 2;
 }
 
 service RemoteExecutor {
