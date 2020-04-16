@@ -14,23 +14,24 @@
 
 syntax = "proto3";
 
-import "common.proto" package server_manager;
+import "common.proto";
+package data_server_manager;
 
 message DataSource { required string path = 1; }
 
-message TaskDataRequest {
+message MetaDataRequest {
   required int32 batch_size = 1;
   required int32 step = 2;
 }
 
-message TaskData {
-  required string uid = 2;
-  repeated bytes datas = 3;
+message MetaDataResult {
+  DataServer data_server = 1;          //  the location of data
+  repeated FileRecordMeta records = 2; // records of files
 }
 
-message TaskDataResponse {
+message MetaDataResponse {
   required common.RPCRet ret = 1;
-  required TaskData task_data = 2;
+  repeated MetaDataResult meta = 1;
 }
 
 /*
@@ -46,7 +47,7 @@ service DataServerManager {
   // New epoch: go through the whole data again
   rpc NewEpoch() returns (common.RPCRet) {}
   // Get a new batch * step data.
-  rpc GetTaskData(TaskDataRequest) returns (TaskDataResponse) {}
+  rpc GetMetaData(MetaDataRequest) returns (MetaDataResponse) {}
 
   /*
   rpc SaveCheckpoint(Checkpoint) returns (common.RPCRet) {}

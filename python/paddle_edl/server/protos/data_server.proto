@@ -14,7 +14,8 @@
 
 syntax = "proto3";
 
-import "common.proto" package data_server;
+import "common.proto";
+package data_server;
 
 /*
 message DataRequest {
@@ -50,5 +51,5 @@ message RecordsResponse {
 }
 
 service DataServer {
-  rpc GetData(RecordsRequest) returns (RecordsResponse) {}
+  rpc GetData(RecordsRequest) returns (TasksDataResponse) {}
 }

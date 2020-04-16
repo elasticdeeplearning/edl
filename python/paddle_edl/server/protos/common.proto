@@ -13,9 +13,44 @@
 // limitations under the License.
 
 syntax = "proto3";
-package common
 
-    message RPCRet {
+package common;
+
+message RPCRet {
   int32 err_code = 1;
   int32 err_info = 2;
 }
+
+message Checkpoint {
+  required string uid = 1;
+  required string path = 2;
+}
+
+message TaskMeta { required string uid = 1; }
+
+message TasksMeta { repeated TaskMeta tasks_meta = 1; }
+
+message TaskStatus {
+  required string uid = 1;
+  required int32 status = 2;
+}
+
+message TaskResult {
+  required TaskStatus status = 1;
+  required bytes data = 2;
+}
+
+message Program { required bytes program = 1; }
+
+message BatchData { repeated bytes records = 1; }
+
+message TasksData {
+  repeated TasksMeta = 1;
+  repeated Batch batchs = 1;
+}
+
+/*
+message TasksResult{
+    repeated TaskResult results = 1;
+}
+*/

@@ -14,27 +14,16 @@
 
 syntax = "proto3";
 
-import "common.proto" package compute_server;
+import "common.proto";
+import "job_server.proto" import "data_server.proto" package compute_server;
 
-message Record { required bytes data = 1; }
+service ComputeServer {
+  rpc DoTasksByMetaData(data_server) returns (comm.RPCRet) {}
+  rpc SetTaskProgramDesc(common.Program) returns (comm.RPCRet) {}
+  // rpc DoTasksByData(TasksData) returns (job_server.TasksResultResponse) {}
 
-message Batch {
-  required int32 batch_size = 2;
-  repeated Record data = 3;
-}
-
-message Task {
-  required string uid = 1;
-  required int32 step_num = 2;
-  repeated Batch data = 3;
-}
-
-message DataResponse {
-  int32 err_code = 1;
-  int32 user_num = 2;
-}
-
-message Checkpoint {
-  required string uid = 1;
-  required string path = 2;
+  /*
+  rpc SaveCheckpoint(Checkpoint) returns (common.RPCRet) {}
+  rpc RollBack(Checkpoint) returns (common.RPCRet) {}
+  */
 }

@@ -13,12 +13,8 @@
 // limitations under the License.
 
 syntax = "proto3";
-package server;
 
-message RPCResponse {
-  int32 err_code = 1;
-  int32 err_info = 2;
-}
+import "common.proto" package job_server;
 
 message Trainer {}
 
@@ -36,37 +32,42 @@ message ClusterResponse {
 
 message ClusterRequest { required string job_id = 1; }
 
-message TaskRequest {
+message TasksRequest {
   required int32 batch_size = 1;
-  required int32 step = 2;
+  enum TaskMode {
+    step_limit = 1;
+    time_limit = 2;
+  }
+  required TaskMode mode = 1;
+  required int32 step_limit = 2;
+  required int32 time_limit = 3;
 }
 
-message Task { required string uid = 1; }
-
-message TaskResponse {
+message TasksResponse {
   common.RPCRet ret = 1;
-  required Task task = 2;
+  TasksMeta tasks_meta = 2;
 }
 
-message TaskStatus {
-  required string uid = 1;
-  required int32 status = 2;
-}
-
-message TaskStatusResponse {
+message TasksStatusResponse {
   required common.RPCRet ret = 1;
-  required TaskStatus task_status = 2;
+  repeated TaskStatus tasks_status = 2;
+}
+
+message TasksResultResponse {
+  required common.RPCRet ret = 1;
+  repeated TaskResult results = 2;
 }
 
 service Master {
   rpc GetCluster(ClusterRequest) returns (ClusterResponse) {}
 
-  rpc DistributeTask(TaskRequest) returns (TaskResponse) {}
-  rpc ReportTaskStatus(TaskStatus) returns (common.RPCRet) {}
-  rpc GetTaskStatus(Task) returns (TaskStatusResponse) {}
-  rpc GetTaskResult(Task) returns (TaskResultResponse) {}
+  rpc DistributeTask(TasksRequest) returns (TasksResponse) {}
+  rpc ReportTaskStatus(TasksStatus) returns (common.RPCRet) {}
+  rpc GetTasksStatus(TasksMeta) returns (TasksStatusResponse) {}
+  rpc GetTasksResult(TasksMeta) returns (TasksResultResponse) {}
 
   /*
+  rpc DistributeAutoTask(AutoTaskRequest) returns (AutoTaskResponse) {}
   rpc SaveCheckpoint() returns () {}
   rpc LoadCheckpoint() returns () {}
   */
