@@ -1,0 +1,73 @@
+// Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+package server;
+
+message RPCResponse {
+  int32 err_code = 1;
+  int32 err_info = 2;
+}
+
+message Trainer {}
+
+message POD { repeated Trainer trainers = 1; }
+
+message Cluster {
+  required string job_flag = 1;
+  repeated POD pods = 2;
+}
+
+message ClusterResponse {
+  required common.RPCRet ret = 1;
+  required Cluster cluster = 2;
+}
+
+message ClusterRequest { required string job_id = 1; }
+
+message TaskRequest {
+  required int32 batch_size = 1;
+  required int32 step = 2;
+}
+
+message Task { required string uid = 1; }
+
+message TaskResponse {
+  common.RPCRet ret = 1;
+  required Task task = 2;
+}
+
+message TaskStatus {
+  required string uid = 1;
+  required int32 status = 2;
+}
+
+message TaskStatusResponse {
+  required common.RPCRet ret = 1;
+  required TaskStatus task_status = 2;
+}
+
+service Master {
+  rpc GetCluster(ClusterRequest) returns (ClusterResponse) {}
+
+  rpc DistributeTask(TaskRequest) returns (TaskResponse) {}
+  rpc ReportTaskStatus(TaskStatus) returns (common.RPCRet) {}
+  rpc GetTaskStatus(Task) returns (TaskStatusResponse) {}
+  rpc GetTaskResult(Task) returns (TaskResultResponse) {}
+
+  /*
+  rpc SaveCheckpoint() returns () {}
+  rpc LoadCheckpoint() returns () {}
+  */
+}
