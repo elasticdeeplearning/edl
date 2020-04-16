@@ -16,17 +16,39 @@ syntax = "proto3";
 
 import "common.proto" package data_server;
 
-message DataRequest { string uid = 1; }
+/*
+message DataRequest {
+    required string path = 1;
+    repeated int64  record_no = 2;
+}
+*/
 
-message Data { required Data data = 1; }
-
-message Datas { repeated Data datas = 1; }
-
-message DataResponse {
-  required common.RPCRet ret = 1;
-  required Datas datas = 2;
+message RecordData {
+  required int64 record_no = 1;
+  required bytes data = 2;
 }
 
-service RemoteExecutor {
-  rpc GetData(DataRequest) returns (DataResponse) {}
+message FileRecords {
+  required string file_path = 1;
+  repeated RecordData records = 2;
+}
+
+message Records { repeated FileRecords records = 1; }
+
+message RecordMeta { required int64 record_no = 2; }
+
+message FileRecordMeta {
+  required string file_path = 1;
+  repeated RecordMeta metas = 1;
+}
+
+message RecordsRequest { repeated FileRecordMeta metas = 1; }
+
+message RecordsResponse {
+  required common.RPCRet ret = 1;
+  required Records records = 2;
+}
+
+service DataServer {
+  rpc GetData(RecordsRequest) returns (RecordsResponse) {}
 }
