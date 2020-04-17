@@ -34,10 +34,6 @@ class ComputeServerStub(object):
             request_serializer=compute__server__pb2.FilesMetaRequest.
             SerializeToString,
             response_deserializer=common__pb2.RPCRet.FromString, )
-        self.SetTaskProgramDesc = channel.unary_unary(
-            '/compute_server.ComputeServer/SetTaskProgramDesc',
-            request_serializer=common__pb2.Program.SerializeToString,
-            response_deserializer=common__pb2.RPCRet.FromString, )
 
 
 class ComputeServerServicer(object):
@@ -51,13 +47,6 @@ class ComputeServerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def SetTaskProgramDesc(self, request, context):
-        # missing associated documentation comment in .proto file
-        pass
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
 
 def add_ComputeServerServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -65,10 +54,6 @@ def add_ComputeServerServicer_to_server(servicer, server):
             servicer.DoTasksByFilesMeta,
             request_deserializer=compute__server__pb2.FilesMetaRequest.
             FromString,
-            response_serializer=common__pb2.RPCRet.SerializeToString, ),
-        'SetTaskProgramDesc': grpc.unary_unary_rpc_method_handler(
-            servicer.SetTaskProgramDesc,
-            request_deserializer=common__pb2.Program.FromString,
             response_serializer=common__pb2.RPCRet.SerializeToString, ),
     }
     generic_handler = grpc.method_handlers_generic_handler(

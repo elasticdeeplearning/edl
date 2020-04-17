@@ -114,6 +114,14 @@ class Edlenv(object):
         pod = cluster.get_pod_by_id(self.pod_id)
         return cluster, pod
 
+    def get_program_desc(self):
+        # get program desc of the train rank
+        cluster, pod = self.get_cluster()
+        if pod == None:
+            return None
+
+        self._job_server_client.get_program_desc()
+
 
 def _post_kv(url, scope, key, value):
     kv = {"scope": scope, "key": key, "value": value}

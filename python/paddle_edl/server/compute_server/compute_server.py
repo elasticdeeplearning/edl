@@ -14,56 +14,71 @@
 
 from __future__ import print_function
 from concurrent import futures
-import remote_executor_pb2
-import remote_executor_pb2_grpc
+import compute_server_pb2
+import compute_server_pb2_grpc
 import grpc
 import sys
 from utils.logger import logging
 import queue
 
 
-class RemoteExecutorServicer(object):
+class ComputeServicer(object):
     def __init__(self, data_queue):
         self._data_queue = data_queue
         pass
 
-    def SendData(self, request, context):
-        ret = remote_executor_pb2.DataResponse()
+    def DoTasksByFilesMeta(self, request, context):
+        ret = common_pb2.RPCRet()
         ret.err_code = 0
+        ret.err_info = ""
 
         self._data_queue.push(request)
         return ret
 
 
-class RemoteExecutorServer(object):
+class ComputeServer(object):
     def __init__(self):
         self._data_queue = queue.Queue()
         self._paddle = None
-        pass
+        self._server = None
 
-    def start(self, endpoint, max_workers=1000, concurrency=100):
+    def init(self):
+        # get program desc from job_server
+        try:
+            edl_env = Edlenv()
+            program_desc = edl_env.get_program_desc()
+            self._paddle.init(program_desc)
+        except e:
+            print("ComputeServer init error:{}".format(e))
+            sys.exit(-1)
+
+    def start(self, endpoint, max_workers=10, concurrency=10):
+        # start sever
         server = grpc.server(
             futures.ThreadPoolExecutor(max_workers=max_workers),
             options=[('grpc.max_send_message_length', 1024 * 1024 * 1024),
                      ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
             maximum_concurrent_rpcs=concurrency)
-        data_server_pb2_grpc.add_DataServerServicer_to_server(
+        compute_server_pb2_grpc.add_ComputeServerServicer_to_server(
             RemoteExecutorServicer(self._data_queue), server)
         server.add_insecure_port('[::]:{}'.format(endpoint))
         server.start()
-        server.wait_for_termination()
+        self._server = server
 
     def run(self):
+        # wait meta data to get real data.
         while True:
-            data = self._data_queue.get()
-            if data is None:
+            request = self._data_queue.get()
+            if request is None:
                 logging.Fatal("Get None data from queue")
                 time.sleep(3)
                 continue
-            self._paddle.execute(data)
-        pass
+            self._paddle.execute(request)
+        self._server.wait_for_termination()
 
 
 if __name__ == "__main__":
-    data_server = RemoteExecutorServer()
-    data_server.start(endpoint=sys.argv[1])
+    server = ComputeServer()
+    server.init()
+    server.start(endpoint=sys.argv[1])
+    server.Run()

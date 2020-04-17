@@ -17,7 +17,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
     package='compute_server',
     syntax='proto3',
     serialized_options=None,
-    serialized_pb=b'\n\x14\x63ompute_server.proto\x12\x0e\x63ompute_server\x1a\x0c\x63ommon.proto\"N\n\x10\x46ilesMetaRequest\x12\x13\n\x0b\x64\x61ta_reader\x18\x01 \x01(\t\x12%\n\nfiles_meta\x18\x02 \x01(\x0b\x32\x11.common.FilesMeta2\x92\x01\n\rComputeServer\x12H\n\x12\x44oTasksByFilesMeta\x12 .compute_server.FilesMetaRequest\x1a\x0e.common.RPCRet\"\x00\x12\x37\n\x12SetTaskProgramDesc\x12\x0f.common.Program\x1a\x0e.common.RPCRet\"\x00\x62\x06proto3',
+    serialized_pb=b'\n\x14\x63ompute_server.proto\x12\x0e\x63ompute_server\x1a\x0c\x63ommon.proto\"S\n\x10\x46ilesMetaRequest\x12\x18\n\x10\x64\x61ta_reader_addr\x18\x01 \x01(\t\x12%\n\nfiles_meta\x18\x02 \x01(\x0b\x32\x11.common.FilesMeta2Y\n\rComputeServer\x12H\n\x12\x44oTasksByFilesMeta\x12 .compute_server.FilesMetaRequest\x1a\x0e.common.RPCRet\"\x00\x62\x06proto3',
     dependencies=[common__pb2.DESCRIPTOR, ])
 
 _FILESMETAREQUEST = _descriptor.Descriptor(
@@ -28,8 +28,8 @@ _FILESMETAREQUEST = _descriptor.Descriptor(
     containing_type=None,
     fields=[
         _descriptor.FieldDescriptor(
-            name='data_reader',
-            full_name='compute_server.FilesMetaRequest.data_reader',
+            name='data_reader_addr',
+            full_name='compute_server.FilesMetaRequest.data_reader_addr',
             index=0,
             number=1,
             type=9,
@@ -71,7 +71,7 @@ _FILESMETAREQUEST = _descriptor.Descriptor(
     extension_ranges=[],
     oneofs=[],
     serialized_start=54,
-    serialized_end=132, )
+    serialized_end=137, )
 
 _FILESMETAREQUEST.fields_by_name[
     'files_meta'].message_type = common__pb2._FILESMETA
@@ -94,8 +94,8 @@ _COMPUTESERVER = _descriptor.ServiceDescriptor(
     file=DESCRIPTOR,
     index=0,
     serialized_options=None,
-    serialized_start=135,
-    serialized_end=281,
+    serialized_start=139,
+    serialized_end=228,
     methods=[
         _descriptor.MethodDescriptor(
             name='DoTasksByFilesMeta',
@@ -103,14 +103,6 @@ _COMPUTESERVER = _descriptor.ServiceDescriptor(
             index=0,
             containing_service=None,
             input_type=_FILESMETAREQUEST,
-            output_type=common__pb2._RPCRET,
-            serialized_options=None, ),
-        _descriptor.MethodDescriptor(
-            name='SetTaskProgramDesc',
-            full_name='compute_server.ComputeServer.SetTaskProgramDesc',
-            index=1,
-            containing_service=None,
-            input_type=common__pb2._PROGRAM,
             output_type=common__pb2._RPCRET,
             serialized_options=None, ),
     ])

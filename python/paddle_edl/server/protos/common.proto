@@ -44,10 +44,22 @@ message TaskResult {
   bytes data = 2;
 }
 
+// TODO(gongwb): add all of them
+message DistStrategy { int32 nccl_comm_num = 1; }
+
 message Program {
   string job_id = 1;
   string job_stage = 2;
+
   bytes program = 3;
+  enum Mode {
+    ORIGIN = 0;
+    COMPILE = 1;
+  }
+
+  Mode mode = 4;
+  repeated string reader_var_names = 5;
+  DistStrategy dist_strategy = 6;
 }
 
 message BatchData { repeated bytes records = 1; }

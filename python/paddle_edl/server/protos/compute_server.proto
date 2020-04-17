@@ -19,17 +19,14 @@ import "common.proto";
 package compute_server;
 
 message FilesMetaRequest {
-  string data_reader = 1;
+  string data_reader_addr = 1;
   common.FilesMeta files_meta = 2;
 }
 
 service ComputeServer {
   rpc DoTasksByFilesMeta(FilesMetaRequest) returns (common.RPCRet) {}
-  rpc SetTaskProgramDesc(common.Program) returns (common.RPCRet) {}
+  // rpc SetTaskProgramDesc(common.Program) returns (common.RPCRet) {}
   // rpc DoTasksByData(TasksData) returns (job_server.TasksResultResponse) {}
-
-  /*
-  rpc SaveCheckpoint(Checkpoint) returns (common.RPCRet) {}
-  rpc RollBack(Checkpoint) returns (common.RPCRet) {}
-  */
+  // rpc SaveCheckpoint(Checkpoint) returns (common.RPCRet) {}
+  // rpc RollBack(Checkpoint) returns (common.RPCRet) {}
 }
