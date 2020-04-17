@@ -96,28 +96,29 @@ message DataSourceRequest {}
 
 service Master {
   // Cluster env
-  // user_client, compute_server  -> master
+  // user_client, computor  -> master
   rpc GetCluster(ClusterRequest) returns (ClusterResponse) {}
 
   // Tasks
-  // user_client -> Master
-  rpc DistributeTask(TasksRequest) returns (TasksResponse) {}
-  rpc ReportTaskStatus(TasksStatus) returns (common.RPCRet) {}
-  rpc GetTasksStatus(common.TasksMeta) returns (TasksStatusResponse) {}
-  rpc GetTasksResult(common.TasksMeta) returns (TasksResultResponse) {}
+  /* user_client -> Master*/
   rpc SetProgramDesc(common.Program) returns (common.RPCRet) {}
   rpc AssignDataResource(common.DataSource) returns (common.RPCRet) {}
   rpc NewEpoch(EpochRequest) returns (common.RPCRet) {}
-  rpc GetMetaData(MetaDataRequest) returns (MetaDataResponse) {}
+  rpc DistributeTask(TasksRequest) returns (TasksResponse) {}
+  rpc GetTasksStatus(common.TasksMeta) returns (TasksStatusResponse) {}
+  rpc GetTasksResult(common.TasksMeta) returns (TasksResultResponse) {}
+  /* user_client -> Master*/
 
-  // compute_server -> master
+  /* computor -> master */
   rpc GetProgramDesc(ProgramDescRequest) returns (ProgramResponse) {}
+  // rpc GetMetaData(MetaDataRequest) returns (MetaDataResponse) {}
+  // rpc ReportTaskStatus(TasksStatus) returns (common.RPCRet) {}
 
-  // data_reader - > master
+  /* reader - > master */
   rpc GetDataSource(DataSourceRequest) returns (common.DataSource) {}
   rpc ReportFilesMeta(common.FilesMeta) returns (common.RPCRet) {}
 
-  /*
+  /* TODO
   rpc DistributeAutoTask(AutoTaskRequest) returns (AutoTaskResponse) {}
   rpc SaveCheckpoint() returns () {}
   rpc LoadCheckpoint() returns () {}
