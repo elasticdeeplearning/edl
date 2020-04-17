@@ -15,13 +15,17 @@
 syntax = "proto3";
 
 import "common.proto";
-import "job_server.proto";
-import "data_server.proto";
+import "data_reader.proto";
 
 package compute_server;
 
+message FilesMetaRequest {
+  required string data_server = 1;
+  required data_reader.FilesMeta files_meta = 2;
+}
+
 service ComputeServer {
-  rpc DoTasksByMetaData(data_server) returns (comm.RPCRet) {}
+  rpc DoTasksByFilesMeta(FilesMetaRequest) returns (comm.RPCRet) {}
   rpc SetTaskProgramDesc(common.Program) returns (comm.RPCRet) {}
   // rpc DoTasksByData(TasksData) returns (job_server.TasksResultResponse) {}
 

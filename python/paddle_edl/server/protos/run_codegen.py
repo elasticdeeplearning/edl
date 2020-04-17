@@ -35,7 +35,28 @@ protoc.main((
     '-I.',
     '--python_out=.',
     '--grpc_python_out=.',
-    'remote_executor.proto', ))
+    'data_reader.proto', ))
 
-import os
-os.system("mv *.py ../remote_executor/")
+protoc.main((
+    '',
+    '-I.',
+    '--python_out=.',
+    '--grpc_python_out=.',
+    'data_server.proto', ))
+
+protoc.main((
+    '',
+    '-I.',
+    '--python_out=.',
+    '--grpc_python_out=.',
+    'compute_server.proto', ))
+
+protoc.main((
+    '',
+    '-I.',
+    '--python_out=.',
+    '--grpc_python_out=.',
+    'job_server.proto', ))
+
+#import os
+#os.system("mv *.py ../remote_executor/")

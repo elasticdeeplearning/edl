@@ -17,54 +17,40 @@ syntax = "proto3";
 import "common.proto";
 package data_server;
 
+message MetaDataRequest {
+  required int32 batch_size = 1;
+  required int32 step_num = 2;
+}
+
+message MetaDataResult {
+  DataServer data_server = 1;          //  the location of data
+  repeated FileRecordMeta records = 2; // records of files
+}
+
+message MetaDataResponse {
+  required common.RPCRet ret = 1;
+  repeated MetaDataResult meta = 1;
+}
+
 /*
-message DataRequest {
-    required string path = 1;
-    repeated int64  record_no = 2;
+message Checkpoint{
+    required string uid = 1;
+    required string path = 2;
 }
 */
 
-message Record {
-  required int64 record_no = 1;
-  required bytes data = 2;
-}
-
-message File {
-  required string file_path = 1;
-  repeated Record records = 2;
-}
-
-message Files { repeated File files = 1; }
-
-message RecordMeta { required int64 record_no = 1; }
-
-message FileMeta {
-  required string file_path = 1;
-  repeated RecordMeta metas = 2;
-}
-
-message FilesMeta { repeated FileMeta files_meta = 1; }
-
-// message DataRequest { required FilesMeta files_meta = 1; }
-
-message DataResponse {
-  required common.RPCRet ret = 1;
-  required Files files = 2;
-}
-
-message DataSourceStatus {
-  required string path = 1;
-  required int32 status = 1;
-  required string err_info = 2;
-}
-
-message DataSourceStatusResponse { repeated DataSourceStatus = 1; }
-
 service DataServer {
-  // compute_server->GetData
-  rpc GetData(FilesMeta) returns (DataResponse) {}
+  // job_server->data_server
+  rpc AssignDataResource(DataSource) returns (common.RPCRet) {}
+  rpc NewEpoch() returns (common.RPCRet) {}
+  rpc GetMetaData(MetaDataRequest) returns (MetaDataResponse) {}
 
-  // data_server_manager->data_server
-  rpc GetDataSourceStatus(common.DataSource)
-      returns (DataSourceStatusResponse) {}
+  // data_reader - > data_server
+  rpc GetDataSource() returns (common.DataSource) {}
+  rpc ReportFilesMeta(FilesMeta) returns (common.RPCRet) {}
+
+  /*
+  rpc SaveCheckpoint(Checkpoint) returns (common.RPCRet) {}
+  rpc RollBack(Checkpoint) returns (common.RPCRet) {}
+  */
 }
