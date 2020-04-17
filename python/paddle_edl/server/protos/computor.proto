@@ -25,8 +25,14 @@ message FilesMetaRequest {
 
 service ComputeServer {
   rpc DoTasksByFilesMeta(FilesMetaRequest) returns (common.RPCRet) {}
+
+  /* master -> computor */
+  // rpc SaveCheckpoint(Checkpoint) returns (common.RPCRet) {}
+  // rpc LoadCheckpoint(Checkpoint) returns (common.RPCRet) {}
+
+  /* user_client -> computor */
+  // rpc GetTasksStatus(common.TasksMeta) returns (TasksStatusResponse) {}
+  // rpc GetTasksResult(common.TasksMeta) returns (TasksResultResponse) {}
   // rpc SetTaskProgramDesc(common.Program) returns (common.RPCRet) {}
   // rpc DoTasksByData(TasksData) returns (job_server.TasksResultResponse) {}
-  // rpc SaveCheckpoint(Checkpoint) returns (common.RPCRet) {}
-  // rpc RollBack(Checkpoint) returns (common.RPCRet) {}
 }

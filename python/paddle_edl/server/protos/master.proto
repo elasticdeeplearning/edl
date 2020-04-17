@@ -105,8 +105,6 @@ service Master {
   rpc AssignDataResource(common.DataSource) returns (common.RPCRet) {}
   rpc NewEpoch(EpochRequest) returns (common.RPCRet) {}
   rpc DistributeTask(TasksRequest) returns (TasksResponse) {}
-  rpc GetTasksStatus(common.TasksMeta) returns (TasksStatusResponse) {}
-  rpc GetTasksResult(common.TasksMeta) returns (TasksResultResponse) {}
   /* user_client -> Master*/
 
   /* computor -> master */

@@ -52,10 +52,10 @@ message DataSourceStatus {
 message DataSourceStatusResponse { repeated DataSourceStatus status_list = 1; }
 
 service DataServer {
-  // compute_server->GetData
+  // computor-> reader
   rpc GetData(common.FilesMeta) returns (DataResponse) {}
 
-  // data_server->data_reader
+  // master -> reader
   rpc GetDataSourceStatus(common.DataSource)
       returns (DataSourceStatusResponse) {}
 }
