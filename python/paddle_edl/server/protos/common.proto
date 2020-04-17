@@ -6,7 +6,7 @@
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
+// Unless  by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
@@ -24,41 +24,50 @@ message RPCRet {
 message DataSource { repeated string path = 1; }
 
 message Checkpoint {
-  required string job_id = 1;
-  required string job_stage = 2;
-  required string path = 3;
+  string job_id = 1;
+  string job_stage = 2;
+  string path = 3;
 }
 
-message TaskMeta { required string task_id = 1; }
+message TaskMeta { string task_id = 1; }
 
 message TasksMeta { repeated TaskMeta tasks_meta = 1; }
 
 message TaskStatus {
-  required string task_id = 1;
-  required int32 status = 2;
-  reqiured string err_inf = 3;
+  string task_id = 1;
+  int32 status = 2;
+  string err_inf = 3;
 }
 
 message TaskResult {
-  required TaskStatus status = 1;
-  required bytes data = 2;
+  TaskStatus status = 1;
+  bytes data = 2;
 }
 
 message Program {
-  required string job_id = 1;
-  required string job_stage = 2;
-  required bytes program = 3;
+  string job_id = 1;
+  string job_stage = 2;
+  bytes program = 3;
 }
 
 message BatchData { repeated bytes records = 1; }
 
+/*
 message TasksData {
-  repeated TasksMeta = 1;
+  repeated TasksMeta tasks_meta = 1;
   repeated Batch batchs = 1;
 }
 
-/*
 message TasksResult{
     repeated TaskResult results = 1;
 }
 */
+
+message RecordMeta { int64 record_no = 1; }
+
+message FileMeta {
+  string file_path = 1;
+  repeated RecordMeta metas = 2;
+}
+
+message FilesMeta { repeated FileMeta files_meta = 1; }

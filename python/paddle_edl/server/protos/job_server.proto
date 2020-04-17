@@ -6,7 +6,7 @@
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
+// Unless  by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
@@ -14,56 +14,59 @@
 
 syntax = "proto3";
 
-import "common.proto" package job_server;
+import "common.proto";
+package job_server;
 
 message Trainer {}
 
 message POD { repeated Trainer trainers = 1; }
 
 message Cluster {
-  required string job_flag = 1;
+  string job_flag = 1;
   repeated POD pods = 2;
 }
 
 message ClusterResponse {
-  required common.RPCRet ret = 1;
-  required Cluster cluster = 2;
+  common.RPCRet ret = 1;
+  Cluster cluster = 2;
 }
 
-message ClusterRequest { required string job_id = 1; }
+message ClusterRequest { string job_id = 1; }
 
 message TasksRequest {
-  required int32 batch_size = 1;
   enum TaskMode {
-    step_limit = 1;
-    time_limit = 2;
-  }
-  required TaskMode mode = 1;
-  required int32 step_limit = 2;
-  required int32 time_limit = 3;
+    STEP_LIMIT = 0;
+    TIME_LIMIT = 1;
+  };
+  TaskMode mode = 1;
+  int32 batch_size = 2;
+  int32 step_limit = 3;
+  int32 time_limit = 4;
 }
 
 message TasksResponse {
   common.RPCRet ret = 1;
-  TasksMeta tasks_meta = 2;
+  common.TasksMeta tasks_meta = 2;
 }
 
-message TasksStatus { repeated TaskStatus status = 1; }
+message TasksStatus { repeated common.TaskStatus status_list = 1; }
 
 message TasksStatusResponse {
-  required common.RPCRet ret = 1;
-  required TasksStatus task_status = 2;
+  common.RPCRet ret = 1;
+  TasksStatus task_status = 2;
 }
 
 message TasksResultResponse {
-  required common.RPCRet ret = 1;
-  repeated TaskResult results = 2;
+  common.RPCRet ret = 1;
+  repeated common.TaskResult results = 2;
 }
 
 message ProgramResponse {
-  required common.RPCRet ret = 1;
-  required common.Program program = 2;
+  common.RPCRet ret = 1;
+  common.Program program = 2;
 }
+
+message ProgramDescRequest {}
 
 service Master {
   // Cluster env
@@ -74,12 +77,12 @@ service Master {
   // user_client -> Master
   rpc DistributeTask(TasksRequest) returns (TasksResponse) {}
   rpc ReportTaskStatus(TasksStatus) returns (common.RPCRet) {}
-  rpc GetTasksStatus(TasksMeta) returns (TasksStatusResponse) {}
-  rpc GetTasksResult(TasksMeta) returns (TasksResultResponse) {}
-  rpc SetProgramDesc(comm.Program) returns (common.RPCRet) {}
+  rpc GetTasksStatus(common.TasksMeta) returns (TasksStatusResponse) {}
+  rpc GetTasksResult(common.TasksMeta) returns (TasksResultResponse) {}
+  rpc SetProgramDesc(common.Program) returns (common.RPCRet) {}
 
   // compute_server -> master
-  rpc GetProgramDesc() returns (ProgramResponse) {}
+  rpc GetProgramDesc(ProgramDescRequest) returns (ProgramResponse) {}
 
   /*
   rpc DistributeAutoTask(AutoTaskRequest) returns (AutoTaskResponse) {}

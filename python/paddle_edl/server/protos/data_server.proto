@@ -6,7 +6,7 @@
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
+// Unless  by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
@@ -18,36 +18,40 @@ import "common.proto";
 package data_server;
 
 message MetaDataRequest {
-  required int32 batch_size = 1;
-  required int32 step_num = 2;
+  int32 batch_size = 1;
+  int32 step_num = 2;
 }
 
-message MetaDataResult {
-  DataServer data_server = 1;          //  the location of data
-  repeated FileRecordMeta records = 2; // records of files
+message DataReader {
+  string data_reader = 1;    //  the location of data
+  common.FilesMeta meta = 2; // records of files
 }
 
 message MetaDataResponse {
-  required common.RPCRet ret = 1;
-  repeated MetaDataResult meta = 1;
+  common.RPCRet ret = 1;
+  repeated DataReader readers = 2;
 }
 
 /*
 message Checkpoint{
-    required string uid = 1;
-    required string path = 2;
+     string uid = 1;
+     string path = 2;
 }
 */
 
+message EpochRequest { string epoch_no = 1; }
+
+message DataSourceRequest {}
+
 service DataServer {
   // job_server->data_server
-  rpc AssignDataResource(DataSource) returns (common.RPCRet) {}
-  rpc NewEpoch() returns (common.RPCRet) {}
+  rpc AssignDataResource(common.DataSource) returns (common.RPCRet) {}
+  rpc NewEpoch(EpochRequest) returns (common.RPCRet) {}
   rpc GetMetaData(MetaDataRequest) returns (MetaDataResponse) {}
 
   // data_reader - > data_server
-  rpc GetDataSource() returns (common.DataSource) {}
-  rpc ReportFilesMeta(FilesMeta) returns (common.RPCRet) {}
+  rpc GetDataSource(DataSourceRequest) returns (common.DataSource) {}
+  rpc ReportFilesMeta(common.FilesMeta) returns (common.RPCRet) {}
 
   /*
   rpc SaveCheckpoint(Checkpoint) returns (common.RPCRet) {}
