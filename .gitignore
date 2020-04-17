@@ -7,5 +7,9 @@ build/
 *.log
 resnet50_pod/
 .*.swp
-*_pb2_grpc.py
-*_pb2.py
+master_pb2_grpc.py
+master_pb2.py
+reader_pb2_grpc.py
+reader_pb2.py
+computor_pb2.py
+computor_pb2_grpc.py
