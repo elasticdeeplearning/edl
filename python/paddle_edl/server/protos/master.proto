@@ -15,7 +15,7 @@
 syntax = "proto3";
 
 import "common.proto";
-package job_server;
+package master;
 
 message Trainer {}
 
@@ -68,6 +68,32 @@ message ProgramResponse {
 
 message ProgramDescRequest {}
 
+message MetaDataRequest {
+  int32 batch_size = 1;
+  int32 step_num = 2;
+}
+
+message DataReader {
+  string data_reader = 1;    //  the location of data
+  common.FilesMeta meta = 2; // records of files
+}
+
+message MetaDataResponse {
+  common.RPCRet ret = 1;
+  repeated DataReader readers = 2;
+}
+
+/*
+message Checkpoint{
+     string uid = 1;
+     string path = 2;
+}
+*/
+
+message EpochRequest { string epoch_no = 1; }
+
+message DataSourceRequest {}
+
 service Master {
   // Cluster env
   // user_client, compute_server  -> master
@@ -80,9 +106,16 @@ service Master {
   rpc GetTasksStatus(common.TasksMeta) returns (TasksStatusResponse) {}
   rpc GetTasksResult(common.TasksMeta) returns (TasksResultResponse) {}
   rpc SetProgramDesc(common.Program) returns (common.RPCRet) {}
+  rpc AssignDataResource(common.DataSource) returns (common.RPCRet) {}
+  rpc NewEpoch(EpochRequest) returns (common.RPCRet) {}
+  rpc GetMetaData(MetaDataRequest) returns (MetaDataResponse) {}
 
   // compute_server -> master
   rpc GetProgramDesc(ProgramDescRequest) returns (ProgramResponse) {}
+
+  // data_reader - > master
+  rpc GetDataSource(DataSourceRequest) returns (common.DataSource) {}
+  rpc ReportFilesMeta(common.FilesMeta) returns (common.RPCRet) {}
 
   /*
   rpc DistributeAutoTask(AutoTaskRequest) returns (AutoTaskResponse) {}
