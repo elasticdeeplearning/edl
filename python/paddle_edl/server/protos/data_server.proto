@@ -24,32 +24,47 @@ message DataRequest {
 }
 */
 
-message RecordData {
+message Record {
   required int64 record_no = 1;
   required bytes data = 2;
 }
 
-message FileRecords {
+message File {
   required string file_path = 1;
-  repeated RecordData records = 2;
+  repeated Record records = 2;
 }
 
-message Records { repeated FileRecords records = 1; }
+message Files { repeated File files = 1; }
 
-message RecordMeta { required int64 record_no = 2; }
+message RecordMeta { required int64 record_no = 1; }
 
-message FileRecordMeta {
+message FileMeta {
   required string file_path = 1;
-  repeated RecordMeta metas = 1;
+  repeated RecordMeta metas = 2;
 }
 
-message RecordsRequest { repeated FileRecordMeta metas = 1; }
+message FilesMeta { repeated FileMeta files_meta = 1; }
 
-message RecordsResponse {
+// message DataRequest { required FilesMeta files_meta = 1; }
+
+message DataResponse {
   required common.RPCRet ret = 1;
-  required Records records = 2;
+  required Files files = 2;
 }
+
+message DataSourceStatus {
+  required string path = 1;
+  required int32 status = 1;
+  required string err_info = 2;
+}
+
+message DataSourceStatusResponse { repeated DataSourceStatus = 1; }
 
 service DataServer {
-  rpc GetData(RecordsRequest) returns (TasksDataResponse) {}
+  // compute_server->GetData
+  rpc GetData(FilesMeta) returns (DataResponse) {}
+
+  // data_server_manager->data_server
+  rpc GetDataSourceStatus(common.DataSource)
+      returns (DataSourceStatusResponse) {}
 }

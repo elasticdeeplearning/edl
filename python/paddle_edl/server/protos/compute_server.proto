@@ -15,7 +15,10 @@
 syntax = "proto3";
 
 import "common.proto";
-import "job_server.proto" import "data_server.proto" package compute_server;
+import "job_server.proto";
+import "data_server.proto";
+
+package compute_server;
 
 service ComputeServer {
   rpc DoTasksByMetaData(data_server) returns (comm.RPCRet) {}

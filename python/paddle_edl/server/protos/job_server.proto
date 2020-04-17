@@ -48,9 +48,11 @@ message TasksResponse {
   TasksMeta tasks_meta = 2;
 }
 
+message TasksStatus { repeated TaskStatus status = 1; }
+
 message TasksStatusResponse {
   required common.RPCRet ret = 1;
-  repeated TaskStatus tasks_status = 2;
+  required TasksStatus task_status = 2;
 }
 
 message TasksResultResponse {
@@ -58,13 +60,26 @@ message TasksResultResponse {
   repeated TaskResult results = 2;
 }
 
+message ProgramResponse {
+  required common.RPCRet ret = 1;
+  required common.Program program = 2;
+}
+
 service Master {
+  // Cluster env
+  // user_client, compute_server  -> master
   rpc GetCluster(ClusterRequest) returns (ClusterResponse) {}
 
+  // Tasks
+  // user_client -> Master
   rpc DistributeTask(TasksRequest) returns (TasksResponse) {}
   rpc ReportTaskStatus(TasksStatus) returns (common.RPCRet) {}
   rpc GetTasksStatus(TasksMeta) returns (TasksStatusResponse) {}
   rpc GetTasksResult(TasksMeta) returns (TasksResultResponse) {}
+  rpc SetProgramDesc(comm.Program) returns (common.RPCRet) {}
+
+  // compute_server -> master
+  rpc GetProgramDesc() returns (ProgramResponse) {}
 
   /*
   rpc DistributeAutoTask(AutoTaskRequest) returns (AutoTaskResponse) {}

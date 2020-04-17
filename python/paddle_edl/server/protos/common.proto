@@ -21,18 +21,22 @@ message RPCRet {
   int32 err_info = 2;
 }
 
+message DataSource { repeated string path = 1; }
+
 message Checkpoint {
-  required string uid = 1;
-  required string path = 2;
+  required string job_id = 1;
+  required string job_stage = 2;
+  required string path = 3;
 }
 
-message TaskMeta { required string uid = 1; }
+message TaskMeta { required string task_id = 1; }
 
 message TasksMeta { repeated TaskMeta tasks_meta = 1; }
 
 message TaskStatus {
-  required string uid = 1;
+  required string task_id = 1;
   required int32 status = 2;
+  reqiured string err_inf = 3;
 }
 
 message TaskResult {
@@ -40,7 +44,11 @@ message TaskResult {
   required bytes data = 2;
 }
 
-message Program { required bytes program = 1; }
+message Program {
+  required string job_id = 1;
+  required string job_stage = 2;
+  required bytes program = 3;
+}
 
 message BatchData { repeated bytes records = 1; }
 

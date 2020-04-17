@@ -17,11 +17,9 @@ syntax = "proto3";
 import "common.proto";
 package data_server_manager;
 
-message DataSource { required string path = 1; }
-
 message MetaDataRequest {
   required int32 batch_size = 1;
-  required int32 step = 2;
+  required int32 step_num = 2;
 }
 
 message MetaDataResult {
@@ -42,12 +40,14 @@ message Checkpoint{
 */
 
 service DataServerManager {
-  // Set new data resource
+  // job_server->data_server_manager
   rpc AssignDataResource(DataSource) returns (common.RPCRet) {}
-  // New epoch: go through the whole data again
   rpc NewEpoch() returns (common.RPCRet) {}
-  // Get a new batch * step data.
   rpc GetMetaData(MetaDataRequest) returns (MetaDataResponse) {}
+
+  // data_server - > data_server_manager
+  rpc GetDataSource() returns (common.DataSource) {}
+  rpc ReportFilesMeta(FilesMeta) returns (common.RPCRet) {}
 
   /*
   rpc SaveCheckpoint(Checkpoint) returns (common.RPCRet) {}
