@@ -101,14 +101,13 @@ service Master {
 
   // Tasks
   /* user_client -> Master*/
-  rpc SetProgramDesc(common.Program) returns (common.RPCRet) {}
+  // rpc SetProgramDesc(common.Program) returns (common.RPCRet) {}
   rpc AssignDataResource(common.DataSource) returns (common.RPCRet) {}
   rpc NewEpoch(EpochRequest) returns (common.RPCRet) {}
   rpc DistributeTask(TasksRequest) returns (TasksResponse) {}
-  /* user_client -> Master*/
 
   /* computor -> master */
-  rpc GetProgramDesc(ProgramDescRequest) returns (ProgramResponse) {}
+  // rpc GetProgramDesc(ProgramDescRequest) returns (ProgramResponse) {}
   // rpc GetMetaData(MetaDataRequest) returns (MetaDataResponse) {}
   // rpc ReportTaskStatus(TasksStatus) returns (common.RPCRet) {}
 
