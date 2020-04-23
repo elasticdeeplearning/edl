@@ -85,7 +85,7 @@ class TestEtcd(unittest.TestCase):
 
         print("events len:", len(events))
         assert len(events) == 1
-        assert EtcdClient.get_server_name_from_all_path(
+        assert EtcdClient.get_server_name_from_full_path(
             events[0].key, "job_2") == '127.0.0.1:1'
         assert events[0].value == 'first'
 

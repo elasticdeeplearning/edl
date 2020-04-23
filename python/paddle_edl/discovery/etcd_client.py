@@ -74,7 +74,7 @@ class EtcdClient(object):
         d = '/service/{}/nodes/'.format(service_name)
         for value, meta in self._etcd.get_prefix(d):
             servers.append([
-                self.get_server_name_from_all_path(meta.key, service_name),
+                self.get_server_name_from_full_path(meta.key, service_name),
                 value
             ])
         return servers
@@ -131,6 +131,6 @@ class EtcdClient(object):
         return
 
     @staticmethod
-    def get_server_name_from_all_path(path, service_name):
+    def get_server_name_from_full_path(path, service_name):
         d = '/service/{}/nodes/'.format(service_name)
         return path[len(d):]
