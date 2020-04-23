@@ -1,6 +1,12 @@
-# PaddlePaddle EDL: Elastic Deep Learning
+# EDL: Elastic Deep Learning
 
-<img src="logo/edl.png" width="500">
+<img src="https://github.com/elasticdeeplearning/artwork/blob/master/horizontal/color/edl-horizontal-color.png" width="500" style="display:inline;vertical-align:middle;padding:2%">
+
+EDL is an Elastic Deep Learning framework designed to help deep learning cloud service providers to build cluster cloud services using deep learning frameworks such as PaddlePaddle and TensorFlow. EDL includes a Kubernetes controller, PaddlePaddle auto-scaler, which changes the number of processes of distributed jobs to the idle hardware resource in the cluster, and a new fault-tolerable architecture.
+
+EDL is an incubation-stage project of the [LF AI Foundation](https://lfai.foundation).
+
+<img src="https://github.com/lfai/artwork/blob/master/lfai-project-badge/incubation/color/lfai-projectlogos_incubation-color.png"  width="200" style="display:inline;vertical-align:middle;padding:2%">
 
 While many hardware and software manufacturers are working on
 improving the running time of deep learning jobs, EDL optimizes
