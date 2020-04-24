@@ -46,9 +46,9 @@ of EDL on this cluster is
   -  [Elastic Deep Learning Design Doc:Scheduler](./doc/edl_design_doc.md).
   -  [Run Elastic Deep Learning Demo on a sinle node](./doc/collective_demo.md).
 
-## FAQ
+## TODO
 
-TBD
+update readme pages
 
 ## License
 
