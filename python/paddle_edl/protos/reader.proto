@@ -30,14 +30,17 @@ message Record {
 }
 
 message File {
-  string file_path = 1;
-  repeated Record records = 2;
+  // string endpoint = 1;
+  string idx_in_list = 2;
+  string path = 3;
+  repeated Record records = 4;
 }
 
 message Files { repeated File files = 1; }
 
 // message DataRequest {  FilesMeta files_meta = 1; }
 
+/*
 message DataResponse {
   common.RPCRet ret = 1;
   Files files = 2;
@@ -50,12 +53,13 @@ message DataSourceStatus {
 }
 
 message DataSourceStatusResponse { repeated DataSourceStatus status_list = 1; }
+*/
 
-service DataServer {
-  // computor-> reader
+service DistributedDataSet {
+  // executor -> DataSet
   rpc GetData(common.FilesMeta) returns (DataResponse) {}
 
   // master -> reader
-  rpc GetDataSourceStatus(common.DataSource)
-      returns (DataSourceStatusResponse) {}
+  // rpc GetDataSourceStatus(common.DataSource)
+  // returns (DataSourceStatusResponse) {}
 }

@@ -103,8 +103,8 @@ service Master {
   /* user_client -> Master*/
   // rpc SetProgramDesc(common.Program) returns (common.RPCRet) {}
   rpc AssignDataResource(common.DataSource) returns (common.RPCRet) {}
-  rpc NewEpoch(EpochRequest) returns (common.RPCRet) {}
-  rpc DistributeTask(TasksRequest) returns (TasksResponse) {}
+  // rpc NewEpoch(EpochRequest) returns (common.RPCRet) {}
+  // rpc DistributeTask(TasksRequest) returns (TasksResponse) {}
 
   /* computor -> master */
   // rpc GetProgramDesc(ProgramDescRequest) returns (ProgramResponse) {}
@@ -112,7 +112,7 @@ service Master {
   // rpc ReportTaskStatus(TasksStatus) returns (common.RPCRet) {}
 
   /* reader - > master */
-  rpc GetDataSource(DataSourceRequest) returns (common.DataSource) {}
+  rpc GetSubDataSet(SubDataSet) returns (common.DataSource) {}
   rpc ReportFilesMeta(common.FilesMeta) returns (common.RPCRet) {}
 
   /* TODO

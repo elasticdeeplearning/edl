@@ -78,8 +78,20 @@ message TasksResult{
 message RecordMeta { int64 record_no = 1; }
 
 message FileMeta {
-  string file_path = 1;
-  repeated RecordMeta metas = 2;
+  string endpoint = 1;
+  string idx_in_list = 2;
+  string file_path = 3;
+  repeated RecordMeta metas = 4;
 }
 
 message FilesMeta { repeated FileMeta files_meta = 1; }
+
+message SubDataSet {
+  string idx_in_list = 2;
+  string file_path = 3;
+}
+
+message SubDataSetResponse {
+  RPCRet ret;
+  SubDataSet
+}
