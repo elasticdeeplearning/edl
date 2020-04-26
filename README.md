@@ -52,4 +52,4 @@ TBD
 
 ## License
 
-PaddlePaddle EDL is provided under the [Apache-2.0 license](LICENSE).
+EDL is provided under the [Apache-2.0 license](LICENSE).
