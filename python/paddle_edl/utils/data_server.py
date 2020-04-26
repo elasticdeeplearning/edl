@@ -22,23 +22,57 @@ import logging
 import threading
 import DistributeReader
 from exception import *
+from dataset import EdlDataSet
 
 
 class DataServerServicer(object):
-    def __init__(self, master):
+    def __init__(self, master, data_set, capcity=1000):
         self._master = master
-        self._metas = Queue()
+        self._sub_data_set = Queue()
+        self._data = {}
+        self._data_queue = Queue(capcity)
+        self._lock = threading.Lock
 
-    def _get_data_set(self):
+        assert isinstance(data_set, EdlDataSet)
+
+    def _get_sub_dataset(self):
         pass
 
-    def GetData(self, request, context):
-        if self._metas.empty():
+    def _read_data(self):
+        if self._sub_data_set.empty():
             try:
-                self._get_data_meta(self)
+                sub_data_set = self._get_sub_dataset(self)
+
             except DataSetEndException as e:
                 # return to client epoch reaches end.
                 pass
+
+        while not self._sub_data_set.empty():
+            file_data_set = self._sub_data_set.pop()
+            rec_map = {}
+            for rec in file_data_set.record:
+                rec_map[rec.record_no] = rec.status
+            for rec_no, data in self._data_set.read(file_data_set.file_path):
+                if rec_map[rec_no] == RecordStatus.PROCSSED:
+                    continue
+
+                key = "idx:{}_recno:{}".format(file_data_set.idx_in_list,
+                                               rec_no)
+                self._data_queue.put(1, block=True)
+                with self._lock:
+                    self._data[key] = data
+
+    def GetData(self, request, context):
+        for rec in request.record_no:
+            key = "idx:{}_recno:{}".format(file_data_set.idx_in_list, rec_no)
+            return self._data[key]
+
+    def ClearDataCache(self, request, context):
+        for rec in request.record_no:
+            key = "idx:{}_recno:{}".format(file_data_set.idx_in_list, rec_no)
+            with self._lock():
+                self._data.pop(key)
+            self._data_queue.pop()
 
 
 class DataServer(object):

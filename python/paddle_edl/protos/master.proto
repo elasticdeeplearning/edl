@@ -19,7 +19,11 @@ package master;
 
 message RecordStatus {
   int64 record_no = 1;
-  int32 status = 2;
+  enum Status {
+    INITIAL = 1;
+    PROCESSEDD = 2;
+  };
+  Status status = 2;
 }
 
 message FileDataSet {
