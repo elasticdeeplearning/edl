@@ -7,7 +7,7 @@ matrix:
         - go get -u golang.org/x/lint/golint
         - curl https://glide.sh/get | bash
         - sudo pip install --upgrade pip 
-        - sudo pip install pre-commit pylint --ignore-installed enum34 flask pathlib
+        - sudo pip install pre-commit pylint --ignore-installed enum34 flask pathlib etcd3
       script:
         - rm -f .copyright.hook
         - bash -x .tools/check_style.sh
