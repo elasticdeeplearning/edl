@@ -35,14 +35,15 @@ protoc.main((
     '-I.',
     '--python_out=.',
     '--grpc_python_out=.',
-    'reader.proto', ))
-
+    'data_server.proto', ))
+"""
 protoc.main((
     '',
     '-I.',
     '--python_out=.',
     '--grpc_python_out=.',
     'computor.proto', ))
+"""
 
 protoc.main((
     '',

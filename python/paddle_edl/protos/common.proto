@@ -21,77 +21,18 @@ message RPCRet {
   int32 err_info = 2;
 }
 
-message DataSource { repeated string path = 1; }
+message Trainer {}
 
-message Checkpoint {
-  string job_id = 1;
-  string job_stage = 2;
-  string path = 3;
+message POD { repeated Trainer trainers = 1; }
+
+message Cluster {
+  string job_flag = 1;
+  repeated POD pods = 2;
 }
 
-message TaskMeta { string task_id = 1; }
-
-message TasksMeta { repeated TaskMeta tasks_meta = 1; }
-
-message TaskStatus {
-  string task_id = 1;
-  int32 status = 2;
-  string err_inf = 3;
+message ClusterResponse {
+  common.RPCRet ret = 1;
+  Cluster cluster = 2;
 }
 
-message TaskResult {
-  TaskStatus status = 1;
-  bytes data = 2;
-}
-
-// TODO(gongwb): add all of them
-message DistStrategy { int32 nccl_comm_num = 1; }
-
-message Program {
-  string job_id = 1;
-  string job_stage = 2;
-
-  bytes program = 3;
-  enum Mode {
-    ORIGIN = 0;
-    COMPILE = 1;
-  }
-
-  Mode mode = 4;
-  repeated string reader_var_names = 5;
-  DistStrategy dist_strategy = 6;
-}
-
-message BatchData { repeated bytes records = 1; }
-
-/*
-message TasksData {
-  repeated TasksMeta tasks_meta = 1;
-  repeated Batch batchs = 1;
-}
-
-message TasksResult{
-    repeated TaskResult results = 1;
-}
-*/
-
-message RecordMeta { int64 record_no = 1; }
-
-message FileMeta {
-  string endpoint = 1;
-  string idx_in_list = 2;
-  string file_path = 3;
-  repeated RecordMeta metas = 4;
-}
-
-message FilesMeta { repeated FileMeta files_meta = 1; }
-
-message SubDataSet {
-  string idx_in_list = 2;
-  string file_path = 3;
-}
-
-message SubDataSetResponse {
-  RPCRet ret;
-  SubDataSet
-}
+message ClusterRequest { string job_id = 1; }

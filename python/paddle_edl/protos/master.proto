@@ -17,107 +17,45 @@ syntax = "proto3";
 import "common.proto";
 package master;
 
-message Trainer {}
-
-message POD { repeated Trainer trainers = 1; }
-
-message Cluster {
-  string job_flag = 1;
-  repeated POD pods = 2;
+message RecordStatus {
+  int64 record_no = 1;
+  int32 status = 2;
 }
 
-message ClusterResponse {
+message DataMeta {
+  string data_server = 1;
+  string idx_in_list = 2;
+  string file_path = 3;
+  int32 file_status = 4;
+  repeated RecordStatus record = 5;
+}
+
+message DataMetaResponse {
   common.RPCRet ret = 1;
-  Cluster cluster = 2;
+  repeated DataMeta metas = 2;
 }
 
-message ClusterRequest { string job_id = 1; }
+message ReportDataMetaRequest { repeated DataMeta metas = 1; }
 
-message TasksRequest {
-  enum TaskMode {
-    STEP_LIMIT = 0;
-    TIME_LIMIT = 1;
-  };
-  TaskMode mode = 1;
-  int32 batch_size = 2;
-  int32 step_limit = 3;
-  int32 time_limit = 4;
-}
+message DataSet { repeated string file_list = 1; }
 
-message TasksResponse {
-  common.RPCRet ret = 1;
-  common.TasksMeta tasks_meta = 2;
-}
+message NewEpochRequest {}
 
-message TasksStatus { repeated common.TaskStatus status_list = 1; }
-
-message TasksStatusResponse {
-  common.RPCRet ret = 1;
-  TasksStatus task_status = 2;
-}
-
-message TasksResultResponse {
-  common.RPCRet ret = 1;
-  repeated common.TaskResult results = 2;
-}
-
-message ProgramResponse {
-  common.RPCRet ret = 1;
-  common.Program program = 2;
-}
-
-message ProgramDescRequest {}
-
-message MetaDataRequest {
-  int32 batch_size = 1;
-  int32 step_num = 2;
-}
-
-message DataReader {
-  string data_reader = 1;    //  the location of data
-  common.FilesMeta meta = 2; // records of files
-}
-
-message MetaDataResponse {
-  common.RPCRet ret = 1;
-  repeated DataReader readers = 2;
-}
-
-/*
-message Checkpoint{
-     string uid = 1;
-     string path = 2;
-}
-*/
-
-message EpochRequest { string epoch_no = 1; }
-
-message DataSourceRequest {}
+message DataMetaRequest {}
 
 service Master {
   // Cluster env
   // user_client, computor  -> master
-  rpc GetCluster(ClusterRequest) returns (ClusterResponse) {}
+  rpc GetCluster(common.ClusterRequest) returns (common.ClusterResponse) {}
 
   // Tasks
   /* user_client -> Master*/
-  // rpc SetProgramDesc(common.Program) returns (common.RPCRet) {}
-  rpc AssignDataResource(common.DataSource) returns (common.RPCRet) {}
-  // rpc NewEpoch(EpochRequest) returns (common.RPCRet) {}
-  // rpc DistributeTask(TasksRequest) returns (TasksResponse) {}
+  rpc AssignDataResource(DataSet) returns (common.RPCRet) {}
+  rpc NewEpoch(NewEpochRequest) returns (common.RPCRet) {}
 
-  /* computor -> master */
-  // rpc GetProgramDesc(ProgramDescRequest) returns (ProgramResponse) {}
-  // rpc GetMetaData(MetaDataRequest) returns (MetaDataResponse) {}
-  // rpc ReportTaskStatus(TasksStatus) returns (common.RPCRet) {}
+  /* data_server - > master */
+  rpc GetDataMeta(DataMetaRequest) returns (DataMetaResponse) {}
 
-  /* reader - > master */
-  rpc GetSubDataSet(SubDataSet) returns (common.DataSource) {}
-  rpc ReportFilesMeta(common.FilesMeta) returns (common.RPCRet) {}
-
-  /* TODO
-  rpc DistributeAutoTask(AutoTaskRequest) returns (AutoTaskResponse) {}
-  rpc SaveCheckpoint() returns () {}
-  rpc LoadCheckpoint() returns () {}
-  */
+  /* executor -> master */
+  rpc ReportDataMeta(ReportDataMetaRequest) returns (common.RPCRet) {}
 }
