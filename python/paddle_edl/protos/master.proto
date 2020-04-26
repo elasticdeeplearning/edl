@@ -22,7 +22,7 @@ message RecordStatus {
   int32 status = 2;
 }
 
-message DataMeta {
+message FileDataSet {
   string data_server = 1;
   string idx_in_list = 2;
   string file_path = 3;
@@ -30,18 +30,18 @@ message DataMeta {
   repeated RecordStatus record = 5;
 }
 
-message DataMetaResponse {
+message SubDataSet {
   common.RPCRet ret = 1;
-  repeated DataMeta metas = 2;
+  repeated FileDataSet files = 2;
 }
 
-message ReportDataMetaRequest { repeated DataMeta metas = 1; }
+message ReportSubDataSetRequest { repeated FileDataSet files = 1; }
 
 message DataSet { repeated string file_list = 1; }
 
 message NewEpochRequest {}
 
-message DataMetaRequest {}
+message SubDataSetRequest {}
 
 service Master {
   // Cluster env
@@ -54,8 +54,8 @@ service Master {
   rpc NewEpoch(NewEpochRequest) returns (common.RPCRet) {}
 
   /* data_server - > master */
-  rpc GetDataMeta(DataMetaRequest) returns (DataMetaResponse) {}
+  rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSetResponse) {}
 
   /* executor -> master */
-  rpc ReportDataMeta(ReportDataMetaRequest) returns (common.RPCRet) {}
+  rpc ReportSubDataSetStatus(ReportSubDataSetRequest) returns (common.RPCRet) {}
 }
