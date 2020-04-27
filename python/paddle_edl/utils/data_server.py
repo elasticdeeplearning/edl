@@ -48,7 +48,7 @@ class DataServerServicer(object):
         if self.master:
             channel = grpc.insecure_channel(self.master)
             stub = data_server_pb2_grpc.MasterStub(channel)
-            request = data_server_pb2.SubDataSetRequest()
+            request = master_pb2.SubDataSetRequest()
             response = stub.GetSubDataSet(request)
             for file_data_set in response.files:
                 self._sub_data_set.put(file_data_set)

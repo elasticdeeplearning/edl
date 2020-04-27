@@ -23,7 +23,7 @@ message Record {
 }
 
 message File {
-  string idx_in_list = 1;
+  int64 idx_in_list = 1;
   string path = 2;
   repeated Record records = 3;
 }
@@ -37,12 +37,12 @@ message Files { repeated File files = 1; }
 
 message RecordError {
   int64 record_no = 1;
-  int32 status = 2;
+  DataStatus status = 2;
 }
 message FileError {
-  string idx_in_list = 1;
+  int64 idx_in_list = 1;
   string path = 2;
-  int32 status = 3;
+  DataStatus status = 3;
   repeated RecordError errors = 4;
 }
 
@@ -53,18 +53,27 @@ message DataResponse {
   Files files = 2;
 }
 
+/*
+message RecordRange{
+    int64 begin=1;
+    // -1: means all
+    int64 end = 2;
+}
+*/
+
 message DataMeta {
-  string data_server = 1;
-  string idx_in_list = 2;
-  string file_path = 3;
-  int32 file_status = 4;
-  repeated int64 record_no = 5;
+  // string data_server = 1;
+  int64 idx_in_list = 1;
+  string file_path = 2;
+  // int32 file_status = 4;
+  // repeated RecordRange record_range = 5;
+  repeated int64 record_no = 3;
 }
 
-message DataMetaRequest { repeated DataMeta metas = 1; }
+message DataRequest { repeated DataMeta metas = 1; }
 
 service DataServer {
   // loader -> DataSet
-  rpc GetData(DataMetaRequest) returns (DataResponse) {}
-  rpc ClearDataCache(DataMetaRequest) returns (common.RPCRet) {}
+  rpc GetData(DataRequest) returns (DataResponse) {}
+  rpc ClearDataCache(DataRequest) returns (common.RPCRet) {}
 }

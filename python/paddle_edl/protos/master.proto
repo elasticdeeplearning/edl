@@ -17,21 +17,22 @@ syntax = "proto3";
 import "common.proto";
 package master;
 
-enum PROCStatus {
+enum ProcStatus {
   INITIAL = 0;
-  PROCESSEDD = 1;
+  PART_PROCESSED = 1;
+  PROCESSED = 2;
 };
 
 message RecordStatus {
   int64 record_no = 1;
-  Status status = 2;
+  ProcStatus status = 2;
 }
 
 message FileDataSet {
   string data_server = 1;
-  string idx_in_list = 2;
+  int64 idx_in_list = 2;
   string file_path = 3;
-  PROCStatus file_status = 4;
+  ProcStatus file_status = 4;
   repeated RecordStatus record = 5;
 }
 
@@ -42,7 +43,7 @@ message SubDataSet {
 
 message ReportSubDataSetRequest { repeated FileDataSet files = 1; }
 
-message DataSet { repeated string file_list = 1; }
+message DataSet { string file_list = 1; }
 
 message NewEpochRequest {}
 
