@@ -20,6 +20,7 @@ import master_pb2
 import master_pb2_grpc
 import grpc
 import sys
+import os
 import logging
 from threading import Thread, Lock
 from Queue import Queue
@@ -86,54 +87,63 @@ class DataServerServicer(object):
                     self._data[key][rec_no] = data
 
     def GetData(self, request, context):
-        response = data_server_pb2.DataResponse()
+        return self._get_data(request, context)
 
-        files = data_sever_pb2.Files()
-        files_error = data_server_pb2.FilesError()
+    def _get_data(self, request, context):
+        try:
+            response = data_server_pb2.DataResponse()
 
-        for meta in request.metas:
-            one_file = data_server_pb2.File()
-            one_file.idx_in_list = meta.idx_in_list
-            one_file.file_path = meta.file_path
+            files = data_server_pb2.Files()
+            files_error = data_server_pb2.FilesError()
 
-            file_error = data_server_pb2.FileError()
-            file_error.idx_in_list = meta.idx_in_list
-            file_error.file_path = meta.file_path
-            file_error.status = data_server_pb2.DataStatus.NOT_FOUND
+            for meta in request.metas:
+                one_file = data_server_pb2.File()
+                one_file.idx_in_list = meta.idx_in_list
+                one_file.file_path = meta.file_path
 
-            key = self._get_file_key(meta.idx_in_list, meta.file_path)
-            while self._lock:
-                if key not in self._data:
-                    response.errors.append(file_error)
-                    continue
+                file_error = data_server_pb2.FileError()
+                file_error.idx_in_list = meta.idx_in_list
+                file_error.file_path = meta.file_path
+                file_error.status = data_server_pb2.DataStatus.NOT_FOUND
 
-                record = data_server_pb2.Record()
-                record_error = data_server_pb2.RecordError()
-                record_error.status = data_server_pb2.DataStatus.NOT_FOUND
-
-                for rec_no in meta.record_no:
-                    if rec_no not in self._data[key]:
-                        record_error.rec_no = rec_no
-                        file_error.errors.append(record_error)
+                key = self._get_file_key(meta.idx_in_list, meta.file_path)
+                while self._lock:
+                    if key not in self._data:
                         response.errors.append(file_error)
                         continue
 
-                    data = self._data[key][rec_no]
+                    record = data_server_pb2.Record()
+                    record_error = data_server_pb2.RecordError()
+                    record_error.status = data_server_pb2.DataStatus.NOT_FOUND
 
-                    record.record_no = rec_no
-                    record.data = data
+                    for rec_no in meta.record_no:
+                        if rec_no not in self._data[key]:
+                            record_error.rec_no = rec_no
+                            file_error.errors.append(record_error)
+                            response.errors.append(file_error)
+                            continue
 
-                    one_file.records.append(record)
-                if len(file_error.errors) > 0:
-                    files_error.errors.append(file_error)
-                files.files.append(one_file)
+                        data = self._data[key][rec_no]
 
-            if len(files_error) > 0:
-                response.errors = files_error
-                return response
+                        record.record_no = rec_no
+                        record.data = data
 
-        response.files = files
-        return response
+                        one_file.records.append(record)
+                    if len(file_error.errors) > 0:
+                        files_error.errors.append(file_error)
+                    files.files.append(one_file)
+
+                if len(files_error) > 0:
+                    response.errors = files_error
+                    return response
+
+            response.files = files
+            return response
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, fname, exc_tb.tb_lineno)
+            raise e
 
     def ClearDataCache(self, request, context):
         response = common.RPCRet()

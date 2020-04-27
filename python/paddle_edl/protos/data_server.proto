@@ -24,7 +24,7 @@ message Record {
 
 message File {
   int64 idx_in_list = 1;
-  string path = 2;
+  string file_path = 2;
   repeated Record records = 3;
 }
 
@@ -41,7 +41,7 @@ message RecordError {
 }
 message FileError {
   int64 idx_in_list = 1;
-  string path = 2;
+  string file_path = 2;
   DataStatus status = 3;
   repeated RecordError errors = 4;
 }
