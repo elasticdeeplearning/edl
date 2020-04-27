@@ -13,10 +13,7 @@
 # limitations under the License.
 
 
-class EDLDataSet(object):
-    def __init__(self, file_list):
-        self._file_list = file_list
-
+class EdlDataSet(object):
     def reader(file_path):
         #yield one record
         raise NotImplementedError()

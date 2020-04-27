@@ -17,12 +17,13 @@ syntax = "proto3";
 import "common.proto";
 package master;
 
+enum PROCStatus {
+  INITIAL = 0;
+  PROCESSEDD = 1;
+};
+
 message RecordStatus {
   int64 record_no = 1;
-  enum Status {
-    INITIAL = 0;
-    PROCESSEDD = 1;
-  };
   Status status = 2;
 }
 
@@ -30,7 +31,7 @@ message FileDataSet {
   string data_server = 1;
   string idx_in_list = 2;
   string file_path = 3;
-  int32 file_status = 4;
+  PROCStatus file_status = 4;
   repeated RecordStatus record = 5;
 }
 

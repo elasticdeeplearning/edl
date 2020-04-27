@@ -23,20 +23,21 @@ import sys
 import logging
 from threading import Thread
 import Queue
-import DistributeReader
 from exception import *
 from dataset import EdlDataSet
 
 
 class DataServerServicer(object):
-    def __init__(self, master, data_set, capcity=1000):
+    def __init__(self, master, data_set, file_list=None, capcity=1000):
         self._master = master
+        # master.FileDataSet
         self._sub_data_set = Queue()
         # {file_key:{rec_no: data}}
         self._data = {}
         # to control the cache size.
         self._data_queue = Queue(capcity)
         self._lock = threading.Lock
+        self._file_list = file_list
 
         assert isinstance(data_set, EdlDataSet)
 
@@ -44,12 +45,22 @@ class DataServerServicer(object):
         self._t_read_data = Thread(target=self._read_data)
 
     def _get_sub_dataset(self):
-        channel = grpc.insecure_channel(self.master)
-        stub = data_server_pb2_grpc.MasterStub(channel)
-        request = data_server_pb2.SubDataSetRequest()
-        response = stub.GetSubDataSet(request)
-        for file_data_set in response.files:
-            self._sub_data_set.put(file_data_set)
+        if self.master:
+            channel = grpc.insecure_channel(self.master)
+            stub = data_server_pb2_grpc.MasterStub(channel)
+            request = data_server_pb2.SubDataSetRequest()
+            response = stub.GetSubDataSet(request)
+            for file_data_set in response.files:
+                self._sub_data_set.put(file_data_set)
+            return
+
+        data_server_pb2.Datameta()
+
+        if self._file_list:
+            arr = utils.file_list_to_dataset(self._file_list)
+            for t in arr:
+                self._sub_data_set.put(t)
+            return
 
     def _get_file_key(self, idx, file_path):
         key = "idx:{}_path:{}".format(idx, file_path)
@@ -146,25 +157,35 @@ class DataServerServicer(object):
 
 class DataServer(object):
     def __init__(self):
-        pass
+        self._server = None
 
-    def start(self, max_workers=1000, concurrency=100, endpoint=""):
-        if endpoint == "":
-            logging.error("You should specify endpoint in start function")
-            return
-
+    def start(self,
+              endpoint,
+              master,
+              data_set_reader,
+              cache_capcity=1000,
+              file_list=None,
+              max_workers=100,
+              concurrency=10):
         server = grpc.server(
             futures.ThreadPoolExecutor(max_workers=max_workers),
             options=[('grpc.max_send_message_length', 1024 * 1024 * 1024),
                      ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
             maximum_concurrent_rpcs=concurrency)
         data_server_pb2_grpc.add_DataServerServicer_to_server(
-            DataServerServicer(), server)
+            DataServerServicer(
+                master=master,
+                data_set=data_set,
+                capcity=cache_capcity,
+                file_list=file_list),
+            server)
         server.add_insecure_port('[::]:{}'.format(endpoint))
         server.start()
-        server.wait_for_termination()
 
+        self._server = server
 
-if __name__ == "__main__":
-    data_server = DataServer()
-    data_server.start(endpoint=sys.argv[1])
+    def wait(self):
+        self._server.wait_for_termination()
+
+    def stop(self):
+        self._server.stop()
