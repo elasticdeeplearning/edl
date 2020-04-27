@@ -16,10 +16,13 @@ from __future__ import print_function
 from concurrent import futures
 import data_server_pb2
 import data_server_pb2_grpc
+import master_pb2
+import master_pb2_grpc
 import grpc
 import sys
 import logging
-import threading
+from threading import Thread
+import Queue
 import DistributeReader
 from exception import *
 from dataset import EdlDataSet
@@ -29,26 +32,33 @@ class DataServerServicer(object):
     def __init__(self, master, data_set, capcity=1000):
         self._master = master
         self._sub_data_set = Queue()
+        # {file_key:{rec_no: data}}
         self._data = {}
+        # to control the cache size.
         self._data_queue = Queue(capcity)
         self._lock = threading.Lock
 
         assert isinstance(data_set, EdlDataSet)
 
+        self._t_get_sub_dataset = Thread(target=self._get_sub_dataset)
+        self._t_read_data = Thread(target=self._read_data)
+
     def _get_sub_dataset(self):
-        pass
+        channel = grpc.insecure_channel(self.master)
+        stub = data_server_pb2_grpc.MasterStub(channel)
+        request = data_server_pb2.SubDataSetRequest()
+        response = stub.GetSubDataSet(request)
+        for file_data_set in response.files:
+            self._sub_data_set.put(file_data_set)
+
+    def _get_file_key(self, idx, file_path):
+        key = "idx:{}_path:{}".format(idx, file_path)
+        return key
 
     def _read_data(self):
-        if self._sub_data_set.empty():
-            try:
-                sub_data_set = self._get_sub_dataset(self)
+        while True:
+            file_data_set = self._sub_data_set.get()
 
-            except DataSetEndException as e:
-                # return to client epoch reaches end.
-                pass
-
-        while not self._sub_data_set.empty():
-            file_data_set = self._sub_data_set.pop()
             rec_map = {}
             for rec in file_data_set.record:
                 rec_map[rec.record_no] = rec.status
@@ -56,23 +66,82 @@ class DataServerServicer(object):
                 if rec_map[rec_no] == RecordStatus.PROCSSED:
                     continue
 
-                key = "idx:{}_recno:{}".format(file_data_set.idx_in_list,
-                                               rec_no)
                 self._data_queue.put(1, block=True)
+                key = self._get_file_key(file_data_set.idx_in_list,
+                                         file_data_set.file_path)
                 with self._lock:
-                    self._data[key] = data
+                    if key not in self._data:
+                        self._data[key] = {}
+                    self._data[key][rec_no] = data
 
     def GetData(self, request, context):
-        for rec in request.record_no:
-            key = "idx:{}_recno:{}".format(file_data_set.idx_in_list, rec_no)
-            return self._data[key]
+        response = data_server_pb2.DataResponse()
+
+        files = data_sever_pb2.Files()
+        files_error = data_server_pb2.FilesError()
+
+        for meta in request.metas:
+            one_file = data_server_pb2.File()
+            one_file.idx_in_list = meta.idx_in_list
+            one_file.file_path = meta.file_path
+
+            file_error = data_server_pb2.FileError()
+            file_error.idx_in_list = meta.idx_in_list
+            file_error.file_path = meta.file_path
+            file_error.status = data_server_pb2.DataStatus.NOT_FOUND
+
+            key = self._get_file_key(meta.idx_in_list, meta.file_path)
+            while self._lock:
+                if key not in self._data:
+                    response.errors.append(file_error)
+                    continue
+
+                record = data_server_pb2.Record()
+                record_error = data_server_pb2.RecordError()
+                record_error.status = data_server_pb2.DataStatus.NOT_FOUND
+
+                for rec_no in meta.record_no:
+                    if rec_no not in self._data[key]:
+                        record_error.rec_no = rec_no
+                        file_error.errors.append(record_error)
+                        response.errors.append(file_error)
+                        continue
+
+                    data = self._data[key][rec_no]
+
+                    record.record_no = rec_no
+                    record.data = data
+
+                    one_file.records.append(record)
+                if len(file_error.errors) > 0:
+                    files_error.errors.append(file_error)
+                files.files.append(one_file)
+
+            if len(files_error) > 0:
+                response.errors = files_error
+                return response
+
+        response.files = files
+        return response
 
     def ClearDataCache(self, request, context):
-        for rec in request.record_no:
-            key = "idx:{}_recno:{}".format(file_data_set.idx_in_list, rec_no)
+        response = common.RPCRet()
+        for meta in request.metas:
+            file_key = self._get_file_key(meta.idx_in_list, meta.file_path)
+
             with self._lock():
-                self._data.pop(key)
-            self._data_queue.pop()
+                if file_key not in self._data[key]:
+                    continue
+
+                recs = self._data[key]
+                for rec_no in recs:
+                    if rec_no not in recs:
+                        continue
+
+                    recs.pop(rec_no)
+                    self._data_queue.pop()
+
+        return response
 
 
 class DataServer(object):

@@ -20,8 +20,8 @@ package master;
 message RecordStatus {
   int64 record_no = 1;
   enum Status {
-    INITIAL = 1;
-    PROCESSEDD = 2;
+    INITIAL = 0;
+    PROCESSEDD = 1;
   };
   Status status = 2;
 }
@@ -58,7 +58,7 @@ service Master {
   rpc NewEpoch(NewEpochRequest) returns (common.RPCRet) {}
 
   /* data_server - > master */
-  rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSetResponse) {}
+  rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSet) {}
 
   /* executor -> master */
   rpc ReportSubDataSetStatus(ReportSubDataSetRequest) returns (common.RPCRet) {}

@@ -28,10 +28,28 @@ message File {
   repeated Record records = 3;
 }
 
+enum DataStatus {
+  DATA_OK = 0;
+  NOT_FOUND = 1;
+}
+
 message Files { repeated File files = 1; }
 
+message RecordError {
+  int64 record_no = 1;
+  int32 status = 2;
+}
+message FileError {
+  string idx_in_list = 1;
+  string path = 2;
+  int32 status = 3;
+  repeated RecordError errors = 4;
+}
+
+message FilesError { repeated FileError errors = 1; }
+
 message DataResponse {
-  common.RPCRet ret = 1;
+  FilesError errors = 1;
   Files files = 2;
 }
 
@@ -43,8 +61,10 @@ message DataMeta {
   repeated int64 record_no = 5;
 }
 
+message DataMetaRequest { repeated DataMeta metas = 1; }
+
 service DataServer {
   // loader -> DataSet
-  rpc GetData(DataMeta) returns (DataResponse) {}
-  rpc ClearDataCache(DataMeta) returns (common.RPCRet ret) {}
+  rpc GetData(DataMetaRequest) returns (DataResponse) {}
+  rpc ClearDataCache(DataMetaRequest) returns (common.RPCRet) {}
 }
