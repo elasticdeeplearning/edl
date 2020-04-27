@@ -20,3 +20,16 @@ class EdlDataSet(object):
 
     def preprocess(data):
         raise NotImplementedError()
+
+
+class TxtDataSet(EdlDataSet):
+    def read(txt_file):
+        with open(txt_file, "r") as f:
+            for line in f:
+                line = line.strip()
+                if len(line) <= 0:
+                    continue
+                yield line
+
+    def preprocess(data):
+        pass

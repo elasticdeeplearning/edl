@@ -21,8 +21,8 @@ import master_pb2_grpc
 import grpc
 import sys
 import logging
-from threading import Thread
-import Queue
+from threading import Thread, Lock
+from Queue import Queue
 from exception import *
 from dataset import EdlDataSet
 
@@ -31,12 +31,12 @@ class DataServerServicer(object):
     def __init__(self, master, data_set, file_list=None, capcity=1000):
         self._master = master
         # master.FileDataSet
-        self._sub_data_set = Queue()
+        self._sub_data_set = Queue
         # {file_key:{rec_no: data}}
         self._data = {}
         # to control the cache size.
         self._data_queue = Queue(capcity)
-        self._lock = threading.Lock
+        self._lock = Lock()
         self._file_list = file_list
 
         assert isinstance(data_set, EdlDataSet)
@@ -175,11 +175,11 @@ class DataServer(object):
         data_server_pb2_grpc.add_DataServerServicer_to_server(
             DataServerServicer(
                 master=master,
-                data_set=data_set,
+                data_set=data_set_reader,
                 capcity=cache_capcity,
                 file_list=file_list),
             server)
-        server.add_insecure_port('[::]:{}'.format(endpoint))
+        server.add_insecure_port('{}'.format(endpoint))
         server.start()
 
         self._server = server
