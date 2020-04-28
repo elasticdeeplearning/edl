@@ -89,6 +89,13 @@ class TestEtcd(unittest.TestCase):
             events[0].key, "job_2") == '127.0.0.1:1'
         assert events[0].value == 'first'
 
+    def test_lease(self):
+        self.add()
+        for i in range(20):
+            self.refresh()
+            servers = self.etcd.get_service("job_1")
+            assert len(servers) == 2, "must two servers"
+
 
 if __name__ == '__main__':
     unittest.main()
