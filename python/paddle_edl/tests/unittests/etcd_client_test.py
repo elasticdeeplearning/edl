@@ -38,6 +38,7 @@ class TestEtcd(unittest.TestCase):
 
     def refresh(self):
         self.etcd.refresh("job_1", "127.0.0.1:1")
+        self.etcd.refresh("job_1", "127.0.0.1:2")
 
     def get_service(self):
         servers = self.etcd.get_service("job_1")
