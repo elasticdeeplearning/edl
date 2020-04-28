@@ -38,6 +38,7 @@ class TestEtcd(unittest.TestCase):
 
     def refresh(self):
         self.etcd.refresh("job_1", "127.0.0.1:1")
+        self.etcd.refresh("job_1", "127.0.0.1:2")
 
     def get_service(self):
         servers = self.etcd.get_service("job_1")
@@ -88,6 +89,14 @@ class TestEtcd(unittest.TestCase):
         assert EtcdClient.get_server_name_from_full_path(
             events[0].key, "job_2") == '127.0.0.1:1'
         assert events[0].value == 'first'
+
+    def test_lease(self):
+        self.add()
+        for i in range(20):
+            self.refresh()
+            servers = self.etcd.get_service("job_1")
+            assert len(servers) == 2, "must two servers"
+            time.sleep(2)
 
 
 if __name__ == '__main__':
