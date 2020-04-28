@@ -127,7 +127,8 @@ class EtcdClient(object):
         key = '/service/{}/nodes/{}'.format(service_name, server)
         lease = self._get_lease(key, ttl)
 
-        self._etcd.refresh_lease(lease)
+        for r in self._etcd.refresh_lease(lease.id):
+            pass
         return
 
     @staticmethod

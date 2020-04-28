@@ -10,4 +10,5 @@ cd ${build_dir}
 
 cmake ..
 make clean && make -j
-ctest -V -R *
+pip install paddlepaddle-gpu
+ctest -V -R
