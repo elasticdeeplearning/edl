@@ -16,6 +16,7 @@ from __future__ import print_function
 from concurrent import futures
 import data_server_pb2
 import data_server_pb2_grpc
+import common_pb2
 import master_pb2
 import master_pb2_grpc
 import grpc
@@ -25,12 +26,14 @@ import logging
 from threading import Thread, Lock
 from Queue import Queue
 from exception import *
-from dataset import EdlDataSet
+from dataset import EdlDataSet, TxtDataSet
 import utils
 from utils import *
+import signal
+import threading
 
 
-class DataServerServicer(object):
+class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
     def __init__(self, master, data_set_reader, file_list=None, capcity=1000):
         self._master = master
         # master.FileDataSet
@@ -64,11 +67,11 @@ class DataServerServicer(object):
         if self.master:
             channel = grpc.insecure_channel(self.master)
             stub = data_server_pb2_grpc.MasterStub(channel)
-            request = master_pb2.SubDataSetRequest()
-            response = stub.GetSubDataSet(request)
-            for file_data_set in response.files:
-                self._sub_data_set.put(file_data_set)
-            return
+            while True:
+                request = master_pb2.SubDataSetRequest()
+                response = stub.GetSubDataSet(request)
+                for file_data_set in response.files:
+                    self._sub_data_set.put(file_data_set)
 
     def _get_file_key(self, idx, file_path):
         key = "idx:{}_path:{}".format(idx, file_path)
@@ -77,6 +80,9 @@ class DataServerServicer(object):
     def _read_data(self):
         while True:
             file_data_set = self._sub_data_set.get()
+            if file_data_set is None:
+                logger.info("terminated exit!")
+                break
 
             rec_map = {}
             for rec in file_data_set.record:
@@ -149,15 +155,16 @@ class DataServerServicer(object):
                         record.data = data
 
                         one_file.records.append(record)
+
                     if len(file_error.errors) > 0:
                         files_error.errors.append(file_error)
                     files.files.append(one_file)
 
-                if len(files_error) > 0:
-                    response.errors = files_error
+                if len(files_error.errors) > 0:
+                    response.errors.CopyFrom(files_error)
                     return response
 
-            response.files = files
+            response.files.CopyFrom(files)
             return response
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -167,7 +174,7 @@ class DataServerServicer(object):
             raise e
 
     def ClearDataCache(self, request, context):
-        response = common.RPCRet()
+        response = common_pb2.RPCRet()
         for meta in request.metas:
             file_key = self._get_file_key(meta.idx_in_list, meta.file_path)
 
@@ -184,6 +191,12 @@ class DataServerServicer(object):
                     self._data_queue.pop()
 
         return response
+
+    def ShutDown(self, request, context):
+        logger.info("Enter into shutdown method")
+        self._sub_data_set.put(None)
+        self._t_read_data.join()
+        return common_pb2.RPCRet()
 
 
 class DataServer(object):
@@ -215,8 +228,22 @@ class DataServer(object):
 
         self._server = server
 
-    def wait(self):
-        self._server.wait_for_termination()
+    def wait(self, timeout=None):
+        if timeout is not None:
+            self._server.stop(timeout)
+            return
+        self._server.wait_for_termination(timeout)
 
-    def stop(self):
-        self._server.stop()
+
+if __name__ == '__main__':
+
+    logger = get_logger(10)
+
+    endpoint = "0.0.0.0:6700"
+    data_server = DataServer()
+    data_server.start(
+        endpoint=endpoint,
+        data_set_reader=TxtDataSet(),
+        file_list="./test_file_list.txt",
+        master=None)
+    data_server.wait(2)

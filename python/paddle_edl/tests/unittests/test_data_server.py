@@ -21,6 +21,8 @@ from paddle_edl.utils.utils import file_list_to_dataset, get_logger
 import time
 import threading
 import grpc
+import signal
+import paddle_edl.utils.common_pb2 as common_pb2
 
 
 class TestDataServer(unittest.TestCase):
@@ -50,20 +52,13 @@ class TestDataServer(unittest.TestCase):
                 meta.record_no.append(i)
 
             request.metas.append(meta)
-        print("request:", request)
 
         response = stub.GetData(request)
         print(response.files)
-        """
-        datas = []
-        for data_file in response.files:
-            datas.append(file_data_set)
 
-        for data in datas:
-            print("data:", data)
-        """
-
-        data_server.stop()
+        request = common_pb2.ShutDownRequest()
+        stub.ShutDown(request)
+        data_server.wait(2)
 
     def test_master(self):
         pass

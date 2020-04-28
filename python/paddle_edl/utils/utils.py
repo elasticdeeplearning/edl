@@ -75,3 +75,8 @@ def datameta_to_string(o):
     ret += "]"
 
     return ret
+
+
+def on_done(signum, frame):
+    logger.info('Got signal {}, {}'.format(signum, frame))
+    done.set()

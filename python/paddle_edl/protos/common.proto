@@ -36,3 +36,5 @@ message ClusterResponse {
 }
 
 message ClusterRequest { string job_id = 1; }
+
+message ShutDownRequest {}

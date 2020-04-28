@@ -76,4 +76,5 @@ service DataServer {
   // loader -> DataSet
   rpc GetData(DataRequest) returns (DataResponse) {}
   rpc ClearDataCache(DataRequest) returns (common.RPCRet) {}
+  rpc ShutDown(common.ShutDownRequest) returns (common.RPCRet) {}
 }
