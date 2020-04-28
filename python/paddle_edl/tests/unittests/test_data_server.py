@@ -17,7 +17,7 @@ from paddle_edl.utils.data_server import DataServer
 from paddle_edl.utils.dataset import TxtDataSet
 import paddle_edl.utils.data_server_pb2_grpc as data_server_pb2_grpc
 import paddle_edl.utils.data_server_pb2 as data_server_pb2
-from paddle_edl.utils.utils import file_list_to_dataset
+from paddle_edl.utils.utils import file_list_to_dataset, get_logger
 import time
 import threading
 import grpc
@@ -50,6 +50,7 @@ class TestDataServer(unittest.TestCase):
                 meta.record_no.append(i)
 
             request.metas.append(meta)
+        print("request:", request)
 
         response = stub.GetData(request)
         print(response.files)
@@ -69,4 +70,7 @@ class TestDataServer(unittest.TestCase):
 
 
 if __name__ == '__main__':
+
+    logger = get_logger(10)
+
     unittest.main()

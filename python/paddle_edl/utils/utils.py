@@ -14,6 +14,24 @@
 
 import master_pb2
 import data_server_pb2
+import logging
+import google.protobuf.text_format as text_format
+
+logger = logging.getLogger("root")
+logger.propagate = False
+
+
+def get_logger(log_level, name="root"):
+    logger = logging.getLogger(name)
+    logger.setLevel(log_level)
+
+    log_handler = logging.StreamHandler()
+    log_format = logging.Formatter(
+        '%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s')
+    log_handler.setFormatter(log_format)
+    logger.addHandler(log_handler)
+
+    return logger
 
 
 def file_list_to_dataset(file_list):
@@ -31,4 +49,29 @@ def file_list_to_dataset(file_list):
             meta.file_path = line
             meta.file_status = master_pb2.ProcStatus.INITIAL
             ret.append(meta)
+            #print(dataset_to_string(meta))
+    return ret
+
+
+def dataset_to_string(o):
+    ret = "data_server:{}, idx_in_list:{}, file_path:{} file_status:{}".format(
+        o.data_server, o.idx_in_list, o.file_path, o.file_status)
+
+    ret += " record:["
+    for r in o.record:
+        ret += "(record_no:{} record_status:{})".format(r.record_no,
+                                                        r.record_status)
+    ret += "]"
+
+    return ret
+
+
+def datameta_to_string(o):
+    ret = "idx_in_list:{} file_path:{}".format(o.idx_in_list, o.file_path)
+
+    ret += " record_no:["
+    for r in o.record_no:
+        ret += "(record_no:{})".format(r)
+    ret += "]"
+
     return ret

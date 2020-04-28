@@ -26,24 +26,39 @@ from threading import Thread, Lock
 from Queue import Queue
 from exception import *
 from dataset import EdlDataSet
+import utils
+from utils import *
 
 
 class DataServerServicer(object):
-    def __init__(self, master, data_set, file_list=None, capcity=1000):
+    def __init__(self, master, data_set_reader, file_list=None, capcity=1000):
         self._master = master
         # master.FileDataSet
-        self._sub_data_set = Queue
+        self._sub_data_set = Queue()
         # {file_key:{rec_no: data}}
         self._data = {}
         # to control the cache size.
         self._data_queue = Queue(capcity)
         self._lock = Lock()
         self._file_list = file_list
+        self._data_set_reader = data_set_reader
 
-        assert isinstance(data_set, EdlDataSet)
+        assert isinstance(data_set_reader, EdlDataSet)
 
-        self._t_get_sub_dataset = Thread(target=self._get_sub_dataset)
+        if self._master:
+            self._t_get_sub_dataset = Thread(target=self._get_sub_dataset)
+            self._t_get_sub_dataset.start()
+        elif self._file_list:
+            logger.info("init from list:{} ".format(self._file_list))
+            arr = utils.file_list_to_dataset(self._file_list)
+            for t in arr:
+                logger.debug("readed:{} ".format(utils.dataset_to_string(t)))
+                self._sub_data_set.put(t)
+        else:
+            assert False, "You must set datasource"
+
         self._t_read_data = Thread(target=self._read_data)
+        self._t_read_data.start()
 
     def _get_sub_dataset(self):
         if self.master:
@@ -53,14 +68,6 @@ class DataServerServicer(object):
             response = stub.GetSubDataSet(request)
             for file_data_set in response.files:
                 self._sub_data_set.put(file_data_set)
-            return
-
-        data_server_pb2.Datameta()
-
-        if self._file_list:
-            arr = utils.file_list_to_dataset(self._file_list)
-            for t in arr:
-                self._sub_data_set.put(t)
             return
 
     def _get_file_key(self, idx, file_path):
@@ -74,9 +81,15 @@ class DataServerServicer(object):
             rec_map = {}
             for rec in file_data_set.record:
                 rec_map[rec.record_no] = rec.status
-            for rec_no, data in self._data_set.read(file_data_set.file_path):
-                if rec_map[rec_no] == RecordStatus.PROCSSED:
+
+            for rec_no, data in enumerate(
+                    self._data_set_reader.reader(file_data_set.file_path)):
+                if rec_no in rec_map and rec_map[
+                        rec_no] == RecordStatus.PROCSSED:
                     continue
+
+                logger.debug("read rec_no:{} data_len:{}".format(rec_no,
+                                                                 len(data)))
 
                 self._data_queue.put(1, block=True)
                 key = self._get_file_key(file_data_set.idx_in_list,
@@ -92,11 +105,12 @@ class DataServerServicer(object):
     def _get_data(self, request, context):
         try:
             response = data_server_pb2.DataResponse()
-
             files = data_server_pb2.Files()
             files_error = data_server_pb2.FilesError()
 
             for meta in request.metas:
+                logger.debug("proc meta:{}".format(
+                    utils.datameta_to_string(meta)))
                 one_file = data_server_pb2.File()
                 one_file.idx_in_list = meta.idx_in_list
                 one_file.file_path = meta.file_path
@@ -107,9 +121,12 @@ class DataServerServicer(object):
                 file_error.status = data_server_pb2.DataStatus.NOT_FOUND
 
                 key = self._get_file_key(meta.idx_in_list, meta.file_path)
-                while self._lock:
+                logger.debug("file key:{}".format(key))
+                with self._lock:
                     if key not in self._data:
-                        response.errors.append(file_error)
+                        logger.error("file key:{} not found in cache".format(
+                            key))
+                        files_error.errors.append(file_error)
                         continue
 
                     record = data_server_pb2.Record()
@@ -119,8 +136,11 @@ class DataServerServicer(object):
                     for rec_no in meta.record_no:
                         if rec_no not in self._data[key]:
                             record_error.rec_no = rec_no
+                            record_error.status = data_server_pb2.DataStatus.NOT_FOUND
                             file_error.errors.append(record_error)
-                            response.errors.append(file_error)
+                            logger.error(
+                                "file key:{} rec_no:{} not found in cache".
+                                format(key, rec_no))
                             continue
 
                         data = self._data[key][rec_no]
@@ -142,7 +162,8 @@ class DataServerServicer(object):
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            print(exc_type, fname, exc_tb.tb_lineno)
+            logger.fatal("context:{} {} {}".format(exc_type, fname,
+                                                   exc_tb.tb_lineno))
             raise e
 
     def ClearDataCache(self, request, context):
@@ -185,7 +206,7 @@ class DataServer(object):
         data_server_pb2_grpc.add_DataServerServicer_to_server(
             DataServerServicer(
                 master=master,
-                data_set=data_set_reader,
+                data_set_reader=data_set_reader,
                 capcity=cache_capcity,
                 file_list=file_list),
             server)

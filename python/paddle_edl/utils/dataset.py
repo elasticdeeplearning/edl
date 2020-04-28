@@ -14,16 +14,16 @@
 
 
 class EdlDataSet(object):
-    def reader(file_path):
+    def reader(self, file_path):
         #yield one record
         raise NotImplementedError()
 
-    def preprocess(data):
+    def preprocessor(data):
         raise NotImplementedError()
 
 
 class TxtDataSet(EdlDataSet):
-    def read(txt_file):
+    def reader(self, txt_file):
         with open(txt_file, "r") as f:
             for line in f:
                 line = line.strip()
@@ -31,5 +31,5 @@ class TxtDataSet(EdlDataSet):
                     continue
                 yield line
 
-    def preprocess(data):
+    def preprocessor(self, data):
         pass
