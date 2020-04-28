@@ -95,6 +95,7 @@ class TestEtcd(unittest.TestCase):
             self.refresh()
             servers = self.etcd.get_service("job_1")
             assert len(servers) == 2, "must two servers"
+            time.sleep(2)
 
 
 if __name__ == '__main__':
