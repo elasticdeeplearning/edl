@@ -174,23 +174,30 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
             raise e
 
     def ClearDataCache(self, request, context):
-        response = common_pb2.RPCRet()
-        for meta in request.metas:
-            file_key = self._get_file_key(meta.idx_in_list, meta.file_path)
+        try:
+            response = common_pb2.RPCRet()
+            for meta in request.metas:
+                file_key = self._get_file_key(meta.idx_in_list, meta.file_path)
 
-            with self._lock():
-                if file_key not in self._data[key]:
-                    continue
-
-                recs = self._data[key]
-                for rec_no in recs:
-                    if rec_no not in recs:
+                with self._lock:
+                    if file_key not in self._data:
                         continue
 
-                    recs.pop(rec_no)
-                    self._data_queue.pop()
+                    recs = self._data[file_key]
+                    for rec_no in recs.keys():
+                        if rec_no not in recs:
+                            continue
 
-        return response
+                        recs.pop(rec_no)
+                        self._data_queue.get(block=False)
+
+            return response
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            logger.fatal("context:{} {} {}".format(exc_type, fname,
+                                                   exc_tb.tb_lineno))
+            raise e
 
     def ShutDown(self, request, context):
         logger.info("Enter into shutdown method")

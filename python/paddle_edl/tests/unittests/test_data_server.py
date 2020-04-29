@@ -29,8 +29,8 @@ class TestDataServer(unittest.TestCase):
     def setUp(self):
         pass
 
-    def test_data_server(self):
-        endpoint = "0.0.0.0:6700"
+    def _start_data_server(self, port):
+        endpoint = "0.0.0.0:{}".format(port)
         data_server = DataServer()
         data_server.start(
             endpoint=endpoint,
@@ -39,7 +39,15 @@ class TestDataServer(unittest.TestCase):
             master=None)
         print("start data server:", endpoint)
         time.sleep(3)
+        return data_server, endpoint
 
+    def _shut_down(self, data_server, stub):
+        request = common_pb2.ShutDownRequest()
+        stub.ShutDown(request)
+        data_server.wait(2)
+
+    def test_data_server(self):
+        data_server, endpoint = self._start_data_server(6700)
         channel = grpc.insecure_channel("127.0.0.1:6700")
         stub = data_server_pb2_grpc.DataServerStub(channel)
 
@@ -54,18 +62,40 @@ class TestDataServer(unittest.TestCase):
             request.metas.append(meta)
 
         response = stub.GetData(request)
-        print(response.files)
+        a = ["a0", "a1", "a2"]
+        b = ["b0", "b1", "b2"]
+        for f in response.files.files:
+            if f.file_path == "data_server/a.txt":
+                assert f.idx_in_list == 0
+                for r in f.records:
+                    assert r.data == a[r.record_no]
+            elif f.file_path == "data_server/b.txt":
+                assert f.idx_in_list == 1
+                for r in f.records:
+                    assert r.data == b[r.record_no]
 
-        request = common_pb2.ShutDownRequest()
-        stub.ShutDown(request)
-        data_server.wait(2)
+        self._shut_down(data_server, stub)
 
-    def test_master(self):
-        pass
+    def test_clear_cache(self):
+        data_server, endpoint = self._start_data_server(6701)
+
+        channel = grpc.insecure_channel("127.0.0.1:6701")
+        stub = data_server_pb2_grpc.DataServerStub(channel)
+
+        request = data_server_pb2.DataRequest()
+        for t in file_list_to_dataset('./test_file_list.txt'):
+            meta = data_server_pb2.DataMeta()
+            meta.idx_in_list = t.idx_in_list
+            meta.file_path = t.file_path
+            for i in range(3):
+                meta.record_no.append(i)
+
+            request.metas.append(meta)
+
+        response = stub.ClearDataCache(request)
+        self._shut_down(data_server, stub)
 
 
 if __name__ == '__main__':
-
     logger = get_logger(10)
-
     unittest.main()
