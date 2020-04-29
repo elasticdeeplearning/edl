@@ -5,7 +5,7 @@ BASEDIR=$(dirname $(readlink -f $0))
 
 cd ${BASEDIR}/..
 
-pip install etcd3 grpc_tools flask pathlib
+pip install etcd3 grpcio_tools grpcio flask pathlib
 pip install paddlepaddle-gpu 
 
 pushd python/paddle_edl/protos/
