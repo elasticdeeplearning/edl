@@ -176,3 +176,24 @@ class EtcdClient(object):
     @_handle_errors
     def get_key(self, key):
         return self._etcd.get(key)
+
+    def services_change(self, response, service_name):
+        add_servers = dict()
+        rm_servers = set()
+        for event in response.events:
+            key = self.get_server_name_from_full_path(event.key,
+                                                      service_name)
+            if isinstance(event, etcd.events.PutEvent):
+                if key in rm_servers:
+                    # after rm key, add again, need remove key from rm set
+                    rm_servers.remove(key)
+                add_servers[key] = event.value
+            elif isinstance(event, etcd.events.DeleteEvent):
+                if key in add_servers:
+                    # after add key, rm again, need remove key from add dict
+                    add_servers.pop(key)
+                rm_servers.add(key)
+            else:
+                raise TypeError('ectd event type is not put or delete!')
+
+        return add_servers, rm_servers
