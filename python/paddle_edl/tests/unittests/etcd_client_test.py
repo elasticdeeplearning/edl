@@ -16,6 +16,7 @@ import unittest
 from paddle_edl.discovery.etcd_client import EtcdClient
 import time
 import threading
+from etcd3.events import PutEvent, DeleteEvent
 
 
 class TestEtcd(unittest.TestCase):
@@ -67,6 +68,14 @@ class TestEtcd(unittest.TestCase):
         def watch_call_back(response):
             try:
                 events.extend(response.events)
+                for e in events:
+                    key = EtcdClient.get_server_name_from_full_path(e.key,
+                                                                    "job_2")
+                    if type(e) == PutEvent:
+                        print("put event key:{} value:{}".format(key, e.value))
+                    elif type(e) == DeleteEvent:
+                        print("delete event key:{} value:{}".format(key,
+                                                                    e.value))
             except Exception as e:
                 print("events len 1:", len(events))
                 print(e)
@@ -80,9 +89,6 @@ class TestEtcd(unittest.TestCase):
         print("watch_id:", watch_id)
         time.sleep(3)
         self.etcd.cancel_watch(watch_id)
-
-        for e in events:
-            print(e.key, e.value)
 
         print("events len:", len(events))
         assert len(events) == 1
