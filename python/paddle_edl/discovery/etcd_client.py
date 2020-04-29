@@ -139,3 +139,7 @@ class EtcdClient(object):
     def get_server_name_from_full_path(path, service_name):
         d = '/{}/{}/nodes/'.format(self._root, service_name)
         return path[len(d):]
+
+    def lock(path, service_name, server, ttl=6):
+        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        return self._etcd.lock(key, ttl=ttl)

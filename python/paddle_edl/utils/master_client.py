@@ -17,8 +17,11 @@ class Client(object):
     def __init__(self):
         self._endpoint = MasterFinder().get_master()
 
-    def get_meta(self):
+    def get_cluster(self, pod_id=None):
         pass
 
-    def get_cluster(self):
+    def assign_data_source(self):
+        pass
+
+    def new_epoch(self):
         pass
