@@ -5,8 +5,8 @@ BASEDIR=$(dirname $(readlink -f $0))
 
 cd ${BASEDIR}/..
 
-pip install etcd3 grpcio_tools grpcio flask pathlib
-pip install paddlepaddle-gpu 
+pip install etcd3 grpcio_tools grpcio flask pathlib --ignore-installed
+pip install paddlepaddle-gpu  --ignore-installed
 
 pushd python/paddle_edl/protos/
 python run_codegen.py
