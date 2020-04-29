@@ -9,8 +9,9 @@ pip install etcd3 grpcio_tools grpcio flask pathlib --ignore-installed
 pip install paddlepaddle-gpu  --ignore-installed
 
 pushd python/paddle_edl/protos/
-python run_codegen.py
+bash generate.sh
 popd
+
 
 build_dir=build
 mkdir -p  ${build_dir}

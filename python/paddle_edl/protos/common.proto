@@ -13,7 +13,7 @@
 // limitations under the License.
 
 syntax = "proto3";
-
+option go_package = ".;master";
 package common;
 
 message RPCRet {

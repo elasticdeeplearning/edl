@@ -15,6 +15,7 @@
 syntax = "proto3";
 
 import "common.proto";
+option go_package = ".;master";
 package master;
 
 enum ProcStatus {
