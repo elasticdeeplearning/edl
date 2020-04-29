@@ -15,21 +15,7 @@
 from paddle_edl.utils.discovery.etcd_client import EtcdClient
 
 
-class EdlEnv(object):
-    def __init__(self, etcd_endoints=None, master=None):
-        self.master_endpoint = master
-        if master_endpoint == None:
-            self.master_endpoint = os.getenv("PADDLE_MASTER", "")
-
-        self.etcd_endpoints = etcd_endpoints
-        if etcd_endpoints is None:
-            self.etcd_endpoints = os.getenv("PADDLE_EDL_ETCD_ENPOINTS", "")
-
-        assert self.etcd_endpoints and self.master_endpoint, "master and etcd_client are not none"
-        assert self.etcd_endpoints is None and self.master_endpoint is None, "master and etcd_client are none"
-
-
-class MasterFinder(object):
+class Finder(object):
     def __init__(self):
         self._edl_env = EdlEnv()
 
@@ -47,6 +33,17 @@ class MasterFinder(object):
             return servers[0]
 
         return self._edl_env.master_endpoint
+
+
+class Register(object):
+    def __init__(self):
+        pass
+
+    def regist_master(self):
+        pass
+
+    def regist_launcher(self):
+        pass
 
 
 class EdlClusterEnv(object):

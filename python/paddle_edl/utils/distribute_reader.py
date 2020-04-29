@@ -22,7 +22,9 @@ class Connection(self):
 
 class DistributeReader(object):
     def __init__(self):
+        # master endpoint
         self._master = MasterFinder().get_master()
+        # connections to data servers
         self._data_servers = {}
 
     def get_meta(self, batch_size, step_num):
