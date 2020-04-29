@@ -8,9 +8,7 @@ function abort(){
 trap 'abort' 0
 set -e
 
-/usr/bin/clang-format --verion
-echo $PATH
-export PATH=/usr/bin:$PATH
+sudo find / -name clang-format
 
 cd $TRAVIS_BUILD_DIR
 export PATH=/usr/bin:$PATH

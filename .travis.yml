@@ -9,7 +9,7 @@ matrix:
         - sudo apt-get remove clang-format
         - sudo apt-get install -y clang-format-3.8
         - sudo pip install --upgrade pip 
-        - sudo pip install pre-commit pylint --ignore-installed enum34 flask pathlib etcd3
+        - sudo pip install pre-commit pylint --ignore-installed enum34 flask pathlib etcd3 grpc_tools
       script:
         - rm -f .copyright.hook
         - bash -x .tools/check_style.sh
