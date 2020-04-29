@@ -8,6 +8,10 @@ function abort(){
 trap 'abort' 0
 set -e
 
+/usr/bin/clang-format --verion
+echo $PATH
+export PATH=/usr/bin:$PATH
+
 cd $TRAVIS_BUILD_DIR
 export PATH=/usr/bin:$PATH
 pre-commit install
