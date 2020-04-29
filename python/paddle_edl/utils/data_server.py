@@ -127,7 +127,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                 file_error.status = data_server_pb2.DataStatus.NOT_FOUND
 
                 key = self._get_file_key(meta.idx_in_list, meta.file_path)
-                logger.debug("file key:{}".format(key))
+                logger.debug("getdata of file:{}".format(key))
                 with self._lock:
                     if key not in self._data:
                         logger.error("file key:{} not found in cache".format(
@@ -141,7 +141,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
 
                     for rec_no in meta.record_no:
                         if rec_no not in self._data[key]:
-                            record_error.rec_no = rec_no
+                            record_error.record_no = rec_no
                             record_error.status = data_server_pb2.DataStatus.NOT_FOUND
                             file_error.errors.append(record_error)
                             logger.error(
@@ -160,9 +160,9 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                         files_error.errors.append(file_error)
                     files.files.append(one_file)
 
-                if len(files_error.errors) > 0:
-                    response.errors.CopyFrom(files_error)
-                    return response
+            if len(files_error.errors) > 0:
+                response.errors.CopyFrom(files_error)
+                return response
 
             response.files.CopyFrom(files)
             return response
@@ -181,11 +181,14 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
 
                 with self._lock:
                     if file_key not in self._data:
+                        logger.error("file:{} not in cache:".format(file_key))
                         continue
 
                     recs = self._data[file_key]
                     for rec_no in recs.keys():
                         if rec_no not in recs:
+                            logger.error("file:{} record_no:{} not in cache:".
+                                         format(file_key, rec_no))
                             continue
 
                         recs.pop(rec_no)

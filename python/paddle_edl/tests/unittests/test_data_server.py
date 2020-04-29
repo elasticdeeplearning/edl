@@ -92,6 +92,14 @@ class TestDataServer(unittest.TestCase):
 
             request.metas.append(meta)
 
+        # clear
+        response = stub.ClearDataCache(request)
+        # get data
+        response = stub.GetData(request)
+        assert len(response.errors.errors) == 2
+        for e in response.errors.errors:
+            assert len(e.errors) == 3
+
         response = stub.ClearDataCache(request)
         self._shut_down(data_server, stub)
 
