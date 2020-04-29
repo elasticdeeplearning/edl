@@ -37,11 +37,15 @@ def _handle_errors(f):
 
 
 class EtcdClient(object):
-    def __init__(self, endpoints=['127.0.0.1:2379'], passwd=None):
+    def __init__(self,
+                 endpoints=['127.0.0.1:2379'],
+                 passwd=None,
+                 root="service"):
         self._endpoints = set(endpoints)
         self._passwd = passwd
         self._etcd = None
         self._leases = {}
+        self._root = root
 
     def _endpoint_to_ip_port(self, endpoint):
         a = endpoint.split(":")
@@ -71,7 +75,7 @@ class EtcdClient(object):
     @_handle_errors
     def get_service(self, service_name):
         servers = []
-        d = '/service/{}/nodes/'.format(service_name)
+        d = '/{}/{}/nodes/'.format(self._root, service_name)
         for value, meta in self._etcd.get_prefix(d):
             servers.append([
                 self.get_server_name_from_full_path(meta.key, service_name),
@@ -80,7 +84,7 @@ class EtcdClient(object):
         return servers
 
     def watch_service(self, service_name, call_back):
-        d = '/service/{}/'.format(service_name)
+        d = '/{}/{}/'.format(self._root, service_name)
         return self._etcd.add_watch_prefix_callback(d, call_back)
 
     def cancel_watch(self, watch_id):
@@ -88,7 +92,7 @@ class EtcdClient(object):
 
     @_handle_errors
     def remove_service(self, service_name):
-        d = '/service/{}/'.format(service_name)
+        d = '/{}/{}/'.format(self._root, service_name)
         servers = self.get_service(service_name)
         for s in servers:
             self.remove_server(service_name, s[0])
@@ -104,13 +108,13 @@ class EtcdClient(object):
 
     @_handle_errors
     def set_server(self, service_name, server, info, ttl=6):
-        key = '/service/{}/nodes/{}'.format(service_name, server)
+        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
         lease = self._get_lease(key, ttl)
         self._etcd.put(key=key, value=info, lease=lease)
 
     @_handle_errors
     def remove_server(self, service_name, server):
-        key = '/service/{}/nodes/{}'.format(service_name, server)
+        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
         self._etcd.delete(key)
         if key in self._leases:
             lease = self._leases[key]
@@ -124,7 +128,7 @@ class EtcdClient(object):
             self.set_server(service_name, server, info, ttl)
             return
 
-        key = '/service/{}/nodes/{}'.format(service_name, server)
+        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
         lease = self._get_lease(key, ttl)
 
         for r in self._etcd.refresh_lease(lease.id):
@@ -133,5 +137,5 @@ class EtcdClient(object):
 
     @staticmethod
     def get_server_name_from_full_path(path, service_name):
-        d = '/service/{}/nodes/'.format(service_name)
+        d = '/{}/{}/nodes/'.format(self._root, service_name)
         return path[len(d):]
