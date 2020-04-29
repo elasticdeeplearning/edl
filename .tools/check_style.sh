@@ -8,9 +8,6 @@ function abort(){
 trap 'abort' 0
 set -e
 
-apt-get remove clang-format
-apt-get install -y clang-format-3.8
-
 cd $TRAVIS_BUILD_DIR
 export PATH=/usr/bin:$PATH
 pre-commit install
