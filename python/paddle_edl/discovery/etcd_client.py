@@ -99,7 +99,7 @@ class EtcdClient(object):
         self._etcd.delete_prefix(d)
 
     @_handle_errors
-    def _get_lease(self, key, ttl=6):
+    def _get_lease(self, key, ttl=10):
         if key not in self._leases:
             lease = self._etcd.lease(ttl)
             self._leases[key] = lease
@@ -107,10 +107,38 @@ class EtcdClient(object):
         return self._leases[key]
 
     @_handle_errors
-    def set_server(self, service_name, server, info, ttl=6):
+    def set_server_not_exists(self,
+                              service_name,
+                              server,
+                              info,
+                              ttl=10,
+                              timeout=20):
+        """
+        :returns: state of transaction, ``True`` if the put was successful,
+                  ``False`` otherwise
+        """
         key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
         lease = self._get_lease(key, ttl)
-        self._etcd.put(key=key, value=info, lease=lease)
+        begin = time.time()
+        while True:
+            if self._etcd.put_if_not_exists(key=key, value=info, lease=lease):
+                return True
+
+            # refresh lease
+            for r in self._etcd.refresh_lease(lease.id):
+                pass
+
+            if (time.time() - begin > timeout):
+                break
+
+            time.sleep(1)
+        return False
+
+    @_handle_errors
+    def set_server(self, service_name, server, info, ttl=10):
+        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        lease = self._get_lease(key, ttl)
+        return self._etcd.put(key=key, value=info, lease=lease)
 
     @_handle_errors
     def remove_server(self, service_name, server):
@@ -123,7 +151,7 @@ class EtcdClient(object):
             self._leases.pop(key)
 
     @_handle_errors
-    def refresh(self, service_name, server, info=None, ttl=6):
+    def refresh(self, service_name, server, info=None, ttl=10):
         if info is not None:
             self.set_server(service_name, server, info, ttl)
             return
@@ -140,6 +168,6 @@ class EtcdClient(object):
         d = '/{}/{}/nodes/'.format(self._root, service_name)
         return path[len(d):]
 
-    def lock(path, service_name, server, ttl=6):
+    def lock(path, service_name, server, ttl=10):
         key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
         return self._etcd.lock(key, ttl=ttl)

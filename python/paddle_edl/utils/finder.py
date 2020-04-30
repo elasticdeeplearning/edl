@@ -46,22 +46,63 @@ class MasterWatcher(object):
             return self._master
 
 
-class PodRegister(object):
-    def __init__(self, etcd_endpoints, job_id, pod_id, pod_info):
-        self._etcd = EtcdClient(etcd_endpoints, root=job_id)
-        self._t_register = Threading(self._set_server)
-        self._lock = Lock()
-        self._pod_id = pod_id
-        self._pod_info = pod_info
+class Register(object):
+    def __init__(self, etcd_endpoints, job_id, service, server, value):
+        self._service = service
+        self._server = server
+        self._stop = threading.Event()
+        self._etcd = EtcdClient(etcd_endpoints, root=job_id, ttl=10)
 
-        self._etcd.set_server(
-            service_name="trainer_pod",
-            server_name=pod_id,
-            info=pod_info,
-            ttl=6)
+        if not self._etcd.set_server_not_exists(service_name, server):
+            raise exception.CanNotRegister()
 
-    def _set_server(self):
-        with self._lock:
-            self._etcd.refresh(
-                service_name="trainer_pod", server_name=pod_id, ttl=6)
+        self._t_register = Threading(self._refresher)
+
+    def _refresher(self):
+        while not self._stop.is_set():
+            self._etcd_lock.refresh(service_name, server)
             time.sleep(3)
+
+    def stop(self):
+        self._stop.set()
+        self._t_register.join()
+
+
+class LauncherRegister(object):
+    def __init__(self, etcd_endpoints, job_id, pod_id, info):
+        service_name = "Launcher"
+        server = pod_id
+
+        self._register = Register(
+            etcd_endpoints,
+            job_id=job_id,
+            service=service_name,
+            server=server,
+            info=info)
+
+
+class TrainerRegister(object):
+    def __init__(self, etcd_endpoints, job_id, pod_id, rank_of_pod, info):
+        service_name = "Trainer"
+        server = pod_id + str(rank_of_pod)
+
+        self._register = Register(
+            etcd_endpoints,
+            job_id=job_id,
+            service=service_name,
+            server=server,
+            info=info)
+
+
+class DataServerRegister(object):
+    def __init__(self, etcd_endpoints, job_id, pod_id, rank_of_pod, info):
+        service_name = "DataServer"
+        server = pod_id + str(trainer_rank)
+        value = trainer_info
+
+        self._register = Register(
+            etcd_endpoints,
+            job_id=job_id,
+            service=service_name,
+            server=server,
+            info=info)

@@ -19,3 +19,7 @@ class EdlExeception(object):
 
 class DataSetEndException(EdlExeception):
     pass
+
+
+class CanNotRegisterExeception(EdlExeception):
+    pass
