@@ -19,26 +19,18 @@ from paddle_edl.utils.discovery.etcd_client import EtcdClient
 
 
 class MasterWatcher(object):
-    def __init__(self, etcd_endpoints, job_id):
+    def __init__(self, etcd_endpoints, job_id, timeout=60):
         self._etcd = EtcdClient(edl_env.etcd_endpoints, root=job_id)
         self._t_watcher = Threading(selt._get_master)
         self._lock = Lock()
         self._master = None
 
     def _get_master(self):
+        begin = time.time()
         while True:
-            servers = self._etcd.get_service("master")
+            v, _ = self._etcd.get_key("/master/addr")
             with self._lock:
-                if len(servers) == 0:
-                    self._master = None
-                elif len(servers) == 1:
-                    self._master = servers[0][1]
-                else:
-                    self._master = None
-                    logger.fatal(
-                        "master must be less than 1, but now:{} server:{}".
-                        format(len(servers), servers))
-
+                self._master = v
             time.sleep(3)
 
     def get_master(self):
@@ -80,6 +72,9 @@ class LauncherRegister(object):
             server=server,
             info=info)
 
+    def stop(self):
+        self._register.stop()
+
 
 class TrainerRegister(object):
     def __init__(self, etcd_endpoints, job_id, pod_id, rank_of_pod, info):
@@ -92,6 +87,9 @@ class TrainerRegister(object):
             service=service_name,
             server=server,
             info=info)
+
+    def stop(self):
+        self._register.stop()
 
 
 class DataServerRegister(object):
@@ -106,3 +104,6 @@ class DataServerRegister(object):
             service=service_name,
             server=server,
             info=info)
+
+    def stop(self):
+        self._register.stop()

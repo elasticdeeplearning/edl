@@ -21,5 +21,5 @@ class DataSetEndException(EdlExeception):
     pass
 
 
-class CanNotRegisterExeception(EdlExeception):
+class RegisterFailureExeception(EdlExeception):
     pass

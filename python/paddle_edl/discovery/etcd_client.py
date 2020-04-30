@@ -135,7 +135,7 @@ class EtcdClient(object):
         return False
 
     @_handle_errors
-    def set_server(self, service_name, server, info, ttl=10):
+    def _set_server(self, service_name, server, info, ttl=10):
         key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
         lease = self._get_lease(key, ttl)
         return self._etcd.put(key=key, value=info, lease=lease)
@@ -153,7 +153,7 @@ class EtcdClient(object):
     @_handle_errors
     def refresh(self, service_name, server, info=None, ttl=10):
         if info is not None:
-            self.set_server(service_name, server, info, ttl)
+            self._set_server(service_name, server, info, ttl)
             return
 
         key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
@@ -168,6 +168,11 @@ class EtcdClient(object):
         d = '/{}/{}/nodes/'.format(self._root, service_name)
         return path[len(d):]
 
-    def lock(path, service_name, server, ttl=10):
+    @_handle_errors
+    def lock(self, service_name, server, ttl=10):
         key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
         return self._etcd.lock(key, ttl=ttl)
+
+    @_handle_errors
+    def get_key(self, key):
+        return self._etcd.get(key)
