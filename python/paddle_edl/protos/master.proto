@@ -24,31 +24,44 @@ enum ProcStatus {
   PROCESSED = 2;
 };
 
+/*
 message RecordStatus {
   int64 record_no = 1;
   ProcStatus status = 2;
 }
-
-message FileDataSet {
-  string data_server = 1;
-  int64 idx_in_list = 2;
-  string file_path = 3;
-  ProcStatus file_status = 4;
-  repeated RecordStatus record = 5;
-}
-
-message SubDataSet {
-  common.RPCRet ret = 1;
-  repeated FileDataSet files = 2;
-}
-
-message ReportSubDataSetRequest { repeated FileDataSet files = 1; }
-
-message DataSet { string file_list = 1; }
-
-message NewEpochRequest {}
+*/
 
 message SubDataSetRequest {}
+
+message FileMeta {
+  int64 idx_in_list = 1;
+  string file_path = 2;
+  // only no
+  repeated int64 filted_records = 3;
+}
+
+message SubDataSetResponse {
+  common.RPCRet ret = 1;
+  repeated FileMeta metas = 2;
+}
+
+message Chunk {
+  string data_sever = 1;
+  int64 idx_in_list = 2;
+  string file_path = 3;
+  // only no
+  repeated int64 records = 4;
+}
+
+message Chunks { repeated Chunk chunks = 2; }
+
+message DataSet { string file_list = 1; }
+message NewEpochRequest {}
+message ChunksRequest {}
+message ChunksResponse {
+  common.RPCRet ret = 1;
+  Chunks chunks = 2;
+}
 
 service Master {
   // Cluster env
@@ -57,12 +70,15 @@ service Master {
 
   // Tasks
   /* user_client -> Master*/
-  rpc AssignDataResource(DataSet) returns (common.RPCRet) {}
+  rpc AddInitDataSet(DataSet) returns (common.RPCRet) {}
   rpc NewEpoch(NewEpochRequest) returns (common.RPCRet) {}
 
   /* data_server - > master */
-  rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSet) {}
+  rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSetResponse) {}
+  rpc ReportChunks(Chunks) returns (common.RPCRet) {}
 
   /* executor -> master */
-  rpc ReportSubDataSetStatus(ReportSubDataSetRequest) returns (common.RPCRet) {}
+  rpc GetChunks(ChunksRequest) returns (ChunksResponse) {}
+  rpc ChunksFinished(Chunks) returns (common.RPCRet) {}
+  rpc ChunksErrored(Chunks) returns (common.RPCRet) {}
 }
