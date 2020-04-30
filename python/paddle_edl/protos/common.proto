@@ -39,3 +39,8 @@ message ClusterResponse {
 message ClusterRequest { string job_id = 1; }
 
 message ShutDownRequest {}
+
+message RecordRange {
+  int64 begin = 1;
+  int64 end = 2;
+}
