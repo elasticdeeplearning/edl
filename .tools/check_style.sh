@@ -8,6 +8,9 @@ function abort(){
 trap 'abort' 0
 set -e
 
+sudo find / -name clang-format
+export PATH=/usr/lib/llvm-3.8/bin/:$PATH
+
 cd $TRAVIS_BUILD_DIR
 export PATH=/usr/bin:$PATH
 pre-commit install

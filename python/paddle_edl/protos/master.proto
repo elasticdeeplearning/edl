@@ -1,0 +1,67 @@
+// Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless  by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+import "common.proto";
+package master;
+
+enum ProcStatus {
+  INITIAL = 0;
+  PART_PROCESSED = 1;
+  PROCESSED = 2;
+};
+
+message RecordStatus {
+  int64 record_no = 1;
+  ProcStatus status = 2;
+}
+
+message FileDataSet {
+  string data_server = 1;
+  int64 idx_in_list = 2;
+  string file_path = 3;
+  ProcStatus file_status = 4;
+  repeated RecordStatus record = 5;
+}
+
+message SubDataSet {
+  common.RPCRet ret = 1;
+  repeated FileDataSet files = 2;
+}
+
+message ReportSubDataSetRequest { repeated FileDataSet files = 1; }
+
+message DataSet { string file_list = 1; }
+
+message NewEpochRequest {}
+
+message SubDataSetRequest {}
+
+service Master {
+  // Cluster env
+  // user_client, computor  -> master
+  rpc GetCluster(common.ClusterRequest) returns (common.ClusterResponse) {}
+
+  // Tasks
+  /* user_client -> Master*/
+  rpc AssignDataResource(DataSet) returns (common.RPCRet) {}
+  rpc NewEpoch(NewEpochRequest) returns (common.RPCRet) {}
+
+  /* data_server - > master */
+  rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSet) {}
+
+  /* executor -> master */
+  rpc ReportSubDataSetStatus(ReportSubDataSetRequest) returns (common.RPCRet) {}
+}

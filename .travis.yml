@@ -6,8 +6,10 @@ matrix:
       install:
         - go get -u golang.org/x/lint/golint
         - curl https://glide.sh/get | bash
+        - sudo apt-get remove clang-format
+        - sudo apt-get install -y clang-format-3.8
         - sudo pip install --upgrade pip 
-        - sudo pip install pre-commit pylint --ignore-installed enum34 flask pathlib etcd3
+        - sudo pip install pre-commit pylint  --ignore-installed enum34
       script:
         - rm -f .copyright.hook
         - bash -x .tools/check_style.sh
