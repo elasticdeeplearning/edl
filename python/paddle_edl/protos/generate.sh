@@ -7,8 +7,6 @@ if [[ ! -d "/tmp/protoc" ]]; then
     wget -O protoc-3.11.4-linux-x86_64.zip  --no-check-certificate  https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
     unzip protoc-3.11.4-linux-x86_64.zip
     popd
-    go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
-    go get -u google.golang.org/grpc
 fi
 
 export PATH=/tmp/protoc/bin:$PATH
