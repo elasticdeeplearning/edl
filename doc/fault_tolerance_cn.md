@@ -27,7 +27,7 @@ Paddle本身提供`save_persistables `保存所有持久的变量。
 Paddle提供`save_check_point`和`load_check_point`两种方式来存、读checkpoint。   
 其中有两个参数需要注意一下:  
 1.fs  
-这个是我们对文件系统的抽线，目前的实现有两种：本地和远程HDFS。您可以实现自己的`FS`类来实现保存和读取checkpoint的功能
+这个是我们对文件系统的抽象，目前的实现有两种：本地和远程HDFS。您可以实现自己的`FS`类来实现保存和读取checkpoint的功能
 
 2.train_status  
 目前该类只有`epoch_no`的类变量，0.2以后的版本将尝试增加用户自定义的member等更多的值。
