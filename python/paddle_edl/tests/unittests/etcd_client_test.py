@@ -56,7 +56,7 @@ class TestEtcd(unittest.TestCase):
         self.etcd.remove_service("job_1")
         self.add()
         self.refresh()
-        time.sleep(10)
+        time.sleep(15)
         self.get_service()
 
     def update_key(self):
@@ -92,7 +92,7 @@ class TestEtcd(unittest.TestCase):
 
         print("events len:", len(events))
         assert len(events) == 1
-        assert EtcdClient.get_server_name_from_full_path(
+        assert self.etcd.get_server_name_from_full_path(
             events[0].key, "job_2") == '127.0.0.1:1'
         assert events[0].value == 'first'
 

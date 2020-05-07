@@ -101,7 +101,6 @@ class TestDataServer(unittest.TestCase):
         response = stub.GetData(request)
         assert len(response.errors.errors) == 2
         for e in response.errors.errors:
-            print(e)
             assert len(e.errors) == 3
 
         response = stub.ClearDataCache(request)

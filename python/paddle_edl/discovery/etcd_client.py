@@ -18,6 +18,7 @@ import functools
 import json
 import random
 import logging
+import time
 
 
 class NoValidEndpoint(Exception):
@@ -163,8 +164,7 @@ class EtcdClient(object):
             pass
         return
 
-    @staticmethod
-    def get_server_name_from_full_path(path, service_name):
+    def get_server_name_from_full_path(self, path, service_name):
         d = '/{}/{}/nodes/'.format(self._root, service_name)
         return path[len(d):]
 

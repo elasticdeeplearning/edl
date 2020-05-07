@@ -19,6 +19,7 @@ pushd ${build_dir}
 
 cmake ..
 make clean && make -j
+unset http_proxy https_proxy
 ctest -V -R
 
 popd
