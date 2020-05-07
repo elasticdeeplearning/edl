@@ -18,4 +18,4 @@ matrix:
         #- glide install --strip-vendor
         #- go test $(glide novendor)
         #- cd cmd/edl && go vet
-        - cd $GOPATH/src/github.com/elasticdeeplearning/edl && bash ./scripts/build.sh
+        - cd $GOPATH/src/github.com/elasticdeeplearning/edl && bash ./scripts/wraper.sh
