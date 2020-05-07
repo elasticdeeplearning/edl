@@ -4,9 +4,9 @@ BASEDIR=$(dirname $(readlink -f $0))
 
 cd ${BASEDIR}/..
 
-./build.sh > build.log 2>&1 
+bash ./scripts/build.sh > build.log 2>&1 
 
-if [[ $? == 1 ]]; then
+if [[ $? != 0 ]]; then
     echo "build failed"
     cat build.log | grep -iE "failed|error"
     exit 1
