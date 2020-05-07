@@ -1,15 +1,6 @@
 package master
 
-import (
-	"context"
-	"google.golang.org/grpc"
-	"log"
-	"net"
-)
-
-const (
-	port = ":50051"
-)
+import ()
 
 type fileDataSet struct {
 	IdxInFileList int64
@@ -28,7 +19,7 @@ func NewDataSet(fileList []string) (*DataSet, error) {
 	for i, v := range fileList {
 		o := fileDataSet{}
 
-		o.IdxInFileList = i
+		o.IdxInFileList = int64(i)
 		o.FilePath = v
 
 		d.Files = append(d.Files, o)
@@ -44,5 +35,5 @@ func (d *DataSet) StartNewEpoch() {
 
 // GetFile gets one file from the file list
 func (d *DataSet) GetFile() (string, error) {
-	return nil, nil
+	return "", nil
 }

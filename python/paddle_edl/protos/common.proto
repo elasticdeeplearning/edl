@@ -13,7 +13,7 @@
 // limitations under the License.
 
 syntax = "proto3";
-option go_package = ".;master";
+option go_package = ".;masterpb";
 
 package common;
 

@@ -2,9 +2,10 @@ package master
 
 import (
 	"context"
-	"google.golang.org/grpc"
-	"log"
-	"net"
+	log "github.com/inconshreveable/log15"
+	pb "github.com/paddlepaddle/edl/pkg/masterpb"
+	"sync"
+	"time"
 )
 
 const (
@@ -19,7 +20,7 @@ type Store interface {
 }
 
 type taskEntry struct {
-	Task Task
+	Task pb.Task
 	// A task fails if it's timeout or trainer reports it exits unnormally.
 	NumFailure int
 }
@@ -39,7 +40,7 @@ type launcher struct {
 
 // Service is the master server service.
 type Service struct {
-	UnimplementedMasterServer
+	// pb.UnimplementedMasterServer
 
 	timeoutDur time.Duration
 	failureMax int
@@ -52,23 +53,23 @@ type Service struct {
 	// store Store
 	state masterState
 
-	Chunks map[string][]Chunk // DataServerID->ChunksArray
+	Chunks map[string][]pb.Chunk // DataServerID->ChunksArray
 
-	dataServers []DataServer
-	trainers    []Trainer
-	launchers   []Launcher
+	dataServers []pb.DataServer
+	trainers    []pb.Trainer
+	// launchers   []pb.Launcher
 
 	etcd EtcdClient
 }
 
 // NewService creates a new service.
-func NewService(etcd EtcdClient, timeoutDur time.Duration, failureMax int) (*Service, error) {
+func NewService(etcd *EtcdClient, timeoutDur time.Duration, failureMax int) (*Service, error) {
 	s := &Service{}
 	s.timeoutDur = timeoutDur
 	s.failureMax = failureMax
 	s.state.Pending = make(map[int]taskEntry)
 	s.ready = make(chan struct{})
-	s.etcd = etcd
+	s.etcd = *etcd
 	if etcd != nil {
 		recovered, err := s.recover()
 		if err != nil {
@@ -88,19 +89,15 @@ func NewService(etcd EtcdClient, timeoutDur time.Duration, failureMax int) (*Ser
 }
 
 // GetSubDataSet implements the proto interface.
-func (s *Service) GetSubDataSet(context.Context, *SubDataSetRequest) (*SubDataSetResponse, error) {
+func (s *Service) GetSubDataSet(context.Context, *pb.SubDataSetRequest) (*pb.SubDataSetResponse, error) {
 	// return file from file list data set
 	// Or the data can't be accessed
 	return nil, nil
 }
 
 // ReportChunks implementes the proto interface.
-func (s *Service) ReportChunks(ctx context.Context, in *Chunks) (*RPCRet, error) {
+func (s *Service) ReportChunks(ctx context.Context, in *pb.ChunksRequest) (*pb.RPCRet, error) {
 	return nil, nil
-}
-
-func partition(chunks []Chunk, chunksPerTask int) []taskEntry {
-	return nil
 }
 
 // recover recovers service state from etcd.
@@ -115,7 +112,7 @@ func (s *Service) snapshot() error {
 	return nil
 }
 
-func readChunks(globPaths []string) ([]Chunk, error) {
+func readChunks(globPaths []string) ([]pb.Chunk, error) {
 	return nil, nil
 }
 
@@ -151,13 +148,13 @@ func (s *Service) logCtx() log.Ctx {
 		"pendingLen": len(s.state.Pending),
 		"doneLen":    len(s.state.Done),
 		"failedLen":  len(s.state.Failed),
-		"curPass":    s.state.CurPass,
+		"curPass":    s.state.CurEpoch,
 	}
 }
 
 // GetTask gets a new task from the service.
 // passID is the client side pass count
-func (s *Service) GetTask(passID int, task *Task) error {
+func (s *Service) GetTask(passID int, task *pb.Task) error {
 	return nil
 }
 
@@ -167,6 +164,6 @@ func (s *Service) TaskFinished(taskID int, dummy *int) error {
 }
 
 // TaskFailed tells the service that a task is failed.
-func (s *Service) TaskFailed(meta TaskMeta, dummy *int) error {
+func (s *Service) TaskFailed(meta pb.TaskMeta, dummy *int) error {
 	return nil
 }

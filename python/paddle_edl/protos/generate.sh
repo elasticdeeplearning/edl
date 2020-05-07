@@ -14,6 +14,6 @@ export PATH=/tmp/protoc/bin:$PATH
 protoc --go_out=plugins=grpc:./  master.proto
 protoc --go_out=plugins=grpc:./  common.proto
 
-mv *.go ../../../pkg/master/
+mv *.go ../../../pkg/masterpb
 python ./run_codegen.py
  

@@ -15,7 +15,7 @@
 syntax = "proto3";
 
 import "common.proto";
-option go_package = ".;master";
+option go_package = ".;masterpb";
 package master;
 
 enum ProcStatus {
@@ -30,7 +30,7 @@ message FileMeta {
   int64 idx_in_list = 1;
   string file_path = 2;
   // only no
-  repeated RecordRange filted_records = 3;
+  repeated common.RecordRange filted_records = 3;
 }
 
 message SubDataSetResponse {
@@ -44,7 +44,7 @@ message DataServer {
   string endpoint = 3;
 }
 
-message Trainer {
+message TrainerRequest {
   string pod_id = 1;
   int32 rank = 2;
   string endpoint = 3;
@@ -54,7 +54,7 @@ message Chunk {
   DataServer data_server = 1;
   int64 idx_in_list = 2;
   string file_path = 3;
-  repeated RecordRange records = 4;
+  repeated common.RecordRange records = 4;
 }
 
 message ChunksRequest { repeated Chunk chunks = 1; }
@@ -73,7 +73,7 @@ message Task {
 
 message Tasks { repeated Task tasks = 1; }
 
-message TaskRequest { Trainer trainer = 1; }
+message TaskRequest { TrainerRequest trainer = 1; }
 message TaskResponse {
   common.RPCRet ret = 1;
   repeated Task tasks = 2;
