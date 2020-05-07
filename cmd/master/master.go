@@ -21,6 +21,7 @@ import (
 
 	log "github.com/inconshreveable/log15"
 	"github.com/namsral/flag"
+	master "github.com/paddlepaddle/edl/pkg/master"
 )
 
 func main() {
@@ -75,26 +76,24 @@ func main() {
 	// Guaranteed to run even panic happens.
 	defer shutdown()
 
-	s, err := master.NewService(store, *chunkPerTask, *taskTimeoutDur, *taskTimeoutMax)
+	s, err := master.NewService(store, *taskTimeoutDur, *taskTimeoutMax)
 	if err != nil {
 		log.Crit("error creating new service.", log.Ctx{"error": err})
 		panic(err)
 	}
 
 	grpcServer := grpc.NewServer()
-	var server Server
-	countries.RegisterCountryServer(grpcServer, server)
-	listen, err := net.Listen("tcp", "0.0.0.0:3000")
+	countries.RegisterCountryServer(grpcServer, s)
+	listen, err := net.Listen("tcp", fmt.Sprintf(":%v", *port))
 	if err != nil {
 		log.Fatalf("could not listen to 0.0.0.0:3000 %v", err)
 	}
-	log.Println("Server starting...")
-	log.Fatal(grpcServer.Serve(listen))
 
 	go func() {
-		err = http.Serve(l, nil)
+		log.Println("Server starting...")
+		err = grpcServer.Serve(listen)
 		if err != nil {
-			log.Crit("error serving HTTP", log.Ctx{"error": err})
+			log.Crit("error serving", log.Ctx{"error": err})
 			panic(err)
 		}
 	}()
