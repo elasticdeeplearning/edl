@@ -23,6 +23,10 @@ import threading
 import grpc
 import signal
 import paddle_edl.utils.common_pb2 as common_pb2
+import os
+
+os.environ["https_proxy"] = ""
+os.environ["http_proxy"] = ""
 
 
 class TestDataServer(unittest.TestCase):
