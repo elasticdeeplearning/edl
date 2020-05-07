@@ -12,4 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set(GOPATH "${CMAKE_CURRENT_BINARY_DIR}/go")
+file(MAKE_DIRECTORY ${GOPATH})
 go_binary(master SRC master.go)
