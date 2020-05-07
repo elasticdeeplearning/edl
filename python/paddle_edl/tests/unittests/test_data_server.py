@@ -108,5 +108,5 @@ class TestDataServer(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    logger = get_logger(10)
+    logger = get_logger(20)
     unittest.main()

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xe
+set -e
 unset GREP_OPTIONS
 BASEDIR=$(dirname $(readlink -f $0))
 
