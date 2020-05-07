@@ -154,16 +154,36 @@ func (s *Service) logCtx() log.Ctx {
 
 // GetTask gets a new task from the service.
 // passID is the client side pass count
-func (s *Service) GetTask(passID int, task *pb.Task) error {
-	return nil
-}
-
-// TaskFinished tell the service that a task is finished.
-func (s *Service) TaskFinished(taskID int, dummy *int) error {
-	return nil
+func (s *Service) GetTask(context.Context, *pb.TaskRequest) (*pb.TaskResponse, error) {
+	return nil, nil
 }
 
 // TaskFailed tells the service that a task is failed.
 func (s *Service) TaskFailed(meta pb.TaskMeta, dummy *int) error {
 	return nil
+}
+
+// AddInitDataSet adds a initial dataset to service.
+func (s *Service) AddInitDataSet(context.Context, *pb.DataSet) (*pb.RPCRet, error) {
+	return nil, nil
+}
+
+// GetCluster gets cluster elements from the service.
+func (s *Service) GetCluster(ctx context.Context, in *pb.ClusterRequest) (*pb.ClusterResponse, error) {
+	return nil, nil
+}
+
+// NewEpoch starts a new epoch of the service.
+func (s *Service) NewEpoch(ctx context.Context, in *pb.NewEpochRequest) (*pb.RPCRet, error) {
+	return nil, nil
+}
+
+// TaskErrored reports a new tasks error to the service.
+func (s *Service) TaskErrored(ctx context.Context, in *pb.Tasks) (*pb.RPCRet, error) {
+	return nil, nil
+}
+
+// TaskFinished tell the service that a task is finished.
+func (s *Service) TaskFinished(ctx context.Context, in *pb.Tasks) (*pb.RPCRet, error) {
+	return nil, nil
 }

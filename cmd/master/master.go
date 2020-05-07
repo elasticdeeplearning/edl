@@ -15,13 +15,18 @@
 package main
 
 import (
-	"os"
-	"os/signal"
-	"time"
-
+	"fmt"
 	log "github.com/inconshreveable/log15"
 	"github.com/namsral/flag"
 	master "github.com/paddlepaddle/edl/pkg/master"
+	pb "github.com/paddlepaddle/edl/pkg/masterpb"
+	utils "github.com/paddlepaddle/edl/pkg/utils"
+	grpc "google.golang.org/grpc"
+	"net"
+	"os"
+	"os/signal"
+	"strings"
+	"time"
 )
 
 func main() {
@@ -45,21 +50,22 @@ func main() {
 	)
 
 	if *endpoints == "" {
-		log.Fatal("-endpoints not set!.")
+		log.Crit("-endpoints not set!.")
+		panic("")
 	}
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
 	eps := strings.Split(*endpoints, ",")
-	ip, err := networkhelper.GetExternalIP()
+	ip, err := utils.GetExternalIP()
 	if err != nil {
 		log.Crit("get external ip error", log.Ctx{"error": err})
 		panic(err)
 	}
 
 	addr := fmt.Sprintf("%s:%d", ip, *port)
-	store, err = master.NewEtcdClient(eps, addr, master.DefaultLockPath, master.DefaultAddrPath, master.DefaultStatePath, *ttlSec)
+	store, err := master.NewEtcdClient(eps, addr, master.DefaultLockPath, master.DefaultAddrPath, master.DefaultStatePath, *ttlSec)
 	if err != nil {
 		log.Crit("error creating etcd client.", log.Ctx{"error": err})
 		panic(err)
@@ -83,14 +89,14 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	countries.RegisterCountryServer(grpcServer, s)
+	pb.RegisterMasterServer(grpcServer, s)
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%v", *port))
 	if err != nil {
-		log.Fatalf("could not listen to 0.0.0.0:3000 %v", err)
+		log.Crit("could not listen to 0.0.0.0:3000 %v", err)
 	}
 
 	go func() {
-		log.Println("Server starting...")
+		log.Info("Server starting...")
 		err = grpcServer.Serve(listen)
 		if err != nil {
 			log.Crit("error serving", log.Ctx{"error": err})

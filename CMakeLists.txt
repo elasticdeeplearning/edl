@@ -18,3 +18,4 @@ ENDIF()
 
 add_subdirectory(python)
 add_subdirectory(cmd/master)
+add_subdirectory(pkg/utils)

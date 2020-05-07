@@ -31,6 +31,10 @@ const (
 	DefaultAddrPath = "/master/addr"
 )
 
+const (
+	dialTimeout = 5 * time.Second
+)
+
 // EtcdClient is the etcd client that the master uses for fault
 // tolerance and service registry.
 type EtcdClient struct {
