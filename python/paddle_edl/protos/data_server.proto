@@ -36,8 +36,9 @@ enum DataStatus {
 message Files { repeated File files = 1; }
 
 message RecordError {
-  // int64 record_no = 1;
-  common.RecordRange records = 1;
+  // common.RecordRange records = 1;
+  // DataStatus status = 2;
+  int64 record_no = 1;
   DataStatus status = 2;
 }
 message FileError {

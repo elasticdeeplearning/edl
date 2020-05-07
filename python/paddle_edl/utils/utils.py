@@ -44,34 +44,38 @@ def file_list_to_dataset(file_list):
                 continue
 
             line_no += 1
-            meta = master_pb2.FileDataSet()
+            meta = master_pb2.FileMeta()
             meta.idx_in_list = line_no
             meta.file_path = line
-            meta.file_status = master_pb2.ProcStatus.INITIAL
             ret.append(meta)
-            #print(dataset_to_string(meta))
     return ret
 
 
 def dataset_to_string(o):
-    ret = "data_server:{}, idx_in_list:{}, file_path:{} file_status:{}".format(
-        o.data_server, o.idx_in_list, o.file_path, o.file_status)
+    """
+    FileMeta to string
+    """
+    ret = "idx_in_list:{}, file_path:{}".format(o.idx_in_list, o.file_path)
 
     ret += " record:["
-    for r in o.record:
-        ret += "(record_no:{} record_status:{})".format(r.record_no,
-                                                        r.record_status)
+    for rs in o.records:
+        for rec_no in range(rs.begin, rs.end + 1):
+            ret += "(record_no:{})".format(rec_no)
     ret += "]"
 
     return ret
 
 
 def datameta_to_string(o):
+    """
+    DataMeta to string
+    """
     ret = "idx_in_list:{} file_path:{}".format(o.idx_in_list, o.file_path)
 
     ret += " record_no:["
-    for r in o.record_no:
-        ret += "(record_no:{})".format(r)
+    for rs in o.records:
+        for rec_no in range(rs.begin, rs.end + 1):
+            ret += "(record_no:{})".format(rec_no)
     ret += "]"
 
     return ret

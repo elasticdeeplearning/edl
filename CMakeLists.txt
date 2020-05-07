@@ -6,7 +6,6 @@ SET(EDL_INSTALL_DIR ${CMAKE_BINARY_DIR}/output)
 SET(CMAKE_INSTALL_RPATH "$ORIGIN" "${CMAKE_INSTALL_RPATH}")
 project(paddle_edl)
 
-include(generic) 
 include(python)
 
 option(WITH_TESTING     "Compile EDL with unit testing"        ON)

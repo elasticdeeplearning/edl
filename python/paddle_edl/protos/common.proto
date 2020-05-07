@@ -40,7 +40,14 @@ message ClusterRequest { string job_id = 1; }
 
 message ShutDownRequest {}
 
+enum ProcStatus {
+  INITIAL = 0;
+  PART_PROCESSED = 1;
+  PROCESSED = 2;
+};
+
 message RecordRange {
-  int64 begin = 1;
-  int64 end = 2;
+  ProcStatus status = 1;
+  int64 begin = 2;
+  int64 end = 3;
 }

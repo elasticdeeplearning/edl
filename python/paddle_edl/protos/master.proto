@@ -18,19 +18,13 @@ import "common.proto";
 option go_package = ".;masterpb";
 package master;
 
-enum ProcStatus {
-  INITIAL = 0;
-  PART_PROCESSED = 1;
-  PROCESSED = 2;
-};
-
 message SubDataSetRequest {}
 
 message FileMeta {
   int64 idx_in_list = 1;
   string file_path = 2;
   // only no
-  repeated common.RecordRange filted_records = 3;
+  repeated common.RecordRange records = 3;
 }
 
 message SubDataSetResponse {
