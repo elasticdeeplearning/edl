@@ -69,17 +69,19 @@ func NewService(etcd EtcdClient, timeoutDur time.Duration, failureMax int) (*Ser
 	s.state.Pending = make(map[int]taskEntry)
 	s.ready = make(chan struct{})
 	s.etcd = etcd
-	recovered, err := s.recover()
-	if err != nil {
-		return nil, err
-	}
+	if etcd != nil {
+		recovered, err := s.recover()
+		if err != nil {
+			return nil, err
+		}
 
-	if recovered {
-		// Recovered. Now the state is already initialized,
-		// and the master is ready.
-		s.initDone = true
-		close(s.ready)
-		log.Info("Master recovered from saved state.")
+		if recovered {
+			// Recovered. Now the state is already initialized,
+			// and the master is ready.
+			s.initDone = true
+			close(s.ready)
+			log.Info("Master recovered from saved state.")
+		}
 	}
 
 	return s, nil

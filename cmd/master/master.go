@@ -25,7 +25,7 @@ import (
 
 func main() {
 	port := flag.Int("port", 8080, "port of the master server.")
-	ttlSec := flag.Int("ttl", 60, "etcd lease TTL in seconds.")
+	ttlSec := flag.Int("ttl", 10, "etcd lease TTL in seconds.")
 	endpoints := flag.String("endpoints", "http://127.0.0.1:2379", "comma separated etcd endpoints. If empty, fault tolerance will not be enabled.")
 	taskTimeoutDur := flag.Duration("task-timout-dur", 20*time.Minute, "task timout duration.")
 	taskTimeoutMax := flag.Int("task-timeout-max", 3, "max timtout count for each task before it being declared failed task.")
@@ -44,71 +44,60 @@ func main() {
 	)
 
 	if *endpoints == "" {
-		log.Warn("-endpoints not set, fault tolerance not be enabled.")
+		log.Fatal("-endpoints not set!.")
 	}
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
-	/*
-		var store master.Store
-		if *endpoints != "" {
-			eps := strings.Split(*endpoints, ",")
-			ip, err := networkhelper.GetExternalIP()
-			if err != nil {
-				log.Crit("get external ip error", log.Ctx{"error": err})
-				panic(err)
-			}
+	eps := strings.Split(*endpoints, ",")
+	ip, err := networkhelper.GetExternalIP()
+	if err != nil {
+		log.Crit("get external ip error", log.Ctx{"error": err})
+		panic(err)
+	}
 
-			addr := fmt.Sprintf("%s:%d", ip, *port)
-			store, err = master.NewEtcdClient(eps, addr, master.DefaultLockPath, master.DefaultAddrPath, master.DefaultStatePath, *ttlSec)
-			if err != nil {
-				log.Crit("error creating etcd client.", log.Ctx{"error": err})
-				panic(err)
-			}
-		} else {
-			store = &master.InMemStore{}
+	addr := fmt.Sprintf("%s:%d", ip, *port)
+	store, err = master.NewEtcdClient(eps, addr, master.DefaultLockPath, master.DefaultAddrPath, master.DefaultStatePath, *ttlSec)
+	if err != nil {
+		log.Crit("error creating etcd client.", log.Ctx{"error": err})
+		panic(err)
+	}
+
+	shutdown := func() {
+		log.Info("shutting down gracefully")
+		err := store.Shutdown()
+		if err != nil {
+			log.Error("shutdown error", log.Ctx{"error": err})
 		}
+	}
 
-		shutdown := func() {
-			log.Info("shutting down gracefully")
-			err := store.Shutdown()
-			if err != nil {
-				log.Error("shutdown error", log.Ctx{"error": err})
-			}
+	// Guaranteed to run even panic happens.
+	defer shutdown()
+
+	s, err := master.NewService(store, *chunkPerTask, *taskTimeoutDur, *taskTimeoutMax)
+	if err != nil {
+		log.Crit("error creating new service.", log.Ctx{"error": err})
+		panic(err)
+	}
+
+	grpcServer := grpc.NewServer()
+	var server Server
+	countries.RegisterCountryServer(grpcServer, server)
+	listen, err := net.Listen("tcp", "0.0.0.0:3000")
+	if err != nil {
+		log.Fatalf("could not listen to 0.0.0.0:3000 %v", err)
+	}
+	log.Println("Server starting...")
+	log.Fatal(grpcServer.Serve(listen))
+
+	go func() {
+		err = http.Serve(l, nil)
+		if err != nil {
+			log.Crit("error serving HTTP", log.Ctx{"error": err})
+			panic(err)
 		}
-
-		// Guaranteed to run even panic happens.
-		defer shutdown()
-
-
-			s, err := master.NewService(store, *chunkPerTask, *taskTimeoutDur, *taskTimeoutMax)
-			if err != nil {
-				log.Crit("error creating new service.", log.Ctx{"error": err})
-				panic(err)
-			}
-
-			err = rpc.Register(s)
-			if err != nil {
-				log.Crit("error registering to etcd.", log.Ctx{"error": err})
-				panic(err)
-			}
-
-			rpc.HandleHTTP()
-			l, err := net.Listen("tcp", ":"+strconv.Itoa(*port))
-			if err != nil {
-				log.Crit("error listing to port", log.Ctx{"error": err, "port": *port})
-				panic(err)
-			}
-
-			go func() {
-				err = http.Serve(l, nil)
-				if err != nil {
-					log.Crit("error serving HTTP", log.Ctx{"error": err})
-					panic(err)
-				}
-			}()
-	*/
+	}()
 
 	<-c
 }
