@@ -85,8 +85,9 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                 break
 
             rec_map = {}
-            for rec in file_data_set.record:
-                rec_map[rec.record_no] = rec.status
+            for one_range in file_data_set.records:
+                for rec_no in range(one_range.begin, one_range.end + 1):
+                    rec_map[rec.record_no] = one_range.status
 
             for rec_no, data in enumerate(
                     self._data_set_reader.reader(file_data_set.file_path)):
@@ -139,22 +140,24 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                     record_error = data_server_pb2.RecordError()
                     record_error.status = data_server_pb2.DataStatus.NOT_FOUND
 
-                    for rec_no in meta.record_no:
-                        if rec_no not in self._data[key]:
-                            record_error.record_no = rec_no
-                            record_error.status = data_server_pb2.DataStatus.NOT_FOUND
-                            file_error.errors.append(record_error)
-                            logger.error(
-                                "file key:{} rec_no:{} not found in cache".
-                                format(key, rec_no))
-                            continue
+                    for one_range in meta.records:
+                        for rec_no in range(one_range.begin,
+                                            one_range.end + 1):
+                            if rec_no not in self._data[key]:
+                                record_error.record_no = rec_no
+                                record_error.status = data_server_pb2.DataStatus.NOT_FOUND
+                                file_error.errors.append(record_error)
+                                logger.error(
+                                    "file key:{} rec_no:{} not found in cache".
+                                    format(key, rec_no))
+                                continue
 
-                        data = self._data[key][rec_no]
+                            data = self._data[key][rec_no]
 
-                        record.record_no = rec_no
-                        record.data = data
+                            record.record_no = rec_no
+                            record.data = data
 
-                        one_file.records.append(record)
+                            one_file.records.append(record)
 
                     if len(file_error.errors) > 0:
                         files_error.errors.append(file_error)

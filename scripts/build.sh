@@ -1,21 +1,31 @@
 #!/bin/bash
-set -xe
+set -e
 unset GREP_OPTIONS
 BASEDIR=$(dirname $(readlink -f $0))
 
 cd ${BASEDIR}/..
 
-pip install etcd3 grpcio_tools grpcio flask pathlib --ignore-installed
-pip install paddlepaddle-gpu  --ignore-installed
+python -m pip install etcd3 grpcio_tools grpcio flask pathlib --ignore-installed
+python -m pip install paddlepaddle-gpu  --ignore-installed
 
 pushd python/paddle_edl/protos/
-python run_codegen.py
+bash generate.sh
 popd
+
 
 build_dir=build
 mkdir -p  ${build_dir}
-cd ${build_dir}
+pushd ${build_dir}
 
 cmake ..
 make clean && make -j
 ctest -V -R
+
+popd
+
+#test all go test
+go test --cover ./...
+mkdir -p build/cmd/master/
+
+#build
+go build   -o build/master/master cmd/master/master.go

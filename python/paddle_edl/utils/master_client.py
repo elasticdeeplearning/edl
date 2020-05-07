@@ -13,13 +13,15 @@
 # limitations under the License.
 
 
-class EdlExeception(object):
-    pass
+class Client(object):
+    def __init__(self):
+        self._endpoint = MasterFinder().get_master()
 
+    def get_cluster(self, pod_id=None):
+        pass
 
-class DataSetEndException(EdlExeception):
-    pass
+    def assign_data_source(self):
+        pass
 
-
-class RegisterFailureExeception(EdlExeception):
-    pass
+    def new_epoch(self):
+        pass

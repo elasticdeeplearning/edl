@@ -28,7 +28,7 @@ class TestEtcd(unittest.TestCase):
         local_servers = {"127.0.0.1:1": "first", "127.0.0.1:2": "second"}
 
         for k, v in local_servers.items():
-            self.etcd.set_server("job_1", k, v)
+            self.etcd.set_server_not_exists("job_1", k, v)
 
         servers = self.etcd.get_service("job_1")
         assert len(servers) == 2, "must two servers"
@@ -56,11 +56,11 @@ class TestEtcd(unittest.TestCase):
         self.etcd.remove_service("job_1")
         self.add()
         self.refresh()
-        time.sleep(10)
+        time.sleep(15)
         self.get_service()
 
     def update_key(self):
-        self.etcd.set_server("job_2", "127.0.0.1:1", "first")
+        self.etcd.set_server_not_exists("job_2", "127.0.0.1:1", "first")
 
     def test_watch(self):
         events = []
@@ -92,7 +92,7 @@ class TestEtcd(unittest.TestCase):
 
         print("events len:", len(events))
         assert len(events) == 1
-        assert EtcdClient.get_server_name_from_full_path(
+        assert self.etcd.get_server_name_from_full_path(
             events[0].key, "job_2") == '127.0.0.1:1'
         assert events[0].value == 'first'
 

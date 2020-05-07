@@ -23,6 +23,10 @@ import threading
 import grpc
 import signal
 import paddle_edl.utils.common_pb2 as common_pb2
+import os
+
+os.environ["https_proxy"] = ""
+os.environ["http_proxy"] = ""
 
 
 class TestDataServer(unittest.TestCase):
@@ -56,8 +60,10 @@ class TestDataServer(unittest.TestCase):
             meta = data_server_pb2.DataMeta()
             meta.idx_in_list = t.idx_in_list
             meta.file_path = t.file_path
-            for i in range(3):
-                meta.record_no.append(i)
+            r_range = common_pb2.RecordRange()
+            r_range.begin = 0
+            r_range.end = 2
+            meta.records.append(r_range)
 
             request.metas.append(meta)
 
@@ -87,9 +93,10 @@ class TestDataServer(unittest.TestCase):
             meta = data_server_pb2.DataMeta()
             meta.idx_in_list = t.idx_in_list
             meta.file_path = t.file_path
-            for i in range(3):
-                meta.record_no.append(i)
-
+            r_range = common_pb2.RecordRange()
+            r_range.begin = 0
+            r_range.end = 2
+            meta.records.append(r_range)
             request.metas.append(meta)
 
         # clear
@@ -105,5 +112,5 @@ class TestDataServer(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    logger = get_logger(10)
+    logger = get_logger(20)
     unittest.main()

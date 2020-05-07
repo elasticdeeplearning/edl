@@ -36,6 +36,8 @@ enum DataStatus {
 message Files { repeated File files = 1; }
 
 message RecordError {
+  // common.RecordRange records = 1;
+  // DataStatus status = 2;
   int64 record_no = 1;
   DataStatus status = 2;
 }
@@ -58,7 +60,8 @@ message DataMeta {
   int64 idx_in_list = 1;
   string file_path = 2;
   // int32 file_status = 4;
-  repeated int64 record_no = 3;
+  // repeated int64 record_no = 3;
+  repeated common.RecordRange records = 3;
 }
 
 message DataRequest { repeated DataMeta metas = 1; }

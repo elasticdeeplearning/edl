@@ -15,39 +15,71 @@
 syntax = "proto3";
 
 import "common.proto";
+option go_package = ".;masterpb";
 package master;
 
-enum ProcStatus {
-  INITIAL = 0;
-  PART_PROCESSED = 1;
-  PROCESSED = 2;
-};
+message SubDataSetRequest {}
 
-message RecordStatus {
-  int64 record_no = 1;
-  ProcStatus status = 2;
+message FileMeta {
+  int64 idx_in_list = 1;
+  string file_path = 2;
+  // only no
+  repeated common.RecordRange records = 3;
 }
 
-message FileDataSet {
-  string data_server = 1;
+message SubDataSetResponse {
+  common.RPCRet ret = 1;
+  repeated FileMeta metas = 2;
+}
+
+message DataServer {
+  string pod_id = 1;
+  int32 rank = 2;
+  string endpoint = 3;
+}
+
+message TrainerRequest {
+  string pod_id = 1;
+  int32 rank = 2;
+  string endpoint = 3;
+}
+
+message Chunk {
+  DataServer data_server = 1;
   int64 idx_in_list = 2;
   string file_path = 3;
-  ProcStatus file_status = 4;
-  repeated RecordStatus record = 5;
+  repeated common.RecordRange records = 4;
 }
 
-message SubDataSet {
+message ChunksRequest { repeated Chunk chunks = 1; }
+
+message TaskMeta {
+  string task_id = 1;
+  int32 epoch_no = 2;
+  string Stage = 3;
+  int32 batch_size = 4; // records's num
+}
+
+message Task {
+  TaskMeta meta = 1;
+  repeated Chunk chunks = 2;
+}
+
+message Tasks { repeated Task tasks = 1; }
+
+message TaskRequest { TrainerRequest trainer = 1; }
+message TaskResponse {
   common.RPCRet ret = 1;
-  repeated FileDataSet files = 2;
+  repeated Task tasks = 2;
 }
-
-message ReportSubDataSetRequest { repeated FileDataSet files = 1; }
 
 message DataSet { string file_list = 1; }
-
 message NewEpochRequest {}
 
-message SubDataSetRequest {}
+message ChunksResponse {
+  common.RPCRet ret = 1;
+  repeated Chunk chunks = 2;
+}
 
 service Master {
   // Cluster env
@@ -56,12 +88,15 @@ service Master {
 
   // Tasks
   /* user_client -> Master*/
-  rpc AssignDataResource(DataSet) returns (common.RPCRet) {}
+  rpc AddInitDataSet(DataSet) returns (common.RPCRet) {}
   rpc NewEpoch(NewEpochRequest) returns (common.RPCRet) {}
 
   /* data_server - > master */
-  rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSet) {}
+  rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSetResponse) {}
+  rpc ReportChunks(ChunksRequest) returns (common.RPCRet) {}
 
   /* executor -> master */
-  rpc ReportSubDataSetStatus(ReportSubDataSetRequest) returns (common.RPCRet) {}
+  rpc GetTask(TaskRequest) returns (TaskResponse) {}
+  rpc TaskFinished(Tasks) returns (common.RPCRet) {}
+  rpc TaskErrored(Tasks) returns (common.RPCRet) {}
 }
