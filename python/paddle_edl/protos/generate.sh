@@ -9,7 +9,10 @@ if [[ ! -d "/tmp/protoc" ]]; then
     popd
 fi
 
-export PATH=/tmp/protoc/bin:$PATH
+pushd  /tmp/
+go get -u -v github.com/golang/protobuf/protoc-gen-go@v1.3.0
+popd
+export PATH=/tmp/protoc/bin:$PATH:$(go env GOPATH)
 
 protoc --go_out=plugins=grpc:./  master.proto
 protoc --go_out=plugins=grpc:./  common.proto
