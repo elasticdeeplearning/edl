@@ -8,6 +8,6 @@ bash ./scripts/build.sh > build.log 2>&1
 
 if [[ $? != 0 ]]; then
     echo "build failed"
-    cat build.log | grep -iE "failed|error"
+    cat build.log | grep -iE "fail|error"
     exit 1
 fi
