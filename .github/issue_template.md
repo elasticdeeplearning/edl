@@ -17,9 +17,9 @@ about: 您可以提问训练中报错、应用、出core等问题。 You could u
 - 复现信息：如为报错，请给出复现环境、复现步骤
 - 问题描述：请详细描述您的问题，同步贴出报错信息、日志、可复现的代码片段
 
-Thank you for contributing to EDL.
-Before submitting the issue, you could search the issue in the GitHub in case that there was a similar issue submitted or resolved before.
-If there is no solution, please make sure that this is a training issue including the following details:
+Thank you for contributing to EDL. 
+Before submitting the issue, you could search the issue in the GitHub in case that there was a similar issue submitted or resolved before. 
+If there is no solution, please make sure that this is a training issue including the following details: 
 
 - System information:  
   - PaddlePaddle version （eg.1.8）or commit
