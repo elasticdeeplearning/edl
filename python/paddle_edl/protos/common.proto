@@ -46,8 +46,12 @@ enum ProcStatus {
   PROCESSED = 2;
 };
 
-message RecordRange {
+message RecordRangeStatus {
   ProcStatus status = 1;
+  int64 begin = 2;
+  int64 end = 3;
+}
+message RecordRange {
   int64 begin = 2;
   int64 end = 3;
 }

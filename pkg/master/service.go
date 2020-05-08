@@ -60,6 +60,8 @@ type Service struct {
 	// launchers   []pb.Launcher
 
 	etcd EtcdClient
+
+	dataset map[string]pb.DataSet
 }
 
 // NewService creates a new service.
@@ -164,8 +166,19 @@ func (s *Service) TaskFailed(meta pb.TaskMeta, dummy *int) error {
 }
 
 // AddInitDataSet adds a initial dataset to service.
-func (s *Service) AddInitDataSet(context.Context, *pb.DataSet) (*pb.RPCRet, error) {
-	return nil, nil
+func (s *Service) AddInitDataSet(context.Context, in *pb.DataSet) (*pb.RPCRet, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.dataset != nil{
+		if _, ok = s.dataset[in.name]; ok {
+			return nil, DuplicateInitDataSet(fmt.Sprintf("dataset:%v", in.name))
+		}
+	}else{
+		s.dataset =make(map[string]pb.DataSet)
+		s.dataset[in.name] = *in
+	}
+
+	return nil
 }
 
 // GetCluster gets cluster elements from the service.

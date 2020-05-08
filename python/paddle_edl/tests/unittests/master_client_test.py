@@ -12,25 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import master_pb2
-import master_pb2_grpc
+import unittest
+from paddle_edl.utils.data_server import DataServer
+from paddle_edl.utils.dataset import TxtDataSet
+import paddle_edl.utils.master_pb2_grpc as master_pb2_grpc
+import paddle_edl.utils.master_pb2 as master_pb2
+from paddle_edl.utils.utils import file_list_to_dataset, get_logger
+import time
+import threading
+import grpc
+import signal
+import paddle_edl.utils.common_pb2 as common_pb2
+import os
+
+os.environ["https_proxy"] = ""
+os.environ["http_proxy"] = ""
 
 
-class Client(object):
-    def __init__(self, endpoint):
-        #self._endpoint = MasterFinder().get_master()
-        self._endpoint = endpoint
-
-    def get_cluster(self, pod_id=None):
+class TestMasterClient(unittest.TestCase):
+    def setUp(self):
+        self._client = Client()
         pass
 
-    def add_dataset(self, dataset):
-        channel = grpc.insecure_channel(self._endpoint)
-        stub = master_pb2_grpc.MasterStub(channel)
-
-        # get data
-        response = stub.AddDataSet(dataset)
-        print(response)
-
-    def new_epoch(self):
+    def test_add_dataset(self):
         pass
