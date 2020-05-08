@@ -31,7 +31,8 @@ class Client(object):
 
         # get data
         response = stub.AddDataSet(dataset)
-        print(response)
+        print("response:", response)
+        return response
 
     def new_epoch(self):
         pass

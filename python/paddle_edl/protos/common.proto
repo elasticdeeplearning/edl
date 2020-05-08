@@ -18,8 +18,8 @@ option go_package = ".;masterpb";
 package common;
 
 message RPCRet {
-  int32 err_code = 1;
-  int32 err_info = 2;
+  string type = 1;
+  string detail = 2;
 }
 
 message Trainer {}

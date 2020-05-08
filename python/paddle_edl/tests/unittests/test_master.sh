@@ -1,6 +1,11 @@
 #!/bin/bash
-# start master
+nohup /tmp/etcd-download-test/etcd 2>&1 &
+etcd_pid=$!
 
-# test master client
+nohup ../../../../build/master/master 2>&1 &
+master_pid=$!
 
-# kill master
+unset https_proxy http_proxy
+python ./master_client_test.py
+
+kill -9 $etcd_pid $master_pid

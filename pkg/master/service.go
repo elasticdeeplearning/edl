@@ -172,14 +172,14 @@ func (s *Service) AddDataSet(ctx context.Context, in *pb.DataSet) (*pb.RPCRet, e
 	defer s.mu.Unlock()
 	if s.dataset != nil {
 		if _, ok := s.dataset[in.Name]; ok {
-			return nil, DuplicateInitDataSet(fmt.Sprintf("dataset:%v", in.Name))
+			return DuplicateInitDataSet(fmt.Sprintf("dataset:%v", in.Name)).ToRPCRet(), nil
 		}
 	} else {
 		s.dataset = make(map[string]pb.DataSet)
 		s.dataset[in.Name] = *in
 	}
 
-	return nil, nil
+	return &pb.RPCRet{}, nil
 }
 
 // GetCluster gets cluster elements from the service.

@@ -2,6 +2,7 @@ package master
 
 import (
 	"fmt"
+	pb "github.com/paddlepaddle/edl/pkg/masterpb"
 )
 
 // ErrorType is the typei name of error.
@@ -30,7 +31,7 @@ func (t ErrorType) String() string {
 
 // Error implements the error interface.
 func (v *Error) Error() string {
-	return fmt.Sprintf("%s", v.ErrorBody())
+	return fmt.Sprintf("%s", v.errorBody())
 }
 
 func (v *Error) errorBody() string {
@@ -39,6 +40,14 @@ func (v *Error) errorBody() string {
 		s += fmt.Sprintf(": %s", v.Detail)
 	}
 	return s
+}
+
+// ToRPCRet converts Error to RPCRet
+func (v *Error) ToRPCRet() *pb.RPCRet {
+	ret := &pb.RPCRet{}
+	ret.Type = string(v.Type)
+	ret.Detail = v.Detail
+	return ret
 }
 
 // DuplicateInitDataSet make the correspond error.

@@ -41,7 +41,11 @@ class TestMasterClient(unittest.TestCase):
         for t in file_list_to_dataset('./test_file_list.txt'):
             dataset.file_list.append(t.file_path)
 
-        self._client.add_dataset(dataset)
+        res = self._client.add_dataset(dataset)
+        assert res is None or res.type == "", "must not any error"
+
+        res = self._client.add_dataset(dataset)
+        assert res.type == "DuplicateInitDataSet", "must error"
 
 
 if __name__ == '__main__':
