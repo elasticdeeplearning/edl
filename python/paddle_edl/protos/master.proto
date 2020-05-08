@@ -101,7 +101,6 @@ service Master {
   // Tasks
   /* user_client -> Master*/
   rpc AddDataSet(DataSet) returns (common.RPCRet) {}
-  // rpc AddInitDataSet(DataSet) returns () {}
   rpc NewEpoch(NewEpochRequest) returns (common.RPCRet) {}
 
   /* data_server - > master */

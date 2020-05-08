@@ -17,6 +17,7 @@ export PATH=/tmp/protoc/bin:$PATH:$(go env GOPATH)
 protoc --go_out=plugins=grpc:./  master.proto
 protoc --go_out=plugins=grpc:./  common.proto
 
+mkdir -p ../../../pkg/masterpb
 mv *.go ../../../pkg/masterpb
 python ./run_codegen.py
  

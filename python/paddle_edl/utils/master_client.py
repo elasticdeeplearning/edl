@@ -27,10 +27,7 @@ class Client(object):
     def add_dataset(self, dataset):
         channel = grpc.insecure_channel(self._endpoint)
         stub = master_pb2_grpc.MasterStub(channel)
-
-        # get data
-        response = stub.AddDataSet(dataset)
-        return response
+        return stub.AddDataSet(dataset)
 
     def new_epoch(self):
         pass
