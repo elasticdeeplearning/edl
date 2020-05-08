@@ -18,6 +18,7 @@ from paddle_edl.utils.dataset import TxtDataSet
 import paddle_edl.utils.master_pb2_grpc as master_pb2_grpc
 import paddle_edl.utils.master_pb2 as master_pb2
 from paddle_edl.utils.utils import file_list_to_dataset, get_logger
+from paddle_edl.utils.master_client import Client
 import time
 import threading
 import grpc
@@ -31,8 +32,18 @@ os.environ["http_proxy"] = ""
 
 class TestMasterClient(unittest.TestCase):
     def setUp(self):
-        self._client = Client()
+        self._client = Client("127.0.0.1:8080")
         pass
 
     def test_add_dataset(self):
-        pass
+        dataset = master_pb2.DataSet()
+        dataset.name = "train"
+        for t in file_list_to_dataset('./test_file_list.txt'):
+            dataset.file_list.append(t.file_path)
+
+        self._client.add_dataset(dataset)
+
+
+if __name__ == '__main__':
+    logger = get_logger(10)
+    unittest.main()

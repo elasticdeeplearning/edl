@@ -14,6 +14,7 @@
 
 import master_pb2
 import master_pb2_grpc
+import grpc
 
 
 class Client(object):

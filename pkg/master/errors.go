@@ -1,12 +1,20 @@
+package master
+
+import (
+	"fmt"
+)
+
+// ErrorType is the typei name of error.
 type ErrorType string
 
+// Error implements Error interface
 type Error struct {
-	Type     ErrorType
-	Detail   string
+	Type   ErrorType
+	Detail string
 }
 
 const (
-	// ErrorTypeDataSet is used to reported dataset error.
+	// ErrorTypeDuplicateInitDataSet is used to reported dataset error.
 	ErrorTypeDuplicateInitDataSet ErrorType = "DuplicateInitDataSet"
 )
 
@@ -22,11 +30,10 @@ func (t ErrorType) String() string {
 
 // Error implements the error interface.
 func (v *Error) Error() string {
-	return fmt.Sprintf("%s",v.ErrorBody())
+	return fmt.Sprintf("%s", v.ErrorBody())
 }
 
-
-func (v *Error) ErrorBody() string {
+func (v *Error) errorBody() string {
 	s := v.Type.String()
 	if len(v.Detail) != 0 {
 		s += fmt.Sprintf(": %s", v.Detail)
@@ -34,6 +41,7 @@ func (v *Error) ErrorBody() string {
 	return s
 }
 
+// DuplicateInitDataSet make the correspond error.
 func DuplicateInitDataSet(detail string) *Error {
 	return &Error{ErrorTypeDuplicateInitDataSet, detail}
 }

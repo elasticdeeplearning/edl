@@ -78,12 +78,13 @@ message TaskResponse {
 enum DataSetType {
   DATASET_TRAIN = 0;
   DATASET_INFERENCE = 1;
+  DATASET_OTHER = 2;
 }
 
 message DataSet {
-  string name = 1;
-  string file_list = 2;
-  // DataSetType type = 2;
+  DataSetType type = 1;
+  string name = 2;
+  repeated string file_list = 3;
 }
 message NewEpochRequest {}
 
