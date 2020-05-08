@@ -1,4 +1,4 @@
-## 2020 Q1
+## 2020-03 Release 0.2.0
 
 ### Elastic Inference 
 - Release features for inference with paddle serving on EDL
@@ -10,7 +10,7 @@
 ### Release 0.2.0
 - Official release 0.2.0 with features of Elastic Inference and Checkpoint based Elastic Training
 
-## 2020 Q2
+## 2020-06 Release 0.3.0
 
 ### EDL High Level API Design
 - Support User defined Training Data and Parameter Adaptation API
@@ -23,7 +23,7 @@
 ### Release 0.3.0
 - Features above will be released
 
-## 2020 Q3
+## 2020-09 Release 0.4.0
 
 ### Online Training
 - Support Elastic Online Training Solution with resources allocated dynamically along the training timeline
@@ -35,6 +35,6 @@
 ### Release 0.4.0
 - Features above will be released
 
-### 2020 Q4
+### 2020-12
 - More Application on EDL
 - More machine learning tools integrated.
