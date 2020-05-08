@@ -19,7 +19,6 @@ import grpc
 
 class Client(object):
     def __init__(self, endpoint):
-        #self._endpoint = MasterFinder().get_master()
         self._endpoint = endpoint
 
     def get_cluster(self, pod_id=None):
@@ -31,7 +30,6 @@ class Client(object):
 
         # get data
         response = stub.AddDataSet(dataset)
-        print("response:", response)
         return response
 
     def new_epoch(self):
