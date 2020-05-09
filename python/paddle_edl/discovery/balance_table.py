@@ -104,10 +104,8 @@ class Service(object):
 
         self._need_update()
 
-    def watch_call_back(self, response):
+    def watch_call_back(self, add_servers, rm_servers):
         need_update = True
-        add_servers, rm_servers = EtcdClient.services_change(response,
-                                                             self.name)
         with self.watch_mutex:
             # after rm key, add again, so need remove from rm set
             # self.rm_servers -= set(add_servers.keys())
@@ -240,7 +238,7 @@ class Service(object):
                 (client_num + server_num - 1) / server_num)
             max_servers_client_can_conn = max(1, int(server_num / client_num))
             logging.info(
-                'service={}, client_num={}, server_num={}, '
+                '<Global> service={}, client_num={}, server_num={}, '
                 'server_provided_conn={}, client_can_conn={}'.format(
                     self.name, client_num, server_num,
                     max_conn_provided_by_server, max_servers_client_can_conn))
@@ -263,8 +261,8 @@ class Service(object):
             for client in self.clients:
                 max_connect = min(max_servers_client_can_conn,
                                   self.client_to_maxn[client])
-                logging.info('service={} client={} max_connect={}'.format(
-                    self.name, client, max_connect))
+                logging.info('<Client> service={} client={} max_connect={}'.
+                             format(self.name, client, max_connect))
 
                 conn_servers = self.client_to_servers[client]
                 # limit servers connected by client
@@ -276,7 +274,7 @@ class Service(object):
                     # client conn is update
                     update_client.add(client)
                     logging.info(
-                        'service={} break link with client={} -> server={}'.
+                        '<Breaking> service={} client-/->server {} -/-> {}'.
                         format(self.name, client, server))
 
                 # TODO. need optimize
@@ -298,7 +296,7 @@ class Service(object):
                     # client conn is update
                     update_client.add(client)
                     logging.info(
-                        'service={} add connect with client={} server={}'.
+                        '<Linking> service={} client-->server {} --> {}'.
                         format(self.name, client, server))
 
             for client in update_client:
@@ -332,16 +330,16 @@ class BalanceTable(object):
         self._db = EtcdClient(db_endpoints, db_passwd)
         self._is_db_connect = False
 
-        self.mutex = threading.Lock()
+        self._mutex = threading.Lock()
 
-        self.client_to_service = dict()
-        self.name_to_service = dict()
+        self._client_to_service = dict()
+        self._name_to_service = dict()
 
-        self.get_service_thread = None
-        self.new_service_queue = queue.Queue()
+        self._get_service_thread = None
+        self._new_service_queue = queue.Queue()
 
-        self.update_service_thread = None
-        self.update_event_queue = queue.Queue()
+        self._update_service_thread = None
+        self._update_event_queue = queue.Queue()
 
         # timing wheel, unregister client
         self._client_timing_buckets = deque(maxlen=idle_seconds)
@@ -351,7 +349,7 @@ class BalanceTable(object):
         self._client_weak_entrys = WeakValueDictionary()
 
     def _add_update_event(self, name):
-        self.update_event_queue.put(name)
+        self._update_event_queue.put(name)
 
     def _get_service_task(self, service):
         # [[server, info], ...]
@@ -363,7 +361,7 @@ class BalanceTable(object):
         while True:
             # name_to_service may be out-of-data, e.g. new service be added and
             # old service be removed after we get, but if doesn't matter.
-            for service in self.name_to_service.values():
+            for service in self._name_to_service.values():
                 # FIXME. use thread pool, is db support?
                 self._get_service_task(service)
 
@@ -373,7 +371,7 @@ class BalanceTable(object):
                 while True:
                     # get service immediately. NOTE, pre for maybe already get this
                     # new service, but it doesn't matter
-                    new_service = self.new_service_queue.get(timeout=timeout)
+                    new_service = self._new_service_queue.get(timeout=timeout)
                     self._get_service_task(new_service)
 
                     timeout = end_time - time.time()
@@ -391,9 +389,9 @@ class BalanceTable(object):
                 timeout = timing_wheel
                 end_time = time.time() + timeout
                 while True:
-                    name = self.update_event_queue.get(timeout=timeout)
+                    name = self._update_event_queue.get(timeout=timeout)
                     try:
-                        service = self.name_to_service[name]
+                        service = self._name_to_service[name]
                         # TODO. add thread pool? If use thread pool. A service can
                         # only be updated by one thread at the same time
                         service.rebalance()
@@ -413,17 +411,25 @@ class BalanceTable(object):
             gc.collect()
 
     def _register_watch_service(self, service_name, callback):
-        watch_id = self._db.watch_service(service_name, callback)
+        def _call_back(response):
+            add_servers, rm_servers = self._db.services_change(response,
+                                                               service_name)
+            if len(add_servers) == 0 and len(rm_servers) == 0:
+                return
+            else:
+                callback(add_servers, rm_servers)
+
+        watch_id = self._db.watch_service(service_name, _call_back)
         return watch_id
 
     def _unregister_watch_service(self, watch_id):
         self._db.cancel_watch(watch_id)
 
     def register_client(self, client, service_name, require_num, token=None):
-        with self.mutex:
-            if client in self.client_to_service:
+        with self._mutex:
+            if client in self._client_to_service:
                 # already registered
-                if self.client_to_service[client].name == service_name:
+                if self._client_to_service[client].name == service_name:
                     logging.warning(
                         'client={} register again service_name={} require_num={}'.
                         format(client, service_name, require_num))
@@ -434,19 +440,19 @@ class BalanceTable(object):
                         .format(client, service_name, require_num))
                     return
 
-            if service_name in self.name_to_service:
-                service = self.name_to_service[service_name]
+            if service_name in self._name_to_service:
+                service = self._name_to_service[service_name]
             else:
                 # add new service monitor
                 service = Service(service_name, self._add_update_event)
-                self.new_service_queue.put(service)
+                self._new_service_queue.put(service)
 
-                self.name_to_service[service_name] = service
+                self._name_to_service[service_name] = service
                 # save watch_id in service
                 service.watch_id = self._register_watch_service(
                     service_name, service.watch_call_back)
 
-            self.client_to_service[client] = service
+            self._client_to_service[client] = service
             service.inc_ref()
 
         service.add_client(client, require_num)
@@ -460,15 +466,15 @@ class BalanceTable(object):
                      format(client, service_name, require_num))
 
     def unregister_client(self, client):
-        # FIXME. client maybe exit before register?
-        if client not in self.client_to_service:
+        # timing wheel maybe unregister again
+        if client not in self._client_to_service:
             return
 
-        service = self.client_to_service[client]
+        service = self._client_to_service[client]
         service.remove_client(client)
 
-        with self.mutex:
-            self.client_to_service.pop(client)
+        with self._mutex:
+            self._client_to_service.pop(client)
 
             service_ref_count = service.dec_ref()
             assert service_ref_count >= 0, \
@@ -476,7 +482,7 @@ class BalanceTable(object):
 
             if service_ref_count == 0:  # remove service monitor
                 self._unregister_watch_service(service.watch_id)
-                self.name_to_service.pop(service.name)
+                self._name_to_service.pop(service.name)
 
         logging.info('unregister client={} service_name={}'.format(
             client, service.name))
@@ -488,20 +494,21 @@ class BalanceTable(object):
         # timing wheel
         entry = self._client_weak_entrys.get(client)
         if entry is None:
-            logging.critical('client={} timeout'.format(client))
+            logging.warning('client={} timeout'.format(client))
             return None
         else:
             self._client_timing_buckets[-1].append(entry)
-        return self.client_to_service[client].get_servers(client, version)
+        return self._client_to_service[client].get_servers(client, version)
 
     def start(self):
+        # start db
         self._db.init()
-        self.get_service_thread = threading.Thread(
+        self._get_service_thread = threading.Thread(
             target=self._period_get_service_worker)
-        self.get_service_thread.daemon = True
-        self.get_service_thread.start()
+        self._get_service_thread.daemon = True
+        self._get_service_thread.start()
 
-        self.update_service_thread = threading.Thread(
+        self._update_service_thread = threading.Thread(
             target=self._update_service_worker)
-        self.update_service_thread.daemon = True
-        self.update_service_thread.start()
+        self._update_service_thread.daemon = True
+        self._update_service_thread.start()

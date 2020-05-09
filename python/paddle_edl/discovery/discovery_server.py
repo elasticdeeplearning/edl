@@ -21,7 +21,7 @@ from concurrent import futures
 from balance_table import BalanceTable
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
 
 
@@ -54,8 +54,9 @@ class DiscoveryServicer(discovery_pb2_grpc.DiscoveryServiceServicer):
                 msg='failed', version=None, servers=None)
 
         new_version, servers = ret
-        logging.debug('client={} new_version={}, servers={}'.format(
-            client, new_version, servers))
+        if new_version > version:
+            logging.info('client={} new_version={}, servers={}'.format(
+                client, new_version, servers))
         return discovery_pb2.Response(
             msg='success', version=new_version, servers=servers)
 
