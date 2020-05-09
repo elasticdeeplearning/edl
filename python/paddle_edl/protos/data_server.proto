@@ -56,11 +56,8 @@ message DataResponse {
 }
 
 message DataMeta {
-  // string data_server = 1;
   int64 idx_in_list = 1;
   string file_path = 2;
-  // int32 file_status = 4;
-  // repeated int64 record_no = 3;
   repeated common.RecordRange records = 3;
 }
 

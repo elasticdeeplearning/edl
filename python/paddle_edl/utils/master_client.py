@@ -12,16 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import master_pb2
+import master_pb2_grpc
+import grpc
+
 
 class Client(object):
-    def __init__(self):
-        self._endpoint = MasterFinder().get_master()
+    def __init__(self, endpoint):
+        self._endpoint = endpoint
 
     def get_cluster(self, pod_id=None):
         pass
 
-    def assign_data_source(self):
-        pass
+    def add_dataset(self, dataset):
+        channel = grpc.insecure_channel(self._endpoint)
+        stub = master_pb2_grpc.MasterStub(channel)
+        return stub.AddDataSet(dataset)
 
     def new_epoch(self):
         pass

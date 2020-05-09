@@ -18,8 +18,8 @@ option go_package = ".;masterpb";
 package common;
 
 message RPCRet {
-  int32 err_code = 1;
-  int32 err_info = 2;
+  string type = 1;
+  string detail = 2;
 }
 
 message Trainer {}
@@ -46,8 +46,12 @@ enum ProcStatus {
   PROCESSED = 2;
 };
 
-message RecordRange {
+message RecordRangeStatus {
   ProcStatus status = 1;
+  int64 begin = 2;
+  int64 end = 3;
+}
+message RecordRange {
   int64 begin = 2;
   int64 end = 3;
 }
