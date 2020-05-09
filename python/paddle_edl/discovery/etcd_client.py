@@ -142,6 +142,13 @@ class EtcdClient(object):
         return self._etcd.put(key=key, value=info, lease=lease)
 
     @_handle_errors
+    def _get_server(self, service_name, server):
+        # for debug
+        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        value, meta = self._etcd.get(key=key)
+        return value, meta.key, meta.version, meta.create_revision, meta.mod_revision
+
+    @_handle_errors
     def remove_server(self, service_name, server):
         key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
         self._etcd.delete(key)
@@ -181,8 +188,7 @@ class EtcdClient(object):
         add_servers = dict()
         rm_servers = set()
         for event in response.events:
-            key = self.get_server_name_from_full_path(event.key,
-                                                      service_name)
+            key = self.get_server_name_from_full_path(event.key, service_name)
             if isinstance(event, etcd.events.PutEvent):
                 if key in rm_servers:
                     # after rm key, add again, need remove key from rm set

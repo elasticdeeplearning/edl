@@ -18,9 +18,10 @@ import threading
 import time
 import sys
 
+from collections import deque
 from etcd_client import EtcdClient
-
 from six.moves import queue
+from weakref import WeakValueDictionary
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -44,7 +45,7 @@ class Service(object):
 
         # get from db
         self.get_mutex = threading.Lock()
-        self.get_servers = None  # get from db, [[server, info], ...]
+        self.db_servers = None  # get from db, [[server, info], ...]
 
         self.servers = set()  # servers in service, cache from store
         # clients served by server {server: set(client), }
@@ -126,7 +127,7 @@ class Service(object):
 
     def set_servers(self, servers):
         with self.get_mutex:
-            self.get_servers = servers
+            self.db_servers = servers
         self._need_update()
 
     def rebalance(self):
@@ -137,9 +138,9 @@ class Service(object):
         # 3. The increase and decrease of the clients.
         # TODO. need revision?
 
-        get_servers = None
+        db_servers = None
         with self.get_mutex:
-            self.get_servers, get_servers = get_servers, self.get_servers
+            self.db_servers, db_servers = db_servers, self.db_servers
 
         add_servers = dict()
         rm_servers = set()
@@ -147,8 +148,8 @@ class Service(object):
             self.add_servers, add_servers = add_servers, self.add_servers
             self.rm_servers, rm_servers = rm_servers, self.rm_servers
 
-        if get_servers is not None:
-            servers = set([s[0] for s in get_servers])
+        if db_servers is not None:
+            servers = set([s[0] for s in db_servers])
             # FIXME. add_servers or rm_servers may ahead or behind with
             # servers, but it doesn't matter?
             # 1. If add_servers is ahead, it's ok;
@@ -301,7 +302,7 @@ class Service(object):
                         format(self.name, client, server))
 
             for client in update_client:
-                self.client_to_version += 1
+                self.client_to_version[client] += 1
 
     def get_servers(self, client, version):
         """ external service interface """
@@ -313,8 +314,21 @@ class Service(object):
             return new_version, None
 
 
+class Entry(object):
+    def __init__(self, client, table):
+        self._client = client
+        self._table = table
+
+    def __del__(self):
+        self._table.unregister_client(self._client)
+
+
 class BalanceTable(object):
-    def __init__(self, db_endpoints, db_passwd=None, db_type='etcd'):
+    def __init__(self,
+                 db_endpoints,
+                 db_passwd=None,
+                 db_type='etcd',
+                 idle_seconds=7):
         self._db = EtcdClient(db_endpoints, db_passwd)
         self._is_db_connect = False
 
@@ -328,6 +342,13 @@ class BalanceTable(object):
 
         self.update_service_thread = None
         self.update_event_queue = queue.Queue()
+
+        # timing wheel, unregister client
+        self._client_timing_buckets = deque(maxlen=idle_seconds)
+        for _ in range(idle_seconds):
+            self._client_timing_buckets.append(list())
+
+        self._client_weak_entrys = WeakValueDictionary()
 
     def _add_update_event(self, name):
         self.update_event_queue.put(name)
@@ -363,21 +384,33 @@ class BalanceTable(object):
             except queue.Empty:
                 pass
 
-    def _update_service_worker(self):
+    def _update_service_worker(self, timing_wheel=1):
+        import gc
         while True:
-            # service which need update
-            name = self.update_event_queue.get()
-
             try:
-                service = self.name_to_service[name]
-            except KeyError:
-                # service may be removed
-                continue
+                timeout = timing_wheel
+                end_time = time.time() + timeout
+                while True:
+                    name = self.update_event_queue.get(timeout=timeout)
+                    try:
+                        service = self.name_to_service[name]
+                        # TODO. add thread pool? If use thread pool. A service can
+                        # only be updated by one thread at the same time
+                        service.rebalance()
+                    except KeyError:
+                        pass
 
-            # TODO. add thread pool?
-            # If use thread pool. A service can only be
-            # updated by one thread at the same time
-            service.rebalance()
+                    timeout = end_time - time.time()
+                    if timeout <= 0:
+                        break
+                    else:
+                        end_time = time.time() + timeout
+            except queue.Empty:
+                pass
+
+            self._client_timing_buckets.append(list())
+            # make sure entry __del__ exec
+            gc.collect()
 
     def _register_watch_service(self, service_name, callback):
         watch_id = self._db.watch_service(service_name, callback)
@@ -418,6 +451,11 @@ class BalanceTable(object):
 
         service.add_client(client, require_num)
 
+        # timing wheel
+        entry = Entry(client, table=self)
+        self._client_timing_buckets[-1].append(entry)
+        self._client_weak_entrys[client] = entry
+
         logging.info('register client={} service_name={} require_num={}'.
                      format(client, service_name, require_num))
 
@@ -446,10 +484,18 @@ class BalanceTable(object):
         if service_ref_count == 0:
             logging.info('remove service_name={} monitor'.format(service.name))
 
-    def get_servers(self, client):
-        return self.client_to_service[client].get_servers(client)
+    def get_servers(self, client, version):
+        # timing wheel
+        entry = self._client_weak_entrys.get(client)
+        if entry is None:
+            logging.critical('client={} timeout'.format(client))
+            return None
+        else:
+            self._client_timing_buckets[-1].append(entry)
+        return self.client_to_service[client].get_servers(client, version)
 
     def start(self):
+        self._db.init()
         self.get_service_thread = threading.Thread(
             target=self._period_get_service_worker)
         self.get_service_thread.daemon = True
