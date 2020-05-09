@@ -22,31 +22,16 @@ message Record {
   bytes data = 2;
 }
 
-message File {
-  int64 idx_in_list = 1;
-  string file_path = 2;
-  repeated Record records = 3;
+message ChunkData {
+  common.Chunk chunk = 1;
+  repeated Record data = 2;
 }
 
-enum DataStatus {
-  DATA_OK = 0;
-  NOT_FOUND = 1;
-}
+message File { repeated ChunkData data = 1; }
 
 message Files { repeated File files = 1; }
 
-message RecordError {
-  // common.RecordRange records = 1;
-  // DataStatus status = 2;
-  int64 record_no = 1;
-  DataStatus status = 2;
-}
-message FileError {
-  int64 idx_in_list = 1;
-  string file_path = 2;
-  DataStatus status = 3;
-  repeated RecordError errors = 4;
-}
+message FileError { repeated common.Chunk chunks = 1; }
 
 message FilesError { repeated FileError errors = 1; }
 
@@ -55,13 +40,7 @@ message DataResponse {
   Files files = 2;
 }
 
-message DataMeta {
-  int64 idx_in_list = 1;
-  string file_path = 2;
-  repeated common.RecordRange records = 3;
-}
-
-message DataRequest { repeated DataMeta metas = 1; }
+message DataRequest { repeated common.Chunk metas = 1; }
 
 service DataServer {
   // loader -> DataSet

@@ -20,16 +20,16 @@ package master;
 
 message SubDataSetRequest {}
 
-message FileMeta {
+message SubDataSetMeta {
   int64 idx_in_list = 1;
   string file_path = 2;
   // only no
-  repeated common.RecordRangeStatus records = 3;
+  repeated common.RecordRange filtered_records = 3;
 }
 
 message SubDataSetResponse {
   common.RPCRet ret = 1;
-  repeated FileMeta metas = 2;
+  repeated SubDataSetMeta metas = 2;
 }
 
 message DataServer {
@@ -42,18 +42,10 @@ message DataServer {
 
 message TrainerRequest {
   string pod_id = 1;
-  int32 rank = 2;
-  string endpoint = 3;
+  string trainer_id = 2;
+  int32 rank_in_pod = 3;
+  string endpoint = 4;
 }
-
-message Chunk {
-  DataServer data_server = 1;
-  int64 idx_in_list = 2;
-  string file_path = 3;
-  repeated common.RecordRange records = 4;
-}
-
-message ChunksRequest { repeated Chunk chunks = 1; }
 
 message TaskMeta {
   string task_id = 1;
@@ -62,9 +54,14 @@ message TaskMeta {
   int32 batch_size = 4; // records's num
 }
 
+message DataServerChunk {
+  DataServer data_server = 1;
+  repeated common.Chunk chunks = 2;
+}
+
 message Task {
   TaskMeta meta = 1;
-  repeated Chunk chunks = 2;
+  repeated DataServerChunk chunks = 2;
 }
 
 message Tasks { repeated Task tasks = 1; }
@@ -88,11 +85,6 @@ message DataSet {
 }
 message NewEpochRequest {}
 
-message ChunksResponse {
-  common.RPCRet ret = 1;
-  repeated Chunk chunks = 2;
-}
-
 service Master {
   // Cluster env
   // user_client, computor  -> master
@@ -105,7 +97,7 @@ service Master {
 
   /* data_server - > master */
   rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSetResponse) {}
-  rpc ReportChunks(ChunksRequest) returns (common.RPCRet) {}
+  rpc ReportChunks(DataServerChunk) returns (common.RPCRet) {}
 
   /* executor -> master */
   rpc GetTask(TaskRequest) returns (TaskResponse) {}

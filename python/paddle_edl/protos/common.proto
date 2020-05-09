@@ -40,18 +40,22 @@ message ClusterRequest { string job_id = 1; }
 
 message ShutDownRequest {}
 
-enum ProcStatus {
-  INITIAL = 0;
-  PART_PROCESSED = 1;
-  PROCESSED = 2;
-};
-
-message RecordRangeStatus {
-  ProcStatus status = 1;
-  int64 begin = 2;
-  int64 end = 3;
-}
 message RecordRange {
-  int64 begin = 2;
-  int64 end = 3;
+  int64 begin = 1;
+  int64 end = 2;
+}
+
+enum DataStatus {
+  DATA_OK = 0;
+  NOT_FOUND = 1;
+}
+
+// Chunk is a index(record range) in a file.
+// The range is elastic.
+message Chunk {
+  DataStatus status = 1;
+  int64 idx_in_list = 2;
+  string file_path = 3;
+  // only no
+  repeated common.RecordRange records = 4;
 }
