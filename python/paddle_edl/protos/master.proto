@@ -77,7 +77,6 @@ enum DataSetType {
   DATASET_INFERENCE = 1;
   DATASET_OTHER = 2;
 }
-
 message DataSet {
   DataSetType type = 1;
   string name = 2;
