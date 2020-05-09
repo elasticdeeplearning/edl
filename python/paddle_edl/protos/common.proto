@@ -22,9 +22,23 @@ message RPCRet {
   string detail = 2;
 }
 
-message Trainer {}
+message Trainer {
+  string pod_id = 1;
+  string id = 4;
+  int32 rank_in_pod = 2;
+  int32 global_rank = 3;
+  string endpoint = 5;
+  repeated int32 gpus = 6;
+}
 
-message POD { repeated Trainer trainers = 1; }
+message POD {
+  string id = 1;
+  int32 rank = 2;
+  string addr = 3;
+  int32 port = 4;
+  repeated int32 gpus = 5;
+  repeated Trainer trainers = 6;
+}
 
 message Cluster {
   string job_flag = 1;
