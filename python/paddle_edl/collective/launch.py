@@ -161,6 +161,50 @@ POD_IP (current node ip address, not needed for local training)
     return parser.parse_args()
 
 
+def launch2(args):
+    job_env = JobEnv()
+    pod_env = PodEnv()
+
+    register = LauncherRegister()
+    cluster, pod = edl_barrier()
+    logger.info("get cluster from edl:{}".format(cluster))
+
+    procs = start_local_trainers(
+        cluster,
+        pod,
+        args.training_script,
+        args.training_script_args,
+        log_dir=args.log_dir)
+
+    while True:
+        cluster2, pod = edl_env.get_cluster(hdfs)
+
+        if cluster2 != cluster:
+            logger.info("Cluster changed. New cluster:{}. Old Cluster:{}".
+                        format(cluster2, cluster))
+            terminate_local_procs(procs)
+
+            cluster, pod = edl_utils.edl_barrier(
+                edl_env, hdfs, timeout=30 * 60)
+
+            procs = start_local_trainers(
+                cluster,
+                pod,
+                args.training_script,
+                args.training_script_args,
+                log_dir=args.log_dir)
+
+        alive = watch_local_trainers(procs, cluster.trainers_nranks())
+
+        if not alive:
+            logger.info("Local procs complete, POD info:{}".format(pod))
+            break
+
+        time.sleep(3)
+
+    edl_utils.edl_barrier(edl_env, hdfs)
+
+
 def launch(args):
     cluster = None
     pod = None
