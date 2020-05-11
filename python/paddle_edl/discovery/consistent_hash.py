@@ -17,11 +17,7 @@ import copy
 import hashlib
 
 
-class ConsistentHash(object):
-    @staticmethod
-    def _get_slot(key):
-        return int(hashlib.md5(key).hexdigest(), 16)
-
+class _ConsistentHashData(object):
     def __init__(self, nodes, virtual_num=300):
         # NOTE. need deepcopy, otherwise outside maybe change
         self._nodes = copy.deepcopy(nodes)
@@ -84,3 +80,38 @@ class ConsistentHash(object):
             index = 0
 
         return self._slot_to_node[self._sorted_slots[index]]
+
+    @staticmethod
+    def _get_slot(key):
+        return int(hashlib.md5(key).hexdigest(), 16)
+
+
+class ConsistentHash(object):
+    """ No lock write with 1 thread write, multi thread read.
+    NOTE. The read data may not be up-to-date, but it doesn't matter
+    """
+
+    def __init__(self, nodes, virtual_num=300):
+        self._hash_data = _ConsistentHashData(nodes, virtual_num)
+
+    def add_new_node(self, node):
+        # no need add
+        if node in self._hash_data._nodes:
+            return
+
+        new_hash_data = copy.deepcopy(self._hash_data)
+        new_hash_data.add_new_node(node)
+        self._hash_data = new_hash_data
+
+    def remove_node(self, node):
+        # no need remove
+        if node not in self._hash_data._nodes:
+            return
+
+        new_hash_data = copy.deepcopy(self._hash_data)
+        new_hash_data.remove_node(node)
+        self._hash_data = new_hash_data
+
+    def get_node(self, key):
+        hash_data = self._hash_data
+        return hash_data.get_node(key)

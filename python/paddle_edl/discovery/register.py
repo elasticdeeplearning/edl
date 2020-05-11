@@ -19,23 +19,11 @@ import threading
 
 from contextlib import closing
 from etcd_client import EtcdClient
+from server_alive import is_server_alive
 
 logging.basicConfig(
     level=logging.INFO,
     format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
-
-
-def is_server_alive(server):
-    alive = True
-    ip, port = server.split(":")
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        try:
-            s.settimeout(1)
-            s.connect((ip, int(port)))
-            s.shutdown(socket.SHUT_RDWR)
-        except socket.error:
-            alive = False
-        return alive
 
 
 class ServerRegister(object):
@@ -52,12 +40,12 @@ class ServerRegister(object):
 
     def _register(self, service_name, server, ttl=120):
         all_time = ttl
-        while not is_server_alive(server) and ttl > 0:
+        while not is_server_alive(server)[0] and ttl > 0:
             logging.warning(
                 'start to register, but server is not alive, ttl={}'.format(
                     ttl))
             ttl -= 2
-            time.sleep(3)
+            time.sleep(2)
 
         if ttl <= 0:
             logging.error('server is not up in time={}s'.format(all_time))

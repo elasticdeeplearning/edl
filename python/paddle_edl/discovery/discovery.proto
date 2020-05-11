@@ -19,7 +19,6 @@ package paddle_edl.discovery;
 service DiscoveryService {
   rpc Register(RegisterRequest) returns (Response) {}
   rpc HeartBeat(HeartBeatRequest) returns (Response) {}
-  rpc UnRegister(UnRegisterRequest) returns (Response) {}
 }
 
 message RegisterRequest {
@@ -28,8 +27,6 @@ message RegisterRequest {
   int32 require_num = 3;
   string token = 4;
 }
-
-message UnRegisterRequest { string client = 1; }
 
 message HeartBeatRequest {
   string client = 1;

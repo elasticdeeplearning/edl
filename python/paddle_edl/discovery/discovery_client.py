@@ -17,11 +17,10 @@ import discovery_pb2
 import discovery_pb2_grpc
 import logging
 import os
-import socket
 import threading
 import time
 
-from contextlib import closing
+from server_alive import is_server_alive
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -29,21 +28,6 @@ logging.basicConfig(
 
 
 class DiscoveryClient(object):
-    @staticmethod
-    def is_server_alive(server):
-        alive = True
-        client_addr = None
-        ip, port = server.split(":")
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            try:
-                s.settimeout(1.5)
-                s.connect((ip, int(port)))
-                client_addr = s.getsockname()
-                s.shutdown(socket.SHUT_RDWR)
-            except socket.error:
-                alive = False
-            return alive, client_addr
-
     def __init__(self, discover, service_name, require_num, token=None):
         self._channel = None
         self._stub = None
@@ -104,8 +88,7 @@ class DiscoveryClient(object):
         failed_count = 0
         max_failed_count = 10
         while True:
-            alive, client_addr = DiscoveryClient.is_server_alive(
-                self._endpoint)
+            alive, client_addr = is_server_alive(self._endpoint)
             if alive:
                 break
             failed_count += 1

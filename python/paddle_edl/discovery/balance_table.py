@@ -19,7 +19,9 @@ import time
 import sys
 
 from collections import deque
+from consistent_hash import _ConsistentHashData
 from etcd_client import EtcdClient
+from server_alive import is_server_alive
 from six.moves import queue
 from weakref import WeakValueDictionary
 
@@ -45,7 +47,7 @@ class Service(object):
 
         # get from db
         self.get_mutex = threading.Lock()
-        self.db_servers = None  # get from db, [[server, info], ...]
+        self._servers_meta = None  # get from db, [[server, info], ...]
 
         self.servers = set()  # servers in service, cache from store
         # clients served by server {server: set(client), }
@@ -62,7 +64,7 @@ class Service(object):
         # for watch or subscribe
         self.watch_id = None
         self.watch_mutex = threading.Lock()
-        self.add_servers = dict()
+        self.add_servers = set()
         self.rm_servers = set()
 
     def _need_update(self):
@@ -106,12 +108,16 @@ class Service(object):
 
     def watch_call_back(self, add_servers, rm_servers):
         need_update = True
+        add_servers = [meta.server for meta in add_servers]
+        rm_servers = [meta.server for meta in rm_servers]
+
         with self.watch_mutex:
             # after rm key, add again, so need remove from rm set
             # self.rm_servers -= set(add_servers.keys())
-            self.rm_servers.difference_update(add_servers.keys())
+            self.rm_servers.difference_update(add_servers)
             # after add key, rm again, so need remove from add dict
-            map(lambda x: self.add_servers.pop(x, None), rm_servers)
+            self.add_servers.difference_update(rm_servers)
+            # map(lambda x: self.add_servers.pop(x, None), rm_servers)
 
             # update add_servers & rm_servers
             self.add_servers.update(add_servers)
@@ -123,9 +129,9 @@ class Service(object):
         if need_update:
             self._need_update()
 
-    def set_servers(self, servers):
+    def set_servers(self, servers_meta):
         with self.get_mutex:
-            self.db_servers = servers
+            self._servers_meta = servers_meta
         self._need_update()
 
     def rebalance(self):
@@ -138,16 +144,16 @@ class Service(object):
 
         db_servers = None
         with self.get_mutex:
-            self.db_servers, db_servers = db_servers, self.db_servers
+            self._servers_meta, db_servers = db_servers, self._servers_meta
 
-        add_servers = dict()
+        add_servers = set()
         rm_servers = set()
         with self.watch_mutex:
             self.add_servers, add_servers = add_servers, self.add_servers
             self.rm_servers, rm_servers = rm_servers, self.rm_servers
 
         if db_servers is not None:
-            servers = set([s[0] for s in db_servers])
+            servers = set([meta.server for meta in db_servers])
             # FIXME. add_servers or rm_servers may ahead or behind with
             # servers, but it doesn't matter?
             # 1. If add_servers is ahead, it's ok;
@@ -156,7 +162,7 @@ class Service(object):
             # or period db refresh.
             # 3. If rm_servers is ahead, it's ok;
             # 4. If rm_servers is behind, del null, I think it's ok.
-            servers.update(add_servers.keys())
+            servers.update(add_servers)
             servers -= rm_servers
 
             old_servers = self.servers
@@ -166,7 +172,7 @@ class Service(object):
             add_servers = set(servers) - set(old_servers)
         else:  # only watch
             rm_servers = rm_servers
-            add_servers = set(add_servers.keys())
+            add_servers = set(add_servers)
 
             # update servers
             # self.servers -= rm_servers
@@ -323,10 +329,12 @@ class Entry(object):
 
 class BalanceTable(object):
     def __init__(self,
+                 discovery_server,
                  db_endpoints,
                  db_passwd=None,
                  db_type='etcd',
                  idle_seconds=7):
+        self._discovery_server = discovery_server
         self._db = EtcdClient(db_endpoints, db_passwd)
         self._is_db_connect = False
 
@@ -334,6 +342,9 @@ class BalanceTable(object):
 
         self._client_to_service = dict()
         self._name_to_service = dict()
+
+        self._consistent_hash = None
+        self._consistent_hash_thread = None
 
         self._get_service_thread = None
         self._new_service_queue = queue.Queue()
@@ -351,28 +362,68 @@ class BalanceTable(object):
     def _add_update_event(self, name):
         self._update_event_queue.put(name)
 
-    def _get_service_task(self, service):
-        # [[server, info], ...]
-        servers = self._db.get_service(service.name)
-        service.set_servers(servers)
+    def _consistent_hash_worker(self, ttl=120):
+        all_time = ttl
+        while not is_server_alive(self._discovery_server)[0] and ttl > 0:
+            logging.warning(
+                'start to register discovery server, but server is not start, ttl={}'.
+                format(ttl))
+            ttl -= 2
+            time.sleep(2)
 
-    def _period_get_service_worker(self, period=20):
-        """ period get all service from db """
+        if ttl <= 0:
+            logging.error('discovery is not up in time={}s'.format(all_time))
+            raise Exception('server up timeout')
+
+        service_name = '__balance__'
+
+        # register discovery server with balance to /service/__balance__/nodes/addr = ''
+        self._db.set_server_not_exists(service_name, self._discovery_server,
+                                       '')
+        logging.info('register discovery server={} success'.format(
+            self._discovery_server))
+
+        servers_meta = self._db.get_service(service_name)
+        logging.info('discovery service={}'.format((
+            [str(server) for server in servers_meta])))
+
+        servers = [meta.server for meta in servers_meta]
+        assert self._discovery_server in servers  # must in discovery server
+
+        self._consistent_hash = _ConsistentHashData(servers)
+
+        revision = servers_meta[0].revision
+        watch_queue = queue.Queue(100)  # Change must be infrequently
+
+        def call_back(add_servers, rm_servers):
+            if len(add_servers) == 0 and rm_servers == 0:
+                return
+
+            watch_queue.put((add_servers, rm_servers))
+
+        self._db.refresh(service_name,
+                         self._discovery_server)  # before watch, refresh
+        # NOTE. start from revision + 1, that is after get_service
+        watch_id = self._db.watch_service(
+            service_name, call_back, start_revision=revision + 1)
+
+        period = 2  # 2 seconds refresh
         while True:
-            # name_to_service may be out-of-data, e.g. new service be added and
-            # old service be removed after we get, but if doesn't matter.
-            for service in self._name_to_service.values():
-                # FIXME. use thread pool, is db support?
-                self._get_service_task(service)
-
+            self._db.refresh(service_name, self._discovery_server)
             try:
                 timeout = period
                 end_time = time.time() + timeout
                 while True:
-                    # get service immediately. NOTE, pre for maybe already get this
-                    # new service, but it doesn't matter
-                    new_service = self._new_service_queue.get(timeout=timeout)
-                    self._get_service_task(new_service)
+                    server_change = watch_queue.get(timeout=timeout)
+                    add_servers, rm_servers = server_change
+
+                    for server in rm_servers:
+                        logging.info('Remove discovery server={}'.format(
+                            server))
+                        self._consistent_hash.remove_node(server)
+                    for server in add_servers:
+                        logging.info('Add discovery server={}'.format(server))
+                        self._consistent_hash.add_new_node(server)
 
                     timeout = end_time - time.time()
                     if timeout <= 0:
@@ -381,6 +432,23 @@ class BalanceTable(object):
                         end_time = time.time() + timeout
             except queue.Empty:
                 pass
+
+    def _get_service_worker(self):
+        """ get service from db """
+        while True:
+            service = self._new_service_queue.get()
+            # even if no server in service, revision will also return
+            servers_meta, revision = self._db.get_service_with_revision(
+                service.name)
+            logging.info('get_service={}, servers={}, revision={}'.format(
+                service.name, servers_meta, revision))
+            if len(servers_meta) != 0:
+                service.set_servers(servers_meta)
+            # save watch_id into service. NOTE, watch from revision + 1
+            service.watch_id = self._db.watch_service(
+                service.name,
+                service.watch_call_back,
+                start_revision=revision + 1)
 
     def _update_service_worker(self, timing_wheel=1):
         import gc
@@ -410,18 +478,6 @@ class BalanceTable(object):
             # make sure entry __del__ exec
             gc.collect()
 
-    def _register_watch_service(self, service_name, callback):
-        def _call_back(response):
-            add_servers, rm_servers = self._db.services_change(response,
-                                                               service_name)
-            if len(add_servers) == 0 and len(rm_servers) == 0:
-                return
-            else:
-                callback(add_servers, rm_servers)
-
-        watch_id = self._db.watch_service(service_name, _call_back)
-        return watch_id
-
     def _unregister_watch_service(self, watch_id):
         self._db.cancel_watch(watch_id)
 
@@ -448,9 +504,6 @@ class BalanceTable(object):
                 self._new_service_queue.put(service)
 
                 self._name_to_service[service_name] = service
-                # save watch_id in service
-                service.watch_id = self._register_watch_service(
-                    service_name, service.watch_call_back)
 
             self._client_to_service[client] = service
             service.inc_ref()
@@ -503,8 +556,14 @@ class BalanceTable(object):
     def start(self):
         # start db
         self._db.init()
+
+        self._consistent_hash_thread = threading.Thread(
+            target=self._consistent_hash_worker)
+        self._consistent_hash_thread.daemon = True
+        self._consistent_hash_thread.start()
+
         self._get_service_thread = threading.Thread(
-            target=self._period_get_service_worker)
+            target=self._get_service_worker)
         self._get_service_thread.daemon = True
         self._get_service_thread.start()
 

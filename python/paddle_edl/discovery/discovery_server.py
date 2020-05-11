@@ -60,20 +60,55 @@ class DiscoveryServicer(discovery_pb2_grpc.DiscoveryServiceServicer):
         return discovery_pb2.Response(
             msg='success', version=new_version, servers=servers)
 
-    def UnRegister(self, request, context):
-        logging.info('request={}, context={}'.format(request, context))
-        return discovery_pb2.Response(msg='a', version=0, servers=['b', 'c'])
 
+def serve(server, worker_num, db_endpoints):
+    discovery_server = grpc.server(
+        futures.ThreadPoolExecutor(max_workers=worker_num))
+    balance_table = BalanceTable(server, db_endpoints)
 
-def serve():
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
-    table = BalanceTable(['127.0.0.1:2379'])
     discovery_pb2_grpc.add_DiscoveryServiceServicer_to_server(
-        DiscoveryServicer(table), server)
-    server.add_insecure_port('[::]:50051')
-    server.start()
-    server.wait_for_termination()
+        DiscoveryServicer(balance_table), discovery_server)
+    discovery_server.add_insecure_port(server)
+    discovery_server.start()
+    discovery_server.wait_for_termination()
 
 
 if __name__ == '__main__':
-    serve()
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description='Discovery server with balance')
+    parser.add_argument(
+        '--server',
+        type=str,
+        default='127.0.0.1:50051',
+        help='endpoint of the server, e.g. 127.0.0.1:8888 [default: %(default)s]'
+    )
+    parser.add_argument(
+        '--worker_num',
+        type=int,
+        default=1,
+        help='worker num of server [default: %(default)s]')
+    parser.add_argument(
+        '--db_endpoints',
+        type=str,
+        default='127.0.0.1:2379',
+        help='database endpoints, e.g. 127.0.0.1:2379,127.0.0.1:2380 [default: %(default)s]'
+    )
+    parser.add_argument(
+        '--db_passwd',
+        type=str,
+        default=None,
+        help='detabase password [default: %(default)s]')
+    parser.add_argument(
+        '--db_type',
+        type=str,
+        default='etcd',
+        help='database type, only support etcd for now [default: %(default)s]')
+
+    args = parser.parse_args()
+    server = args.server
+    worker_num = args.worker_num
+    db_endpoints = args.db_endpoints.split(',')
+
+    serve(server, worker_num, db_endpoints)
