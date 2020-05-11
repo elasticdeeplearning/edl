@@ -2,6 +2,7 @@ package master
 
 import (
 	"context"
+	"fmt"
 	log "github.com/inconshreveable/log15"
 	pb "github.com/paddlepaddle/edl/pkg/masterpb"
 	"sync"
@@ -60,6 +61,8 @@ type Service struct {
 	// launchers   []pb.Launcher
 
 	etcd EtcdClient
+
+	dataset map[string]pb.DataSet
 }
 
 // NewService creates a new service.
@@ -163,9 +166,20 @@ func (s *Service) TaskFailed(meta pb.TaskMeta, dummy *int) error {
 	return nil
 }
 
-// AddInitDataSet adds a initial dataset to service.
-func (s *Service) AddInitDataSet(context.Context, *pb.DataSet) (*pb.RPCRet, error) {
-	return nil, nil
+// AddDataSet adds a initial dataset to service.
+func (s *Service) AddDataSet(ctx context.Context, in *pb.DataSet) (*pb.RPCRet, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.dataset != nil {
+		if _, ok := s.dataset[in.Name]; ok {
+			return DuplicateInitDataSet(fmt.Sprintf("dataset:%v", in.Name)).ToRPCRet(), nil
+		}
+	} else {
+		s.dataset = make(map[string]pb.DataSet)
+		s.dataset[in.Name] = *in
+	}
+
+	return &pb.RPCRet{}, nil
 }
 
 // GetCluster gets cluster elements from the service.

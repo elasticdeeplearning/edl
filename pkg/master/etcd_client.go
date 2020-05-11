@@ -72,7 +72,7 @@ func NewEtcdClient(endpoints []string, addr string, lockPath, addrPath, statePat
 	if err != nil {
 		return nil, err
 	}
-	log.Info("Successfully acquired lock at %s.", log.Ctx{"path": lockPath})
+	log.Info("Successfully acquired lock at: ", log.Ctx{"path": lockPath})
 
 	put := clientv3.OpPut(addrPath, addr)
 	resp, err := cli.Txn(context.Background()).If(lock.IsOwner()).Then(put).Commit()
