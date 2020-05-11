@@ -1,15 +1,28 @@
-FROM    golang:1.8
-RUN     go get github.com/Masterminds/glide
-RUN     apt-get update && apt-get install -y git
-WORKDIR $GOPATH/src/github.com/paddlepaddle
-RUN     mkdir -p $GOPATH/src/github.com/paddlepaddle/edl
-# Add ENV http_proxy=[your proxy server] if needed
-# run glide install before building go sources, so that
-# if we change the code and rebuild the image can cost little time
-ADD     ./glide.yaml ./glide.lock $GOPATH/src/github.com/paddlepaddle/edl/
-WORKDIR $GOPATH/src/github.com/paddlepaddle/edl
-RUN     glide install --strip-vendor
-ADD     . $GOPATH/src/github.com/paddlepaddle/edl
-RUN     go build -o /usr/local/bin/edl github.com/paddlepaddle/edl/cmd/edl
-RUN     rm -rf $GOPATH/src/github.com/paddlepaddle/edl
-CMD     ["edl"]
+FROM paddlepaddle/paddle:latest-gpu-cuda10.0-cudnn7-dev
+
+# Install Go
+RUN wget -qO- https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz | \
+    tar -xz -C /usr/local && \
+    mkdir /root/gopath && \
+    mkdir /root/gopath/bin && \
+    mkdir /root/gopath/src
+ENV GOROOT=/usr/local/go GOPATH=/root/gopath
+# should not be in the same line with GOROOT definition, otherwise docker build could not find GOROOT.
+ENV PATH=PATH:{GOROOT}/bin:${GOPATH}/bin
+
+RUN python -m pip install etcd3==0.12.0 grpcio_tools==1.28.1 grpcio==1.28.1 flask==1.1.2 pathlib==1.0.1
+RUN python -m pip install paddlepaddle-gpu
+
+ENV HOME /root
+WORKDIR /root/paddle_edl
+ADD ./scripts/download_etcd.sh /root/paddle_edl/download_etcd.sh
+
+# Install redis
+RUN cd /tmp/ && wget http://download.redis.io/releases/redis-6.0.1.tar.gz &&  \
+    tar xzf redis-6.0.1.tar.gz && \
+    cd redis-6.0.1 && make -j && \
+    mv src/redis-server /usr/local/bin && \
+    mv src/redis-cli /usr/local/bin && \
+    cd .. && rm -rf redis-6.0.1.tar.gz redis-6.0.1
+
+
