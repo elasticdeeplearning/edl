@@ -346,9 +346,6 @@ class BalanceTable(object):
         self._consistent_hash = None
         self._consistent_hash_thread = None
 
-        self._get_service_thread = None
-        self._new_service_queue = queue.Queue()
-
         self._update_service_thread = None
         self._update_event_queue = queue.Queue()
 
@@ -433,23 +430,6 @@ class BalanceTable(object):
             except queue.Empty:
                 pass
 
-    def _get_service_worker(self):
-        """ get service from db """
-        while True:
-            service = self._new_service_queue.get()
-            # even if no server in service, revision will also return
-            servers_meta, revision = self._db.get_service_with_revision(
-                service.name)
-            logging.info('get_service={}, servers={}, revision={}'.format(
-                service.name, servers_meta, revision))
-            if len(servers_meta) != 0:
-                service.set_servers(servers_meta)
-            # save watch_id into service. NOTE, watch from revision + 1
-            service.watch_id = self._db.watch_service(
-                service.name,
-                service.watch_call_back,
-                start_revision=revision + 1)
-
     def _update_service_worker(self, timing_wheel=1):
         import gc
         while True:
@@ -481,7 +461,29 @@ class BalanceTable(object):
     def _unregister_watch_service(self, watch_id):
         self._db.cancel_watch(watch_id)
 
+    def _get_service_from_db(self, service):
+        # even if no server in service, revision will also return
+        servers_meta, revision = self._db.get_service_with_revision(
+            service.name)
+        logging.info('get_service={}, servers={}, revision={}'.format(
+            service.name, servers_meta, revision))
+        if len(servers_meta) != 0:
+            service.set_servers(servers_meta)
+        # save watch_id into service. NOTE, watch from revision + 1
+        service.watch_id = self._db.watch_service(
+            service.name, service.watch_call_back, start_revision=revision + 1)
+
     def register_client(self, client, service_name, require_num, token=None):
+        if self._consistent_hash is None:
+            # TODO. return code. balance table is not ready, need retry
+            return
+        # All discovery requests with the same service name are sent to the same server
+        discovery_server = self._consistent_hash.get_node(service_name)
+        if discovery_server != self._discovery_server:
+            # TODO. request need sent to discovery_server
+            return discovery_server
+
+        is_new_service = False
         with self._mutex:
             if client in self._client_to_service:
                 # already registered
@@ -489,6 +491,7 @@ class BalanceTable(object):
                     logging.warning(
                         'client={} register again service_name={} require_num={}'.
                         format(client, service_name, require_num))
+                    # TODO.
                     return
                 else:  # NOTE. This must be impossible
                     logging.critical(
@@ -501,12 +504,14 @@ class BalanceTable(object):
             else:
                 # add new service monitor
                 service = Service(service_name, self._add_update_event)
-                self._new_service_queue.put(service)
-
                 self._name_to_service[service_name] = service
+                is_new_service = True
 
             self._client_to_service[client] = service
             service.inc_ref()
+
+        if is_new_service:
+            self._get_service_from_db(service)
 
         service.add_client(client, require_num)
 
@@ -561,11 +566,6 @@ class BalanceTable(object):
             target=self._consistent_hash_worker)
         self._consistent_hash_thread.daemon = True
         self._consistent_hash_thread.start()
-
-        self._get_service_thread = threading.Thread(
-            target=self._get_service_worker)
-        self._get_service_thread.daemon = True
-        self._get_service_thread.start()
 
         self._update_service_thread = threading.Thread(
             target=self._update_service_worker)
