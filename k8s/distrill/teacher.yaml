@@ -1,0 +1,24 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: teacher
+  labels:
+    app: teacher
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: teacher 
+      labels:
+        app: teacher 
+    spec:
+      containers:
+      - name: teacher
+        image: hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
+        imagePullPolicy: Always
+        workingDir: /
+        command: ['/bin/bash', '-c']
+        args: ['sleep 3000']
+        ports:
+        - containerPort: 7001
+          name: serving
