@@ -1,0 +1,28 @@
+FROM paddlepaddle/paddle:1.8.0-gpu-cuda10.0-cudnn7
+
+# Install Go
+RUN rm -rf /usr/local/go && wget -qO- https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz | \
+    tar -xz -C /usr/local && \
+    mkdir -p /root/gopath && \
+    mkdir -p /root/gopath/bin && \
+    mkdir -p /root/gopath/src
+ENV GOROOT=/usr/local/go GOPATH=/root/gopath
+# should not be in the same line with GOROOT definition, otherwise docker build could not find GOROOT.
+ENV PATH=$PATH:{GOROOT}/bin:${GOPATH}/bin
+
+ADD ./requirements.txt /root/
+RUN python -m pip install -r /root/requirements.txt
+
+ENV HOME /root
+WORKDIR /root/paddle_edl
+ADD ./download_etcd.sh /root/paddle_edl/download_etcd.sh
+
+# Install redis
+RUN cd /tmp/ && wget http://download.redis.io/releases/redis-6.0.1.tar.gz &&  \
+    tar xzf redis-6.0.1.tar.gz && \
+    cd redis-6.0.1 && make -j && \
+    mv src/redis-server /usr/local/bin && \
+    mv src/redis-cli /usr/local/bin && \
+    cd .. && rm -rf redis-6.0.1.tar.gz redis-6.0.1
+
+
