@@ -1,1 +1,0 @@
-FROM hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
