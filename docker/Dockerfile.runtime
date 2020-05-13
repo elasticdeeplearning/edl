@@ -27,4 +27,10 @@ RUN cd /tmp/ && wget http://download.redis.io/releases/redis-6.0.1.tar.gz &&  \
     mv src/redis-cli /usr/local/bin && \
     cd .. && rm -rf redis-6.0.1.tar.gz redis-6.0.1
 
+# install edl
+ADD ./build/python/dist/paddle_edl-0.0.0-py2-none-any.whl /tmp/paddle_edl-0.0.0-py2-none-any.whl
+RUN python -m pipi install /tmp/paddle_edl-0.0.0-py2-none-any.whl
+RUN rm -f /tmp/paddle_edl-0.0.0-py2-none-any.whl
 
+# add example
+ADD ./example /root/paddle_edl/example
