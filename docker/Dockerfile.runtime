@@ -17,10 +17,10 @@ RUN python -m pip install -r /root/paddle_edl/requirements.txt
 ENV HOME /root
 WORKDIR /root/paddle_edl
 ADD ./scripts/download_etcd.sh /root/paddle_edl/download_etcd.sh
-RUN /root/paddle_edl/download_etcd.sh
+RUN bash /root/paddle_edl/download_etcd.sh
 
 # Install redis
-RUN cd /tmp/ && wget http://download.redis.io/releases/redis-6.0.1.tar.gz &&  \
+RUN cd /tmp/ && wget -q http://download.redis.io/releases/redis-6.0.1.tar.gz &&  \
     tar xzf redis-6.0.1.tar.gz && \
     cd redis-6.0.1 && make -j && \
     mv src/redis-server /usr/local/bin && \
@@ -29,7 +29,7 @@ RUN cd /tmp/ && wget http://download.redis.io/releases/redis-6.0.1.tar.gz &&  \
 
 # install edl
 ADD ./build/python/dist/paddle_edl-0.0.0-py2-none-any.whl /tmp/paddle_edl-0.0.0-py2-none-any.whl
-RUN python -m pipi install /tmp/paddle_edl-0.0.0-py2-none-any.whl
+RUN python -m pip install /tmp/paddle_edl-0.0.0-py2-none-any.whl
 RUN rm -f /tmp/paddle_edl-0.0.0-py2-none-any.whl
 
 # add example
