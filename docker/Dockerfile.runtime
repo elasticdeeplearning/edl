@@ -10,12 +10,14 @@ ENV GOROOT=/usr/local/go GOPATH=/root/gopath
 # should not be in the same line with GOROOT definition, otherwise docker build could not find GOROOT.
 ENV PATH=$PATH:{GOROOT}/bin:${GOPATH}/bin
 
-ADD ./requirements.txt /root/
-RUN python -m pip install -r /root/requirements.txt
+ADD ./docker/requirements.txt /root/paddle_edl/requirements.txt
+RUN python -m pip install -r /root/paddle_edl/requirements.txt
 
+# etcd
 ENV HOME /root
 WORKDIR /root/paddle_edl
-ADD ./download_etcd.sh /root/paddle_edl/download_etcd.sh
+ADD ./scripts/download_etcd.sh /root/paddle_edl/download_etcd.sh
+RUN /root/paddle_edl/download_etcd.sh
 
 # Install redis
 RUN cd /tmp/ && wget http://download.redis.io/releases/redis-6.0.1.tar.gz &&  \
