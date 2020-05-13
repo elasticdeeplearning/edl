@@ -22,6 +22,7 @@ class _ConsistentHashData(object):
         # NOTE. need deepcopy, otherwise outside maybe change
         self._nodes = copy.deepcopy(nodes)
         self._virtual_num = virtual_num
+        self._version = 0
 
         # as c++ std::map
         self._slot_to_node = dict()  # hash slot to node
@@ -55,6 +56,7 @@ class _ConsistentHashData(object):
 
         self._add_node(node)
         self._sorted_slots.sort()  # NOTE. sort
+        self._version += 1
 
     def remove_node(self, node):
         if node not in self._nodes:
@@ -69,7 +71,10 @@ class _ConsistentHashData(object):
                 del self._slot_to_node[slot]
                 self._sorted_slots.remove(slot)
 
+        self._version += 1
+
     def get_node(self, key):
+        # return node
         if len(self._nodes) == 0:
             return None
 
@@ -81,6 +86,14 @@ class _ConsistentHashData(object):
 
         return self._slot_to_node[self._sorted_slots[index]]
 
+    def get_node_nodes(self, key):
+        # return node, nodes, version
+        if len(self._nodes) == 0:
+            return None, self._nodes, self._version
+
+        node = self.get_node(key)
+        return node, self._nodes, self._version
+
     @staticmethod
     def _get_slot(key):
         return int(hashlib.md5(key).hexdigest(), 16)
@@ -88,7 +101,8 @@ class _ConsistentHashData(object):
 
 class ConsistentHash(object):
     """ No lock write with 1 thread write, multi thread read.
-    NOTE. The read data may not be up-to-date, but it doesn't matter
+    NOTE. Only 1 thread can write. I think it's enough.
+    NOTE. The read data may not be up-to-date, but it doesn't matter.
     """
 
     def __init__(self, nodes, virtual_num=300):
@@ -113,5 +127,11 @@ class ConsistentHash(object):
         self._hash_data = new_hash_data
 
     def get_node(self, key):
+        # return node
         hash_data = self._hash_data
         return hash_data.get_node(key)
+
+    def get_node_nodes(self, key):
+        # return node, nodes, version
+        hash_data = self._hash_data
+        return hash_data.get_node_nodes(key)

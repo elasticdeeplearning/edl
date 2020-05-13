@@ -38,27 +38,13 @@ class DiscoveryServicer(discovery_pb2_grpc.DiscoveryServiceServicer):
         logging.info('client={}, service_name={}, require_num={} token={}'.
                      format(client, service_name, require_num, token))
 
-        # TODO, return code
-        self._table.register_client(client, service_name, require_num)
-
-        return discovery_pb2.Response(msg='success', version=0, servers=[])
+        return self._table.register_client(client, service_name, require_num)
 
     def HeartBeat(self, request, context):
         client = request.client
         version = request.version
 
-        ret = self._table.get_servers(client, version)
-        if ret is None:
-            # not register, or timeout
-            return discovery_pb2.Response(
-                msg='failed', version=None, servers=None)
-
-        new_version, servers = ret
-        if new_version > version:
-            logging.info('client={} new_version={}, servers={}'.format(
-                client, new_version, servers))
-        return discovery_pb2.Response(
-            msg='success', version=new_version, servers=servers)
+        return self._table.get_servers(client, version)
 
 
 def serve(server, worker_num, db_endpoints):
@@ -81,7 +67,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--server',
         type=str,
-        default='127.0.0.1:50051',
+        default='127.0.0.1:50052',
         help='endpoint of the server, e.g. 127.0.0.1:8888 [default: %(default)s]'
     )
     parser.add_argument(

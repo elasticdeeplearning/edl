@@ -59,7 +59,7 @@ class ServerRegister(object):
         failed_count = 0
 
         while failed_count < retry:
-            while is_server_alive(server):
+            while is_server_alive(server)[0]:
                 if failed_count != 0:
                     self._db.set_server_not_exists(service_name, server,
                                                    self._monitor())

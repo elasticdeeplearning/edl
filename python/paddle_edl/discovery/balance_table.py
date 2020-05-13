@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import discovery_pb2 as discovery
 import functools
 import logging
 import threading
@@ -414,13 +415,14 @@ class BalanceTable(object):
                     server_change = watch_queue.get(timeout=timeout)
                     add_servers, rm_servers = server_change
 
-                    for server in rm_servers:
+                    for server_meta in rm_servers:
                         logging.info('Remove discovery server={}'.format(
-                            server))
-                        self._consistent_hash.remove_node(server)
-                    for server in add_servers:
-                        logging.info('Add discovery server={}'.format(server))
-                        self._consistent_hash.add_new_node(server)
+                            server_meta))
+                        self._consistent_hash.remove_node(server_meta.server)
+                    for server_meta in add_servers:
+                        logging.info('Add discovery server={}'.format(
+                            server_meta))
+                        self._consistent_hash.add_new_node(server_meta.server)
 
                     timeout = end_time - time.time()
                     if timeout <= 0:
@@ -475,29 +477,41 @@ class BalanceTable(object):
 
     def register_client(self, client, service_name, require_num, token=None):
         if self._consistent_hash is None:
-            # TODO. return code. balance table is not ready, need retry
-            return
+            # return discovery server is not ready, client need retry
+            status = discovery.Status(code=discovery.Code.NO_READY)
+            return discovery.Response(status=status)
+
         # All discovery requests with the same service name are sent to the same server
-        discovery_server = self._consistent_hash.get_node(service_name)
+        discovery_server, discovery_servers, discovery_version = \
+            self._consistent_hash.get_node_nodes(service_name)
         if discovery_server != self._discovery_server:
-            # TODO. request need sent to discovery_server
-            return discovery_server
+            # request need sent to another discovery server
+            status = discovery.Status(
+                code=discovery.Code.REDIRECT, message=discovery_server)
+            redirect_response = discovery.Response(
+                status=status,
+                discovery_version=discovery_version,
+                discoverers=discovery_servers)
+            return redirect_response
 
         is_new_service = False
         with self._mutex:
             if client in self._client_to_service:
                 # already registered
                 if self._client_to_service[client].name == service_name:
-                    logging.warning(
-                        'client={} register again service_name={} require_num={}'.
-                        format(client, service_name, require_num))
-                    # TODO.
-                    return
+                    status = discovery.Status(
+                        code=discovery.Code.ALREADY_REGISTER)
+                    return discovery.Response(
+                        status=status,
+                        discovery_version=discovery_version,
+                        discoverers=discovery_servers)
                 else:  # NOTE. This must be impossible
                     logging.critical(
                         'client={} register new service_name={} require_num={}, this is impossible'
                         .format(client, service_name, require_num))
-                    return
+                    status = discovery.Status(
+                        code=discovery.Code.REGISTER_OTHER_SERVICE)
+                    return discovery.Response(status=status)
 
             if service_name in self._name_to_service:
                 service = self._name_to_service[service_name]
@@ -522,6 +536,12 @@ class BalanceTable(object):
 
         logging.info('register client={} service_name={} require_num={}'.
                      format(client, service_name, require_num))
+
+        status = discovery.Status(code=discovery.Code.OK)
+        return discovery.Response(
+            status=status,
+            discovery_version=discovery_version,
+            discoverers=discovery_servers)
 
     def unregister_client(self, client):
         # timing wheel maybe unregister again
@@ -552,11 +572,21 @@ class BalanceTable(object):
         # timing wheel
         entry = self._client_weak_entrys.get(client)
         if entry is None:
-            logging.warning('client={} timeout'.format(client))
-            return None
+            logging.warning('client={} timeout or unregister'.format(client))
+            status = discovery.Status(code=discovery.Code.UNREGISTERED)
+            return discovery.Response(status=status)
         else:
             self._client_timing_buckets[-1].append(entry)
-        return self._client_to_service[client].get_servers(client, version)
+
+        new_version, servers = self._client_to_service[client].get_servers(
+            client, version)
+        if new_version > version:
+            logging.info('client={} new_version={}, servers={}'.format(
+                client, new_version, servers))
+
+        status = discovery.Status(code=discovery.Code.OK)
+        return discovery.Response(
+            status=status, version=new_version, servers=servers)
 
     def start(self):
         # start db
