@@ -33,9 +33,9 @@ class TestEtcd(unittest.TestCase):
         servers = self.etcd.get_service("job_1")
         assert len(servers) == 2, "must two servers"
 
-        for k, v in servers:
-            value = local_servers[k]
-            assert value == v
+        for server_meta in servers:
+            value = local_servers[server_meta.server]
+            assert value == server_meta.info
 
     def refresh(self):
         self.etcd.refresh("job_1", "127.0.0.1:1")
@@ -65,20 +65,15 @@ class TestEtcd(unittest.TestCase):
     def test_watch(self):
         events = []
 
-        def watch_call_back(response):
-            try:
-                events.extend(response.events)
-                for e in events:
-                    key = EtcdClient.get_server_name_from_full_path(e.key,
-                                                                    "job_2")
-                    if type(e) == PutEvent:
-                        print("put event key:{} value:{}".format(key, e.value))
-                    elif type(e) == DeleteEvent:
-                        print("delete event key:{} value:{}".format(key,
-                                                                    e.value))
-            except Exception as e:
-                print("events len 1:", len(events))
-                print(e)
+        def watch_call_back(add_servers, rm_servers):
+            for server_meta in add_servers:
+                print('put server:{} value:{}'.format(server_meta.server,
+                                                      server_meta.info))
+                events.append(server_meta)
+            for server_meta in rm_servers:
+                print('delete server:{} value:{}'.format(server_meta.server,
+                                                         server_meta.info))
+                events.append(server_meta)
 
         watch_id = self.etcd.watch_service("job_2", watch_call_back)
 
@@ -92,9 +87,8 @@ class TestEtcd(unittest.TestCase):
 
         print("events len:", len(events))
         assert len(events) == 1
-        assert self.etcd.get_server_name_from_full_path(
-            events[0].key, "job_2") == '127.0.0.1:1'
-        assert events[0].value == 'first'
+        assert events[0].server == '127.0.0.1:1'
+        assert events[0].info == 'first'
 
     def test_lease(self):
         self.add()
