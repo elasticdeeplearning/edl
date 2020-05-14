@@ -1,0 +1,24 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: paddleserving
+  labels:
+    app: paddleserving
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: paddleserving
+      labels:
+        app: paddleserving
+    spec:
+      containers:
+      - name: paddleserving
+        image: hub.baidubce.com/ctr/paddleserving:k8s-test
+        imagePullPolicy: Always
+        workingDir: /
+        command: ['/bin/bash', '-c']
+        args: ['wget --no-check-certificate https://paddle-serving.bj.bcebos.com/lac/lac_model_jieba_web.tar.gz && tar -xzf lac_model_jieba_web.tar.gz && python lac_web_service.py jieba_server_model/ lac_workdir 9292']
+        ports:
+        - containerPort: 9292
+          name: serving

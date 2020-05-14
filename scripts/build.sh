@@ -5,11 +5,6 @@ BASEDIR=$(dirname $(readlink -f $0))
 
 cd ${BASEDIR}/..
 
-python -m pip install etcd3==0.12.0 grpcio_tools==1.28.1 grpcio==1.28.1 flask==1.1.2 pathlib==1.0.1 --ignore-installed
-python -m pip install paddlepaddle-gpu  --ignore-installed
-
-./scripts/download_etcd.sh
-
 pushd python/paddle_edl/protos/
 bash generate.sh
 popd
