@@ -19,23 +19,11 @@ import threading
 
 from contextlib import closing
 from etcd_client import EtcdClient
+from server_alive import is_server_alive
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
-
-
-def is_server_alive(server):
-    alive = True
-    ip, port = server.split(":")
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        try:
-            s.settimeout(1)
-            s.connect((ip, int(port)))
-            s.shutdown(socket.SHUT_RDWR)
-        except:
-            alive = False
-        return alive
 
 
 class ServerRegister(object):
@@ -47,23 +35,23 @@ class ServerRegister(object):
 
     def _monitor(self):
         # Todo, monitor cpu, gpu, net
-        info = '{cpu:10%, gpu:20%, net:1}'
+        info = '{gpu:20%, net:1}'
         return info
 
     def _register(self, service_name, server, ttl=120):
         all_time = ttl
-        while not is_server_alive(server) and ttl > 0:
+        while not is_server_alive(server)[0] and ttl > 0:
             logging.warning(
                 'start to register, but server is not alive, ttl={}'.format(
                     ttl))
             ttl -= 2
-            time.sleep(3)
+            time.sleep(2)
 
         if ttl <= 0:
             logging.error('server is not up in time={}s'.format(all_time))
             raise Exception('server up timeout')
 
-        self._db.set_server(service_name, server, self._monitor())
+        self._db.set_server_not_exists(service_name, server, self._monitor())
         logging.info('register server={} success'.format(server))
 
     def _heartbeat(self, service_name, server, beat_time=1.5):
@@ -71,17 +59,18 @@ class ServerRegister(object):
         failed_count = 0
 
         while failed_count < retry:
-            while is_server_alive(server):
+            while is_server_alive(server)[0]:
                 if failed_count != 0:
-                    self._db.set_server(service_name, server, self._monitor())
+                    self._db.set_server_not_exists(service_name, server,
+                                                   self._monitor())
                     failed_count = 0
-                logging.debug(self._db.get_service(service_name))
+                logging.debug(self._db._get_server(service_name, server))
                 self._db.refresh(service_name, server)
                 time.sleep(beat_time)
             failed_count += 1
 
             logging.warning('server={} is not alive, retry={}'.format(
-                self._server, failed_count))
+                server, failed_count))
             time.sleep(2)
 
         logging.error('wait server restart timeout, exit')
@@ -132,11 +121,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--service_name',
         type=str,
-        help='service name where the server is located')
+        help='service name where the server is located',
+        required=True)
     parser.add_argument(
         '--server',
         type=str,
-        help='endpoint of the server, e.g. 127.0.0.1:8888')
+        help='endpoint of the server, e.g. 127.0.0.1:8888',
+        required=True)
     # TODO. service_token
     parser.add_argument(
         '--service_token',
