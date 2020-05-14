@@ -70,7 +70,7 @@ class ServerRegister(object):
             failed_count += 1
 
             logging.warning('server={} is not alive, retry={}'.format(
-                self._server, failed_count))
+                server, failed_count))
             time.sleep(2)
 
         logging.error('wait server restart timeout, exit')

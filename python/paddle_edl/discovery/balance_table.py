@@ -222,6 +222,7 @@ class Service(object):
             if client_num == 0:
                 assert len(update_client) == 0, "if all client unregister, len of" \
                                                 "update_client must == 0"
+                return
             # no servers in service =.=
             if server_num == 0:
                 logging.warning('service={} have no servers'.format(self.name))
@@ -491,7 +492,7 @@ class BalanceTable(object):
             redirect_response = discovery.Response(
                 status=status,
                 discovery_version=discovery_version,
-                discoverers=discovery_servers)
+                discovery_servers=discovery_servers)
             return redirect_response
 
         is_new_service = False
@@ -504,7 +505,7 @@ class BalanceTable(object):
                     return discovery.Response(
                         status=status,
                         discovery_version=discovery_version,
-                        discoverers=discovery_servers)
+                        discovery_servers=discovery_servers)
                 else:  # NOTE. This must be impossible
                     logging.critical(
                         'client={} register new service_name={} require_num={}, this is impossible'
@@ -541,7 +542,7 @@ class BalanceTable(object):
         return discovery.Response(
             status=status,
             discovery_version=discovery_version,
-            discoverers=discovery_servers)
+            discovery_servers=discovery_servers)
 
     def unregister_client(self, client):
         # timing wheel maybe unregister again
@@ -578,15 +579,39 @@ class BalanceTable(object):
         else:
             self._client_timing_buckets[-1].append(entry)
 
-        new_version, servers = self._client_to_service[client].get_servers(
-            client, version)
+        service = self._client_to_service[client]
+        service_name = service.name
+
+        if self._consistent_hash is None:
+            # return discovery server is not ready, client need retry
+            status = discovery.Status(code=discovery.Code.NO_READY)
+            return discovery.Response(status=status)
+
+        # All discovery requests with the same service name are sent to the same server
+        discovery_server, discovery_servers, discovery_version = \
+            self._consistent_hash.get_node_nodes(service_name)
+        if discovery_server != self._discovery_server:
+            # request need sent to another discovery server
+            status = discovery.Status(
+                code=discovery.Code.REDIRECT, message=discovery_server)
+            redirect_response = discovery.Response(
+                status=status,
+                discovery_version=discovery_version,
+                discovery_servers=discovery_servers)
+            return redirect_response
+
+        new_version, servers = service.get_servers(client, version)
         if new_version > version:
             logging.info('client={} new_version={}, servers={}'.format(
                 client, new_version, servers))
 
         status = discovery.Status(code=discovery.Code.OK)
         return discovery.Response(
-            status=status, version=new_version, servers=servers)
+            status=status,
+            version=new_version,
+            servers=servers,
+            discovery_version=discovery_version,
+            discovery_servers=discovery_servers)
 
     def start(self):
         # start db

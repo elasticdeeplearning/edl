@@ -90,7 +90,7 @@ message Response {
   uint64 version = 2;
   uint64 discovery_version = 3;
   repeated string servers = 4;
-  repeated string discoverers = 5;
+  repeated string discovery_servers = 5;
 }
 
 service DiscoveryService {

@@ -90,10 +90,14 @@ class DiscoveryClient(object):
         if response.version > self._version:
             self._ret_servers = response.servers
             self._version = response.version
+            logging.info('service version={} servers={}'.format(
+                self._version, self._ret_servers))
 
         if response.discovery_version > self._discovery_version:
-            self._discovery_servers = response.discoverers
+            self._discovery_servers = response.discovery_servers
             self._discovery_version = response.discovery_version
+            logging.info('discovery_version={} servers={}'.format(
+                self._discovery_version, self._discovery_servers))
 
     def _process_no_ready(self, response):
         logging.info('discovery server={} is not ready'.format(self._discover))
@@ -104,8 +108,9 @@ class DiscoveryClient(object):
 
         old_discover = self._discover
         self._discover = response.status.message
-        self._discovery_servers = response.discoverers
+        self._discovery_servers = response.discovery_servers
         self._discovery_version = response.discovery_version
+        self._version = 0
 
         logging.info('redirect discovery server, old={} new={}'.format(
             old_discover, self._discover))
@@ -153,7 +158,9 @@ class DiscoveryClient(object):
                 self._register()
 
             beat_request = discovery.HeartBeatRequest(
-                client=self._client, version=self._version)
+                client=self._client,
+                version=self._version,
+                discovery_version=self._discovery_version)
             response = self._stub_heartbeat(beat_request)
             self._process_response(response)
 
@@ -235,7 +242,9 @@ class DiscoveryClient(object):
 
 
 if __name__ == '__main__':
-    client = DiscoveryClient(['127.0.0.1:50051'], 'TestService', 4)
+    client = DiscoveryClient(['127.0.0.1:50051', '127.0.0.1:50052'],
+                             'TestService', 4)
+    # client = DiscoveryClient(['127.0.0.1:50051'], 'TestService2', 4)
     client.start(daemon=True)
     for i in range(1000):
         servers = client.get_servers()

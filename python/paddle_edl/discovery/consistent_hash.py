@@ -22,7 +22,7 @@ class _ConsistentHashData(object):
         # NOTE. need deepcopy, otherwise outside maybe change
         self._nodes = copy.deepcopy(nodes)
         self._virtual_num = virtual_num
-        self._version = 0
+        self._version = 1
 
         # as c++ std::map
         self._slot_to_node = dict()  # hash slot to node
