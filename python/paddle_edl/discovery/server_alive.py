@@ -11,3 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import socket
+from contextlib import closing
+
+
+def is_server_alive(server):
+    """ is server alive
+    return alive, client_addr
+    """
+    alive = True
+    client_addr = None
+    ip, port = server.split(":")
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        try:
+            s.settimeout(1.5)
+            s.connect((ip, int(port)))
+            client_addr = s.getsockname()
+            s.shutdown(socket.SHUT_RDWR)
+        except socket.error:
+            alive = False
+        return alive, client_addr
