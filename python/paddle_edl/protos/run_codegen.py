@@ -28,9 +28,10 @@
 """Runs protoc with the gRPC plugin to generate messages and gRPC stubs."""
 
 from grpc_tools import protoc
+import pkg_resources
 import os
 
-#python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. data_server.proto
+# python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. data_server.proto
 protoc.main((
     '',
     '-I.',
@@ -52,5 +53,15 @@ protoc.main((
     '--grpc_python_out=.',
     'common.proto', ))
 
-#import os
+proto_include = pkg_resources.resource_filename('grpc_tools', '_proto')
+protoc.main((
+    '',
+    '-I.',
+    '-I{}'.format(proto_include),
+    '--python_out=.',
+    '--grpc_python_out=.',
+    'distill_discovery.proto', ))
+
+# import os
 os.system("mv master*.py common*.py data_server*.py ../utils/")
+os.system("mv distill_discovery*.py ../distill/")

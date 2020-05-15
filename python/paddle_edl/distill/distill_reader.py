@@ -540,22 +540,17 @@ class DynamicServiceDiscover(ServiceDiscover):
         self._client = None
 
     def _connect(self):
-        # FIXME. imort
-        from client import Client as DiscoverClient
-        # from .. import Client as DiscoverClient
-        # from .client import Client as DiscoverClient
-        self._client = DiscoverClient(self._host, self._port,
-                                      self._service_name)
-        teacher_list = self._client.start(self._require_num)
-        logging.info('init {} servers={}'.format(
-            len(teacher_list), teacher_list))
-        return teacher_list
+        from paddle_edl.distill.discovery_client import DiscoveryClient
+        client = DiscoveryClient(['{}:{}'.format(self._host, self._port)],
+                                 self._service_name, self._require_num)
+        client.start(daemon=True)
+        self._client = client
 
     def get_servers(self):
         if self._client is None:
-            return self._connect()
+            self._connect()
 
-        is_update, servers = self._client.get_teacher_list()
+        servers = self._client.get_servers()
         return servers
 
     def __del__(self):
@@ -1270,44 +1265,3 @@ class FakeDistillReader(object):
                 yield new_samples
 
         return __fake_reader_impl__
-
-
-if __name__ == '__main__':
-    #_NOP_PREDICT_TEST = True
-
-    # test mnist distill reader
-    def _reader():
-        img = np.array(
-            [(i + 1) / 28.0 for i in range(28)] * 28,
-            dtype=np.float32).reshape((1, 28, 28))
-        label = np.array([100], dtype=np.int64)
-        for i in range(24):
-            yield 8 * [(img, label)]
-        yield 2 * [(img, label)]
-
-    dr = DistillReader(
-        'test_mnist_distill_reader.conf',
-        32,
-        4,
-        capacity=4,
-        occupied_capacity=2)
-    dr.set_sample_list_generator(_reader)
-    distill_reader = dr.distill_reader()
-
-    for epoch in range(300):
-        for step, batch in enumerate(distill_reader()):
-            # print('----step={}, predict_shape={}, predict[0]={} ----'.format(step, batch[-1].shape, batch[-1][0]))
-            pass
-        if epoch % 10 == 0:
-            print('^^^^^^^^^^^^^ epoch={} predict[0][0]={}^^^^^^^^^^^^^^'.
-                  format(epoch, batch[-1][0][0]))
-
-    fake_dr = FakeDistillReader('test_mnist_distill_reader.conf')
-    fake_distill_reader = fake_dr.fake_from_sample_list_generator(_reader)
-    for epoch in range(20):
-        for step, sample_list in enumerate(fake_distill_reader()):
-            # print('---step={}, predict_shape={}, predict[0]={}---'.format(step, sample_list[0][-1].shape, sample_list[0][-1][0]))
-            pass
-        if epoch % 10 == 0:
-            print('^^^^^^^^^^^^^ fake_epoch={} predict[0][0]={}^^^^^^^^^^^^^^'.
-                  format(epoch, sample_list[0][-1][0]))
