@@ -18,7 +18,7 @@ spec:
         imagePullPolicy: Always
         workingDir: /
         command: ['/bin/bash', '-c']
-        args: ['sleep 3000']
+        args: ['etcd']
         ports:
         - containerPort: 2379
           name: serving
