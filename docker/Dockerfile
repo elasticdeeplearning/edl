@@ -1,4 +1,4 @@
-FROM paddlepaddle/paddle:latest-gpu-cuda10.0-cudnn7-dev
+FROM hub.baidubce.com/paddlepaddle/paddle:latest-gpu-cuda10.0-cudnn7-dev
 
 # Install Go
 RUN rm -rf /usr/local/go && wget -qO- https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz | \
