@@ -1,4 +1,4 @@
-FROM paddlepaddle/paddle:latest-gpu-cuda10.0-cudnn7-dev
+FROM hub.baidubce.com/paddlepaddle/paddle:latest-gpu-cuda10.0-cudnn7-dev
 
 # Install Go
 RUN rm -rf /usr/local/go && wget -qO- https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz | \
@@ -22,11 +22,20 @@ ADD ./scripts/download_etcd.sh /root/paddle_edl/download_etcd.sh
 RUN bash /root/paddle_edl/download_etcd.sh
 
 # Install redis
-RUN cd /tmp/ && wget -q http://download.redis.io/releases/redis-6.0.1.tar.gz &&  \
+RUN cd /tmp/ && wget -q https://paddle-edl.bj.bcebos.com/redis-6.0.1.tar.gz &&  \
     tar xzf redis-6.0.1.tar.gz && \
     cd redis-6.0.1 && make -j && \
     mv src/redis-server /usr/local/bin && \
     mv src/redis-cli /usr/local/bin && \
     cd .. && rm -rf redis-6.0.1.tar.gz redis-6.0.1
 
+
+# protoc
+RUN mkdir -p /tmp/protoc && cd /tmp/protoc && \
+    wget -q -O protoc-3.11.4-linux-x86_64.zip  --no-check-certificate  https://paddle-edl.bj.bcebos.com/protoc-3.11.4-linux-x86_64.zip && \
+    unzip protoc-3.11.4-linux-x86_64.zip && mv bin/protoc /usr/local/bin
+
+RUN echo "go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.io,direct" >> /root/.bashrc
+ENV GO111MODULE=on
+ENV GOPROXY=https://goproxy.io,direct
 

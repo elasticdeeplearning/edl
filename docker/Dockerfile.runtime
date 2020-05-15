@@ -1,4 +1,4 @@
-FROM paddlepaddle/paddle:1.8.0-gpu-cuda10.0-cudnn7
+FROM hub.baidubce.com/paddlepaddle/paddle:1.8.0-gpu-cuda10.0-cudnn7
 
 # Install Go
 RUN rm -rf /usr/local/go && wget -qO- https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz | \
@@ -20,7 +20,7 @@ ADD ./scripts/download_etcd.sh /root/paddle_edl/download_etcd.sh
 RUN bash /root/paddle_edl/download_etcd.sh
 
 # Install redis
-RUN cd /tmp/ && wget -q http://download.redis.io/releases/redis-6.0.1.tar.gz &&  \
+RUN cd /tmp/ && wget -q https://paddle-edl.bj.bcebos.com/redis-6.0.1.tar.gz &&  \
     tar xzf redis-6.0.1.tar.gz && \
     cd redis-6.0.1 && make -j && \
     mv src/redis-server /usr/local/bin && \
