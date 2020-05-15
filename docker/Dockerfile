@@ -35,5 +35,5 @@ RUN mkdir -p /tmp/protoc && cd /tmp/protoc && \
     wget -q -O protoc-3.11.4-linux-x86_64.zip  --no-check-certificate  https://paddle-edl.bj.bcebos.com/protoc-3.11.4-linux-x86_64.zip && \
     unzip protoc-3.11.4-linux-x86_64.zip && mv bin/protoc /usr/local/bin
 
-
+RUN go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.io,direct
 
