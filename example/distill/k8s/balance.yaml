@@ -1,0 +1,21 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: balance
+  labels:
+    app: balance
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: balance 
+      labels:
+        app: balance 
+    spec:
+      containers:
+      - name: balance
+        image: hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
+        imagePullPolicy: Always
+        workingDir: /
+        command: ['/bin/bash', '-c']
+        args: ['sleep 3000']
