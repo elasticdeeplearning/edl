@@ -30,3 +30,12 @@ RUN cd /tmp/ && wget -q https://paddle-edl.bj.bcebos.com/redis-6.0.1.tar.gz &&  
     cd .. && rm -rf redis-6.0.1.tar.gz redis-6.0.1
 
 
+# protoc
+RUN mkdir -p /tmp/protoc && pushd /tmp/protoc && \
+    wget -O protoc-3.11.4-linux-x86_64.zip  --no-check-certificate  https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip && \
+    unzip protoc-3.11.4-linux-x86_64.zip && mv bin/protoc /usr/local/bin && popd
+
+RUN pushd  /tmp/ && go get -u -v github.com/golang/protobuf/protoc-gen-go@v1.3.0 && popd
+RUN export PATH=$PATH:$(go env GOPATH)
+
+
