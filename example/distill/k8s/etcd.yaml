@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: etcd
   labels:
-    app: etcd
+    edl-distill-demo-app: etcd
 spec:
   replicas: 1
   template:
@@ -12,6 +12,7 @@ spec:
       labels:
         app: etcd 
     spec:
+      hostNetwork: true
       containers:
       - name: etcd
         image: hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
@@ -22,3 +23,11 @@ spec:
         ports:
         - containerPort: 2379
           name: serving
+        resources:
+          requests:
+            memory: 20Gi
+            cpu: 2
+          limits:
+            memory: 20Gi
+            cpu: 2
+      restartPolicy: Never

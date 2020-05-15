@@ -1,0 +1,36 @@
+#!/bin/bash
+
+set -x
+
+balance_label="edl-distill-demo-app=student"
+etcd_label="edl-distill-demo-app=etcd"
+
+start_balance() {
+  stdbuf -oL python /root/k8s_tools.py wait_pods_running ${etcd_label} 1
+  export etcd_ip=$(python /root/k8s_tools.py fetch_ips ${etcd_label})
+}
+
+usage() {
+    echo "usage: paddle_k8s [<args>]:"
+    echo "  start_balance  Start a blance"
+    echo "  start_student  Start a stduent"
+    echo "  start_teacher  Start a teacher"
+}
+
+case "$1" in
+    start_balance)
+        start_balance
+        ;;
+    start_stduent)
+        start_student
+        ;;
+    start_teacher)
+        start_teacher
+        ;;
+    --help)
+        usage
+        ;;
+    *)
+        usage
+        ;;
+esac
