@@ -1,24 +1,21 @@
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: etcd
+  name: balance
   labels:
-    app: etcd
+    app: balance
 spec:
   replicas: 1
   template:
     metadata:
-      name: etcd 
+      name: balance 
       labels:
-        app: etcd 
+        app: balance 
     spec:
       containers:
-      - name: etcd
+      - name: balance
         image: hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
         imagePullPolicy: Always
         workingDir: /
         command: ['/bin/bash', '-c']
         args: ['sleep 3000']
-        ports:
-        - containerPort: 2379
-          name: serving
