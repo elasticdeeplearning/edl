@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: teacher
   labels:
-    app: teacher
+    edl-distill-demo-app: teacher
 spec:
   replicas: 1
   template:
@@ -12,6 +12,7 @@ spec:
       labels:
         app: teacher 
     spec:
+      hostNetwork: true
       containers:
       - name: teacher
         image: hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
@@ -22,3 +23,11 @@ spec:
         ports:
         - containerPort: 7001
           name: serving
+        resources:
+          requests:
+            memory: 20Gi
+            cpu: 2
+          limits:
+            memory: 20Gi
+            cpu: 2
+      restartPolicy: Never

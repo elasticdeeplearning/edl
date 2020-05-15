@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: student
   labels:
-    app: student
+    edl-distill-demo-app: student
 spec:
   replicas: 1
   template:
@@ -12,6 +12,7 @@ spec:
       labels:
         app: student 
     spec:
+      hostNetwork: true
       containers:
       - name: student
         image: hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
@@ -19,3 +20,11 @@ spec:
         workingDir: /
         command: ['/bin/bash', '-c']
         args: ['sleep 3000']
+        resources:
+          requests:
+            memory: 20Gi
+            cpu: 2
+          limits:
+            memory: 20Gi
+            cpu: 2
+      restartPolicy: Never

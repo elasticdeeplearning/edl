@@ -34,3 +34,4 @@ RUN rm -f /tmp/paddle_edl-0.0.0-py2-none-any.whl
 
 # add example
 ADD ./example /root/paddle_edl/example
+ADD  ./k8s/k8s_tools.py ./example/distill/k8s/edl_k8s /root/paddle_edl/
