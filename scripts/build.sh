@@ -24,3 +24,5 @@ cmake ..
 make clean && make -j
 ctest -V -R
 popd
+
+echo "complete!"
