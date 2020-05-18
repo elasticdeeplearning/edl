@@ -46,8 +46,8 @@ def get_file_list(file_list):
             if len(line) <= 0:
                 continue
 
-            ret.append((line, line_no))
             line_no += 1
+            ret.append((line, line_no))
     return ret
 
 
@@ -71,11 +71,17 @@ def data_request_to_string(o):
     DataMeta to string
     """
     ret = "idx_in_list:{} file_path:{}".format(o.idx_in_list, o.file_path)
-    ret += " chunks:["
     for rs in o.chunks:
-        ret += "status:{}".format(rs.status)
-        for rec_no in range(rs.meta.begin, rs.meta.end + 1):
-            ret += "(record_no:{}), ".format(rec_no)
-    ret += "]"
+        ret += " chunk:["
+        ret += chunk_to_string(rs)
+        ret += "]"
+
+    return ret
+
+
+def chunk_to_string(rs):
+    ret = "status:{} ".format(rs.status)
+    for rec_no in range(rs.meta.begin, rs.meta.end + 1):
+        ret += "(record_no:{}) ".format(rec_no)
 
     return ret

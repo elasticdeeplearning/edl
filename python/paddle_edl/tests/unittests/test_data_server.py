@@ -17,7 +17,7 @@ from paddle_edl.utils.data_server import DataServer
 from paddle_edl.utils.dataset import TxtDataSet
 import paddle_edl.utils.data_server_pb2_grpc as data_server_pb2_grpc
 import paddle_edl.utils.data_server_pb2 as data_server_pb2
-from paddle_edl.utils.utils import get_file_list, get_logger
+from paddle_edl.utils.utils import *
 import time
 import threading
 import grpc
@@ -67,14 +67,18 @@ class TestDataServer(unittest.TestCase):
             request.chunks.append(chunk)
 
             response = stub.GetData(request)
-            for f in response.files.files:
-                if f.file_path == "data_server/a.txt":
-                    assert f.idx_in_list == 0
-                    for r in f.records:
+            f_d = response.file
+            if f_d.file_path == "data_server/a.txt":
+                assert f_d.idx_in_list == 0, "f_d.idx_in_list:{}".format(
+                    f_d.idx_in_list)
+                for c in f_d.data:
+                    for r in c.records:
                         assert r.data == a[r.record_no]
-                elif f.file_path == "data_server/b.txt":
-                    assert f.idx_in_list == 1
-                    for r in f.records:
+            elif f_d.file_path == "data_server/b.txt":
+                assert f_d.idx_in_list == 1, "f_d.idx_in_list:{}".format(
+                    f_d.idx_in_list)
+                for c in f_d.data:
+                    for r in c.records:
                         assert r.data == b[r.record_no]
 
         self._shut_down(data_server, stub)
@@ -99,8 +103,9 @@ class TestDataServer(unittest.TestCase):
 
             # get data
             response = stub.GetData(request)
-            for m in response.metas:
-                assert m.status == common_pb2.NOT_FOUND
+            f_d = response.file
+            for m in f_d.data:
+                assert m.chunk.status == common_pb2.NOT_FOUND
 
         self._shut_down(data_server, stub)
 

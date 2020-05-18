@@ -24,7 +24,7 @@ message Record {
 
 message ChunkData {
   common.Chunk chunk = 1;
-  repeated Record data = 2;
+  repeated Record records = 2;
 }
 
 message File {

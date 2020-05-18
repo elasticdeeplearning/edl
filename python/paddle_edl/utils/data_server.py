@@ -27,11 +27,11 @@ from threading import Thread, Lock
 from Queue import Queue
 from exception import *
 from dataset import EdlDataSet, TxtDataSet
-import utils
-from utils import *
 import signal
 import threading
 import copy
+import paddle_edl.utils.utils as utils
+from utils import logger
 
 
 class Record(object):
@@ -149,14 +149,14 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                             f_d.data.append(c)
                             logger.error(
                                 "file key:{} chunk:{} not found in cache".
-                                format(key, chunk_to_string(chunk)))
+                                format(key, utils.chunk_to_string(chunk)))
                             continue
 
                         data = self._data[key][rec_no]
                         r = data_server_pb2.Record()
                         r.record_no = rec_no
                         r.data = data
-                        c.data.append(r)
+                        c.records.append(r)
 
                     f_d.data.append(c)
 
