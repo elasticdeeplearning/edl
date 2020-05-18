@@ -13,13 +13,39 @@
 # limitations under the License.
 
 
-class EdlExeception(object):
+class EdlExeception(Exception):
     pass
 
 
-class DataSetEndException(EdlExeception):
+class EdLDuplicateInitDataSetError(EdlExeception):
     pass
 
 
-class RegisterFailureExeception(EdlExeception):
+class EdlDataSetEndError(EdlExeception):
     pass
+
+
+class EdlRegisterError(EdlExeception):
+    pass
+
+
+class EdlBarrierError(EdlExeception):
+    pass
+
+
+class EdlUnkownError(EdlExeception):
+    pass
+
+
+_excpetions = {
+    "DuplicateInitDataSet": DuplicateInitDataSet,
+    "ErrorTypeBarrier": BarrierFailure
+}
+
+
+def edl_exception(e_type, detail):
+    if e_type not in _excpetions:
+        return EdlUnkownError(detail)
+
+    e = _excpetions["e_type"](detail)
+    raise e

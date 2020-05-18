@@ -12,23 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from paddle_edl.utils.utils import get_extern_ip, logger
+
 
 class JobEnv(object):
     def __init__(self, etcd_endoints=None, job_id=None):
         self.running_env = os.getenv("PADDLE_RUNING_ENV")
         self.job_id = os.getenv("PADDLE_JOB_ID") if job_id is None else job_id
         self.etcd_endpoints = os.getenv(
-            "PADDLE_EDL_ETCD_ENPOINTS"
-        ) if etcd_endpoints is None else etcd_endoints
+            "PADDLE_ETCD_ENPOINTS") if etcd_endpoints is None else etcd_endoints
 
         assert self.job_id, "job_id must has valid value "
         assert self.etcd_endpoints, "etcd_endpoints must has valid value "
 
 
 class PodEnv(object):
-    def __init__(self, gpu_num, pod_id=None, trainer_ports=None):
+    def __init__(self, gpu_num, pod_id=None, pod_port=None,
+                 trainer_ports=None):
         self.pod_id = os.getenv("PADDLE_POD_ID") if pod_id is None else pod_id
+        self.pod_port = os.getenv(
+            "PADDLE_POD_PORT") if pod_port is None else pod_port
         assert self.pod_id, "pod_id must has valid value "
+        assert self.pod_port, "pod_port must has valid value "
+        self.pod_addr = utils.get_extern_ip()
+        self.pod_endpoint = "{}:{}".format(pod_addr, self.pod_port)
+
         ports = os.getenv(
             "PADDLE_TRAINER_PORTS") if trainer_ports is None else trainer_ports
         assert ports, "PADDLE_TRAINER_PORTS must has valid value"

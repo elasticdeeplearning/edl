@@ -15,6 +15,7 @@
 import master_pb2
 import master_pb2_grpc
 import grpc
+from exceptions import edl_exception
 
 
 class Client(object):
@@ -24,6 +25,11 @@ class Client(object):
     def get_cluster(self, pod_id=None):
         pass
 
+    def _get_conn(self):
+        channel = grpc.insecure_channel(self._endpoint)
+        stub = data_server_pb2_grpc.DataServerStub(channel)
+        return channel, stub
+
     def add_dataset(self, dataset):
         channel = grpc.insecure_channel(self._endpoint)
         stub = master_pb2_grpc.MasterStub(channel)
@@ -31,3 +37,31 @@ class Client(object):
 
     def new_epoch(self):
         pass
+
+    def barrier(self, job_id, pod_id, timeout=15):
+        req = master_pb2.BarrierRequest()
+        req.job_id = job_id
+        req.pod_id = pod_id
+
+        c, s = self._get_conn()
+        begin = time.time()
+        while True:
+            res = s.Barrier(req)
+            error = res.ret
+            if error.type == "":
+                return
+
+            if error.type == "BarrierError":
+                if time.time() - begin > timeout:
+                    logger.debug("job_id:{} pod_id:{} barrier time out".format(
+                        job_id, pod_id))
+                    raise edl_exception(error.type, error.details)
+                time.sleep(1)
+                continue
+
+            if error.type == 'PodDroppedError':
+                log.info("job_id:{} pod_id:{} not exist in cluster, exit now!".
+                         format(job_id, pod_id))
+                sys.exit(0)
+
+            raise edl_exception(error.type, error.detail)

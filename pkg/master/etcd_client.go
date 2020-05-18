@@ -27,8 +27,11 @@ const (
 	DefaultLockPath = "/master/lock"
 	// DefaultStatePath is the default etcd key for master state.
 	DefaultStatePath = "/master/state"
-	// DefaultAddrPath is the default etcd key for master address.
-	DefaultAddrPath = "/master/addr"
+	// DefaultMeta is the default etcd key for master address.
+	// endpoint, job_stage
+	DefaultMeta = "/master/meta"
+	// DefaultScaleInOut is the the default etcd key for pod changes.
+	DefaultScaleInOut = "/master/scale_in_out"
 )
 
 const (

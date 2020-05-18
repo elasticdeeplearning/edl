@@ -85,7 +85,7 @@ message NewEpochRequest {}
 message BarrierRequest {
   string job_id = 1;
   string pod_id = 2;
-  string job_stage = 3;
+  // string job_stage = 3;
 }
 
 service Master {

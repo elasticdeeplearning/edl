@@ -16,6 +16,7 @@ import master_pb2
 import data_server_pb2
 import logging
 import google.protobuf.text_format as text_format
+import socket
 
 logger = logging.getLogger("root")
 logger.propagate = False
@@ -85,3 +86,7 @@ def chunk_to_string(rs):
         ret += "(record_no:{}) ".format(rec_no)
 
     return ret
+
+
+def get_extern_ip():
+    return socket.gethostbyname(socket.gethostname())

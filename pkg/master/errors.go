@@ -15,15 +15,19 @@ type Error struct {
 }
 
 const (
-	// ErrorTypeDuplicateInitDataSet is used to reported dataset error.
-	ErrorTypeDuplicateInitDataSet ErrorType = "DuplicateInitDataSet"
+	// DuplicateInitDataSetError is used to reported dataset error.
+	DuplicateInitDataSetError ErrorType = "DuplicateInitDataSetError"
+	// BarrierError is used to barrier
+	BarrierError ErrorType = "BarrierError"
 )
 
 // String converts a ErrorType into its corresponding canonical error message.
 func (t ErrorType) String() string {
 	switch t {
-	case ErrorTypeDuplicateInitDataSet:
+	case DuplicateInitDataSetError:
 		return "DataSet must be inited once."
+	case BarrierError:
+		return "Can't barrier now"
 	default:
 		panic(fmt.Sprintf("unrecognized validation error: %q", string(t)))
 	}
