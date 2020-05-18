@@ -19,8 +19,6 @@ import sys
 from utils import Cluster, Pod, Trainer, logger, Hdfs
 from http_store import kv_server
 
-#from paddle_edl.utils.regitser
-
 
 class Edlenv(object):
     def __init__(self):
