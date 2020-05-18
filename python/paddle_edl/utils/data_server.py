@@ -31,6 +31,14 @@ import utils
 from utils import *
 import signal
 import threading
+import copy
+
+
+class Record(object):
+    def __init__(self):
+        self.record_no = -1
+        self.status = common_pb2.DATA_OK
+        r.data = None
 
 
 class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
@@ -114,64 +122,45 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
 
     def _get_data(self, request, context):
         try:
+            logger.debug("proc meta:{}".format(
+                utils.data_request_to_string(request)))
+
             response = data_server_pb2.DataResponse()
-            files = data_server_pb2.Files()
-            files_error = data_server_pb2.FilesError()
+            f_d = response.file
+            f_d.idx_in_list = request.idx_in_list
+            f_d.file_path = request.file_path
 
-            for meta in request.metas:
-                logger.debug("proc meta:{}".format(
-                    utils.datameta_to_string(meta)))
-                one_file = data_server_pb2.File()
-                one_file.idx_in_list = meta.idx_in_list
-                one_file.file_path = meta.file_path
+            key = self._get_file_key(request.idx_in_list, request.file_path)
+            logger.debug("getdata of file:{}".format(key))
+            with self._lock:
+                if key not in self._data:
+                    logger.error("file key:{} not found in cache".format(key))
 
-                file_error = data_server_pb2.FileError()
-                file_error.idx_in_list = meta.idx_in_list
-                file_error.file_path = meta.file_path
-                file_error.status = data_server_pb2.DataStatus.NOT_FOUND
+                    f_d.status = common_pb2.DataStatus.NOT_FOUND
+                    return response
 
-                key = self._get_file_key(meta.idx_in_list, meta.file_path)
-                logger.debug("getdata of file:{}".format(key))
-                with self._lock:
-                    if key not in self._data:
-                        logger.error("file key:{} not found in cache".format(
-                            key))
-                        files_error.errors.append(file_error)
-                        continue
+                for chunk in request.chunks:
+                    c = data_server_pb2.ChunkData()
+                    c.chunk.meta.begin = chunk.meta.begin
+                    c.chunk.meta.end = chunk.meta.end
+                    for rec_no in range(chunk.meta.begin, chunk.meta.end + 1):
+                        if rec_no not in self._data[key]:
+                            c.chunk.status = common_pb2.DataStatus.NOT_FOUND
+                            f_d.data.append(c)
+                            logger.error(
+                                "file key:{} chunk:{} not found in cache".
+                                format(key, chunk_to_string(chunk)))
+                            continue
 
-                    record = data_server_pb2.Record()
-                    record_error = data_server_pb2.RecordError()
-                    record_error.status = data_server_pb2.DataStatus.NOT_FOUND
+                        data = self._data[key][rec_no]
+                        r = data_server_pb2.Record()
+                        r.record_no = rec_no
+                        r.data = data
+                        c.data.append(r)
 
-                    for one_range in meta.records:
-                        for rec_no in range(one_range.begin,
-                                            one_range.end + 1):
-                            if rec_no not in self._data[key]:
-                                record_error.record_no = rec_no
-                                record_error.status = data_server_pb2.DataStatus.NOT_FOUND
-                                file_error.errors.append(record_error)
-                                logger.error(
-                                    "file key:{} rec_no:{} not found in cache".
-                                    format(key, rec_no))
-                                continue
+                    f_d.data.append(c)
 
-                            data = self._data[key][rec_no]
-
-                            record.record_no = rec_no
-                            record.data = data
-
-                            one_file.records.append(record)
-
-                    if len(file_error.errors) > 0:
-                        files_error.errors.append(file_error)
-                    files.files.append(one_file)
-
-            if len(files_error.errors) > 0:
-                response.errors.CopyFrom(files_error)
                 return response
-
-            response.files.CopyFrom(files)
-            return response
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -182,23 +171,23 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
     def ClearDataCache(self, request, context):
         try:
             response = common_pb2.RPCRet()
-            for meta in request.metas:
-                file_key = self._get_file_key(meta.idx_in_list, meta.file_path)
+            file_key = self._get_file_key(request.idx_in_list,
+                                          request.file_path)
 
-                with self._lock:
-                    if file_key not in self._data:
-                        logger.error("file:{} not in cache:".format(file_key))
-                        continue
+            with self._lock:
+                if file_key not in self._data:
+                    logger.error("file:{} not in cache:".format(file_key))
+                    return response
 
-                    recs = self._data[file_key]
-                    for rec_no in recs.keys():
-                        if rec_no not in recs:
-                            logger.error("file:{} record_no:{} not in cache:".
-                                         format(file_key, rec_no))
-                            continue
+                recs = self._data[file_key]
+                for rec_no in recs.keys():
+                    if rec_no not in recs:
+                        logger.error("file:{} record_no:{} not in cache:".
+                                     format(file_key, rec_no))
+                        return response
 
-                        recs.pop(rec_no)
-                        self._data_queue.get(block=False)
+                    recs.pop(rec_no)
+                    self._data_queue.get(block=False)
 
             return response
         except Exception as e:

@@ -66,21 +66,16 @@ def dataset_to_string(o):
     return ret
 
 
-def datameta_to_string(o):
+def data_request_to_string(o):
     """
     DataMeta to string
     """
     ret = "idx_in_list:{} file_path:{}".format(o.idx_in_list, o.file_path)
-
-    ret += " record_no:["
-    for rs in o.records:
-        for rec_no in range(rs.begin, rs.end + 1):
-            ret += "(record_no:{})".format(rec_no)
+    ret += " chunks:["
+    for rs in o.chunks:
+        ret += "status:{}".format(rs.status)
+        for rec_no in range(rs.meta.begin, rs.meta.end + 1):
+            ret += "(record_no:{}), ".format(rec_no)
     ret += "]"
 
     return ret
-
-
-def on_done(signum, frame):
-    logger.info('Got signal {}, {}'.format(signum, frame))
-    done.set()

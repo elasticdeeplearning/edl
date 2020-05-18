@@ -55,30 +55,27 @@ class TestDataServer(unittest.TestCase):
         channel = grpc.insecure_channel("127.0.0.1:6700")
         stub = data_server_pb2_grpc.DataServerStub(channel)
 
-        request = data_server_pb2.DataRequest()
-        for t in get_file_list('./test_file_list.txt'):
-            meta = common_pb2.Chunk()
-            meta.idx_in_list = t[1]
-            meta.file_path = t[0]
-            r_range = common_pb2.RecordRange()
-            r_range.begin = 0
-            r_range.end = 2
-            meta.records.append(r_range)
-
-            request.metas.append(meta)
-
-        response = stub.GetData(request)
         a = ["a0", "a1", "a2"]
         b = ["b0", "b1", "b2"]
-        for f in response.files.files:
-            if f.file_path == "data_server/a.txt":
-                assert f.idx_in_list == 0
-                for r in f.records:
-                    assert r.data == a[r.record_no]
-            elif f.file_path == "data_server/b.txt":
-                assert f.idx_in_list == 1
-                for r in f.records:
-                    assert r.data == b[r.record_no]
+        request = data_server_pb2.DataRequest()
+        for t in get_file_list('./test_file_list.txt'):
+            request.idx_in_list = t[1]
+            request.file_path = t[0]
+            chunk = common_pb2.Chunk()
+            chunk.meta.begin = 0
+            chunk.meta.end = 2
+            request.chunks.append(chunk)
+
+            response = stub.GetData(request)
+            for f in response.files.files:
+                if f.file_path == "data_server/a.txt":
+                    assert f.idx_in_list == 0
+                    for r in f.records:
+                        assert r.data == a[r.record_no]
+                elif f.file_path == "data_server/b.txt":
+                    assert f.idx_in_list == 1
+                    for r in f.records:
+                        assert r.data == b[r.record_no]
 
         self._shut_down(data_server, stub)
 
@@ -90,24 +87,21 @@ class TestDataServer(unittest.TestCase):
 
         request = data_server_pb2.DataRequest()
         for t in get_file_list('./test_file_list.txt'):
-            meta = common_pb2.Chunk()
-            meta.idx_in_list = t[1]
-            meta.file_path = t[0]
-            r_range = common_pb2.RecordRange()
-            r_range.begin = 0
-            r_range.end = 2
-            meta.records.append(r_range)
-            request.metas.append(meta)
+            request.idx_in_list = t[1]
+            request.file_path = t[0]
+            chunk = common_pb2.Chunk()
+            chunk.meta.begin = 0
+            chunk.meta.end = 2
+            request.chunks.append(chunk)
 
-        # clear
-        response = stub.ClearDataCache(request)
-        # get data
-        response = stub.GetData(request)
-        assert len(response.errors.errors) == 2
-        for e in response.errors.errors:
-            assert len(e.errors) == 3
+            # clear
+            response = stub.ClearDataCache(request)
 
-        response = stub.ClearDataCache(request)
+            # get data
+            response = stub.GetData(request)
+            for m in response.metas:
+                assert m.status == common_pb2.NOT_FOUND
+
         self._shut_down(data_server, stub)
 
 

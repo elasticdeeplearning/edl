@@ -69,5 +69,5 @@ enum DataStatus {
 message Chunk {
   DataStatus status = 1;
   // only no
-  repeated common.RecordRange records = 4;
+  common.RecordRange meta = 2;
 }

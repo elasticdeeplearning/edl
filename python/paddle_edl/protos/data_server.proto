@@ -30,25 +30,17 @@ message ChunkData {
 message File {
   int64 idx_in_list = 1;
   string file_path = 2;
-  repeated ChunkData data = 3;
+  common.DataStatus status = 3;
+  repeated ChunkData data = 4;
 }
 
-message Files { repeated File files = 1; }
+message DataResponse { File file = 1; }
 
-message FileError {
+message DataRequest {
   int64 idx_in_list = 1;
   string file_path = 2;
   repeated common.Chunk chunks = 3;
 }
-
-message FilesError { repeated FileError errors = 1; }
-
-message DataResponse {
-  FilesError errors = 1;
-  Files files = 2;
-}
-
-message DataRequest { repeated common.Chunk metas = 1; }
 
 service DataServer {
   // loader -> DataSet
