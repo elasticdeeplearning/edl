@@ -156,7 +156,7 @@ class EtcdClient(object):
         d = '/{}/{}/'.format(self._root, service_name)
         servers = self.get_service(service_name)
         for s in servers:
-            self.remove_server(service_name, s[0])
+            self.remove_server(service_name, s.server)
         self._etcd.delete_prefix(d)
 
     @_handle_errors
