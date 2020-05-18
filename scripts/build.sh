@@ -14,16 +14,13 @@ python -m pip install  paddlepaddle-gpu==1.8.0.post107
 
 #build python
 build_dir=build
-mkdir -p  ${build_dir}
+mkdir -p ${build_dir}/cmd/master/
 pushd ${build_dir}
 cmake ..
 make clean && make -j
+go build   -o build/cmd/master/master cmd/master/master.go
 ctest -V -R
 popd
-
-#build master go
-mkdir -p build/cmd/master/
-go build   -o build/cmd/master/master cmd/master/master.go
 
 #test all go test
 go test --cover ./...
