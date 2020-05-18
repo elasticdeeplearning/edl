@@ -25,6 +25,18 @@ class NoValidEndpoint(Exception):
     pass
 
 
+class ServerMeta(object):
+    def __init__(self, server, info, mod_revision, revision):
+        self.server = server
+        self.info = info
+        self.mod_revision = mod_revision  # key mod revision
+        self.revision = revision  # etcd global revision
+
+    def __str__(self):
+        return 'server={}, info={}, mod_revision={}, revision={}'.\
+            format(self.server, self.info, self.mod_revision, self.revision)
+
+
 def _handle_errors(f):
     def handler(*args, **kwargs):
         try:
@@ -78,15 +90,63 @@ class EtcdClient(object):
         servers = []
         d = '/{}/{}/nodes/'.format(self._root, service_name)
         for value, meta in self._etcd.get_prefix(d):
-            servers.append([
-                self.get_server_name_from_full_path(meta.key, service_name),
-                value
-            ])
+            servers.append(
+                ServerMeta(
+                    self.get_server_name_from_full_path(
+                        meta.key, service_name), value, meta.mod_revision,
+                    meta.response_header.revision))
         return servers
 
-    def watch_service(self, service_name, call_back):
+    @_handle_errors
+    def get_service_with_revision(self, service_name):
+        servers = []
+        d = '/{}/{}/nodes/'.format(self._root, service_name)
+
+        key_prefix = d
+        range_response = self._etcd.get_prefix_response(key_prefix)
+        for kv in range_response.kvs:
+            servers.append(
+                ServerMeta(
+                    self.get_server_name_from_full_path(kv.key, service_name),
+                    kv.value, kv.mod_revision, range_response.header.revision))
+
+        return servers, range_response.header.revision
+
+    def watch_service(self, service_name, call_back, **kwargs):
+        # call_back(add_servers, rm_servers)
+        #   add_servers: list(ServerMeta)
+        #   rm_servers: list(ServerMeta)
+        # start_revision=, watch start from revision
+        def services_change(response):
+            add_servers = dict()
+            rm_servers = dict()
+            for event in response.events:
+                key = self.get_server_name_from_full_path(event.key,
+                                                          service_name)
+                server = ServerMeta(key, event.value, event.mod_revision,
+                                    response.header.revision)
+
+                if isinstance(event, etcd.events.PutEvent):
+                    if key in rm_servers:
+                        # after rm key, add again, need remove key from rm set
+                        rm_servers.pop(key)
+                    add_servers[key] = server
+                elif isinstance(event, etcd.events.DeleteEvent):
+                    if key in add_servers:
+                        # after add key, rm again, need remove key from add dict
+                        add_servers.pop(key)
+                    rm_servers[key] = server
+                else:
+                    raise TypeError('ectd event type is not put or delete!')
+
+            if len(add_servers) == 0 and len(rm_servers) == 0:
+                return
+
+            call_back(add_servers.values(), rm_servers.values())
+
         d = '/{}/{}/'.format(self._root, service_name)
-        return self._etcd.add_watch_prefix_callback(d, call_back)
+        return self._etcd.add_watch_prefix_callback(d, services_change,
+                                                    **kwargs)
 
     def cancel_watch(self, watch_id):
         return self._etcd.cancel_watch(watch_id)
@@ -96,7 +156,7 @@ class EtcdClient(object):
         d = '/{}/{}/'.format(self._root, service_name)
         servers = self.get_service(service_name)
         for s in servers:
-            self.remove_server(service_name, s[0])
+            self.remove_server(service_name, s.server)
         self._etcd.delete_prefix(d)
 
     @_handle_errors
@@ -140,6 +200,13 @@ class EtcdClient(object):
         key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
         lease = self._get_lease(key, ttl)
         return self._etcd.put(key=key, value=info, lease=lease)
+
+    @_handle_errors
+    def _get_server(self, service_name, server):
+        # for debug
+        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        value, meta = self._etcd.get(key=key)
+        return value, meta.key, meta.version, meta.create_revision, meta.mod_revision
 
     @_handle_errors
     def remove_server(self, service_name, server):

@@ -1,0 +1,33 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: etcd
+  labels:
+    edl-distill-demo-app: etcd
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: etcd 
+      labels:
+        app: etcd 
+    spec:
+      hostNetwork: true
+      containers:
+      - name: etcd
+        image: hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
+        imagePullPolicy: Always
+        workingDir: /
+        command: ['/bin/bash', '-c']
+        args: ['etcd']
+        ports:
+        - containerPort: 2379
+          name: serving
+        resources:
+          requests:
+            memory: 20Gi
+            cpu: 2
+          limits:
+            memory: 20Gi
+            cpu: 2
+      restartPolicy: Never
