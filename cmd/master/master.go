@@ -81,6 +81,7 @@ func main() {
 
 	// Guaranteed to run even panic happens.
 	defer shutdown()
+	fmt.Println("loggered")
 
 	s, err := master.NewService(store, *taskTimeoutDur, *taskTimeoutMax)
 	if err != nil {

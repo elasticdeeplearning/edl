@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-nohup etcd 2>&1 &
+nohup etcd > etcd.log 2>&1 &
 pid=$!
 
 unset https_proxy http_proxy
