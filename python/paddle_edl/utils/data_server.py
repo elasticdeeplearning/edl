@@ -42,7 +42,7 @@ class Record(object):
 
 
 class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
-    def __init__(self, master, data_set_reader, file_list=None, capcity=1000):
+    def __init__(self, master, data_set_reader, file_list=None, capcity=3000):
         self._master = master
         # master.SubDataSetMeta
         self._sub_data_set = Queue()
@@ -184,7 +184,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                     if rec_no not in recs:
                         logger.error("file:{} record_no:{} not in cache:".
                                      format(file_key, rec_no))
-                        return response
+                        continue
 
                     recs.pop(rec_no)
                     self._data_queue.get(block=False)
