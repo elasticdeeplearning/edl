@@ -24,7 +24,7 @@ import (
 	grpc "google.golang.org/grpc"
 	"net"
 	"os"
-	//"os/signal"
+	"os/signal"
 	"strings"
 	"time"
 )

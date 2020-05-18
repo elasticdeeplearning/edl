@@ -6,7 +6,7 @@ etcd_pid=$!
 unset GREP_OPTIONS
 BASEDIR=$(dirname $(readlink -f $0))
 
-nohup ${BASEDIR}/../../../../cmd/master 2>&1 &
+nohup ${BASEDIR}/../../../../cmd/master/master 2>&1 &
 master_pid=$!
 
 unset https_proxy http_proxy

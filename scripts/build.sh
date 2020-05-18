@@ -19,8 +19,8 @@ ctest -V -R
 popd
 
 #build master go
-mkdir -p build/cmd/
-go build   -o build/cmd/master cmd/master/master.go
+mkdir -p build/cmd/master/
+go build   -o build/cmd/master/master cmd/master/master.go
 
 #test all go test
 go test --cover ./...
