@@ -38,8 +38,8 @@ class EdlUnkownError(EdlExeception):
 
 
 _excpetions = {
-    "DuplicateInitDataSet": DuplicateInitDataSet,
-    "ErrorTypeBarrier": BarrierFailure
+    "DuplicateInitDataSetError": EdlDuplicateInitDataSetError,
+    "BarrierError": EdlBarrierError,
 }
 
 
