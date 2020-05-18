@@ -224,7 +224,3 @@ def get_gpus(selected_gpus):
             ]
 
     return selected_gpus
-
-
-def register_pod(selected_gpus):
-    register = LauncherRegister()

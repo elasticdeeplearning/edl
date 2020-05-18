@@ -33,8 +33,6 @@ message SubDataSetResponse {
 }
 
 message DataServer {
-  // get this id from master
-  // string id = 1;
   string pod_id = 2;
   string affinity_trainer_id = 3;
   string endpoint = 4;
@@ -87,23 +85,19 @@ message NewEpochRequest {}
 message BarrierRequest {
   string job_id = 1;
   string pod_id = 2;
+  string job_stage = 3;
 }
-
-/*
-message DataServerIDRequest {
-  string job_id = 1;
-  string pod_id = 2;
-  string trainer_id = 3;
-  string endpoint = 4;
-}
-*/
 
 service Master {
   // Cluster env
   // user_client, computor  -> master
   rpc GetCluster(common.ClusterRequest) returns (common.ClusterResponse) {}
   rpc Barrier(BarrierRequest) returns (common.ClusterResponse) {}
-  // rpc GetDataServerID(DataServerIDRequest) returns (DataServer) {}
+
+  // Cluster controller -> master
+  // rpc ScaleOut(){}
+  // rpc ScaleIn(){}
+  // rpc Profile(){}
 
   // Tasks
   /* user_client -> Master*/
