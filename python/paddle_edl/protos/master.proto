@@ -33,6 +33,7 @@ message SubDataSetResponse {
 }
 
 message DataServer {
+  string job_id = 1;
   string affinity_pod_id = 2;
   string affinity_rank_in_pod = 3;
   string endpoint = 4;

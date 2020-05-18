@@ -38,6 +38,9 @@ class PodEnv(object):
 
 class TrainerEnv(object):
     def __init__(self, trainer_id=None):
-        self.trainer_id = os.getenv(
-            "PADDLE_TRAINER_ID") if trainer_id is None else trainer_id
-        assert self.trainer_id, "trainer_id must has valid value "
+        self.trainer_rank_in_pod = os.getenv(
+            "PADDLE_TRAINER_RANK_IN_POD") if trainer_id is None else trainer_id
+        self.trainer_global_rank = os.getenv(
+            "PADDLE_TRAINER_GLOBAL_RANK") if trainer_id is None else trainer_id
+        assert self.trainer_rank_in_pod, "trainer_rank_in_pod must has valid value "
+        assert self.trainer_global_rank, "global_rank must has valid value "
