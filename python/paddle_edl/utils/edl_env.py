@@ -14,25 +14,26 @@
 
 
 class JobEnv(object):
-    def __init__(self, etcd_endoints=None, job_id=None, master=None):
+    def __init__(self, etcd_endoints=None, job_id=None):
         self.running_env = os.getenv("PADDLE_RUNING_ENV")
         self.job_id = os.getenv("PADDLE_JOB_ID") if job_id is None else job_id
-        self.master = os.getenv("PADDLE_MASTER") if master is None else master
         self.etcd_endpoints = os.getenv(
             "PADDLE_EDL_ETCD_ENPOINTS"
         ) if etcd_endpoints is None else etcd_endoints
 
         assert self.job_id, "job_id must has valid value "
-        assert self.master, "master must has valid value "
         assert self.etcd_endpoints, "etcd_endpoints must has valid value "
-        #assert not (self.etcd_endpoints and self.master_endpoint), "master and etcd_client are not none"
-        #assert not (self.etcd_endpoints is None and self.master_endpoint is None), "master and etcd_client are none"
 
 
 class PodEnv(object):
-    def __init__(self, pod_id=None):
+    def __init__(self, gpu_num, pod_id=None, trainer_ports=None):
         self.pod_id = os.getenv("PADDLE_POD_ID") if pod_id is None else pod_id
         assert self.pod_id, "pod_id must has valid value "
+        ports = os.getenv(
+            "PADDLE_TRAINER_PORTS") if trainer_ports is None else trainer_ports
+        assert ports, "PADDLE_TRAINER_PORTS must has valid value"
+        self.trainer_ports = ports.split(",")
+        assert len(self.trainer_ports) == gpu_num, "one gpu one port"
 
 
 class TrainerEnv(object):

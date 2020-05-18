@@ -62,7 +62,7 @@ class Register(object):
 
 class LauncherRegister(object):
     def __init__(self, etcd_endpoints, job_id, pod_id, info):
-        service_name = "Launcher"
+        service_name = "pod"
         server = pod_id
 
         self._register = Register(

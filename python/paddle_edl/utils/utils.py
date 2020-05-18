@@ -34,7 +34,10 @@ def get_logger(log_level, name="root"):
     return logger
 
 
-def file_list_to_dataset(file_list):
+def get_file_list(file_list):
+    """
+    return [(file_path, line_no)...]
+    """
     line_no = -1
     ret = []
     with open(file_list, "r") as f:
@@ -44,10 +47,7 @@ def file_list_to_dataset(file_list):
                 continue
 
             line_no += 1
-            meta = master_pb2.FileMeta()
-            meta.idx_in_list = line_no
-            meta.file_path = line
-            ret.append(meta)
+            ret.append((line, line_no))
     return ret
 
 
@@ -66,21 +66,22 @@ def dataset_to_string(o):
     return ret
 
 
-def datameta_to_string(o):
+def data_request_to_string(o):
     """
     DataMeta to string
     """
     ret = "idx_in_list:{} file_path:{}".format(o.idx_in_list, o.file_path)
-
-    ret += " record_no:["
-    for rs in o.records:
-        for rec_no in range(rs.begin, rs.end + 1):
-            ret += "(record_no:{})".format(rec_no)
-    ret += "]"
+    for rs in o.chunks:
+        ret += " chunk:["
+        ret += chunk_to_string(rs)
+        ret += "]"
 
     return ret
 
 
-def on_done(signum, frame):
-    logger.info('Got signal {}, {}'.format(signum, frame))
-    done.set()
+def chunk_to_string(rs):
+    ret = "status:{} ".format(rs.status)
+    for rec_no in range(rs.meta.begin, rs.meta.end + 1):
+        ret += "(record_no:{}) ".format(rec_no)
+
+    return ret

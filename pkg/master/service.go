@@ -99,7 +99,12 @@ func (s *Service) GetSubDataSet(context.Context, *pb.SubDataSetRequest) (*pb.Sub
 }
 
 // ReportChunks implementes the proto interface.
-func (s *Service) ReportChunks(ctx context.Context, in *pb.ChunksRequest) (*pb.RPCRet, error) {
+func (s *Service) ReportChunks(ctx context.Context, in *pb.DataServerChunk) (*pb.RPCRet, error) {
+	return nil, nil
+}
+
+// Barrier implementes the proto interface.
+func (s *Service) Barrier(ctx context.Context, in *pb.BarrierRequest) (*pb.ClusterResponse, error) {
 	return nil, nil
 }
 

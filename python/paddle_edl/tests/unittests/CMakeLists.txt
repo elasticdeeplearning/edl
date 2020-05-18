@@ -38,7 +38,7 @@ function(bash_test_modules TARGET_NAME)
     set(multiValueArgs MODULES DEPS ENVS LABELS)
     cmake_parse_arguments(bash_test_modules "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-    set(timeout 120)
+    set(timeout 80)
     if(${bash_test_modules_TIMEOUT})
         set(timeout ${bash_test_modules_TIMEOUT})
     endif()
