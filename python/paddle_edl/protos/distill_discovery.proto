@@ -1,0 +1,99 @@
+// Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package paddle_edl.distill;
+
+import "google/protobuf/any.proto";
+
+enum Code {
+  // success
+  OK = 0;
+
+  // unknown error
+  UNKNOWN = 1;
+
+  // discovery server is not ready,
+  // client need wait for a while and try again.
+  NO_READY = 2;
+
+  // redirect to another discovery server, client need disconnect
+  // current link, reconnect with another discovery server.
+  REDIRECT = 3;
+
+  // client argument invalid
+  INVALID_ARGUMENT = 4;
+
+  // client already register
+  ALREADY_REGISTER = 5;
+
+  // client already register & register service !=
+  // pre register service name, currently classified as error
+  REGISTER_OTHER_SERVICE = 6;
+
+  // client unregistered, maybe timeout or discovery server
+  // change, client need register again
+  UNREGISTERED = 7;
+
+  // client token unauthorized with service
+  UNAUTHORIZED = 8;
+}
+
+// from
+// https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto
+message Status {
+  // status code, should be an enum value of Code
+  int32 code = 1;
+  string message = 2;
+  // https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/any.proto
+  //  Example 3: Pack and unpack a message in Python.
+  //
+  //     foo = Foo(...)
+  //     any = Any()
+  //     any.Pack(foo)
+  //     ...
+  //     if any.Is(Foo.DESCRIPTOR):
+  //       any.Unpack(foo)
+  //       ...
+  repeated google.protobuf.Any datails = 3;
+}
+
+message RegisterRequest {
+  string client = 1;
+  string service_name = 2;
+  int32 require_num = 3;
+  string token = 4;
+}
+
+message HeartBeatRequest {
+  string client = 1;
+  // Version of servers assigned to client
+  uint64 version = 2;
+  // Version of discovery servers
+  uint64 discovery_version = 3;
+}
+
+message Response {
+  Status status = 1;
+  uint64 version = 2;
+  uint64 discovery_version = 3;
+  repeated string servers = 4;
+  repeated string discovery_servers = 5;
+}
+
+service DiscoveryService {
+  rpc Register(RegisterRequest) returns (Response) {}
+  rpc HeartBeat(HeartBeatRequest) returns (Response) {}
+}
