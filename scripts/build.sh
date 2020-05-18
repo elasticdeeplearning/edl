@@ -9,18 +9,20 @@ pushd python/paddle_edl/protos/
 bash generate.sh
 popd
 
+# TODO(gongwb):mv to devel image
+python -m pip install  paddlepaddle-gpu==1.8.0.post107
+
+# go
+mkdir -p ${build_dir}/cmd/master/
+go build   -o build/cmd/master/master cmd/master/master.go
+
 #build python
 build_dir=build
-mkdir -p  ${build_dir}
 pushd ${build_dir}
 cmake ..
 make clean && make -j
-#ctest -V -R
+ctest -V -R
 popd
-
-#build master go
-mkdir -p build/cmd/master/
-go build   -o build/cmd/master cmd/master/master.go
 
 #test all go test
 go test --cover ./...

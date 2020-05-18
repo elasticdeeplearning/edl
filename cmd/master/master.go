@@ -35,7 +35,6 @@ func main() {
 	endpoints := flag.String("endpoints", "http://127.0.0.1:2379", "comma separated etcd endpoints. If empty, fault tolerance will not be enabled.")
 	taskTimeoutDur := flag.Duration("task-timout-dur", 20*time.Minute, "task timout duration.")
 	taskTimeoutMax := flag.Int("task-timeout-max", 3, "max timtout count for each task before it being declared failed task.")
-	//chunkPerTask := flag.Int("chunk-per-task", 10, "chunk per task.")
 	logLevel := flag.String("log-level", "info",
 		"log level, possible values: debug, info, warn, error, crit")
 	flag.Parse()
@@ -54,7 +53,7 @@ func main() {
 		panic("")
 	}
 
-	c := make(chan os.Signal, 1)
+	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt)
 
 	eps := strings.Split(*endpoints, ",")
