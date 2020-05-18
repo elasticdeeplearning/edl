@@ -36,7 +36,7 @@ import threading
 class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
     def __init__(self, master, data_set_reader, file_list=None, capcity=1000):
         self._master = master
-        # master.FileDataSet
+        # master.SubDataSetMeta
         self._sub_data_set = Queue()
         # {file_key:{rec_no: data}}
         self._data = {}
@@ -53,10 +53,13 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
             self._t_get_sub_dataset.start()
         elif self._file_list:
             logger.info("init from list:{} ".format(self._file_list))
-            arr = utils.file_list_to_dataset(self._file_list)
+            arr = utils.get_file_list(self._file_list)
             for t in arr:
-                logger.debug("readed:{} ".format(utils.dataset_to_string(t)))
-                self._sub_data_set.put(t)
+                logger.debug("readed:{} {}".format(t[0], t[1]))
+                d = master_pb2.SubDataSetMeta()
+                d.file_path = t[0]
+                d.idx_in_list = t[1]
+                self._sub_data_set.put(d)
         else:
             assert False, "You must set datasource"
 
@@ -85,7 +88,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                 break
 
             rec_map = {}
-            for one_range in file_data_set.records:
+            for one_range in file_data_set.filtered_records:
                 for rec_no in range(one_range.begin, one_range.end + 1):
                     rec_map[rec.record_no] = one_range.status
 

@@ -15,7 +15,7 @@ mkdir -p  ${build_dir}
 pushd ${build_dir}
 cmake ..
 make clean && make -j
-#ctest -V -R
+ctest -V -R
 popd
 
 #build master go

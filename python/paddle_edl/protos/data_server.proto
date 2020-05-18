@@ -27,11 +27,19 @@ message ChunkData {
   repeated Record data = 2;
 }
 
-message File { repeated ChunkData data = 1; }
+message File {
+  int64 idx_in_list = 1;
+  string file_path = 2;
+  repeated ChunkData data = 3;
+}
 
 message Files { repeated File files = 1; }
 
-message FileError { repeated common.Chunk chunks = 1; }
+message FileError {
+  int64 idx_in_list = 1;
+  string file_path = 2;
+  repeated common.Chunk chunks = 3;
+}
 
 message FilesError { repeated FileError errors = 1; }
 

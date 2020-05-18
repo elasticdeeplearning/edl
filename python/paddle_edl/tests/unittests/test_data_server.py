@@ -17,7 +17,7 @@ from paddle_edl.utils.data_server import DataServer
 from paddle_edl.utils.dataset import TxtDataSet
 import paddle_edl.utils.data_server_pb2_grpc as data_server_pb2_grpc
 import paddle_edl.utils.data_server_pb2 as data_server_pb2
-from paddle_edl.utils.utils import file_list_to_dataset, get_logger
+from paddle_edl.utils.utils import get_file_list, get_logger
 import time
 import threading
 import grpc
@@ -56,10 +56,10 @@ class TestDataServer(unittest.TestCase):
         stub = data_server_pb2_grpc.DataServerStub(channel)
 
         request = data_server_pb2.DataRequest()
-        for t in file_list_to_dataset('./test_file_list.txt'):
-            meta = data_server_pb2.DataMeta()
-            meta.idx_in_list = t.idx_in_list
-            meta.file_path = t.file_path
+        for t in get_file_list('./test_file_list.txt'):
+            meta = common_pb2.Chunk()
+            meta.idx_in_list = t[1]
+            meta.file_path = t[0]
             r_range = common_pb2.RecordRange()
             r_range.begin = 0
             r_range.end = 2
@@ -89,10 +89,10 @@ class TestDataServer(unittest.TestCase):
         stub = data_server_pb2_grpc.DataServerStub(channel)
 
         request = data_server_pb2.DataRequest()
-        for t in file_list_to_dataset('./test_file_list.txt'):
-            meta = data_server_pb2.DataMeta()
-            meta.idx_in_list = t.idx_in_list
-            meta.file_path = t.file_path
+        for t in get_file_list('./test_file_list.txt'):
+            meta = common_pb2.Chunk()
+            meta.idx_in_list = t[1]
+            meta.file_path = t[0]
             r_range = common_pb2.RecordRange()
             r_range.begin = 0
             r_range.end = 2
@@ -112,5 +112,5 @@ class TestDataServer(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    logger = get_logger(20)
+    logger = get_logger(10)
     unittest.main()

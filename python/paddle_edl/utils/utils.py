@@ -34,7 +34,10 @@ def get_logger(log_level, name="root"):
     return logger
 
 
-def file_list_to_dataset(file_list):
+def get_file_list(file_list):
+    """
+    return [(file_path, line_no)...]
+    """
     line_no = -1
     ret = []
     with open(file_list, "r") as f:
@@ -43,11 +46,8 @@ def file_list_to_dataset(file_list):
             if len(line) <= 0:
                 continue
 
+            ret.append((line, line_no))
             line_no += 1
-            meta = master_pb2.FileMeta()
-            meta.idx_in_list = line_no
-            meta.file_path = line
-            ret.append(meta)
     return ret
 
 
