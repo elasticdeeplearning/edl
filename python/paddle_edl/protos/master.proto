@@ -20,37 +20,40 @@ package master;
 
 message SubDataSetRequest {}
 
+message SubDataSetMeta {
+  int64 idx_in_list = 1;
+  string file_path = 2;
+  // only no
+  repeated common.RecordRange filtered_records = 3;
+}
+
 message SubDataSetResponse {
   common.RPCRet ret = 1;
-  repeated Chunk metas = 2;
+  repeated SubDataSetMeta metas = 2;
 }
 
 message DataServer {
-  // get this id from master
-  string id = 1;
-  string pod_id = 2;
-  int32 trainer_rank = 3;
+  string affinity_pod_id = 2;
+  string affinity_rank_in_pod = 3;
   string endpoint = 4;
 }
 
 message TrainerRequest {
   string pod_id = 1;
-  int32 rank_in_pod = 2;
-  string endpoint = 3;
+  int32 rank_in_pod = 3;
+  string endpoint = 4;
 }
-
-message DataServerChunk {
-  DataServer data_server = 1;
-  repeated Chunk metas = 4;
-}
-
-message ChunksRequest { repeated DataServerChunk chunks = 1; }
 
 message TaskMeta {
   string task_id = 1;
   int32 epoch_no = 2;
-  string Stage_flag = 3;
-  int32 batch_size = 4; // records's num
+  string stage_flag = 3;
+  int32 batch_size = 4;
+}
+
+message DataServerChunk {
+  DataServer data_server = 1;
+  repeated common.Chunk chunks = 2;
 }
 
 message Task {
@@ -71,7 +74,6 @@ enum DataSetType {
   DATASET_INFERENCE = 1;
   DATASET_OTHER = 2;
 }
-
 message DataSet {
   DataSetType type = 1;
   string name = 2;
@@ -79,10 +81,22 @@ message DataSet {
 }
 message NewEpochRequest {}
 
+message BarrierRequest {
+  string job_id = 1;
+  string pod_id = 2;
+  string job_stage = 3;
+}
+
 service Master {
   // Cluster env
   // user_client, computor  -> master
   rpc GetCluster(common.ClusterRequest) returns (common.ClusterResponse) {}
+  rpc Barrier(BarrierRequest) returns (common.ClusterResponse) {}
+
+  // Cluster controller -> master
+  // rpc ScaleOut(){}
+  // rpc ScaleIn(){}
+  // rpc Profile(){}
 
   // Tasks
   /* user_client -> Master*/
@@ -91,7 +105,7 @@ service Master {
 
   /* data_server - > master */
   rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSetResponse) {}
-  rpc ReportChunks(ChunksRequest) returns (common.RPCRet) {}
+  rpc ReportChunks(DataServerChunk) returns (common.RPCRet) {}
 
   /* executor -> master */
   rpc GetTask(TaskRequest) returns (TaskResponse) {}
