@@ -78,3 +78,24 @@ def edl_barrier(master_dog, job_env, pod_env, timeout=15):
 
     pod = cluster.get_pod_by_id(pod_env.pod_id)
     return cluster, pod
+
+
+def edl_initial_barrier(master_dog,
+                        job_env,
+                        pod_env,
+                        init_pod_endpoints,
+                        timeout=15):
+    while True:
+        cluster, pod = edl_barrier(master_dog, job_env, pod_env, timeout)
+        pod_endpoints = cluster.get_pod_endpoints()
+        if cluster.pods_num(
+        ) != init_pod_num and cluster.job_stage == "INITIAL":
+            logger.info(
+                "wait init_pod_num:{} now:{} init_pod_ips:{} now:{}".format(
+                    len(init_pod_endpoints),
+                    len(pod_endpoints), init_pod_endpoints, pod_endpoints))
+
+            time.sleep(15)
+            continue
+
+        return cluster, pod

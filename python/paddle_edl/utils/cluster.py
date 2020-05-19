@@ -122,6 +122,13 @@ class Cluster(object):
             p.init_from_pb(pod)
             self.pods.append(p)
 
+    def get_pods_endpoints(self):
+        eps = []
+        for p in self.pods:
+            eps.append(p.endpoint)
+
+        return eps
+
 
 class Trainer(object):
     def __init__(self):
@@ -159,8 +166,8 @@ class Trainer(object):
 
     def init_frim_pb(self, trainer):
         self.rank_in_pod = trainer.rank_in_pod
-        self.global_rank = trainer.glboal_rank
-        self.endpoint = trainer.endpoints
+        self.global_rank = trainer.global_rank
+        self.endpoint = trainer.endpoint
         self.gpus = []
         for g in pod.gpus:
             self.gpus.append(g)
@@ -232,3 +239,7 @@ class Pod(object):
             t.init_from_pb(trainer)
 
             self.trainers.append(t)
+
+    @property
+    def endpoint(self):
+        return "{}:{}".format(self.addr, self.port)

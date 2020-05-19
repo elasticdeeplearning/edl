@@ -27,15 +27,21 @@ class JobEnv(object):
 
 
 class PodEnv(object):
-    def __init__(self, gpu_num, pod_id=None, pod_port=None,
+    def __init__(self,
+                 gpu_num,
+                 pod_id=None,
+                 pod_ip=None,
+                 pod_port=None,
                  trainer_ports=None):
         self.pod_id = os.getenv("PADDLE_POD_ID") if pod_id is None else pod_id
         self.pod_port = os.getenv(
             "PADDLE_POD_PORT") if pod_port is None else pod_port
+        self.pod_addr = os.getenv(
+            "PADDLE_POD_IP") if pod_ip is None else pod_ip
         assert self.pod_id, "pod_id must has valid value "
         assert self.pod_port, "pod_port must has valid value "
-        self.pod_addr = utils.get_extern_ip()
-        self.pod_endpoint = "{}:{}".format(pod_addr, self.pod_port)
+        assert self.pod_addr, "pod_ip must has valid value "
+        self.pod_endpoint = "{}:{}".format(self.pod_addr, self.pod_port)
 
         ports = os.getenv(
             "PADDLE_TRAINER_PORTS") if trainer_ports is None else trainer_ports

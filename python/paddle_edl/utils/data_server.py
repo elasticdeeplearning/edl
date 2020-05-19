@@ -207,15 +207,21 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
 class DataServer(object):
     def __init__(self):
         self._server = None
+        self._port = None
+        self_endpoint = None
 
     def start(self,
-              endpoint,
               master,
+              addr,
+              port,
               data_set_reader,
+              job_env,
+              affinity_pod_id,
+              affinity_rank_of_pod,
               cache_capcity=1000,
               file_list=None,
               max_workers=100,
-              concurrency=10):
+              concurrency=20):
         server = grpc.server(
             futures.ThreadPoolExecutor(max_workers=max_workers),
             options=[('grpc.max_send_message_length', 1024 * 1024 * 1024),
@@ -228,10 +234,22 @@ class DataServer(object):
                 capcity=cache_capcity,
                 file_list=file_list),
             server)
-        server.add_insecure_port('{}'.format(endpoint))
-        server.start()
 
+        endpoint = "{}:{}".format(addr, port)
+        self._port = server.add_insecure_port('{}'.format(endpoint))
+        assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(
+            endpoint, self._port)
+        self._endpoint = "{}:{}".format(addr, self._port)
+
+        server.start()
         self._server = server
+
+        self._register = DataServerRegister(
+            job_env.etcd_endoints,
+            job_env.job_id,
+            affinity_pod_id=affinity_pod_id,
+            affinity_rank_of_pod=affinity_rank_of_pod,
+            endpoint=self._endpoint)
 
     def wait(self, timeout=None):
         if timeout is not None:

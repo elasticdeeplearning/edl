@@ -48,10 +48,11 @@ import paddle.fluid as fluid
 from contextlib import closing
 import socket
 
-from utils import *
+from paddle_edl.utils.utils import *
 from edl_env import JobEnv, PodEnv
 from register import LauncherRegister
 from watcher import MasterWatcher
+import paddle_edl.utils.master_client as master_client
 
 
 def _print_arguments(args):
@@ -67,25 +68,15 @@ def _parse_args():
     @retval ArgumentParser
     """
     parser = ArgumentParser(
-        description='''start paddle training using multi-process mode.
-NOTE: your train program ***must*** run as distributed nccl2 mode,
-see: http://www.paddlepaddle.org/documentation/docs/zh/1.6/user_guides/howto/training/cluster_howto.html#permalink-8--nccl2-
-And your train program must read environment variables below in order to let different
-process init properly:
-FLAGS_selected_gpus
-PADDLE_TRAINER_ID
-PADDLE_CURRENT_ENDPOINT
-PADDLE_TRAINERS_NUM
-PADDLE_TRAINER_ENDPOINTS
-POD_IP (current node ip address, not needed for local training)
-''')
+        description='''start paddle training using multi-process mode.''')
 
     #Optional arguments for the launch helper
     parser.add_argument(
         "--cluster_node_ips",
         type=str,
         default="127.0.0.1",
-        help="Paddle cluster nodes ips, such as 192.168.0.16,192.168.0.17..")
+        help="The initial Paddle cluster nodes ips, such as 192.168.0.16,192.168.0.17.. May be changed in the traning process"
+    )
     parser.add_argument(
         "--node_ip",
         type=str,
@@ -160,9 +151,9 @@ def launch(args):
     job_env = JobEnv()
     pod_env = PodEnv()
 
-    master_dog = MasterWatcher(job_env.etcd_endpoints, job_env.job_id)
+    dog = MasterWatcher(job_env.etcd_endpoints, job_env.job_id)
     pod_reg = LauncherRegister(job_env, pod_env)
-    cluster, pod = edl_barrier(master_dog, job_env, pod_env, 15 * 60)
+    cluster, pod = edl_initial_barrier(dog, job_env, pod_env, 15 * 60)
     logger.info("get cluster from edl:{}".format(cluster))
 
     procs = start_local_trainers(
@@ -172,8 +163,9 @@ def launch(args):
         args.training_script_args,
         log_dir=args.log_dir)
 
+    client = master_client.Client(master_dog.get_master().endpoint)
     while True:
-        cluster2, pod = edl_env.get_cluster(hdfs)
+        cluster2, pod = client.get_cluster(hdfs)
 
         if cluster2.stage != cluster.stage:
             logger.info("Cluster changed. New cluster:{}. Old Cluster:{}".
