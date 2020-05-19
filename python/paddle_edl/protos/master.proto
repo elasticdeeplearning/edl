@@ -33,15 +33,15 @@ message SubDataSetResponse {
 }
 
 message DataServer {
-  string affinity_pod_id = 2;
-  string affinity_rank_in_pod = 3;
-  string endpoint = 4;
+  string affinity_pod_id = 1;
+  string affinity_rank_in_pod = 2;
+  string endpoint = 3;
 }
 
 message TrainerRequest {
   string pod_id = 1;
-  int32 rank_in_pod = 3;
-  string endpoint = 4;
+  int32 rank_in_pod = 2;
+  string endpoint = 3;
 }
 
 message TaskMeta {
@@ -84,7 +84,6 @@ message NewEpochRequest {}
 message BarrierRequest {
   string job_id = 1;
   string pod_id = 2;
-  string job_stage = 3;
 }
 
 service Master {

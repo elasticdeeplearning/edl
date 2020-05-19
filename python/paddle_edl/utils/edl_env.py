@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from paddle_edl.utils.utils import get_extern_ip, logger
+from paddle_edl.utils.utils import get_gpus
 
 
 class JobEnv(object):
@@ -28,33 +29,34 @@ class JobEnv(object):
 
 class PodEnv(object):
     def __init__(self,
-                 gpu_num,
+                 selected_gpus,
                  pod_id=None,
                  pod_ip=None,
                  pod_port=None,
                  trainer_ports=None):
-        self.pod_id = os.getenv("PADDLE_POD_ID") if pod_id is None else pod_id
-        self.pod_port = os.getenv(
+        self.port = os.getenv(
             "PADDLE_POD_PORT") if pod_port is None else pod_port
-        self.pod_addr = os.getenv(
-            "PADDLE_POD_IP") if pod_ip is None else pod_ip
-        assert self.pod_id, "pod_id must has valid value "
-        assert self.pod_port, "pod_port must has valid value "
-        assert self.pod_addr, "pod_ip must has valid value "
-        self.pod_endpoint = "{}:{}".format(self.pod_addr, self.pod_port)
+        self.addr = os.getenv("PADDLE_POD_IP") if pod_ip is None else pod_ip
+        assert self.port, "pod_port must has valid value "
+        assert self.addr, "pod_ip must has valid value "
+        self.endpoint = "{}:{}".format(self.pod_addr, self.pod_port)
+        self.id = self.endpoint
 
         ports = os.getenv(
             "PADDLE_TRAINER_PORTS") if trainer_ports is None else trainer_ports
         assert ports, "PADDLE_TRAINER_PORTS must has valid value"
+
+        self.gpus = get_gpus(selected_gpus)
         self.trainer_ports = ports.split(",")
         assert len(self.trainer_ports) == gpu_num, "one gpu one port"
 
 
 class TrainerEnv(object):
-    def __init__(self, trainer_id=None):
-        self.trainer_rank_in_pod = os.getenv(
-            "PADDLE_TRAINER_RANK_IN_POD") if trainer_id is None else trainer_id
+    def __init__(self, rank_in_pod=None, global_rank=None):
+        self.rank_in_pod = os.getenv("PADDLE_TRAINER_RANK_IN_POD"
+                                     ) if rank_in_pod is None else rank_in_pod
         self.trainer_global_rank = os.getenv(
-            "PADDLE_TRAINER_GLOBAL_RANK") if trainer_id is None else trainer_id
-        assert self.trainer_rank_in_pod, "trainer_rank_in_pod must has valid value "
-        assert self.trainer_global_rank, "global_rank must has valid value "
+            "PADDLE_TRAINER_ID") if global_rank is None else global_rank
+        assert self.rank_in_pod, "trainer_rank_in_pod must has valid value "
+        assert self.global_rank, "global_rank must has valid value "
+        self.id = self.global_rank

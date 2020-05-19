@@ -23,7 +23,7 @@ message RPCRet {
 }
 
 message Trainer {
-  string pod_id = 1;
+  // string pod_id = 1;
   // string id = 4;
   int32 rank_in_pod = 2;
   int32 global_rank = 3;
