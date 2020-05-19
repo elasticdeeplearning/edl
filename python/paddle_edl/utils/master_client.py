@@ -14,6 +14,9 @@
 
 import master_pb2
 import master_pb2_grpc
+import common_pb2
+import common_pb2_grpc
+from cluster import Cluster
 import grpc
 from exceptions import edl_exception
 
@@ -49,7 +52,7 @@ class Client(object):
             res = s.Barrier(req)
             error = res.ret
             if error.type == "":
-                return
+                return res.cluster
 
             if error.type == "BarrierError":
                 if time.time() - begin > timeout:
@@ -65,3 +68,13 @@ class Client(object):
                 sys.exit(0)
 
             raise edl_exception(error.type, error.detail)
+
+
+def edl_barrier(master_dog, job_env, pod_env, timeout=15):
+    c = Client(master_dog.get_master().endpoint)
+    pb_cluster = e.barrier(job_env.job_id, pod_env.pod_id, timeout)
+    cluster = Cluster()
+    cluster.init_frim_pb(pb_cluster)
+
+    pod = cluster.get_pod_by_id(pod_env.pod_id)
+    return cluster, pod

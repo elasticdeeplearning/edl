@@ -24,11 +24,11 @@ message RPCRet {
 
 message Trainer {
   string pod_id = 1;
-  string id = 4;
+  // string id = 4;
   int32 rank_in_pod = 2;
   int32 global_rank = 3;
-  string endpoint = 5;
-  repeated int32 gpus = 6;
+  string endpoint = 4;
+  repeated int32 gpus = 5;
 }
 
 message POD {
@@ -41,7 +41,7 @@ message POD {
 }
 
 message Cluster {
-  string job_flag = 1;
+  string job_stage = 1;
   repeated POD pods = 2;
 }
 

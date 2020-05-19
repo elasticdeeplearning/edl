@@ -161,9 +161,8 @@ def launch(args):
     pod_env = PodEnv()
 
     master_dog = MasterWatcher(job_env.etcd_endpoints, job_env.job_id)
-    pod_reg = LauncherRegister(kob_end, pod_env)
-    master_client = master_client.Client(master_dog)
-    cluster, pod = edl_barrier(job_end, pod_end)
+    pod_reg = LauncherRegister(job_env, pod_env)
+    cluster, pod = edl_barrier(master_dog, job_env, pod_env, 15 * 60)
     logger.info("get cluster from edl:{}".format(cluster))
 
     procs = start_local_trainers(

@@ -39,7 +39,7 @@ class MasterWatcher(object):
     def _get_master(self):
         begin = time.time()
         while True:
-            v, _ = self._etcd.get_key("/{}/master/addr".format(self._job_id))
+            v, _ = self._etcd.get_key("/{}/master/meta".format(self._job_id))
             with self._lock:
                 d = json.loads(v)
                 self.master.endpoint = d['endpoint']

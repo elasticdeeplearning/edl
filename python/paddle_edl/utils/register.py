@@ -60,6 +60,7 @@ class LauncherRegister(object):
         self._register.stop()
 
 
+"""
 class TrainerRegister(object):
     def __init__(self, etcd_endpoints, job_id, pod_id, rank_of_pod, endpoint):
         service_name = "Trainer"
@@ -79,6 +80,7 @@ class TrainerRegister(object):
 
     def stop(self):
         self._register.stop()
+"""
 
 
 class DataServerRegister(object):
