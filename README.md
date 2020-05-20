@@ -36,7 +36,7 @@ on the Kubernetes official blog.
 - EDL framework on PaddlePaddle:
   -  [Fault-Tolerant Training in PaddlePaddle](./doc/fault_tolerance.md).
   -  [EDL framework](./doc/edl_collective_design_doc.md).
-  -  [EDL distill training](./doc/edl_distill_design_doc.md)
+  -  [EDL Distillation](./doc/edl_distill_design_doc.md)
 
 ## Experiments:
 
