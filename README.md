@@ -35,14 +35,13 @@ on the Kubernetes official blog.
   -  [Scheduler](./doc/edl_design_doc.md).
 - EDL framework on PaddlePaddle:
   -  [Fault-Tolerant Training in PaddlePaddle](./doc/fault_tolerance.md).
-  -  [Compute engine](./doc/edl_collective_design_doc.md).
-  -  Distill Training
+  -  [EDL framework](./doc/edl_collective_design_doc.md).
+  -  [EDL distill training](./doc/edl_distill_design_doc.md)
 
 ## Experiments:
-We deployed EDL on a real Kubernetes cluster, dlnel.com, opened for
-graduate students of Tsinghua University.  The performance test report
-of EDL on this cluster is
-[here](https://github.com/PaddlePaddle/cloud/blob/develop/doc/edl/experiment/README.md).
+
+- [Auto-scaling Experiment](https://github.com/PaddlePaddle/cloud/blob/develop/doc/edl/experiment/README.md).
+- [Distill training on Resnet50](./doc/experiment/distill_resnet50.md)
 
 ## FAQ
 
