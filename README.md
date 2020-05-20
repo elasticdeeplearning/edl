@@ -2,7 +2,14 @@
 
 <img src="https://github.com/elasticdeeplearning/artwork/blob/master/horizontal/color/edl-horizontal-color.png" width="500" style="display:inline;vertical-align:middle;padding:2%">
 
-EDL is an Elastic Deep Learning framework designed to help deep learning cloud service providers to build cluster cloud services using deep learning frameworks such as PaddlePaddle and TensorFlow. EDL includes a Kubernetes controller, PaddlePaddle auto-scaler, which changes the number of processes of distributed jobs to the idle hardware resource in the cluster, and a new fault-tolerable architecture.
+EDL is an Elastic Deep Learning framework designed to help deep learning cloud service providers to build cluster cloud services using deep learning framework PaddlePaddle.
+
+EDL includes two parts:
+
+1. A Kubernetes controller for the elastic scheduling of distributed
+   deep learning jobs and tools for adjusting manually.
+
+1. Making PaddlePaddle a fault-tolerable deep learning framework with usability API for job management.
 
 EDL is an incubation-stage project of the [LF AI Foundation](https://lfai.foundation).
 
@@ -18,33 +25,24 @@ For more about the project EDL, please refer to this [invited blog
 post](https://kubernetes.io/blog/2017/12/paddle-paddle-fluid-elastic-learning/)
 on the Kubernetes official blog.
 
-EDL includes two parts:
+## Tutorials
+- [Run CTR Training and Deployment on Baidu Cloud](./example/ctr/deploy_ctr_on_baidu_cloud_cn.rst)
+- [Run EDL distill training demo on Kubernetes or a single node](./example/distill/README.md)
+- [Run Elastic Deep Learning Demo on a sinle node](./example/collective/README.md).
 
-1. a Kubernetes controller for the elastic scheduling of distributed
-   deep learning jobs, and
+## Design Docs
+- A scheduler on Kubernetes:
+  -  [Scheduler](./doc/edl_design_doc.md).
+- EDL framework on PaddlePaddle:
+  -  [Fault-Tolerant Training in PaddlePaddle](./doc/fault_tolerance.md).
+  -  [Compute engine](./doc/edl_collective_design_doc.md).
+  -  Distill Training
 
-1. making PaddlePaddle a fault-tolerable deep learning framework.
-   This directory contains the Kubernetes controller.  For more
-   information about fault-tolerance, please refer to the
-   [design](./doc/fault_tolerance.md).
-
+## Experiments:
 We deployed EDL on a real Kubernetes cluster, dlnel.com, opened for
 graduate students of Tsinghua University.  The performance test report
 of EDL on this cluster is
 [here](https://github.com/PaddlePaddle/cloud/blob/develop/doc/edl/experiment/README.md).
-
-## Tutorials
-
-- [Usage](./doc/usage.md)
-- [How to Build EDL Component](./doc/build.md)
-- [Run CTR Training and Deployment on Baidu Cloud](./example/ctr/deploy_ctr_on_baidu_cloud_cn.rst)
-
-## Design Docs
-- Collective communication pattern
-  -  [Fault-Tolerant Training in PaddlePaddle](./doc/fault_tolerance.md).
-  -  [Elastic Deep Learning Design Doc:compute engine](./doc/edl_collective_design_doc.md).
-  -  [Elastic Deep Learning Design Doc:Scheduler](./doc/edl_design_doc.md).
-  -  [Run Elastic Deep Learning Demo on a sinle node](./doc/collective_demo.md).
 
 ## FAQ
 
