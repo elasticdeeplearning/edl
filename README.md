@@ -38,7 +38,7 @@ on the Kubernetes official blog.
 ## Experiments:
 - [Auto-scaling Experiment](https://github.com/PaddlePaddle/cloud/blob/develop/doc/edl/experiment/README.md)
 
-## Application:
+## Applications:
 - EDL Distillation:
   - [EDL Distillation design](./doc/edl_distill_design_doc.md)
   - [Run EDL distillation training demo on Kubernetes or a single node](./example/distill/README.md)
