@@ -56,10 +56,6 @@ type Service struct {
 
 	Chunks map[string][]pb.Chunk // DataServerID->ChunksArray
 
-	dataServers []pb.DataServer
-	trainers    []pb.Trainer
-	// launchers   []pb.Launcher
-
 	etcd EtcdClient
 
 	dataset map[string]pb.DataSet
@@ -89,6 +85,9 @@ func NewService(etcd *EtcdClient, timeoutDur time.Duration, failureMax int) (*Se
 	}
 
 	return s, nil
+}
+
+func (s *Service) watchCluster() {
 }
 
 // GetSubDataSet implements the proto interface.

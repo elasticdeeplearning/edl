@@ -41,13 +41,10 @@ class Register(object):
 
 
 class LauncherRegister(object):
-    def __init__(self, etcd_endpoints, job_id, pod_id, endpoint):
+    def __init__(self, etcd_endpoints, job_id, pod_id, endpoint, gpus):
         service_name = "pod"
         server = endpoint
-        info = {
-            "job_id": job_id,
-            "pod_id": pod_id,
-        }
+        info = {"job_id": job_id, "pod_id": pod_id, "gpus": gpus}
 
         self._register = Register(
             etcd_endpoints,

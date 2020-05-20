@@ -133,6 +133,13 @@ def _parse_args():
         default=None,
         help="The hdfs_path used for edl.")
 
+    # checkpoint will saved here
+    parser.add_argument(
+        "--data_server_num",
+        type=int,
+        default=1,
+        help="The data sever number with one trainer.")
+
     #positional
     parser.add_argument(
         "training_script",
@@ -149,11 +156,12 @@ def _parse_args():
 
 def launch(args):
     job_env = JobEnv()
-    pod_env = PodEnv()
+    pod_env = PodEnv(args.selected_gpus)
 
     dog = MasterWatcher(job_env.etcd_endpoints, job_env.job_id)
     pod_reg = LauncherRegister(job_env, pod_env)
-    cluster, pod = edl_initial_barrier(dog, job_env, pod_env, 15 * 60)
+    cluster, pod = master_client.edl_initial_barrier(dog, job_env, pod_env,
+                                                     15 * 60)
     logger.info("get cluster from edl:{}".format(cluster))
 
     procs = start_local_trainers(
@@ -173,7 +181,7 @@ def launch(args):
             terminate_local_procs(procs)
 
             cluster, pod = master_client.edl_barrier(
-                job_env, pod_env, timeout=30 * 60)
+                job_env, pod_env, timeout=15 * 60)
 
             procs = start_local_trainers(
                 cluster,
