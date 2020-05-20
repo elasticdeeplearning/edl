@@ -36,12 +36,14 @@ on the Kubernetes official blog.
 - EDL framework on PaddlePaddle:
   -  [Fault-Tolerant Training in PaddlePaddle](./doc/fault_tolerance.md)
   -  [EDL framework](./doc/edl_collective_design_doc.md)
-  -  [EDL Distillation](./doc/edl_distill_design_doc.md)
 
 ## Experiments:
-
 - [Auto-scaling Experiment](https://github.com/PaddlePaddle/cloud/blob/develop/doc/edl/experiment/README.md)
-- [Distill training on Resnet50](./doc/experiment/distill_resnet50.md)
+
+## Application:
+- Distillation:
+  - [EDL Distillation design](./doc/edl_distill_design_doc.md)
+  - [EDL Distill performance: Resnet50](./doc/experiment/distill_resnet50.md)
 
 ## FAQ
 
