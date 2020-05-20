@@ -28,19 +28,19 @@ on the Kubernetes official blog.
 ## Tutorials
 - [Run CTR Training and Deployment on Baidu Cloud](./example/ctr/deploy_ctr_on_baidu_cloud_cn.rst)
 - [Run EDL distill training demo on Kubernetes or a single node](./example/distill/README.md)
-- [Run Elastic Deep Learning Demo on a sinle node](./example/collective/README.md).
+- [Run Elastic Deep Learning Demo on a sinle node](./example/collective/README.md)
 
 ## Design Docs
 - A scheduler on Kubernetes:
-  -  [Scheduler](./doc/edl_design_doc.md).
+  -  [Scheduler](./doc/edl_design_doc.md)
 - EDL framework on PaddlePaddle:
-  -  [Fault-Tolerant Training in PaddlePaddle](./doc/fault_tolerance.md).
-  -  [EDL framework](./doc/edl_collective_design_doc.md).
+  -  [Fault-Tolerant Training in PaddlePaddle](./doc/fault_tolerance.md)
+  -  [EDL framework](./doc/edl_collective_design_doc.md)
   -  [EDL Distillation](./doc/edl_distill_design_doc.md)
 
 ## Experiments:
 
-- [Auto-scaling Experiment](https://github.com/PaddlePaddle/cloud/blob/develop/doc/edl/experiment/README.md).
+- [Auto-scaling Experiment](https://github.com/PaddlePaddle/cloud/blob/develop/doc/edl/experiment/README.md)
 - [Distill training on Resnet50](./doc/experiment/distill_resnet50.md)
 
 ## FAQ

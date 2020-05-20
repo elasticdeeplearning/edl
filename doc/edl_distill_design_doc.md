@@ -1,7 +1,7 @@
 # Introduction
 Distilling the Knowledge in a Neural Network[<sup>1</sup>](#r_1) is a different type of training used to transfer the knowledge from the cumbersome models(teachers) to a small model(student) that is more suitable for deployment.
 
-EDL distillation is a large scale and universal solution for knowledge distillation. 
+EDL Distillation is a large scale and universal solution for knowledge distillation. 
 
 - Decouple the teacher and student models
   - They can run in the same or different nodes and transfer knowledge via network even on heterogeneous machines.            
