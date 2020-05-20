@@ -26,8 +26,6 @@ post](https://kubernetes.io/blog/2017/12/paddle-paddle-fluid-elastic-learning/)
 on the Kubernetes official blog.
 
 ## Tutorials
-- [Run CTR Training and Deployment on Baidu Cloud](./example/ctr/deploy_ctr_on_baidu_cloud_cn.rst)
-- [Run EDL distill training demo on Kubernetes or a single node](./example/distill/README.md)
 - [Run Elastic Deep Learning Demo on a sinle node](./example/collective/README.md)
 
 ## Design Docs
@@ -41,9 +39,12 @@ on the Kubernetes official blog.
 - [Auto-scaling Experiment](https://github.com/PaddlePaddle/cloud/blob/develop/doc/edl/experiment/README.md)
 
 ## Application:
-- Distillation:
+- EDL Distillation:
   - [EDL Distillation design](./doc/edl_distill_design_doc.md)
-  - [EDL Distill performance: Resnet50](./doc/experiment/distill_resnet50.md)
+  - [Run EDL distillation training demo on Kubernetes or a single node](./example/distill/README.md)
+  - [EDL Distillation performance: Resnet50](./doc/experiment/distill_resnet50.md)
+- EDL CTR
+  - [EDL CTR training and deployment on Baidu Cloud](./example/ctr/deploy_ctr_on_baidu_cloud_cn.rst)
 
 ## FAQ
 
