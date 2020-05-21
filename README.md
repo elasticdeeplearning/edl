@@ -28,18 +28,17 @@ improving the running time of deep learning jobs, EDL optimizes
 - Easy to use: Few lines of code need to be added to support EDL.
 
 ## Quick start demo: EDL Resnet50 experiments on a single machine:
-We highly recommand run it in our docker:  
+We highly **recommand** you run it in our docker:  
 
-1. Start a Jobserver on one node
+1. Start a Jobserver on one node.
  
 ```
 docker pull hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
-git clone https://github.com/PaddlePaddle/edl
-cd python/edl/demo/collective
+cd example/demo/collective
 ./start_job_server.sh
 ```
 
-2. Start a Jobclient on every node. Jobclient controls the worker process.
+2. Start a Jobclient which controls the worker process.
 
 ```
 #Set the ImageNet data path
