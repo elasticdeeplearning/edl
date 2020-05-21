@@ -41,7 +41,7 @@ if os.getenv("PADDLE_EDL_VERSION"):
 max_version, mid_version, min_version = python_version()
 
 REQUIRED_PACKAGES = [
-    'six >= 1.10.0', 'protobuf >= 3.1.0', "flask", "pathlib"
+    'six >= 1.10.0', 'protobuf >= 3.1.0', "flask", "pathlib2"
 ]
 
 packages=['paddle_edl', 
