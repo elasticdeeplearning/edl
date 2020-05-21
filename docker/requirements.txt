@@ -2,6 +2,6 @@ etcd3==0.12.0
 grpcio_tools==1.28.1 
 grpcio==1.28.1 
 flask==1.1.2
-pathlib==1.0.1
+pathlib2==2.3.5
 protobuf==3.8.0
 kubernetes
