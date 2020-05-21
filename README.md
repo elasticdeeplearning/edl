@@ -21,12 +21,42 @@ improving the running time of deep learning jobs, EDL optimizes
 1. the global utilization of the cluster, and
 1. the waiting time of job submitters.
 
-For more about the project EDL, please refer to this [invited blog
-post](https://kubernetes.io/blog/2017/12/paddle-paddle-fluid-elastic-learning/)
-on the Kubernetes official blog.
+## Key Features:
+- Efficiency: Provides parallelism strategies to minimize adjustment overheads.
+- Consistency: Accuracy verification on multiple models compared those without scaling.
+- Flexibility: Any components can be killed or joined at any time.
+- Easy to use: Few lines of code need to be added to support EDL.
 
-## Tutorials
-- [Run Elastic Deep Learning Demo on a sinle node](./example/collective/README.md)
+## Quick start demo: EDL Resnet50 experiments on a single machine:
+We highly recommand run it in our docker:  
+
+1. Start a Jobserver on one node
+ 
+```
+docker pull hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
+git clone https://github.com/PaddlePaddle/edl
+cd python/edl/demo/collective
+./start_job_server.sh
+```
+
+2. Start a Jobclient on every node. Jobclient controls the worker process.
+
+```
+#Set the ImageNet data path
+export PADDLE_EDL_IMAGENET_PATH=<your path>
+#Set the checkpoint path
+export PADDLE_EDL_FLEET_CHECKPOINT_PATH=<your path>
+
+mkdir -p resnet50_pod
+./start_job_client.sh
+```
+
+3. Experiments result
+ 
+| total batch size | acc1 | acc5 |
+| :-----: | ----: | ----: |
+| 1024 | 76.0 | 75.8 |
+
 
 ## Design Docs
 - A scheduler on Kubernetes:
@@ -34,9 +64,6 @@ on the Kubernetes official blog.
 - EDL framework on PaddlePaddle:
   -  [Fault-Tolerant Training in PaddlePaddle](./doc/fault_tolerance.md)
   -  [EDL framework](./doc/edl_collective_design_doc.md)
-
-## Experiments:
-- [Auto-scaling Experiment](https://github.com/PaddlePaddle/cloud/blob/develop/doc/edl/experiment/README.md)
 
 ## Applications:
 - EDL Distillation:
