@@ -27,7 +27,7 @@ improving the running time of deep learning jobs, EDL optimizes
 - Flexibility: Any components can be killed or joined at any time.
 - Easy to use: Few lines of code need to be added to support EDL.
 
-## Quick start demo: EDL Resnet50 experiments on a single machine:
+## Quick start demo: EDL Resnet50 experiments on a single machine:
 We highly **recommand** you run it in our docker:  
 
 1. Start a Jobserver on one node.
