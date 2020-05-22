@@ -1,35 +1,29 @@
 # -*- coding: utf-8 -*-
 import ast
-import ctypes
 import logging
 import multiprocessing as mps
 import numpy as np
-import os
 import socket
 import time
 import threading
 
 from contextlib import closing
-from paddle_serving_client import Client
 
 from six.moves.configparser import ConfigParser
 from six.moves import queue
 
 from .parse_config import parse_serving_conf
 from .shared_data import SharedMemoryArray, Var
-from .timeline import _TimeLine
+from . import distill_worker
 
 logging.basicConfig(
     level=logging.INFO,
     format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
 
-# only for local test.
-_NOP_PREDICT_TEST = False
-
 
 def is_server_alive(server):
     # FIXME. only for test, need find a better test method
-    if _NOP_PREDICT_TEST:
+    if distill_worker._NOP_PREDICT_TEST:
         return True
     alive = True
     ip, port = server.split(":")
@@ -41,150 +35,6 @@ def is_server_alive(server):
         except:
             alive = False
         return alive
-
-
-class _ServerItem(object):
-    PENDING = 'pending'
-    ERROR = 'error'
-    FINISHED = 'finished'
-
-    def __init__(self, server_id, server, stop_event_id, state=PENDING):
-        self.server_id = server_id
-        self.server = server
-        self.stop_event_id = stop_event_id
-        self.state = state
-
-
-class PredictServer(object):
-    def connect(self):
-        """ connect success, return True, else return False"""
-        raise NotImplementedError()
-
-    def predict(self, batch_size, feeds_memory, fetchs_memory):
-        """ predict success, return True, else return False"""
-        raise NotImplementedError()
-
-
-class PaddlePredictServer(PredictServer):
-    def __init__(self, server, config_file, feeds, fetchs, max_failed_times=3):
-        self._server = server
-        self._config_file = config_file
-        self._feeds = feeds
-        self._fetchs = fetchs
-        self._fetchs_name = [fetch_var.name for fetch_var in fetchs]
-        self._max_failed_times = max_failed_times
-        self.client = None
-        logging.info((server, config_file, feeds, fetchs, max_failed_times))
-
-        self._time_line = _TimeLine()
-
-    def connect(self):
-        """ connect success, return True, else return False"""
-        try:
-            self.client = Client()
-            self.client.load_client_config(self._config_file)
-            self.client.connect([self._server])
-        except Exception as e:
-            logging.error('Exception when connect server={}, Exception is:'.
-                          format(str(self._server)))
-            logging.error(str(e))
-            return False
-        return True
-
-    def _preprocess(self, batch_size, memorys):
-        assert len(self._feeds) == len(memorys), \
-            "Error: len(feeds_name)={} != len(memorys)={}".format(len(self._feeds), len(memorys))
-
-        feed_map_list = []
-        for batch_idx in range(batch_size):
-            feed_map = {}
-            for feed_idx, feed_var in enumerate(self._feeds):
-                # NOTE. this method fast 5 times than list method.
-                # with bs=2, shape=3*224*224, list time=46ms, slice time=9ms, np tolist 2-3ms
-                # feed_map[name] = list(memorys[feed_idx][batch_idx])
-                # feed_map[var.name] = memorys[feed_idx][batch_idx][:]
-                feed_map[feed_var.name] = np.frombuffer(
-                    memorys[feed_idx][batch_idx],
-                    dtype=feed_var.dtype).reshape(feed_var.shape)
-            feed_map_list.append(feed_map)
-        logging.debug('predict feed_map_list len={}'.format(
-            len(feed_map_list)))
-        return feed_map_list
-
-    def _postprocess(self, batch_size, memorys, fetchs_map):
-        assert len(self._fetchs) == len(fetchs_map), \
-            "Error: len(fetchs)={} != len(fetchs_list)={}".format(len(self._fetchs), len(fetchs_map))
-
-        for fetch_idx, fetch_var in enumerate(self._fetchs):
-            # if fetch is list, use slice
-            # >>> a_type = ctypes.c_float * 4
-            # >>> a = a_type()
-            # >>> a[:]
-            # [0.0, 0.0, 0.0, 0.0]
-            # >>> a[:] = [1.0, 3.0, 2.0, 5.0]
-            # >>> a[:]
-            # [1.0, 3.0, 2.0, 5.0]
-            fetch_data = fetchs_map[fetch_var.name]
-            assert ctypes.sizeof(memorys[fetch_idx][0]) * batch_size == fetch_data.nbytes, \
-                "sizeof(memory)={} != fetch_data.nbytes={} shape={} dtype={}".format(
-                    ctypes.sizeof(memorys[fetch_idx][0]) * batch_size,
-                    fetch_data.nbytes,
-                    fetch_data.shape,
-                    fetch_data.dtype)
-            ctypes.memmove(memorys[fetch_idx], fetch_data.ctypes.data,
-                           fetch_data.nbytes)
-
-    def predict(self, batch_size, feeds_memory, fetchs_memory):
-        """ predict success, return True, else return False"""
-        self._time_line.reset()
-        feed_map_list = self._preprocess(batch_size, feeds_memory)
-        self._time_line.record('preprocess')
-
-        fetch_map_list = None
-        for i in range(self._max_failed_times):
-            try:
-                fetch_map_list = self.client.predict(
-                    feed=feed_map_list, fetch=self._fetchs_name)
-                if fetch_map_list is None:
-                    raise Exception('fetch_map_list should not be None')
-                break
-            except Exception as e:
-                logging.warning('Failed {} times with server={}'.format(
-                    i + 1, self._server))
-                logging.warning('Exception:\n{}'.format(str(e)))
-                # time.sleep(0.1 * (i + 1))
-
-        self._time_line.record('real_predict')
-
-        if fetch_map_list is None:
-            return False
-
-        self._postprocess(batch_size, fetchs_memory, fetch_map_list)
-        self._time_line.record('postprocess')
-        return True
-
-    def __del__(self):
-        try:
-            if self.client is not None:
-                self.client.release()
-        except Exception as e:
-            logging.critical('Release client failed with server={}, '
-                             'there may be an unknown error'.format(
-                                 self._server))
-            logging.critical('Exception:\n{}'.format(str(e)))
-        logging.warning('Stopped predict server={}'.format(self._server))
-
-
-class _TestNopPaddlePredictServer(PaddlePredictServer):
-    def connect(self):
-        return True
-
-    def predict(self, batch_size, feeds_memory, fetchs_memory):
-        feed_map_list = self._preprocess(batch_size, feeds_memory)
-        return True
-
-    def __del__(self):
-        pass
 
 
 class ServiceDiscover(object):
@@ -232,97 +82,7 @@ _service_discover = None
 _service_discover_lock = threading.Lock()
 
 
-class _PoisonPill:
-    def __init__(self, feed_count, predict_count=0, complete_count=0):
-        self.feed_count = feed_count
-        self.predict_count = predict_count
-        self.complete_count = complete_count
-
-
 class DistillReader(object):
-    POISON_PILL = -1
-
-    # def __init__(self, conf_file, batch_size, d_batch_size, capacity,
-    #              occupied_capacity):
-    #     assert batch_size % d_batch_size == 0, \
-    #             "distill_batch_size must be able to divide batch_size."
-    #     assert capacity > occupied_capacity, "capacity must > occupied_capacity, or will hang"
-    #     self.batch_size = batch_size
-    #     self.d_batch_size = d_batch_size
-    #     self._capacity = capacity
-    #     self._occupied_capacity = occupied_capacity
-    #
-    #     self._d_batch_reader = None
-    #
-    #     config = ConfigParser()
-    #     config.read(conf_file)
-    #
-    #     self._mode = config.get('conf', 'mode')
-    #     self._serving_conf_file = config.get('conf', 'serving_conf_file')
-    #     if self._mode == 'fixed':
-    #         # fixed servers conf
-    #         self._servers = ast.literal_eval(config.get('conf', 'servers'))
-    #         self._require_num = len(self._servers)
-    #         logging.info((self._mode, self._servers, self._require_num))
-    #     elif self._mode == 'discover':
-    #         # discovery service conf
-    #         self._host = config.get('conf', 'host')
-    #         self._port = config.getint('conf', 'port')
-    #         self._service_name = config.get('conf', 'service_name')
-    #         self._require_num = config.getint('conf', 'require_num')
-    #         logging.info((self._host, self._port, self._service_name,
-    #                       self._require_num))
-    #
-    #     # set shared memory conf
-    #     self._max_thread = 2  # TODO. set max_thread
-    #     # double buffer
-    #     self._shared_len = max(2 * ((batch_size + d_batch_size - 1) /
-    #                                 d_batch_size), 2 * self._require_num)
-    #     # failed write back, is ok?
-    #     self._queue_len = self._shared_len + self._require_num * self._max_thread
-    #
-    #     # get shared memory and idx queue
-    #     self._shared_memory_array = SharedMemoryArray(
-    #         config, d_batch_size, batch_size, self._shared_len, self._capacity)
-    #
-    #     # FIXME. put these queue into shared_memory array?
-    #     # idle--(feed)-->ready--(predict)-->complete--(fetch)-->idle
-    #     self._idle_queue = mps.Queue(self._queue_len)
-    #     self._ready_queue = mps.Queue(self._queue_len)
-    #     self._complete_queue = mps.Queue(self._queue_len)
-    #     for i in range(self._shared_len):
-    #         self._idle_queue.put(i)
-    #
-    #     # complete memory--(multi copy)-->out memory
-    #     # idle--(copy)-->ready--(yield)-->idle
-    #     self._out_idle_queue = mps.Queue(self._capacity + 1)
-    #     self._out_ready_queue = mps.Queue(self._capacity + 1)
-    #     for i in range(self._capacity):
-    #         self._out_idle_queue.put(i)
-    #
-    #     # work processor
-    #     self._is_predict_start = False
-    #     self._is_feed_start = False
-    #     self._is_fetch_start = False
-    #     self._predict_cond = mps.Condition()  # for function reentrant
-    #     self._feed_cond = mps.Condition()  # for function reentrant
-    #     self._fetch_cond = mps.Condition()  # for function reentrant
-    #
-    #     # for predict worker to exit normally
-    #     self._predict_job_lock = mps.Lock()
-    #     self._count_of_working_predict = mps.Value('i', 0, lock=False)
-    #     self._predict_job_count = mps.Value('i', 0, lock=False)
-    #
-    #     # predict worker pool
-    #     self._predict_manage_thread = None
-    #     self._predict_stop_events = [
-    #         mps.Event() for i in range(self._require_num)
-    #     ]
-    #     self._predict_server_queue = mps.Queue(self._require_num)
-    #     self._predict_server_result_queue = mps.Queue(self._require_num)
-    #
-    #     self._is_init = False
-
     def __init__(self):
         self.batch_size = None
         self.d_batch_size = 1
@@ -485,182 +245,6 @@ class DistillReader(object):
         self._predict_server_queue = mps.Queue(self._require_num)
         self._predict_server_result_queue = mps.Queue(self._require_num)
 
-    def _feed_worker(self, reader):
-        """ supported samples format [np_var0, np_var1, ..] each numpy contains <=d_batch_size """
-        logging.info('feed_work pid{}'.format(os.getpid()))
-        # TODO. exit feed_worker
-        while True:
-            uid = 0
-            for d_batch in reader():
-                idle_memory_idx = self._idle_queue.get()
-                self._shared_memory_array.write_feed(idle_memory_idx, uid,
-                                                     d_batch)
-                self._ready_queue.put(idle_memory_idx)
-                uid += 1
-
-            poison_pill = _PoisonPill(uid)
-
-            # self._ready_queue.put(poison_pill)  # NOTE! can't put here, or will hang
-            with self._feed_cond:
-                # NOTE! see comment in _fetch_cond.wait()
-                self._ready_queue.put(poison_pill)
-                self._feed_cond.wait()
-
-    def _d_batch_predict(self, ready_memory_idx, client):
-
-        d_batch_size, predict_feeds_memory, fetchs_memory = \
-            self._shared_memory_array.get_predict_feeds_fetchs_memory(ready_memory_idx)
-
-        assert d_batch_size <= self.d_batch_size
-        return client.predict(d_batch_size, predict_feeds_memory,
-                              fetchs_memory)
-
-    def _predict(self, server_item):
-        feeds = self._shared_memory_array.get_predict_feeds()
-        fetchs = self._shared_memory_array.get_fetchs()
-
-        logging.info('connect server={}'.format(server_item.server))
-        predict_server = PaddlePredictServer if _NOP_PREDICT_TEST is False else _TestNopPaddlePredictServer
-        client = predict_server(server_item.server, self._serving_conf_file,
-                                feeds, fetchs)
-        if client.connect() is False:
-            return False
-
-        stop_event = self._predict_stop_events[server_item.stop_event_id]
-
-        with self._predict_job_lock:
-            self._count_of_working_predict.value += 1
-
-        time_line = _TimeLine()
-        predict_count = 0
-        while not stop_event.is_set():
-            ready_memory_idx = self._ready_queue.get()
-            time_line.record('get_ready')
-
-            # Poison
-            if isinstance(ready_memory_idx, _PoisonPill):
-                poison_pill = ready_memory_idx
-                # FIXME. tmp code
-                all_success = False
-
-                with self._predict_job_lock:
-                    # accumulate success predict_count
-                    poison_pill.predict_count += predict_count
-                    poison_pill.predict_count += self._predict_job_count.value
-
-                    # clear local predict_count
-                    predict_count = 0
-                    self._predict_job_count.value = 0
-
-                    # last process
-                    if self._count_of_working_predict.value == 1:
-                        if poison_pill.predict_count == poison_pill.feed_count:  # all predict worker success
-                            self._count_of_working_predict.value -= 1
-                            logging.debug(
-                                'pid={} write poison to complete queue'.format(
-                                    os.getpid()))
-                            all_success = True
-                            # self._complete_queue.put(poison_pill)  # poison consumer  # NOTE! put here may hang
-                        else:  # NOTE. some of predict worker failed
-                            assert poison_pill.predict_count < poison_pill.feed_count,\
-                                "if failed, predict_count={} must < feed_count={}".format(poison_pill.predict_count,
-                                                                                          poison_pill.feed_count)
-                            self._ready_queue.put(
-                                poison_pill)  # write back poison pill
-                            continue  # continue predict failed job
-                    else:  # not last process
-                        logging.debug('pid={} write poison back to ready'.
-                                      format(os.getpid()))
-                        assert poison_pill.predict_count <= poison_pill.feed_count, \
-                            "predict_count={} must <= feed_count={}".format(poison_pill.predict_count,
-                                                                            poison_pill.feed_count)
-                        self._count_of_working_predict.value -= 1
-                        # self._ready_queue.put(poison_pill)  # poison other predict worker  # NOTE! put here may hang
-
-                with self._predict_cond:
-                    # NOTE! see comment in _fetch_cond.wait()
-                    if all_success is True:
-                        self._complete_queue.put(
-                            poison_pill)  # poison consumer
-                    else:
-                        self._ready_queue.put(
-                            poison_pill)  # poison other predict worker
-
-                    # wait next reader iter or last failed predict job
-                    self._predict_cond.wait()
-
-                with self._predict_job_lock:
-                    self._count_of_working_predict.value += 1
-                continue
-
-            logging.debug('pid={} ready_memory_idx={} memory_uid={}'.format(
-                os.getpid(), ready_memory_idx,
-                self._shared_memory_array.get_shared_uid(ready_memory_idx)))
-
-            # Predict
-            predict_success = self._d_batch_predict(ready_memory_idx, client)
-            time_line.record('predict')
-
-            # Failed
-            if not predict_success:
-                with self._predict_job_lock:
-                    self._predict_job_count.value += predict_count
-                    self._ready_queue.put(
-                        ready_memory_idx)  # write back failed transaction
-                    # last process
-                    if self._count_of_working_predict.value == 1:
-                        # NOTE. need notify other predict worker, or maybe deadlock
-                        with self._predict_cond:
-                            self._predict_cond.notify_all()
-
-                    self._count_of_working_predict.value -= 1
-                    predict_count = 0  # clear count
-                    return False
-
-            logging.debug(
-                'pid={} write ready_memory_idx={} memory_uid={} predict_count={}'.
-                format(os.getpid(), ready_memory_idx,
-                       self._shared_memory_array.get_shared_uid(
-                           ready_memory_idx), predict_count))
-            # predict complete
-            self._complete_queue.put(ready_memory_idx)
-            predict_count += 1
-            time_line.record('put_complete')
-
-        with self._predict_job_lock:
-            self._predict_job_count.value += predict_count
-            # last process
-            if self._count_of_working_predict.value == 1:
-                # FIXME. remove server, how to notify? if notify all, one process complete poison consumer
-                # some other process may wait on the _ready_queue.get(), however this is ok for now.
-                # NOTE. need notify other predict worker, or maybe deadlock
-                with self._predict_cond:
-                    self._predict_cond.notify_all()
-            self._count_of_working_predict.value -= 1
-            predict_count = 0
-        return True
-
-    def _predict_worker(self):
-        logging.info('predict_worker pid={}'.format(os.getpid()))
-        while True:
-            # get server item
-            server_item = self._predict_server_queue.get(block=True)
-            if server_item is None:
-                self._predict_server_result_queue.put(None)
-                return
-
-            # predict
-            is_normal_stop = self._predict(server_item)
-
-            server_item.state = _ServerItem.FINISHED \
-                if is_normal_stop else _ServerItem.ERROR
-
-            # clear event, return result, release semaphore
-            # self._predict_stop_events[server_item.stop_event_id].clear()
-            self._predict_server_result_queue.put(server_item)
-            #self._idle_predict_semaphore.release()
-            logging.info('Stopped server={}'.format(server_item.server))
-
     def _get_servers(self, first_in):
         global _service_discover
         if _service_discover is not None:
@@ -755,7 +339,8 @@ class DistillReader(object):
 
                 idle_predict_num -= 1
                 event_id = event_set.pop()
-                server_item = _ServerItem(server_id, server, event_id)
+                server_item = distill_worker._ServerItem(server_id, server,
+                                                         event_id)
                 self._predict_server_queue.put(server_item)
                 server_to_item[server] = server_item
                 server_id += 1
@@ -763,116 +348,16 @@ class DistillReader(object):
 
             time.sleep(1.5)
 
-    def _fetch_worker(self):
-        logging.info('fetch_worker pid={}'.format(os.getpid()))
-        # init
-        out_idx = self._out_idle_queue.get()
-        assert out_idx == 0, "first out_idx must == 0"
-        out_offset = 0
-        last_complete_memory_idx, last_length = -1, -1
-
-        out_uid = 0
-        complete_count = 0
-        while True:
-            complete_memory_idx = self._complete_queue.get()
-
-            # Poison
-            if isinstance(complete_memory_idx, _PoisonPill):
-                poison_pill = complete_memory_idx
-                assert poison_pill.feed_count == poison_pill.predict_count, \
-                    "poison_pill feed_count={} != predict_count={}".format(poison_pill.feed_count,
-                                                                           poison_pill.predict_count)
-                poison_pill.complete_count += complete_count
-                complete_count = 0  # clear
-
-                # last no full batch
-                if last_complete_memory_idx != -1 and poison_pill.complete_count + 1 == poison_pill.predict_count:
-                    self._shared_memory_array.copy_shm_to_out(
-                        last_complete_memory_idx, out_idx, out_offset, out_uid,
-                        last_length)
-                    self._idle_queue.put(last_complete_memory_idx)
-
-                    last_complete_memory_idx = -1
-                    out_offset += last_length
-
-                    poison_pill.complete_count += 1
-
-                if poison_pill.complete_count == poison_pill.predict_count:  # all fetch job success
-                    assert last_complete_memory_idx == -1, "no full batch fetch failed?"
-                    if out_offset > 0:
-                        # put last no full ready data to out_ready_queue
-                        self._out_ready_queue.put(out_idx)
-                    else:
-                        # write back idle out idx
-                        self._out_idle_queue.put(out_idx)
-
-                    # poison distill reader
-                    # self._out_ready_queue.put(DistillReader.POISON_PILL)  # NOTE. POISON here may be hang
-                    with self._fetch_cond:
-                        # NOTE!!! put poison pill can only be placed inside the critical area of the cond variable,
-                        # otherwise, when reader finishes, reentrant and sending notify,
-                        # the current process may not have entered the critical area and cannot receive notifications.
-                        # The will hang.
-                        self._out_ready_queue.put(DistillReader.POISON_PILL)
-                        self._fetch_cond.wait()
-
-                    # init
-                    out_idx = self._out_idle_queue.get()
-                    out_offset = 0
-                    last_complete_memory_idx, last_length = -1, -1
-                    out_uid = 0
-                    continue
-                else:
-                    # NOTE!!!!!!!!!
-                    # When predict with multi process worker, complete_queue maybe unordered.
-                    # Last process may write POISON_PILL before other process.
-                    # For example:
-                    # [DEBUG 2020-04-20 23:37:37,582 distill_reader.py:649] pid=60636 write ready_memory_idx=15 memory_uid=[47L, 4L]
-                    # [DEBUG 2020-04-20 23:37:37,582 distill_reader.py:649] pid=60637 write ready_memory_idx=0 memory_uid=[48L, 2L]
-                    # [DEBUG 2020-04-20 23:37:37,582 distill_reader.py:603] pid=60636 write poison back to ready
-                    # [DEBUG 2020-04-20 23:37:37,583 distill_reader.py:599] pid=60637 write poison to complete queue
-                    # From time order, we must want complete_queue be Queue(15, 0, poison_pill).
-                    # But in fact complete_queue may be Queue(0, poison_pill, 15), for the queue.put() is unordered in multi process.
-                    assert poison_pill.complete_count < poison_pill.predict_count, \
-                        "poison_pill complete_count={} must< predict_count={}".format(poison_pill.complete_count,
-                                                                                      poison_pill.predict_count)
-                    logging.debug('complete is unordered!!!!')
-                    self._complete_queue.put(poison_pill)  # write back poison
-                    continue
-
-            uid_list = self._shared_memory_array.get_shared_uid(
-                complete_memory_idx)
-            uid, filled_length = uid_list
-            logging.debug('result_memory_idx={} memory_uid={}'.format(
-                complete_memory_idx, uid_list))
-
-            assert filled_length <= self.d_batch_size
-            # not full, must be last batch
-            if filled_length != self.d_batch_size:
-                logging.debug('filled_length={} d_batch_size={} idx={}'.format(
-                    filled_length, self.d_batch_size, complete_memory_idx))
-                last_complete_memory_idx = complete_memory_idx
-                last_length = filled_length
-            else:  # full
-                self._shared_memory_array.copy_shm_to_out(
-                    complete_memory_idx, out_idx, out_offset, out_uid,
-                    self.d_batch_size)
-                # copy done, write back idx to idle queue
-                self._idle_queue.put(complete_memory_idx)
-                complete_count += 1
-
-                out_offset += self.d_batch_size
-                # out is ready
-                if out_offset == self.batch_size:
-                    self._out_ready_queue.put(out_idx)
-                    out_idx = self._out_idle_queue.get()
-                    out_uid += 1
-                    out_offset = 0
-
     def _start_feed_worker(self, reader):
         if not self._is_feed_start:
             feed_worker = mps.Process(
-                target=self._feed_worker, args=(reader, ))
+                target=distill_worker.feed_worker,
+                args=(
+                    reader,
+                    self._idle_queue,
+                    self._ready_queue,
+                    self._shared_memory_array,
+                    self._feed_cond, ))
             feed_worker.daemon = True
             feed_worker.start()
             self._is_feed_start = True
@@ -884,7 +369,20 @@ class DistillReader(object):
         process = []
         for i in range(self._require_num):
             stop_flag = mps.Event()
-            worker = mps.Process(target=self._predict_worker)
+            worker = mps.Process(
+                target=distill_worker.predict_worker,
+                args=(
+                    self._predict_server_queue,
+                    self._predict_server_result_queue,
+                    self._shared_memory_array,
+                    self._serving_conf_file,
+                    self._predict_stop_events,
+                    self._predict_job_lock,
+                    self._count_of_working_predict,
+                    self._ready_queue,
+                    self._predict_job_count,
+                    self._predict_cond,
+                    self._complete_queue, ))
             worker.daemon = True
             worker.start()
             process.append(worker)
@@ -907,7 +405,17 @@ class DistillReader(object):
 
     def _start_fetch_worker(self):
         if not self._is_fetch_start:
-            fetch_worker = mps.Process(target=self._fetch_worker)
+            fetch_worker = mps.Process(
+                target=distill_worker.fetch_worker,
+                args=(
+                    self.batch_size,
+                    self.d_batch_size,
+                    self._shared_memory_array,
+                    self._idle_queue,
+                    self._complete_queue,
+                    self._out_idle_queue,
+                    self._out_ready_queue,
+                    self._fetch_cond, ))
             fetch_worker.daemon = True
             fetch_worker.start()
             self._is_fetch_start = True
@@ -1029,7 +537,7 @@ class DistillReader(object):
             idx_being_used = []
             while True:
                 idx = self._out_ready_queue.get()
-                if idx == DistillReader.POISON_PILL:
+                if idx == distill_worker.POISON_PILL:
                     break
                 out_np = self._shared_memory_array.get_np_from_out(idx)
                 idx_being_used.append(idx)
