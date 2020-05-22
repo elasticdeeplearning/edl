@@ -16,6 +16,8 @@ package master
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	log "github.com/inconshreveable/log15"
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
@@ -26,12 +28,14 @@ const (
 	// DefaultLockPath is the default etcd master lock path.
 	DefaultLockPath = "/master/lock"
 	// DefaultStatePath is the default etcd key for master state.
+	// version_0, version_1 ..., reserve last 3
 	DefaultStatePath = "/master/state"
-	// DefaultMeta is the default etcd key for master address.
-	// endpoint, job_stage
-	DefaultMeta = "/master/meta"
-	// DefaultScaleInOut is the the default etcd key for pod changes.
-	DefaultScaleInOut = "/master/scale_in_out"
+	// DefaultMetaPath is the default etcd key for master address.
+	// {job_stage:"", endpoint:""}
+	DefaultMetaPath = "/master/meta"
+	// DefaultAdjustPath is the the default etcd key for pod changes.
+	// operation1, operatrion2, ...
+	DefaultAdjustPath = "/master/adjust_operation"
 )
 
 const (
@@ -48,8 +52,25 @@ type EtcdClient struct {
 	sess      *concurrency.Session
 }
 
+type meta struct {
+	JobStage string `json:"job_stage"`
+	Endpoint string `json:"endpoint"`
+}
+
+func lockPath(jogID) string {
+	return fmt.Sprintf("/%s%s", jogID, DefaultLockPath)
+}
+
+func metaPath(jogID) string {
+	return fmt.Sprintf("/%s%s", jogID, DefaultMetaPath)
+}
+
+func statePath(jogID) string {
+	return fmt.Sprintf("/%s%s", jogID, DefaultStatePath)
+}
+
 // NewEtcdClient creates a new EtcdClient.
-func NewEtcdClient(endpoints []string, addr string, lockPath, addrPath, statePath string, ttlSec int) (*EtcdClient, error) {
+func NewEtcdClient(jogID string, endpoints []string, addr string, ttlSec int) (*EtcdClient, error) {
 	log.Debug("Connecting to etcd", log.Ctx{"endpoint": endpoints})
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   endpoints,
@@ -64,7 +85,7 @@ func NewEtcdClient(endpoints []string, addr string, lockPath, addrPath, statePat
 		return nil, err
 	}
 
-	lock := concurrency.NewMutex(sess, lockPath)
+	lock := concurrency.NewMutex(sess, lockPath(jogID))
 	// It's fine for the lock to get stuck, in this case we have
 	// multiple master servers running (only configured to have
 	// one master running, but split-brain problem may cause
@@ -77,7 +98,10 @@ func NewEtcdClient(endpoints []string, addr string, lockPath, addrPath, statePat
 	}
 	log.Info("Successfully acquired lock at: ", log.Ctx{"path": lockPath})
 
-	put := clientv3.OpPut(addrPath, addr)
+	// FIXME(gongwb): master should support fail over
+	m := meta{"INITIAL", addr}
+
+	put := clientv3.OpPut(metaPath, json.Marshal(m))
 	resp, err := cli.Txn(context.Background()).If(lock.IsOwner()).Then(put).Commit()
 	if err != nil {
 		return nil, err
@@ -89,8 +113,8 @@ func NewEtcdClient(endpoints []string, addr string, lockPath, addrPath, statePat
 	}
 
 	e := &EtcdClient{
-		lockPath:  lockPath,
-		statePath: statePath,
+		lockPath:  lockPath(jogID),
+		statePath: statePath(jogID),
 		client:    cli,
 		lock:      lock,
 		sess:      sess,
@@ -99,10 +123,22 @@ func NewEtcdClient(endpoints []string, addr string, lockPath, addrPath, statePat
 	return e, nil
 }
 
+// GetNextVersion gets next version by etcd_list
+func (e *EtcdClient) GetNextVersion() (string, error) {
+	return "", nil
+}
+
+// Save saves the version state to etcd
+func (e *EtcdClient) Save(state []byte, version string) error {
+	// save the new version
+	statePath := fmt.Sprintf("/%s/%s/%s", e.jogID, DefaultStatePath, version)
+	return e.save(state, statePath)
+}
+
 // Save saves the state into the etcd.
-func (e *EtcdClient) Save(state []byte) error {
+func (e *EtcdClient) save(state []byte, statePath string) error {
 	ctx := context.TODO()
-	put := clientv3.OpPut(e.statePath, string(state))
+	put := clientv3.OpPut(statePath, string(state))
 	resp, err := e.client.Txn(ctx).If(e.lock.IsOwner()).Then(put).Commit()
 	if err != nil {
 		return err
@@ -134,9 +170,9 @@ func (e *EtcdClient) Save(state []byte) error {
 }
 
 // Load loads the state from etcd.
-func (e *EtcdClient) Load() ([]byte, error) {
+func (e *EtcdClient) Load(statePath) ([]byte, error) {
 	ctx := context.TODO()
-	get := clientv3.OpGet(e.statePath)
+	get := clientv3.OpGet(statePath)
 
 	resp, err := e.client.Txn(ctx).If(e.lock.IsOwner()).Then(get).Commit()
 	if err != nil {

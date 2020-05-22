@@ -42,19 +42,35 @@ class Register(object):
 
 class LauncherRegister(object):
     def __init__(self, etcd_endpoints, job_id, pod_id, endpoint, gpus):
-        service_name = "pod"
-        server = endpoint
-        info = {"job_id": job_id, "pod_id": pod_id, "gpus": gpus}
+        sefl._service_name = "pod"
+        self._server = endpoint
+
+        info = self._get_info(etcd_endpoints, job_id, pod_id, endpoint, gpus)
 
         self._register = Register(
             etcd_endpoints,
             job_id=job_id,
-            service=service_name,
-            server=server,
+            service=self._service_name,
+            server=self._server,
             info=json.dumps(info))
+
+    def get_info(etcd_endpoints, job_id, pod_id, endpoint, gpus, complete=0):
+        info = {
+            "job_id": job_id,
+            "pod_id": pod_id,
+            "gpus": gpus,
+            "complete": complete
+        }
+        return info
 
     def stop(self):
         self._register.stop()
+
+    def complete(self):
+        info = self._get_info(
+            etcd_endpoints, job_id, pod_id, endpoint, gpus, complete=1)
+        self._etcd.set_server_permanent(self._server_name, self._server, info)
+        self.stop()
 
 
 """

@@ -61,9 +61,13 @@ class Cluster(object):
         self.job_stage = None
 
     def __str__(self):
-        return "job_server:{} pods:{} job_stage_flag:{} hdfs:{}".format(
-            self.job_server, [str(pod) for pod in self.pods],
-            self.job_stage_flag, self.hdfs)
+        return "pods:{} job_stage_flag:{} hdfs:{}".format(
+            [str(pod) for pod in self.pods], self.job_stage_flag, self.hdfs)
+
+    def details(self):
+        return "pods:{} job_stage_flag:{} hdfs:{}".format(
+            [pod.details() for pod in self.pods], self.job_stage_flag,
+            self.hdfs)
 
     def __eq__(self, cluster):
         if len(self.pods) != len(cluster.pods):
@@ -139,7 +143,7 @@ class Trainer(object):
 
     def __str__(self):
         return "gpu:{} endpoint:{} rank_in_pod:{} global_rank:{}".format(
-            self.gpus, self.endpoint, self.rank_in_pod, self.glboal_rank)
+            self.gpus, self.endpoint, self.rank_in_pod, self.global_rank)
 
     def __eq__(self, t):
         if len(self.gpus) != len(t.gpus):
@@ -183,6 +187,10 @@ class Pod(object):
         self.gpus = []
 
     def __str__(self):
+        return "rank:{} id:{} addr:{} port:{} visible_gpu:{}".format(
+            self.rank, self.id, self.addr, self.port, self.gpus)
+
+    def details(self):
         return "rank:{} id:{} addr:{} port:{} visible_gpu:{} trainers:{}".format(
             self.rank, self.id, self.addr, self.port, self.gpus,
             [str(t) for t in self.trainers])

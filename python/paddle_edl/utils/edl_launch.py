@@ -154,14 +154,34 @@ def _parse_args():
     return parser.parse_args()
 
 
+def edl_barrier(master_dog, job_env, pod_env, timeout=15):
+    c = Client(master_dog.get_master().endpoint)
+    try:
+        pb_cluster = c.barrier(job_env.job_id, pod_env.pod_id, timeout)
+    except Exception as e:
+        if type(e) is exception.PodDroppedError:
+            logger.info("job_id:{} pod_id:{} was dropped".format(job_id,
+                                                                 pod_id))
+            sys.exit(0)
+
+        logger.info("job_id:{} pod_id:{} barrier error:{}".format(
+            job_id, pod_id, e.value))
+        sys.exit(1)
+
+    cluster = Cluster()
+    cluster.init_from_pb(pb_cluster)
+
+    pod = cluster.get_pod_by_id(pod_env.pod_id)
+    return cluster, pod
+
+
 def launch(args):
     job_env = JobEnv()
     pod_env = PodEnv(args.selected_gpus)
 
     dog = MasterWatcher(job_env.etcd_endpoints, job_env.job_id)
     pod_reg = LauncherRegister(job_env, pod_env)
-    cluster, pod = master_client.edl_initial_barrier(dog, job_env, pod_env,
-                                                     15 * 60)
+    cluster, pod = edl_barrier(dog, job_env, pod_env, None, 15 * 60)
     logger.info("get cluster from edl:{}".format(cluster))
 
     procs = start_local_trainers(
@@ -178,19 +198,21 @@ def launch(args):
         if cluster2.stage != cluster.stage:
             logger.info("Cluster changed. New cluster:{}. Old Cluster:{}".
                         format(cluster2, cluster))
-            terminate_local_procs(procs)
 
-            cluster, pod = master_client.edl_barrier(
-                job_env, pod_env, timeout=15 * 60)
+            edl_proces.sterminate_local_procs(procs)
 
-            procs = start_local_trainers(
+            cluster, pod = edl_barrier(
+                job_env, pod_env, local_procs=procs, timeout=15 * 60)
+
+            procs = edl_process.start_local_trainers(
                 cluster,
                 pod,
                 args.training_script,
                 args.training_script_args,
                 log_dir=args.log_dir)
 
-        alive = watch_local_trainers(procs, cluster.trainers_nranks())
+        alive = edl_process.watch_local_trainers(procs,
+                                                 cluster.trainers_nranks())
 
         if not alive:
             logger.info("Local procs complete, POD info:{}".format(pod))
@@ -198,4 +220,5 @@ def launch(args):
 
         time.sleep(3)
 
-    edl_utils.edl_barrier(edl_env)
+    # normal exit
+    pod_reg.complete()

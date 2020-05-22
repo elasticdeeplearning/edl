@@ -31,10 +31,11 @@ class MasterWatcher(object):
         self._master = Master()
 
         self._lock = Lock()
+        # wait to get master
+        self._get_master()
+
         self._t_watcher = Threading(selt._get_master)
         self._t_watcher.start()
-
-        self._get_master()
 
     def _get_master(self):
         begin = time.time()

@@ -32,6 +32,8 @@ type masterState struct {
 	Done     []taskEntry
 	Failed   []taskEntry
 	CurEpoch int
+	Stage    string // generate by master and Pods change job stage change.
+	version  string // should equal with the trainer's checkpoint
 }
 
 type launcher struct {

@@ -42,6 +42,9 @@ class Client(object):
         pass
 
     def barrier(self, job_id, pod_id, timeout=15):
+        """
+        try to barrier on master with other launchers until timeout
+        """
         req = master_pb2.BarrierRequest()
         req.job_id = job_id
         req.pod_id = pod_id
@@ -62,24 +65,10 @@ class Client(object):
                 time.sleep(1)
                 continue
 
-            if error.type == 'PodDroppedError':
-                log.info("job_id:{} pod_id:{} not exist in cluster, exit now!".
-                         format(job_id, pod_id))
-                sys.exit(0)
-
             raise edl_exception(error.type, error.detail)
 
 
-def edl_barrier(master_dog, job_env, pod_env, timeout=15):
-    c = Client(master_dog.get_master().endpoint)
-    pb_cluster = e.barrier(job_env.job_id, pod_env.pod_id, timeout)
-    cluster = Cluster()
-    cluster.init_frim_pb(pb_cluster)
-
-    pod = cluster.get_pod_by_id(pod_env.pod_id)
-    return cluster, pod
-
-
+"""
 def edl_initial_barrier(master_dog,
                         job_env,
                         pod_env,
@@ -99,3 +88,4 @@ def edl_initial_barrier(master_dog,
             continue
 
         return cluster, pod
+"""

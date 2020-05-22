@@ -40,7 +40,10 @@ class PodEnv(object):
         assert self.port, "pod_port must has valid value "
         assert self.addr, "pod_ip must has valid value "
         self.endpoint = "{}:{}".format(self.pod_addr, self.pod_port)
-        self.id = self.endpoint
+        self.id = os.getenv("PADDLE_POD_ID") if pod_id is None else pod_id
+        if self.id is None:
+            self.id = self.endpoint
+        assert self.addr, "pod_ip must has valid value "
 
         ports = os.getenv(
             "PADDLE_TRAINER_PORTS") if trainer_ports is None else trainer_ports
