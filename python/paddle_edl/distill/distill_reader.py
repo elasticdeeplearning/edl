@@ -17,6 +17,7 @@ from six.moves.configparser import ConfigParser
 from six.moves import queue
 
 from .shared_data import SharedMemoryArray
+from .timeline import _TimeLine
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,33 +25,6 @@ logging.basicConfig(
 
 # only for local test.
 _NOP_PREDICT_TEST = False
-
-
-class _NopTimeLine(object):
-    def record(self, name):
-        pass
-
-    def reset(self):
-        pass
-
-
-class _RealTimeLine(object):
-    def __init__(self):
-        self.pid = os.getpid()
-        self.time = time.time()
-
-    def record(self, name):
-        new_time = time.time()
-        sys.stderr.write('pid={} op={} time={}ms\n'.format(self.pid, name, (
-            new_time - self.time) * 1000))
-        self.time = new_time
-
-    def reset(self):
-        self.time = time.time()
-
-
-_is_profile = int(os.environ.get('DISTILL_READER_PROFILE', 0))
-_TimeLine = _RealTimeLine if _is_profile else _NopTimeLine
 
 
 def is_server_alive(server):
