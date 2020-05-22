@@ -47,7 +47,7 @@ REQUIRED_PACKAGES = [
 packages=['paddle_edl', 
           'paddle_edl.collective', 
           'paddle_edl.demo', 
-          'paddle_edl.demo.collective', 
+          'paddle_edl.demo.collective',
           'paddle_edl.discovery',
           'paddle_edl.distill',
           ]
