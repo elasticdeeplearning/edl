@@ -17,7 +17,7 @@ import paddle_edl.distill.distill_reader as distill_reader
 
 if __name__ == '__main__':
     # temp local test
-    distill_reader._NOP_PREDICT_TEST = True
+    distill_reader.distill_worker._NOP_PREDICT_TEST = True
 
     # test mnist distill reader
     def _reader():
@@ -28,9 +28,6 @@ if __name__ == '__main__':
         for i in range(24):
             yield 8 * [(img, label)]
         yield 2 * [(img, label)]
-
-    # dr = distill_reader.DistillReader(
-    #     'distill_reader_test.conf', 32, 4, capacity=4, occupied_capacity=2)
 
     dr = distill_reader.DistillReader()
     dr.set_batch_size(batch_size=32, teacher_batch_size=4)
