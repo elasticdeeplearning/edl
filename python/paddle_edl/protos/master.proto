@@ -53,6 +53,8 @@ message TaskMeta {
 
 message DataServerChunk {
   DataServer data_server = 1;
+  int64 idx_in_list = 1;
+  string file_path = 2;
   repeated common.Chunk chunks = 2;
 }
 
