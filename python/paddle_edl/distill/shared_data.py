@@ -37,27 +37,29 @@ class Var(object):
 
 
 class DataStruct(object):
-    def __init__(self, config, d_batch_size, batch_size):
-        # feed vars conf
-        self._feed_vars = ast.literal_eval(config.get('feed', 'feed_vars'))
-        self._feed_types = ast.literal_eval(config.get('feed', 'feed_types'))
-        self._feed_shapes = ast.literal_eval(config.get('feed', 'feed_shapes'))
-        self._predict_feed_ids = ast.literal_eval(
-            config.get('feed', 'predict_feed_ids'))
-        logging.info((self._feed_vars, self._feed_types, self._feed_shapes,
-                      self._predict_feed_ids))
+    def __init__(self, d_batch_size, batch_size, predict_feed_vars,
+                 predict_fetch_vars, reader_vars, reader_fetch_names):
 
-        # fetch vars conf
-        self._fetch_vars = ast.literal_eval(config.get('fetch', 'fetch_vars'))
-        self._fetch_types = ast.literal_eval(
-            config.get('fetch', 'fetch_types'))
-        self._fetch_shapes = ast.literal_eval(
-            config.get('fetch', 'fetch_shapes'))
+        self._reader_feed_vars = reader_vars
+        self._predict_feed_ids = []
+        for i, var in enumerate(self._reader_feed_vars):
+            if var.name in predict_feed_vars:
+                assert var.shape == predict_feed_vars[var.name].shape
+                assert var.dtype == predict_feed_vars[var.name].dtype
+                self._predict_feed_ids.append(i)
+
+        self._reader_fetch_vars = []
+        for name in reader_fetch_names:
+            assert name in predict_fetch_vars
+            self._reader_fetch_vars.append(predict_fetch_vars[name])
+
         self._fetch_ids = [
-            i + len(self._feed_vars) for i in range(len(self._fetch_vars))
+            i + len(self._reader_feed_vars)
+            for i in range(len(self._reader_fetch_vars))
         ]
-        logging.info((self._fetch_vars, self._fetch_types, self._fetch_shapes,
-                      self._fetch_ids))
+
+        # logging.info((self._fetch_vars, self._fetch_types, self._fetch_shapes,
+        #               self._fetch_ids))
 
         # get all_vars and DataStruct
         self._all_vars = []
@@ -66,8 +68,11 @@ class DataStruct(object):
             for _var, var_type, var_shape in zip(_vars, types, shapes):
                 self._all_vars.append(Var(_var, var_type, var_shape))
 
-        get_all_vars(self._feed_vars, self._feed_types, self._feed_shapes)
-        get_all_vars(self._fetch_vars, self._fetch_types, self._fetch_shapes)
+        self._all_vars += self._reader_feed_vars
+        self._all_vars += self._reader_fetch_vars
+
+        # get_all_vars(self._feed_vars, self._feed_types, self._feed_shapes)
+        # get_all_vars(self._fetch_vars, self._fetch_types, self._fetch_shapes)
         logging.info([str(s) for s in self._all_vars])
 
         def get_uid(names):
@@ -119,7 +124,7 @@ class DataStruct(object):
         return self._all_vars
 
     def get_fetchs_name(self):
-        return self._fetch_vars
+        return [var.name for var in self._reader_fetch_vars]
 
     def get_feed_name(self, idx):
         return self._all_vars[idx].name
@@ -134,7 +139,7 @@ class DataStruct(object):
         return [self._all_vars[idx] for idx in self._fetch_ids]
 
     def get_feed_count(self):
-        return len(self._feed_vars)
+        return len(self._reader_feed_vars)
 
     def get_uid_name(self):
         return self._uid
@@ -144,10 +149,14 @@ class DataStruct(object):
 
 
 class SharedMemoryArray(object):
-    def __init__(self, config, d_batch_size, batch_size, shared_len, capacity):
+    def __init__(self, d_batch_size, batch_size, shared_len, capacity,
+                 predict_feed_vars, predict_fetch_vars, reader_vars,
+                 reader_fetch_names):
         self._d_batch_size = d_batch_size
         self._batch_size = batch_size
-        self._data_struct = DataStruct(config, d_batch_size, batch_size)
+        self._data_struct = DataStruct(d_batch_size, batch_size,
+                                       predict_feed_vars, predict_fetch_vars,
+                                       reader_vars, reader_fetch_names)
 
         self._shared_len = shared_len
         self._capacity = capacity
