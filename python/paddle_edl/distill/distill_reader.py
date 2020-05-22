@@ -6,7 +6,6 @@ import multiprocessing as mps
 import numpy as np
 import os
 import socket
-import sys
 import time
 import threading
 
@@ -16,7 +15,8 @@ from paddle_serving_client import Client
 from six.moves.configparser import ConfigParser
 from six.moves import queue
 
-from .shared_data import SharedMemoryArray
+from .parse_config import parse_serving_conf
+from .shared_data import SharedMemoryArray, Var
 from .timeline import _TimeLine
 
 logging.basicConfig(
@@ -202,17 +202,16 @@ class FixedServiceDiscover(ServiceDiscover):
 
 
 class DynamicServiceDiscover(ServiceDiscover):
-    def __init__(self, host, port, require_num, service_name):
-        self._host = host
-        self._port = port
+    def __init__(self, discovery_servers, require_num, service_name):
+        self._discovery_servers = discovery_servers
         self._require_num = require_num
         self._service_name = service_name
         self._client = None
 
     def _connect(self):
         from paddle_edl.distill.discovery_client import DiscoveryClient
-        client = DiscoveryClient(['{}:{}'.format(self._host, self._port)],
-                                 self._service_name, self._require_num)
+        client = DiscoveryClient(self._discovery_servers, self._service_name,
+                                 self._require_num)
         client.start(daemon=True)
         self._client = client
 
@@ -243,36 +242,198 @@ class _PoisonPill:
 class DistillReader(object):
     POISON_PILL = -1
 
-    def __init__(self, conf_file, batch_size, d_batch_size, capacity,
-                 occupied_capacity):
-        assert batch_size % d_batch_size == 0, \
-                "distill_batch_size must be able to divide batch_size."
-        assert capacity > occupied_capacity, "capacity must > occupied_capacity, or will hang"
-        self.batch_size = batch_size
-        self.d_batch_size = d_batch_size
-        self._capacity = capacity
-        self._occupied_capacity = occupied_capacity
+    # def __init__(self, conf_file, batch_size, d_batch_size, capacity,
+    #              occupied_capacity):
+    #     assert batch_size % d_batch_size == 0, \
+    #             "distill_batch_size must be able to divide batch_size."
+    #     assert capacity > occupied_capacity, "capacity must > occupied_capacity, or will hang"
+    #     self.batch_size = batch_size
+    #     self.d_batch_size = d_batch_size
+    #     self._capacity = capacity
+    #     self._occupied_capacity = occupied_capacity
+    #
+    #     self._d_batch_reader = None
+    #
+    #     config = ConfigParser()
+    #     config.read(conf_file)
+    #
+    #     self._mode = config.get('conf', 'mode')
+    #     self._serving_conf_file = config.get('conf', 'serving_conf_file')
+    #     if self._mode == 'fixed':
+    #         # fixed servers conf
+    #         self._servers = ast.literal_eval(config.get('conf', 'servers'))
+    #         self._require_num = len(self._servers)
+    #         logging.info((self._mode, self._servers, self._require_num))
+    #     elif self._mode == 'discover':
+    #         # discovery service conf
+    #         self._host = config.get('conf', 'host')
+    #         self._port = config.getint('conf', 'port')
+    #         self._service_name = config.get('conf', 'service_name')
+    #         self._require_num = config.getint('conf', 'require_num')
+    #         logging.info((self._host, self._port, self._service_name,
+    #                       self._require_num))
+    #
+    #     # set shared memory conf
+    #     self._max_thread = 2  # TODO. set max_thread
+    #     # double buffer
+    #     self._shared_len = max(2 * ((batch_size + d_batch_size - 1) /
+    #                                 d_batch_size), 2 * self._require_num)
+    #     # failed write back, is ok?
+    #     self._queue_len = self._shared_len + self._require_num * self._max_thread
+    #
+    #     # get shared memory and idx queue
+    #     self._shared_memory_array = SharedMemoryArray(
+    #         config, d_batch_size, batch_size, self._shared_len, self._capacity)
+    #
+    #     # FIXME. put these queue into shared_memory array?
+    #     # idle--(feed)-->ready--(predict)-->complete--(fetch)-->idle
+    #     self._idle_queue = mps.Queue(self._queue_len)
+    #     self._ready_queue = mps.Queue(self._queue_len)
+    #     self._complete_queue = mps.Queue(self._queue_len)
+    #     for i in range(self._shared_len):
+    #         self._idle_queue.put(i)
+    #
+    #     # complete memory--(multi copy)-->out memory
+    #     # idle--(copy)-->ready--(yield)-->idle
+    #     self._out_idle_queue = mps.Queue(self._capacity + 1)
+    #     self._out_ready_queue = mps.Queue(self._capacity + 1)
+    #     for i in range(self._capacity):
+    #         self._out_idle_queue.put(i)
+    #
+    #     # work processor
+    #     self._is_predict_start = False
+    #     self._is_feed_start = False
+    #     self._is_fetch_start = False
+    #     self._predict_cond = mps.Condition()  # for function reentrant
+    #     self._feed_cond = mps.Condition()  # for function reentrant
+    #     self._fetch_cond = mps.Condition()  # for function reentrant
+    #
+    #     # for predict worker to exit normally
+    #     self._predict_job_lock = mps.Lock()
+    #     self._count_of_working_predict = mps.Value('i', 0, lock=False)
+    #     self._predict_job_count = mps.Value('i', 0, lock=False)
+    #
+    #     # predict worker pool
+    #     self._predict_manage_thread = None
+    #     self._predict_stop_events = [
+    #         mps.Event() for i in range(self._require_num)
+    #     ]
+    #     self._predict_server_queue = mps.Queue(self._require_num)
+    #     self._predict_server_result_queue = mps.Queue(self._require_num)
+    #
+    #     self._is_init = False
+
+    def __init__(self):
+        self.batch_size = None
+        self.d_batch_size = 1
+        self._capacity = 4
+        self._occupied_capacity = None
 
         self._d_batch_reader = None
 
-        config = ConfigParser()
-        config.read(conf_file)
+        self._serving_conf_file = None
+        self._predict_feed_vars = dict()
+        self._predict_fetch_vars = dict()
 
-        self._mode = config.get('conf', 'mode')
-        self._serving_conf_file = config.get('conf', 'serving_conf_file')
-        if self._mode == 'fixed':
-            # fixed servers conf
-            self._servers = ast.literal_eval(config.get('conf', 'servers'))
-            self._require_num = len(self._servers)
-            logging.info((self._mode, self._servers, self._require_num))
-        elif self._mode == 'discover':
-            # discovery service conf
-            self._host = config.get('conf', 'host')
-            self._port = config.getint('conf', 'port')
-            self._service_name = config.get('conf', 'service_name')
-            self._require_num = config.getint('conf', 'require_num')
-            logging.info((self._host, self._port, self._service_name,
-                          self._require_num))
+        self._reader_vars = []
+        self._reader_fetch_names = []
+
+        self._mode = None
+        self._servers = []
+        self._require_num = 1
+
+        self._discovery_servers = []
+        self._service_name = None
+
+        # set shared memory conf
+        self._max_thread = 2  # TODO. set max_thread
+        # double buffer
+        self._shared_len = 0
+        # failed write back, is ok?
+        self._queue_len = 0
+
+        # get shared memory and idx queue
+        self._shared_memory_array = None
+
+        # FIXME. put these queue into shared_memory array?
+        # idle--(feed)-->ready--(predict)-->complete--(fetch)-->idle
+        self._idle_queue = None
+        self._ready_queue = None
+        self._complete_queue = None
+
+        # complete memory--(multi copy)-->out memory
+        # idle--(copy)-->ready--(yield)-->idle
+        self._out_idle_queue = None
+        self._out_ready_queue = None
+
+        # work processor
+        self._is_predict_start = False
+        self._is_feed_start = False
+        self._is_fetch_start = False
+        self._predict_cond = mps.Condition()  # for function reentrant
+        self._feed_cond = mps.Condition()  # for function reentrant
+        self._fetch_cond = mps.Condition()  # for function reentrant
+
+        # for predict worker to exit normally
+        self._predict_job_lock = mps.Lock()
+        self._count_of_working_predict = mps.Value('i', 0, lock=False)
+        self._predict_job_count = mps.Value('i', 0, lock=False)
+
+        # predict worker pool
+        self._predict_manage_thread = None
+        self._predict_stop_events = []
+        self._predict_server_queue = None
+        self._predict_server_result_queue = None
+
+        self._is_init = False
+
+    def set_batch_size(self, batch_size, teacher_batch_size=1):
+        assert batch_size % teacher_batch_size == 0, \
+                "teacher_batch_size must be able to divide batch_size."
+
+        self.batch_size = batch_size
+        self.d_batch_size = teacher_batch_size
+
+    def set_capacity(self, capacity=4, occupied_capacity=0):
+        assert capacity > occupied_capacity, "capacity must > occupied_capacity, or will hang"
+        self._capacity = capacity
+        self._occupied_capacity = occupied_capacity
+
+    def load_serving_client_conf(self, conf_file):
+        self._serving_conf_file = conf_file
+        feed_vars, fetch_vars = parse_serving_conf(conf_file)
+        self._predict_feed_vars = feed_vars
+        self._predict_fetch_vars = fetch_vars
+
+    def set_reader_feed_fetch(self, feed_names, feed_types, feed_shapes,
+                              predict_fetch_names):
+        self._reader_vars = []
+        for name, dtype, shape in zip(feed_names, feed_types, feed_shapes):
+            var = Var(name, dtype, shape)
+            self._reader_vars.append(var)
+
+        self._reader_fetch_names = predict_fetch_names
+
+    def set_fixed_teacher(self, teachers):
+        self._mode = 'fixed'
+        self._servers = teachers
+        self._require_num = len(teachers)
+
+    def set_dynamic_teacher(self,
+                            discovery_servers,
+                            teacher_service_name,
+                            require_max_teacher=1):
+        self._mode = 'discover'
+        self._discovery_servers = discovery_servers
+        self._service_name = teacher_service_name
+        self._require_num = require_max_teacher
+
+    def init(self):
+        assert self._is_init is False
+        self._is_init = True
+
+        batch_size = self.batch_size
+        d_batch_size = self.d_batch_size
 
         # set shared memory conf
         self._max_thread = 2  # TODO. set max_thread
@@ -284,7 +445,9 @@ class DistillReader(object):
 
         # get shared memory and idx queue
         self._shared_memory_array = SharedMemoryArray(
-            config, d_batch_size, batch_size, self._shared_len, self._capacity)
+            d_batch_size, batch_size, self._shared_len, self._capacity,
+            self._predict_feed_vars, self._predict_fetch_vars,
+            self._reader_vars, self._reader_fetch_names)
 
         # FIXME. put these queue into shared_memory array?
         # idle--(feed)-->ready--(predict)-->complete--(fetch)-->idle
@@ -302,21 +465,20 @@ class DistillReader(object):
             self._out_idle_queue.put(i)
 
         # work processor
-        self._is_predict_start = False
-        self._is_feed_start = False
-        self._is_fetch_start = False
-        self._predict_cond = mps.Condition()  # for function reentrant
-        self._feed_cond = mps.Condition()  # for function reentrant
-        self._fetch_cond = mps.Condition()  # for function reentrant
+        # self._is_predict_start = False
+        # self._is_feed_start = False
+        # self._is_fetch_start = False
+        # self._predict_cond = mps.Condition()  # for function reentrant
+        # self._feed_cond = mps.Condition()  # for function reentrant
+        # self._fetch_cond = mps.Condition()  # for function reentrant
 
         # for predict worker to exit normally
-        self._predict_job_lock = mps.Lock()
-        self._count_of_working_predict = mps.Value('i', 0, lock=False)
-        self._predict_job_count = mps.Value('i', 0, lock=False)
+        # self._predict_job_lock = mps.Lock()
+        # self._count_of_working_predict = mps.Value('i', 0, lock=False)
+        # self._predict_job_count = mps.Value('i', 0, lock=False)
 
         # predict worker pool
         self._predict_manage_thread = None
-        #self._idle_predict_semaphore = mps.Semaphore(self._require_num)
         self._predict_stop_events = [
             mps.Event() for i in range(self._require_num)
         ]
@@ -516,7 +678,7 @@ class DistillReader(object):
                     _service_discover = FixedServiceDiscover(self._servers)
                 elif self._mode == 'discover':
                     _service_discover = DynamicServiceDiscover(
-                        self._host, self._port, self._require_num,
+                        self._discovery_servers, self._require_num,
                         self._service_name)
                 else:
                     raise TypeError('mode must be fixed or discover')
