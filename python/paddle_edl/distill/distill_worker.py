@@ -49,10 +49,10 @@ class _PoisonPill:
 
 
 class TaskMeta(object):
-    def __init__(self, task_id, batch_id, batch_end):
+    def __init__(self, task_id, batch_id=-1, batch_size=-1):
         self.task_id = task_id
         self.batch_id = batch_id
-        self.batch_end = batch_end
+        self.batch_size = batch_size
 
 
 class PredictServer(object):
@@ -326,27 +326,152 @@ class ReaderType(object):
     BATCH = 2
 
 
-def reader_worker(reader, reader_type, out_queue, stop_event, task_semaphore,
-                  reader_cond):
+def reader_worker(reader, reader_type, teacher_batch_size, out_queue,
+                  stop_event, task_semaphore, reader_cond):
+    # Use task_semaphore to keep order.
+    # e.g. If semaphore is 4, reader send task(0, 1, 2, 3),
+    # consumer may recv out-of-order task(3, 1, 2) before task(0), consumer will store then,
+    # when task(0) is completed and consumer recv it, it will release semaphore,
+    # reader go on working.
+    read_func = {
+        ReaderType.SAMPLE: read_sample,
+        ReaderType.SAMPLE_LIST: read_sample_list,
+        ReaderType.BATCH: read_batch
+    }
+
     while not stop_event.is_set():
-        send_idx = 0
-        # TODO. reader_type
-        for read_data in reader():
-            # Use task_semaphore to keep order.
-            # e.g. If semaphore is 4, reader send task(0, 1, 2, 3),
-            # consumer may recv out-of-order task(3, 1, 2) before task(0), consumer will store then,
-            # when task(0) is completed and consumer recv it, it will release semaphore,
-            # reader go on working.
-            task_semaphore.acquire()
-            out_queue.put((send_idx, read_data))
-            send_idx += 1
+        task_size = read_func[reader_type](reader, teacher_batch_size,
+                                           out_queue, task_semaphore)
 
-        poison_pill = _PoisonPill(send_idx)
-
+        poison_pill = _PoisonPill(task_size)
         with reader_cond:
             out_queue.put(poison_pill)
             # wait next reader iter
             reader_cond.wait()
+
+
+def read_sample(reader, teacher_batch_size, out_queue, task_semaphore):
+    task_id = 0
+    sample_size = 0
+    send_data = []
+
+    for read_data in reader():
+        # read_data: (img, label)
+        slot_data = tuple()
+        for slot in read_data:
+            slot_data += (np.asarray(slot), )
+        send_data.append(slot_data)
+
+        sample_size += 1
+        if sample_size == teacher_batch_size:
+            task_semaphore.acquire()
+            task = TaskMeta(task_id=task_id)
+            out_queue.put(task, send_data)
+
+            task_id += 1
+            send_data = []
+            sample_size = 0
+        else:
+            continue
+
+    # remain
+    if sample_size != 0:
+        task_semaphore.acquire()
+        task = TaskMeta(task_id=task_id)
+        out_queue.put(task, send_data)
+
+    return task_id
+
+
+def read_sample_list(reader, teacher_batch_size, out_queue, task_semaphore):
+    task_id = 0
+    batch_id = 0
+    sample_size = 0
+    send_data = []
+
+    for read_data in reader():
+        # read_data: [(img, label), (img, label), .. ]
+        batch_size = len(read_data)
+        for sample_data in read_data:
+            # sample_data: (img, label)
+            slot_data = tuple()
+            for slot in sample_data:
+                slot_data += (np.asarray(slot), )
+            send_data.append(slot_data)
+
+            sample_size += 1
+            if sample_size == teacher_batch_size:
+                task_semaphore.acquire()
+                task = TaskMeta(
+                    task_id=task_id, batch_id=batch_id, batch_size=batch_size)
+                out_queue.put(task, send_data)
+
+                task_id += 1
+                send_data = []
+                sample_size = 0
+            else:
+                continue
+
+        # remain
+        if sample_size != 0:
+            task_semaphore.acquire()
+            task = TaskMeta(
+                task_id=task_id, batch_id=batch_id, batch_size=batch_size)
+            out_queue.put(task, send_data)
+
+            task_id += 1
+            send_data = []
+            sample_size = 0
+
+        batch_id += 1
+
+    return task_id
+
+
+def read_batch(reader, teacher_batch_size, out_queue, task_semaphore):
+    task_id = 0
+    batch_id = 0
+    sample_size = 0
+    send_data = []
+
+    for read_data in reader():
+        # read_data: (img[batch, shape], label[batch, shape])
+        slot_size = len(read_data)
+        batch_size = len(read_data[0])
+
+        for i in range(batch_size):
+            slot_data = tuple()
+            for j in range(slot_size):
+                slot_data += (read_data[j][i], )
+            send_data.append(slot_data)
+
+            sample_size += 1
+            if sample_size == teacher_batch_size:
+                task_semaphore.acquire()
+                task = TaskMeta(
+                    task_id=task_id, batch_id=batch_id, batch_size=batch_size)
+                out_queue.put(task, send_data)
+
+                task_id += 1
+                send_data = []
+                sample_size = 0
+            else:
+                continue
+
+        # remain
+        if sample_size != 0:
+            task_semaphore.acquire()
+            task = TaskMeta(
+                task_id=task_id, batch_id=batch_id, batch_size=batch_size)
+            out_queue.put(task, send_data)
+
+            task_id += 1
+            send_data = []
+            sample_size = 0
+
+        batch_size += 1
+
+    return task_id
 
 
 def fetch_worker(reader_type, in_queue, out_queue, stop_event, task_semaphore,
