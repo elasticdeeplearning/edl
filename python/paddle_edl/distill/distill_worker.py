@@ -48,7 +48,7 @@ class _PoisonPill:
         self.complete_count = complete_count
 
 
-class TaskMeta(object):
+class Task(object):
     def __init__(self, task_id, batch_id=-1, batch_size=-1):
         self.task_id = task_id
         self.batch_id = batch_id
@@ -333,15 +333,16 @@ def reader_worker(reader, reader_type, teacher_batch_size, out_queue,
     # consumer may recv out-of-order task(3, 1, 2) before task(0), consumer will store then,
     # when task(0) is completed and consumer recv it, it will release semaphore,
     # reader go on working.
-    read_func = {
+    read_func_map = {
         ReaderType.SAMPLE: read_sample,
         ReaderType.SAMPLE_LIST: read_sample_list,
         ReaderType.BATCH: read_batch
     }
+    read_func = read_func_map[reader_type]
 
     while not stop_event.is_set():
-        task_size = read_func[reader_type](reader, teacher_batch_size,
-                                           out_queue, task_semaphore)
+        task_size = read_func(reader, teacher_batch_size, out_queue,
+                              task_semaphore)
 
         poison_pill = _PoisonPill(task_size)
         with reader_cond:
@@ -365,7 +366,7 @@ def read_sample(reader, teacher_batch_size, out_queue, task_semaphore):
         sample_size += 1
         if sample_size == teacher_batch_size:
             task_semaphore.acquire()
-            task = TaskMeta(task_id=task_id)
+            task = Task(task_id=task_id)
             out_queue.put(task, send_data)
 
             task_id += 1
@@ -377,7 +378,7 @@ def read_sample(reader, teacher_batch_size, out_queue, task_semaphore):
     # remain
     if sample_size != 0:
         task_semaphore.acquire()
-        task = TaskMeta(task_id=task_id)
+        task = Task(task_id=task_id)
         out_queue.put(task, send_data)
 
     return task_id
@@ -402,7 +403,7 @@ def read_sample_list(reader, teacher_batch_size, out_queue, task_semaphore):
             sample_size += 1
             if sample_size == teacher_batch_size:
                 task_semaphore.acquire()
-                task = TaskMeta(
+                task = Task(
                     task_id=task_id, batch_id=batch_id, batch_size=batch_size)
                 out_queue.put(task, send_data)
 
@@ -415,7 +416,7 @@ def read_sample_list(reader, teacher_batch_size, out_queue, task_semaphore):
         # remain
         if sample_size != 0:
             task_semaphore.acquire()
-            task = TaskMeta(
+            task = Task(
                 task_id=task_id, batch_id=batch_id, batch_size=batch_size)
             out_queue.put(task, send_data)
 
@@ -448,7 +449,7 @@ def read_batch(reader, teacher_batch_size, out_queue, task_semaphore):
             sample_size += 1
             if sample_size == teacher_batch_size:
                 task_semaphore.acquire()
-                task = TaskMeta(
+                task = Task(
                     task_id=task_id, batch_id=batch_id, batch_size=batch_size)
                 out_queue.put(task, send_data)
 
@@ -461,7 +462,7 @@ def read_batch(reader, teacher_batch_size, out_queue, task_semaphore):
         # remain
         if sample_size != 0:
             task_semaphore.acquire()
-            task = TaskMeta(
+            task = Task(
                 task_id=task_id, batch_id=batch_id, batch_size=batch_size)
             out_queue.put(task, send_data)
 
@@ -477,21 +478,28 @@ def read_batch(reader, teacher_batch_size, out_queue, task_semaphore):
 def fetch_worker(reader_type, in_queue, out_queue, stop_event, task_semaphore,
                  fetch_cond):
     logging.info('fetch_worker pid={}'.format(os.getpid()))
-    task_data = dict()
+    fetch_func_map = {
+        ReaderType.SAMPLE: fetch_sample,
+        ReaderType.SAMPLE_LIST: fetch_sample_list,
+        ReaderType.BATCH: fetch_batch
+    }
+    fetch_func = fetch_func_map[reader_type]
 
+    recv_id = 0
+    store_data = dict()
+    samples = [0, []]  # [accumulate_sample_size, samples]
     while not stop_event.is_set():
-        recv_idx = 0
 
-        recv_data = in_queue.get()
-        if isinstance(recv_data, _PoisonPill):
-            poison_pill = recv_data
+        fetch_data = in_queue.get()
+        if isinstance(fetch_data, _PoisonPill):
+            poison_pill = fetch_data
             assert poison_pill.feed_count == poison_pill.predict_count, \
-                "poison_pill feed_count={} != predict_count={}".\
+                "poison_pill feed_count={} != predict_count={}". \
                 format(poison_pill.feed_count, poison_pill.predict_count)
 
-            if recv_idx == poison_pill.predict_count:
+            if recv_id == poison_pill.predict_count:
                 # all fetch job success
-                poison_pill.complete_count = recv_idx
+                poison_pill.complete_count = recv_id
 
                 with fetch_cond:
                     # NOTE!!! put poison pill can only be placed inside the critical area of the cond variable,
@@ -500,7 +508,7 @@ def fetch_worker(reader_type, in_queue, out_queue, stop_event, task_semaphore,
                     # The will hang.
                     out_queue.put(poison_pill)
                     fetch_cond.wait()
-                recv_idx = 0
+                recv_id = 0
                 continue
             else:
                 # NOTE! When predict with multi process, predict_out_queue maybe unordered.
@@ -515,11 +523,91 @@ def fetch_worker(reader_type, in_queue, out_queue, stop_event, task_semaphore,
                 logging.debug('fetch is unordered!!!')
                 in_queue.put(poison_pill)  # write back poison
 
-        task_id, data = recv_data
-        if task_id == recv_idx:
+        recv_id = fetch_func(fetch_data, store_data, recv_id, task_semaphore,
+                             out_queue, samples)
+
+
+def fetch_sample(fetch_data, store_data, recv_id, task_semaphore, out_queue,
+                 samples):
+    # data: (img, label, predict)
+    task, data = fetch_data
+
+    # store data, may out-of-order
+    store_data[task.task_id] = data
+    while True:
+        if recv_id in store_data:
             task_semaphore.release()
-            recv_idx += 1
-            # TODO. joint
+            recv_data = store_data.pop(recv_id)
+            out_queue.put(recv_data)
+            recv_id += 1
         else:
-            # store out-of-order samples
-            task_data[task_id] = data
+            break
+    return recv_id
+
+
+def fetch_sample_list(fetch_data, store_data, recv_id, task_semaphore,
+                      out_queue, samples):
+    # data: [(img, label, predict), (img, label, predict), ..]
+    task, data = fetch_data
+
+    # store data, may out-of-order
+    store_data[task.task_id] = fetch_data
+    while True:
+        if recv_id in store_data:
+            recv_task, recv_data = store_data.pop(recv_id)
+            recv_id += 1
+
+            samples[0] += len(recv_data)
+            # joint batch list
+            samples[1] += recv_data
+            assert samples[0] <= recv_task.batch_size
+            if samples[0] == recv_task.batch_size:
+                task_semaphore.release()
+                # out_data: batch sample [(img, label, predict), (img, label, predict), ..,]
+                out_queue.put(samples[1])
+                samples[0] = 0
+                samples[1] = []
+        else:
+            break
+
+    return recv_id
+
+
+def fetch_batch(fetch_data, store_data, recv_id, task_semaphore, out_queue,
+                samples):
+    # data: [(img, label, predict), (img, label, predict), ..]
+    task, data = fetch_data
+
+    # store data, may out-of-order
+    store_data[task.task_id] = fetch_data
+    while True:
+        if recv_id in store_data:
+            recv_task, recv_data = store_data.pop(recv_id)
+            recv_id += 1
+
+            samples[0] += len(recv_data)
+            # joint batch list
+            samples[1] += recv_data
+            assert samples[0] <= recv_task.batch_size
+            if samples[0] == recv_task.batch_size:
+                task_semaphore.release()
+
+                # len (img, label, predict)
+                slot_size = len(samples[1][0])
+                batch_size = recv_task.batch_size
+
+                batch_data = tuple()
+                for i in range(slot_size):
+                    slot = []
+                    for j in range(batch_size):
+                        slot.append(samples[1][j][i])
+                    batch_data += (np.array(slot), )
+
+                # out_data: (img[batch, shape], label[batch, shape], sample[batch, shape])
+                out_queue.put(batch_data)
+                samples[0] = 0
+                samples[1] = []
+        else:
+            break
+
+    return recv_id
