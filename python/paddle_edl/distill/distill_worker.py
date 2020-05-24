@@ -367,7 +367,16 @@ def fetch_worker(reader_type, in_queue, out_queue, stop_event, task_semaphore,
             if recv_idx == poison_pill.predict_count:
                 # all fetch job success
                 poison_pill.complete_count = recv_idx
-                out_queue.put(poison_pill)
+
+                with fetch_cond:
+                    # NOTE!!! put poison pill can only be placed inside the critical area of the cond variable,
+                    # otherwise, when reader finishes, reader reentrant then sending notify,
+                    # the current process may not have entered the critical area and cannot receive notifications.
+                    # The will hang.
+                    out_queue.put(poison_pill)
+                    fetch_cond.wait()
+                recv_idx = 0
+                continue
             else:
                 # NOTE! When predict with multi process, predict_out_queue maybe unordered.
                 # Last process may write POISON_PILL before other process. For example:
@@ -389,110 +398,3 @@ def fetch_worker(reader_type, in_queue, out_queue, stop_event, task_semaphore,
         else:
             # store out-of-order samples
             task_data[task_id] = data
-
-
-def fetch_worker(batch_size, d_batch_size, shared_memory_array, idle_queue,
-                 complete_queue, out_idle_queue, out_ready_queue, fetch_cond):
-    logging.info('fetch_worker pid={}'.format(os.getpid()))
-    # init
-    out_idx = out_idle_queue.get()
-    assert out_idx == 0, "first out_idx must == 0"
-    out_offset = 0
-    last_complete_memory_idx, last_length = -1, -1
-
-    out_uid = 0
-    complete_count = 0
-    while True:
-        complete_memory_idx = complete_queue.get()
-
-        # Poison
-        if isinstance(complete_memory_idx, _PoisonPill):
-            poison_pill = complete_memory_idx
-            assert poison_pill.feed_count == poison_pill.predict_count, \
-                "poison_pill feed_count={} != predict_count={}".format(poison_pill.feed_count,
-                                                                       poison_pill.predict_count)
-            poison_pill.complete_count += complete_count
-            complete_count = 0  # clear
-
-            # last no full batch
-            if last_complete_memory_idx != -1 and poison_pill.complete_count + 1 == poison_pill.predict_count:
-                shared_memory_array.copy_shm_to_out(last_complete_memory_idx,
-                                                    out_idx, out_offset,
-                                                    out_uid, last_length)
-                idle_queue.put(last_complete_memory_idx)
-
-                last_complete_memory_idx = -1
-                out_offset += last_length
-
-                poison_pill.complete_count += 1
-
-            if poison_pill.complete_count == poison_pill.predict_count:  # all fetch job success
-                assert last_complete_memory_idx == -1, "no full batch fetch failed?"
-                if out_offset > 0:
-                    # put last no full ready data to out_ready_queue
-                    out_ready_queue.put(out_idx)
-                else:
-                    # write back idle out idx
-                    out_idle_queue.put(out_idx)
-
-                # poison distill reader
-                # self._out_ready_queue.put(DistillReader.POISON_PILL)  # NOTE. POISON here may be hang
-                with fetch_cond:
-                    # NOTE!!! put poison pill can only be placed inside the critical area of the cond variable,
-                    # otherwise, when reader finishes, reentrant and sending notify,
-                    # the current process may not have entered the critical area and cannot receive notifications.
-                    # The will hang.
-                    out_ready_queue.put(POISON_PILL)
-                    fetch_cond.wait()
-
-                # init
-                out_idx = out_idle_queue.get()
-                out_offset = 0
-                last_complete_memory_idx, last_length = -1, -1
-                out_uid = 0
-                continue
-            else:
-                # NOTE!!!!!!!!!
-                # When predict with multi process worker, complete_queue maybe unordered.
-                # Last process may write POISON_PILL before other process.
-                # For example:
-                # [DEBUG 2020-04-20 23:37:37,582 distill_reader.py:649] pid=60636 write ready_memory_idx=15 memory_uid=[47L, 4L]
-                # [DEBUG 2020-04-20 23:37:37,582 distill_reader.py:649] pid=60637 write ready_memory_idx=0 memory_uid=[48L, 2L]
-                # [DEBUG 2020-04-20 23:37:37,582 distill_reader.py:603] pid=60636 write poison back to ready
-                # [DEBUG 2020-04-20 23:37:37,583 distill_reader.py:599] pid=60637 write poison to complete queue
-                # From time order, we must want complete_queue be Queue(15, 0, poison_pill).
-                # But in fact complete_queue may be Queue(0, poison_pill, 15), for the queue.put() is unordered in multi process.
-                assert poison_pill.complete_count < poison_pill.predict_count, \
-                    "poison_pill complete_count={} must< predict_count={}".format(poison_pill.complete_count,
-                                                                                  poison_pill.predict_count)
-                logging.debug('complete is unordered!!!!')
-                complete_queue.put(poison_pill)  # write back poison
-                continue
-
-        uid_list = shared_memory_array.get_shared_uid(complete_memory_idx)
-        uid, filled_length = uid_list
-        logging.debug('result_memory_idx={} memory_uid={}'.format(
-            complete_memory_idx, uid_list))
-
-        assert filled_length <= d_batch_size
-        # not full, must be last batch
-        if filled_length != d_batch_size:
-            logging.debug('filled_length={} d_batch_size={} idx={}'.format(
-                filled_length, d_batch_size, complete_memory_idx))
-            last_complete_memory_idx = complete_memory_idx
-            last_length = filled_length
-        else:  # full
-            shared_memory_array.copy_shm_to_out(complete_memory_idx, out_idx,
-                                                out_offset, out_uid,
-                                                d_batch_size)
-            # copy done, write back idx to idle queue
-            idle_queue.put(complete_memory_idx)
-            complete_count += 1
-
-            out_offset += d_batch_size
-            # out is ready
-            if out_offset == batch_size:
-                out_ready_queue.put(out_idx)
-                out_idx = out_idle_queue.get()
-                out_uid += 1
-                out_offset = 0
