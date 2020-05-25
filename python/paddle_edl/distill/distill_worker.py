@@ -111,15 +111,15 @@ class PaddlePredictServer(PredictServer):
             len(feed_map_list)))
         return feed_map_list
 
-    def _postprocess(self, fetch_map_list):
+    def _postprocess(self, fetch_map_list, batch_size):
         """ fetch_map_list(map): format e.g. {'predict0': np[bsize, ..], 'predict1': np[bsize, ..]}
         return [(predict0, predict1), (predict0, predict1)]
         """
-        predict_data = [tuple() for _ in range(len(self._fetchs))]
-        for fetch_idx, fetch_name in enumerate(self._fetchs):
+        predict_data = [tuple() for _ in range(batch_size)]
+        for fetch_name in self._fetchs:
             batch_fetch_data = fetch_map_list[fetch_name]
-            for fetch_data in batch_fetch_data:
-                predict_data[fetch_idx] += (fetch_data, )
+            for batch_idx, fetch_data in enumerate(batch_fetch_data):
+                predict_data[batch_idx] += (fetch_data, )
         return predict_data
 
     def predict(self, feed_data):
@@ -148,7 +148,7 @@ class PaddlePredictServer(PredictServer):
         if fetch_map_list is None:
             return False, None
 
-        predict_data = self._postprocess(fetch_map_list)
+        predict_data = self._postprocess(fetch_map_list, len(feed_data))
         self._time_line.record('postprocess')
         return True, predict_data
 
@@ -312,9 +312,9 @@ def client_predict(client, data):
         return False, None
 
     out_data = read_data
-    for i in range(len(data)):
+    for i in range(len(out_data)):
         out_data[i] += predict_data[i]
-    return True, (task, read_data)
+    return True, (task, out_data)
 
 
 class ReaderType(object):
