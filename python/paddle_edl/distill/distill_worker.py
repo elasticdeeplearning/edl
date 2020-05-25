@@ -172,7 +172,7 @@ class _TestNopPaddlePredictServer(PaddlePredictServer):
         return True
 
     def predict(self, feed_data):
-        predict_data = [tuple() for _ in range(len(self._fetchs))]
+        predict_data = [tuple() for _ in range(len(feed_data))]
         return True, predict_data
 
     def __del__(self):
@@ -289,7 +289,7 @@ def predict_loop(server_item, working_predict_count, in_queue, out_queue,
 
         out_queue.put(out_data)
         finished_task += 1
-        time_line.recode('put_data')
+        time_line.record('put_data')
 
     # disconnect with server
     with predict_lock:
@@ -309,7 +309,7 @@ def client_predict(client, data):
     # out_data = read_data + predict_data, will be
     # [(img, label, img1, label1, predict0, predict1),
     #  (img, label, img1, label1, predict0, predict1)]
-    task_idx, read_data = data
+    task, read_data = data
     success, predict_data = client.predict(read_data)
     if not success:
         return False, None
@@ -317,7 +317,7 @@ def client_predict(client, data):
     out_data = read_data
     for i in range(len(data)):
         out_data[i] += predict_data[i]
-    return True, (task_idx, read_data)
+    return True, (task, read_data)
 
 
 class ReaderType(object):
@@ -367,7 +367,7 @@ def read_sample(reader, teacher_batch_size, out_queue, task_semaphore):
         if sample_size == teacher_batch_size:
             task_semaphore.acquire()
             task = Task(task_id=task_id)
-            out_queue.put(task, send_data)
+            out_queue.put((task, send_data))
 
             task_id += 1
             send_data = []
@@ -379,7 +379,7 @@ def read_sample(reader, teacher_batch_size, out_queue, task_semaphore):
     if sample_size != 0:
         task_semaphore.acquire()
         task = Task(task_id=task_id)
-        out_queue.put(task, send_data)
+        out_queue.put((task, send_data))
 
     return task_id
 
@@ -405,7 +405,7 @@ def read_sample_list(reader, teacher_batch_size, out_queue, task_semaphore):
                 task_semaphore.acquire()
                 task = Task(
                     task_id=task_id, batch_id=batch_id, batch_size=batch_size)
-                out_queue.put(task, send_data)
+                out_queue.put((task, send_data))
 
                 task_id += 1
                 send_data = []
@@ -418,7 +418,7 @@ def read_sample_list(reader, teacher_batch_size, out_queue, task_semaphore):
             task_semaphore.acquire()
             task = Task(
                 task_id=task_id, batch_id=batch_id, batch_size=batch_size)
-            out_queue.put(task, send_data)
+            out_queue.put((task, send_data))
 
             task_id += 1
             send_data = []
@@ -451,7 +451,7 @@ def read_batch(reader, teacher_batch_size, out_queue, task_semaphore):
                 task_semaphore.acquire()
                 task = Task(
                     task_id=task_id, batch_id=batch_id, batch_size=batch_size)
-                out_queue.put(task, send_data)
+                out_queue.put((task, send_data))
 
                 task_id += 1
                 send_data = []
@@ -464,7 +464,7 @@ def read_batch(reader, teacher_batch_size, out_queue, task_semaphore):
             task_semaphore.acquire()
             task = Task(
                 task_id=task_id, batch_id=batch_id, batch_size=batch_size)
-            out_queue.put(task, send_data)
+            out_queue.put((task, send_data))
 
             task_id += 1
             send_data = []
@@ -520,8 +520,9 @@ def fetch_worker(reader_type, in_queue, out_queue, stop_event, task_semaphore,
                 # From time order, we must want predict_out_queue be ([img0], [img1], poison_pill)
                 # But in fact predict_out_queue may be Queue([img1], poison_pill, [img0]),
                 # for the queue.put() is unordered in multi process.
-                logging.debug('fetch is unordered!!!')
+                logging.info('fetch is unordered!!!')
                 in_queue.put(poison_pill)  # write back poison
+                continue
 
         recv_id = fetch_func(fetch_data, store_data, recv_id, task_semaphore,
                              out_queue, samples)
@@ -554,6 +555,7 @@ def fetch_sample_list(fetch_data, store_data, recv_id, task_semaphore,
     store_data[task.task_id] = fetch_data
     while True:
         if recv_id in store_data:
+            task_semaphore.release()
             recv_task, recv_data = store_data.pop(recv_id)
             recv_id += 1
 
@@ -562,7 +564,6 @@ def fetch_sample_list(fetch_data, store_data, recv_id, task_semaphore,
             samples[1] += recv_data
             assert samples[0] <= recv_task.batch_size
             if samples[0] == recv_task.batch_size:
-                task_semaphore.release()
                 # out_data: batch sample [(img, label, predict), (img, label, predict), ..,]
                 out_queue.put(samples[1])
                 samples[0] = 0
@@ -582,6 +583,7 @@ def fetch_batch(fetch_data, store_data, recv_id, task_semaphore, out_queue,
     store_data[task.task_id] = fetch_data
     while True:
         if recv_id in store_data:
+            task_semaphore.release()
             recv_task, recv_data = store_data.pop(recv_id)
             recv_id += 1
 
@@ -590,8 +592,6 @@ def fetch_batch(fetch_data, store_data, recv_id, task_semaphore, out_queue,
             samples[1] += recv_data
             assert samples[0] <= recv_task.batch_size
             if samples[0] == recv_task.batch_size:
-                task_semaphore.release()
-
                 # len (img, label, predict)
                 slot_size = len(samples[1][0])
                 batch_size = recv_task.batch_size

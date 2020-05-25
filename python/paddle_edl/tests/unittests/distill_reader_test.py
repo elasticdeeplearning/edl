@@ -29,36 +29,33 @@ if __name__ == '__main__':
             yield 8 * [(img, label)]
         yield 2 * [(img, label)]
 
-    dr = distill_reader.DistillReader()
-    dr.set_batch_size(batch_size=32, teacher_batch_size=4)
-    dr.set_capacity(capacity=4, occupied_capacity=2)
-    dr.load_serving_client_conf(
-        'distill_reader_test_mnist_client_conf/serving_client_conf.prototxt')
-    dr.set_reader_feed_fetch(
-        ['img', 'label'], ['float32', 'int64'], [(1, 28, 28), (1, )],
-        predict_fetch_names=['prediction'])
-    # dr.set_fixed_teacher(['127.0.0.1:9292', '127.0.0.1:9293'])
-    dr.set_dynamic_teacher(['127.0.0.1:7001'], 'DistillReaderTest', 3)
-
-    dr.init()
+    dr = distill_reader.DistillReader(
+        ins=['img', 'label'],
+        predicts=['prediction'],
+        conf_file='distill_reader_test_mnist_client_conf/serving_client_conf.prototxt'
+    )
+    dr.set_teacher_batch_size(4)
+    dr.set_capacity(capacity=4)
+    dr.set_fixed_teacher(['127.0.0.1:9292', '127.0.0.1:9293'])
+    # dr.set_dynamic_teacher(['127.0.0.1:7001'], 'DistillReaderTest', 3)
 
     dr.set_sample_list_generator(_reader)
-    train_reader = dr.distill_reader()
 
     for epoch in range(300):
-        for step, batch in enumerate(train_reader()):
-            # print('----step={}, predict_shape={}, predict[0]={} ----'.format(step, batch[-1].shape, batch[-1][0]))
+        for step, batch in enumerate(dr()):
+            print('----step={}, predict_shape={}, predict[0]={} ----'.format(
+                step, len(batch), batch[-1][-1]))
             pass
         if epoch % 10 == 0:
             print('^^^^^^^^^^^^^ epoch={} predict[0][0]={}^^^^^^^^^^^^^^'.
-                  format(epoch, batch[-1][0][0]))
+                  format(epoch, batch[-1][-1][0]))
 
-    fake_dr = distill_reader.FakeDistillReader('distill_reader_test.conf')
-    fake_test_reader = fake_dr.fake_from_sample_list_generator(_reader)
-    for epoch in range(20):
-        for step, sample_list in enumerate(fake_test_reader()):
-            # print('---step={}, predict_shape={}, predict[0]={}---'.format(step, sample_list[0][-1].shape, sample_list[0][-1][0]))
-            pass
-        if epoch % 10 == 0:
-            print('^^^^^^^^^^^^^ fake_epoch={} predict[0][0]={}^^^^^^^^^^^^^^'.
-                  format(epoch, sample_list[0][-1][0]))
+    # fake_dr = distill_reader.FakeDistillReader('distill_reader_test.conf')
+    # fake_test_reader = fake_dr.fake_from_sample_list_generator(_reader)
+    # for epoch in range(20):
+    #     for step, sample_list in enumerate(fake_test_reader()):
+    #         # print('---step={}, predict_shape={}, predict[0]={}---'.format(step, sample_list[0][-1].shape, sample_list[0][-1][0]))
+    #         pass
+    #     if epoch % 10 == 0:
+    #         print('^^^^^^^^^^^^^ fake_epoch={} predict[0][0]={}^^^^^^^^^^^^^^'.
+    #               format(epoch, sample_list[0][-1][0]))
