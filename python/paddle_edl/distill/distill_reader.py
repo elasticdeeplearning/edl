@@ -87,7 +87,6 @@ class DistillReader(object):
         self._serving_conf_file = conf_file
 
         self._teacher_batch_size = 1
-        self._capacity = 4
 
         self._mode = None
         self._teachers = []
@@ -117,23 +116,17 @@ class DistillReader(object):
         # predict worker pool
         self._predict_manage_thread = None
 
-        # fetch worker args
-        self._fetch_out_queue = None
+        # fetch args
         self._fetch_stop_event = None
-        self._fetch_cond = None
 
         # work processor
         self._is_predict_start = False
         self._is_reader_start = False
-        self._is_fetch_start = False
 
         self._is_args_init = False
 
     def set_teacher_batch_size(self, teacher_batch_size=1):
         self._teacher_batch_size = teacher_batch_size
-
-    def set_capacity(self, capacity=4):
-        self._capacity = capacity
 
     def set_fixed_teacher(self, teachers):
         self._mode = 'fixed'
@@ -309,24 +302,6 @@ class DistillReader(object):
             with self._predict_cond:
                 self._predict_cond.notify_all()
 
-    def _start_fetch_worker(self):
-        if not self._is_fetch_start:
-            fetch_worker = mps.Process(
-                target=distill_worker.fetch_worker,
-                args=(
-                    self._reader_type,
-                    self._predict_out_queue,
-                    self._fetch_out_queue,
-                    self._fetch_stop_event,
-                    self._task_semaphore,
-                    self._fetch_cond, ))
-            fetch_worker.daemon = True
-            fetch_worker.start()
-            self._is_fetch_start = True
-        else:
-            with self._fetch_cond:
-                self._fetch_cond.notify()
-
     def _init_args(self):
         if not self._is_args_init:
             # reader
@@ -340,7 +315,7 @@ class DistillReader(object):
             self._predict_server_queue = mps.Queue(self._require_num)
             self._predict_server_result_queue = mps.Queue(self._require_num)
             self._working_predict_count = mps.Value('i', 0, lock=False)
-            # self._predict_out_queue = mps.Queue()
+            self._predict_out_queue = mps.Queue()
             self._predict_stop_events = [
                 mps.Event() for i in range(self._require_num)
             ]
@@ -349,10 +324,7 @@ class DistillReader(object):
             self._predict_cond = mps.Condition()
 
             # fetch
-            self._fetch_out_queue = mps.Queue(self._capacity)
             self._fetch_stop_event = mps.Event()
-            self._fetch_cond = mps.Condition()
-            self._predict_out_queue = mps.Queue()
 
             self._is_args_init = True
 
@@ -378,12 +350,10 @@ class DistillReader(object):
 
         assert self._reader_out_queue.empty()
         assert self._predict_out_queue.empty()
-        assert self._fetch_out_queue.empty()
 
         self._start_reader_worker()
-        self._start_fetch_worker()
-        # NOTE. When using logging, if start_predict_worker_pool is before start_feed_worker
-        # or start_fetch_worker, logging maybe hang!!!
+        # NOTE. When using logging, if start_predict_worker_pool is before
+        # start_reader_worker, logging maybe hang!!!
         # For specific reasons, please see https://bugs.python.org/issue6721
         # https://stackoverflow.com/questions/24509650/deadlock-with-logging-multiprocess-multithread-python-script
         # >>> The problem is common in any situation where you have locks, threads and forks.
@@ -393,61 +363,7 @@ class DistillReader(object):
         # manager thread, or for the sake of safety, don't use logging?
         self._start_predict_worker_pool()
 
-        while True:
-            data = self._fetch_out_queue.get()
-            if isinstance(data, distill_worker._PoisonPill):
-                break
+        for data in distill_worker.fetch_out(
+                self._reader_type, self._predict_out_queue,
+                self._fetch_stop_event, self._task_semaphore):
             yield data
-
-
-class FakeDistillReader(object):
-    def __init__(self, conf_file):
-        config = ConfigParser()
-        config.read(conf_file)
-        # fetch vars conf
-        self._fetch_vars = ast.literal_eval(config.get('fetch', 'fetch_vars'))
-        self._fetch_types = ast.literal_eval(
-            config.get('fetch', 'fetch_types'))
-        self._fetch_shapes = ast.literal_eval(
-            config.get('fetch', 'fetch_shapes'))
-
-    def fake_from_sample_generator(self, reader):
-        """ reader format: type(list|tuple)([slot0, slot1, slot3]) """
-        fetchs = []
-        for i, var in enumerate(self._fetch_vars):
-            tmp_var = np.zeros(
-                shape=self._fetch_shapes[i], dtype=self._fetch_types[i])
-            fetchs.append(tmp_var)
-
-        def __fake_reader_impl__():
-            for sample in reader():
-                if type(sample) is tuple:
-                    yield tuple(list(sample) + fetchs)
-                elif type(sample) is list:
-                    yield sample + fetchs
-                else:
-                    raise TypeError('reader sample must be tuple or list')
-
-        return __fake_reader_impl__
-
-    def fake_from_sample_list_generator(self, reader):
-        """ reader format: type(list)([(sp0_slot0, sp0_slot1, ..), (sp1_slot0, ..), ...])"""
-        fetchs = []
-        for i, var in enumerate(self._fetch_vars):
-            tmp_var = np.zeros(
-                shape=self._fetch_shapes[i], dtype=self._fetch_types[i])
-            fetchs.append(tmp_var)
-
-        def __fake_reader_impl__():
-            for samples in reader():
-                new_samples = []
-                for sample in samples:
-                    if type(sample) is tuple:
-                        new_samples.append(tuple(list(sample) + fetchs))
-                    elif type(sample) is list:
-                        new_samples.append(sample + fetchs)
-                    else:
-                        raise TypeError('reader sample must be tuple or list')
-                yield new_samples
-
-        return __fake_reader_impl__

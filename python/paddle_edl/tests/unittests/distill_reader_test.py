@@ -35,7 +35,6 @@ if __name__ == '__main__':
         conf_file='distill_reader_test_mnist_client_conf/serving_client_conf.prototxt'
     )
     dr.set_teacher_batch_size(4)
-    dr.set_capacity(capacity=4)
     dr.set_fixed_teacher(['127.0.0.1:9292', '127.0.0.1:9293'])
     # dr.set_dynamic_teacher(['127.0.0.1:7001'], 'DistillReaderTest', 3)
 
@@ -49,13 +48,3 @@ if __name__ == '__main__':
         if epoch % 10 == 0:
             print('^^^^^^^^^^^^^ epoch={} predict[0][0]={}^^^^^^^^^^^^^^'.
                   format(epoch, batch[-1][-1][0]))
-
-    # fake_dr = distill_reader.FakeDistillReader('distill_reader_test.conf')
-    # fake_test_reader = fake_dr.fake_from_sample_list_generator(_reader)
-    # for epoch in range(20):
-    #     for step, sample_list in enumerate(fake_test_reader()):
-    #         # print('---step={}, predict_shape={}, predict[0]={}---'.format(step, sample_list[0][-1].shape, sample_list[0][-1][0]))
-    #         pass
-    #     if epoch % 10 == 0:
-    #         print('^^^^^^^^^^^^^ fake_epoch={} predict[0][0]={}^^^^^^^^^^^^^^'.
-    #               format(epoch, sample_list[0][-1][0]))

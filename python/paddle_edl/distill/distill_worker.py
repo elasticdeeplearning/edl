@@ -475,9 +475,7 @@ def read_batch(reader, teacher_batch_size, out_queue, task_semaphore):
     return task_id
 
 
-def fetch_worker(reader_type, in_queue, out_queue, stop_event, task_semaphore,
-                 fetch_cond):
-    logging.info('fetch_worker pid={}'.format(os.getpid()))
+def fetch_out(reader_type, in_queue, stop_event, task_semaphore):
     fetch_func_map = {
         ReaderType.SAMPLE: fetch_sample,
         ReaderType.SAMPLE_LIST: fetch_sample_list,
@@ -485,11 +483,19 @@ def fetch_worker(reader_type, in_queue, out_queue, stop_event, task_semaphore,
     }
     fetch_func = fetch_func_map[reader_type]
 
-    recv_id = 0
-    store_data = dict()
-    samples = [0, []]  # [accumulate_sample_size, samples]
-    while not stop_event.is_set():
+    class RecvId:
+        def __init__(self, val):
+            self.val = val
 
+    class Samples:
+        def __init__(self, size, sample_list):
+            self.size = size
+            self.samples = sample_list
+
+    store_data = dict()
+    recv_id = RecvId(0)
+    samples = Samples(0, [])  # (accumulate_sample_size, samples)
+    while not stop_event.is_set():
         fetch_data = in_queue.get()
         if isinstance(fetch_data, _PoisonPill):
             poison_pill = fetch_data
@@ -497,19 +503,8 @@ def fetch_worker(reader_type, in_queue, out_queue, stop_event, task_semaphore,
                 "poison_pill feed_count={} != predict_count={}". \
                 format(poison_pill.feed_count, poison_pill.predict_count)
 
-            if recv_id == poison_pill.predict_count:
-                # all fetch job success
-                poison_pill.complete_count = recv_id
-
-                with fetch_cond:
-                    # NOTE!!! put poison pill can only be placed inside the critical area of the cond variable,
-                    # otherwise, when reader finishes, reader reentrant then sending notify,
-                    # the current process may not have entered the critical area and cannot receive notifications.
-                    # The will hang.
-                    out_queue.put(poison_pill)
-                    fetch_cond.wait()
-                recv_id = 0
-                continue
+            if recv_id.val == poison_pill.predict_count:
+                return
             else:
                 # NOTE! When predict with multi process, predict_out_queue maybe unordered.
                 # Last process may write POISON_PILL before other process. For example:
@@ -520,94 +515,88 @@ def fetch_worker(reader_type, in_queue, out_queue, stop_event, task_semaphore,
                 # From time order, we must want predict_out_queue be ([img0], [img1], poison_pill)
                 # But in fact predict_out_queue may be Queue([img1], poison_pill, [img0]),
                 # for the queue.put() is unordered in multi process.
-                logging.info('fetch is unordered!!!')
+                logging.debug('fetch is unordered!!!')
                 in_queue.put(poison_pill)  # write back poison
                 continue
 
-        recv_id = fetch_func(fetch_data, store_data, recv_id, task_semaphore,
-                             out_queue, samples)
+        for data in fetch_func(fetch_data, store_data, recv_id, task_semaphore,
+                               samples):
+            yield data
 
 
-def fetch_sample(fetch_data, store_data, recv_id, task_semaphore, out_queue,
-                 samples):
+def fetch_sample(fetch_data, store_data, recv_id, task_semaphore, samples):
     # data: (img, label, predict)
     task, data = fetch_data
 
     # store data, may out-of-order
     store_data[task.task_id] = data
     while True:
-        if recv_id in store_data:
+        if recv_id.val in store_data:
             task_semaphore.release()
-            recv_data = store_data.pop(recv_id)
-            out_queue.put(recv_data)
-            recv_id += 1
+            recv_data = store_data.pop(recv_id.val)
+            recv_id.val += 1
+            yield recv_data
         else:
             break
-    return recv_id
 
 
 def fetch_sample_list(fetch_data, store_data, recv_id, task_semaphore,
-                      out_queue, samples):
+                      samples):
     # data: [(img, label, predict), (img, label, predict), ..]
     task, data = fetch_data
 
     # store data, may out-of-order
     store_data[task.task_id] = fetch_data
     while True:
-        if recv_id in store_data:
+        if recv_id.val in store_data:
             task_semaphore.release()
-            recv_task, recv_data = store_data.pop(recv_id)
-            recv_id += 1
+            recv_task, recv_data = store_data.pop(recv_id.val)
+            recv_id.val += 1
 
-            samples[0] += len(recv_data)
+            samples.size += len(recv_data)
             # joint batch list
-            samples[1] += recv_data
-            assert samples[0] <= recv_task.batch_size
-            if samples[0] == recv_task.batch_size:
+            samples.samples += recv_data
+            assert samples.size <= recv_task.batch_size
+            if samples.size == recv_task.batch_size:
                 # out_data: batch sample [(img, label, predict), (img, label, predict), ..,]
-                out_queue.put(samples[1])
-                samples[0] = 0
-                samples[1] = []
+                yield samples.samples
+                samples.size = 0
+                samples.samples = []
         else:
             break
 
-    return recv_id
 
-
-def fetch_batch(fetch_data, store_data, recv_id, task_semaphore, out_queue,
-                samples):
+def fetch_batch(fetch_data, store_data, recv_id, task_semaphore, samples):
     # data: [(img, label, predict), (img, label, predict), ..]
     task, data = fetch_data
 
     # store data, may out-of-order
     store_data[task.task_id] = fetch_data
     while True:
-        if recv_id in store_data:
+        if recv_id.val in store_data:
             task_semaphore.release()
-            recv_task, recv_data = store_data.pop(recv_id)
-            recv_id += 1
+            recv_task, recv_data = store_data.pop(recv_id.val)
+            recv_id.val += 1
 
-            samples[0] += len(recv_data)
+            samples.size += len(recv_data)
             # joint batch list
-            samples[1] += recv_data
-            assert samples[0] <= recv_task.batch_size
-            if samples[0] == recv_task.batch_size:
+            samples.samples += recv_data
+            assert samples.size <= recv_task.batch_size
+            if samples.size == recv_task.batch_size:
                 # len (img, label, predict)
-                slot_size = len(samples[1][0])
+                slot_size = len(samples.samples[0])
                 batch_size = recv_task.batch_size
 
                 batch_data = tuple()
                 for i in range(slot_size):
                     slot = []
                     for j in range(batch_size):
-                        slot.append(samples[1][j][i])
+                        slot.append(samples.samples[j][i])
                     batch_data += (np.array(slot), )
 
                 # out_data: (img[batch, shape], label[batch, shape], sample[batch, shape])
-                out_queue.put(batch_data)
-                samples[0] = 0
-                samples[1] = []
+                yield batch_data
+                samples.size = 0
+                samples.samples = []
         else:
             break
-
-    return recv_id
