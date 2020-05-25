@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ctypes
 import logging
 import numpy as np
 import os
@@ -22,14 +21,13 @@ from .timeline import _TimeLine
 
 # only for local test.
 _NOP_PREDICT_TEST = False
-POISON_PILL = -1
 
 logging.basicConfig(
     level=logging.INFO,
     format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
 
 
-class _ServerItem(object):
+class ServerItem(object):
     PENDING = 'pending'
     ERROR = 'error'
     FINISHED = 'finished'
@@ -42,10 +40,9 @@ class _ServerItem(object):
 
 
 class _PoisonPill:
-    def __init__(self, feed_count, predict_count=0, complete_count=0):
+    def __init__(self, feed_count, predict_count=0):
         self.feed_count = feed_count
         self.predict_count = predict_count
-        self.complete_count = complete_count
 
 
 class Task(object):
@@ -195,7 +192,7 @@ def predict_worker(server_queue, server_result_queue, working_predict_count,
                                stop_events, predict_lock, global_finished_task,
                                predict_cond)
 
-        server_item.state = _ServerItem.FINISHED if success else _ServerItem.ERROR
+        server_item.state = ServerItem.FINISHED if success else ServerItem.ERROR
         server_result_queue.put(server_item)
         logging.info('Stopped server={}'.format(server_item.server))
 

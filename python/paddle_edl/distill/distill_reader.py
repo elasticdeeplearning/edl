@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
-import ast
 import logging
 import multiprocessing as mps
-import numpy as np
 import socket
 import time
 import threading
+import os
 
 from contextlib import closing
-
-from six.moves.configparser import ConfigParser
 from six.moves import queue
 
 from . import distill_worker
@@ -124,23 +121,7 @@ class DistillReader(object):
         self._is_reader_start = False
 
         self._is_args_init = False
-
-    def set_teacher_batch_size(self, teacher_batch_size=1):
-        self._teacher_batch_size = teacher_batch_size
-
-    def set_fixed_teacher(self, teachers):
-        self._mode = 'fixed'
-        self._teachers = teachers
-        self._require_num = len(teachers)
-
-    def set_dynamic_teacher(self,
-                            discovery_servers,
-                            teacher_service_name,
-                            require_max_teacher=1):
-        self._mode = 'discover'
-        self._discovery_servers = discovery_servers
-        self._service_name = teacher_service_name
-        self._require_num = require_max_teacher
+        self._already_from_env = False
 
     def _get_servers(self, first_in):
         global _service_discover
@@ -236,8 +217,8 @@ class DistillReader(object):
 
                 idle_predict_num -= 1
                 event_id = event_set.pop()
-                server_item = distill_worker._ServerItem(server_id, server,
-                                                         event_id)
+                server_item = distill_worker.ServerItem(server_id, server,
+                                                        event_id)
                 self._predict_server_queue.put(server_item)
                 server_to_item[server] = server_item
                 server_id += 1
@@ -303,6 +284,7 @@ class DistillReader(object):
                 self._predict_cond.notify_all()
 
     def _init_args(self):
+        self._get_discovery_from_env()
         if not self._is_args_init:
             # reader
             self._reader_out_queue = mps.Queue()
@@ -327,6 +309,47 @@ class DistillReader(object):
             self._fetch_stop_event = mps.Event()
 
             self._is_args_init = True
+
+    def _get_discovery_from_env(self):
+        # env have highest priority
+        if self._already_from_env:
+            return
+        self._already_from_env = True
+
+        discovery_servers = os.environ.get('PADDLE_DISTILL_BALANCE_SERVER')
+        if discovery_servers is not None:
+            service_name = os.environ.get('PADDLE_DISTILL_SERVICE_NAME')
+            assert service_name is not None
+
+            self._mode = 'discover'
+            self._discovery_servers = discovery_servers.split(',')
+            self._service_name = service_name
+
+            max_teacher = os.environ.get('PADDLE_DISTILL_MAX_TEACHER')
+            if max_teacher is not None:
+                self._require_num = int(max_teacher)
+
+    def set_teacher_batch_size(self, teacher_batch_size=1):
+        self._teacher_batch_size = teacher_batch_size
+
+    def set_fixed_teacher(self, teachers):
+        self._mode = 'fixed'
+        self._teachers = teachers
+        self._require_num = len(teachers)
+
+    def set_dynamic_teacher(self,
+                            discovery_servers,
+                            teacher_service_name,
+                            require_max_teacher=1):
+        self._mode = 'discover'
+        self._discovery_servers = discovery_servers
+        self._service_name = teacher_service_name
+        self._require_num = require_max_teacher
+
+    def set_require_max_teacher(self, require_max_teacher):
+        if self._mode == 'fixed':
+            return
+        self._require_num = require_max_teacher
 
     def set_sample_generator(self, reader):
         assert self._reader is None, 'reader has already set'
