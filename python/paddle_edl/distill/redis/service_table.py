@@ -120,7 +120,15 @@ class ServiceTable(object):
         server_infos = self._store.get_service(service_name)
 
         # list [ip_port, ..., ]. Todo. info
-        servers = [s['server'] for s in server_infos]
+        servers = []
+        for s in server_infos:
+            try:
+                server = s['server']
+                servers.append(server)
+            except KeyError:
+                # when get service, server may expired
+                continue
+
         # update servers in service_name
         self._service_name_to_servers[service_name] = servers
 

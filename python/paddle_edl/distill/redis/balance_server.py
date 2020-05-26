@@ -275,6 +275,6 @@ if __name__ == '__main__':
     from service_table import ServiceTable
 
     # service_name = 'TestService'
-    table = ServiceTable('127.0.0.1', 6001)  # connect redis ip:port
+    table = ServiceTable('127.0.0.1', 6379)  # connect redis ip:port
     balance_server = BalanceServer('0.0.0.0', 7001, table)  # listen
     balance_server.server_forever()

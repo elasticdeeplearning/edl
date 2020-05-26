@@ -50,6 +50,7 @@ packages=['paddle_edl',
           'paddle_edl.demo.collective',
           'paddle_edl.discovery',
           'paddle_edl.distill',
+          'paddle_edl.distill.redis',
           ]
 
 setup(
