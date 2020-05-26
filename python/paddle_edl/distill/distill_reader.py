@@ -136,7 +136,7 @@ class DistillReader(object):
 
         # FIXME. The order of object destruction
         if not first_in:
-            logging.warning('service discover must have been deconstructed')
+            logging.debug('service discover must have been deconstructed')
             return None
 
         with _service_discover_lock:
