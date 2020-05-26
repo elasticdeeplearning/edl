@@ -106,16 +106,12 @@ def train(nn_type,
         paddle.reader.shuffle(
             paddle.dataset.mnist.train(), buf_size=500),
         batch_size=BATCH_SIZE)
+
     if args.use_distill_service:
-        assert BATCH_SIZE % 8 == 0
-        dr = DistillReader(
-            'mnist_client_conf/distill_reader.conf',
-            BATCH_SIZE,
-            d_batch_size=8,
-            capacity=4,
-            occupied_capacity=2)
+        dr = DistillReader(ins=['img', 'label'], predicts=['prediction'])
+
         dr.set_sample_list_generator(train_reader)
-        train_reader = dr.distill_reader()
+        train_reader = dr
 
     test_reader = paddle.batch(
         paddle.dataset.mnist.test(), batch_size=BATCH_SIZE)
@@ -185,12 +181,10 @@ def train(nn_type,
 
     exe = fluid.Executor(place)
 
-    py_train_reader = fluid.io.PyReader(
-        feed_list=inputs, capacity=2, iterable=True)
-    if args.use_distill_service:
-        py_train_reader.decorate_batch_generator(train_reader, place)
-    else:
-        py_train_reader.decorate_sample_list_generator(train_reader, place)
+    py_train_reader = fluid.io.DataLoader.from_generator(
+        feed_list=inputs, capacity=16)
+    py_train_reader.set_sample_list_generator(train_reader,
+                                              fluid.cuda_places())
 
     test_feeder = fluid.DataFeeder(feed_list=test_inputs, place=place)
     exe.run(startup_program)
@@ -200,14 +194,10 @@ def train(nn_type,
     step = 0
     for epoch_id in epochs:
         for step_id, data in enumerate(py_train_reader()):
-            metrics = exe.run(
-                main_program,
-                #feed=feeder.feed(data),
-                feed=data,
-                fetch_list=[loss, acc])
+            metrics = exe.run(main_program, feed=data, fetch_list=[loss, acc])
             if step % 100 == 0:
-                print("Pass %d, Epoch %d, Cost %f" % (step, epoch_id,
-                                                      metrics[0]))
+                print("Pass {}, Epoch {}, Cost {}".format(step, epoch_id,
+                                                          metrics[0]))
             step += 1
 
         if trainer_id == 0:
