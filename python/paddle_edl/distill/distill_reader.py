@@ -329,6 +329,12 @@ class DistillReader(object):
             if max_teacher is not None:
                 self._require_num = int(max_teacher)
 
+        assert self._mode is not None, \
+            'Teacher is empty, you can use `set_fixed_teacher` to set fixed teacher, ' \
+            'or use `set_dynamic_teacher` to set the service discovery to automatically ' \
+            'obtain the teacher. Or set the paddlecloud environment variable and obtain ' \
+            'the discovery service from the environment'
+
     def set_teacher_batch_size(self, teacher_batch_size=1):
         self._teacher_batch_size = teacher_batch_size
 
