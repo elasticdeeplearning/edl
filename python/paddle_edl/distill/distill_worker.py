@@ -17,6 +17,7 @@ import numpy as np
 import os
 
 from paddle_serving_client import Client
+from six.moves import reduce
 from .timeline import _TimeLine
 
 # only for local test.
@@ -67,6 +68,8 @@ class PaddlePredictServer(PredictServer):
         self._server = server
         self._config_file = config_file
         self._predict_feed_idxs = []
+        self._predict_feed_shapes = dict()
+        self._predict_feed_size = dict()
         self._feeds = feeds
         self._fetchs = fetchs
         self._max_failed_times = max_failed_times
@@ -89,9 +92,15 @@ class PaddlePredictServer(PredictServer):
             return False
 
         self._predict_feed_idxs = []
+        self._predict_feed_shapes = dict()
+        self._predict_feed_size = dict()
         for feed_idx, feed_name in enumerate(self._feeds):
             if feed_name in self.client.get_feed_names():
                 self._predict_feed_idxs.append(feed_idx)
+                self._predict_feed_shapes[feed_name] = tuple(
+                    self.client.feed_shapes_[feed_name])
+                self._predict_feed_size[feed_name] = reduce(
+                    lambda x, y: x * y, self._predict_feed_shapes[feed_name])
         return True
 
     def _preprocess(self, feed_data):
@@ -103,8 +112,15 @@ class PaddlePredictServer(PredictServer):
         for batch_idx in range(len(feed_data)):
             feed_map = dict()
             for feed_idx in self._predict_feed_idxs:
-                feed_map[self._feeds[feed_idx]] = feed_data[batch_idx][
-                    feed_idx]
+                feed_name = self._feeds[feed_idx]
+                feed_size = self._predict_feed_size[feed_name]
+                feed_shape = self._predict_feed_shapes[feed_name]
+
+                data = feed_data[batch_idx][feed_idx]
+                if data.size == feed_size:
+                    data = data.reshape(feed_shape)
+
+                feed_map[feed_name] = data
             feed_map_list.append(feed_map)
 
         logging.debug('predict feed_map_list len={}'.format(
