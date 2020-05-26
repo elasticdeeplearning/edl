@@ -108,14 +108,7 @@ def train(nn_type,
         batch_size=BATCH_SIZE)
 
     if args.use_distill_service:
-        dr = DistillReader(
-            ins=['img', 'label'],
-            predicts=['prediction'],
-            conf_file='mnist_client_conf/serving_client_conf.prototxt')
-        dr.set_teacher_batch_size(16)
-
-        #dr.set_fixed_teacher(['127.0.0.1:9292', '127.0.0.1:9293'])
-        #dr.set_require_max_teacher(4)
+        dr = DistillReader(ins=['img', 'label'], predicts=['prediction'])
 
         dr.set_sample_list_generator(train_reader)
         train_reader = dr

@@ -84,10 +84,10 @@ _service_discover_lock = threading.Lock()
 
 
 class DistillReader(object):
-    def __init__(self, ins, predicts, conf_file):
+    def __init__(self, ins, predicts):
         self._feeds = ins
         self._fetchs = predicts
-        self._serving_conf_file = conf_file
+        self._serving_conf_file = './serving_conf/serving_client_conf.prototxt'
 
         self._teacher_batch_size = 1
 
@@ -290,6 +290,7 @@ class DistillReader(object):
                 self._predict_cond.notify_all()
 
     def _init_args(self):
+        self._get_conf_file_from_env()
         self._get_discovery_from_env()
         if not self._is_args_init:
             # reader
@@ -316,6 +317,12 @@ class DistillReader(object):
 
             self._is_args_init = True
 
+    def _get_conf_file_from_env(self):
+        if os.path.isfile(self._serving_conf_file):
+            return
+
+        # TODO. get conf file addr from env, download
+
     def _get_discovery_from_env(self):
         # env have highest priority
         if self._already_from_env:
@@ -340,6 +347,10 @@ class DistillReader(object):
             'or use `set_dynamic_teacher` to set the service discovery to automatically ' \
             'obtain the teacher. Or set the paddlecloud environment variable and obtain ' \
             'the discovery service from the environment'
+
+    def set_serving_conf_file(self, conf_file):
+        assert os.path.isfile(conf_file), '{} is not file'.format(conf_file)
+        self._serving_conf_file = conf_file
 
     def set_teacher_batch_size(self, teacher_batch_size=1):
         self._teacher_batch_size = teacher_batch_size
