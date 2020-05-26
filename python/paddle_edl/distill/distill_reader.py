@@ -290,14 +290,14 @@ class DistillReader(object):
                 self._predict_cond.notify_all()
 
     def _init_args(self):
-        self._get_conf_file_from_env()
-        self._get_discovery_from_env()
         if not self._is_args_init:
+            self._get_conf_file_from_env()
+            self._get_discovery_from_env()
+
             # reader
             self._reader_out_queue = mps.Queue()
             self._reader_stop_event = mps.Event()
             self._reader_cond = mps.Condition()
-            # TODO. task_semaphore
             self._task_semaphore = mps.Semaphore(2 * self._require_num)
 
             # predict
@@ -319,9 +319,23 @@ class DistillReader(object):
 
     def _get_conf_file_from_env(self):
         if os.path.isfile(self._serving_conf_file):
+            # If there is a file in the default path, or the
+            # user has set a conf file, then use this file.
             return
 
-        # TODO. get conf file addr from env, download
+        conf_file = os.getenv('PADDLE_DISTILL_CONF_FILE')
+        assert conf_file is not None, \
+            'For now, you must put paddle_serving conf_file to the default ' \
+            'path={}, or use `set_serving_conf_file` interface to set the path ' \
+            'of conf_file. In the future, we will cancel the settings of this file'.\
+            format(self._serving_conf_file)
+
+        assert os.path.isfile(conf_file), \
+            'Get serving conf_file={} from PaddleCloud environment, ' \
+            'but it is not a file, please contact PaddleCloud administrator ' \
+            'to troubleshoot the problem.'.format(conf_file)
+
+        self._serving_conf_file = conf_file
 
     def _get_discovery_from_env(self):
         # env have highest priority
@@ -378,16 +392,19 @@ class DistillReader(object):
         assert self._reader is None, 'reader has already set'
         self._reader = reader
         self._reader_type = distill_worker.ReaderType.SAMPLE
+        return self
 
     def set_sample_list_generator(self, reader):
         assert self._reader is None, 'reader has already set'
         self._reader = reader
         self._reader_type = distill_worker.ReaderType.SAMPLE_LIST
+        return self
 
     def set_batch_generator(self, reader):
         assert self._reader is None, 'reader has already set'
         self._reader = reader
         self._reader_type = distill_worker.ReaderType.BATCH
+        return self
 
     def __call__(self):
         assert self._reader is not None, "must set reader before iter DistillReader"
