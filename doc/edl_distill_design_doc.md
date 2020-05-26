@@ -21,4 +21,4 @@ EDL Distillation is a large scale and universal solution for knowledge distillat
 ## Balancer
 
 ## Reference
-1. <div id="r_1">[Distilling the Knowledge in a Neural Network](https://arxiv.org/pdf/1503.02531.pdf)</div>
+<a name="r_1"></a> 1.[Distilling the Knowledge in a Neural Network](https://arxiv.org/pdf/1503.02531.pdf)

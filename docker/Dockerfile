@@ -13,7 +13,6 @@ ENV PATH=$PATH:{GOROOT}/bin:${GOPATH}/bin
 # python
 ADD ./docker/requirements.txt /root/paddle_edl/requirements.txt
 RUN python -m pip install -r /root/paddle_edl/requirements.txt
-#RUN python -m pip install paddlepaddle-gpu -i  http://mirrors.aliyun.com/pypi/simple/
 
 #etcd
 ENV HOME /root

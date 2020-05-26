@@ -18,7 +18,7 @@ import os
 if os.environ.get('PADDLE_TRAINER_ENDPOINTS') is None:
     os.environ['PADDLE_TRAINER_ENDPOINTS'] = '127.0.0.1:0'
 
-from distill_reader.distill_reader import DistillReader
+from paddle_edl.distill.distill_reader import DistillReader
 import argparse
 import ast
 from PIL import Image

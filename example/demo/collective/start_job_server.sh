@@ -8,7 +8,7 @@ echo "node_ips:${node_ips}"
 BASEDIR=$(dirname $(readlink -f $0))
 echo "${BASEDIR}"
 
-nohup python -u ${BASEDIR}/job_server_demo.py \
+nohup python -u paddle_edl.demo.collective.job_server_demo \
     --node_ips ${node_ips} \
     --pod_num_of_node 8 \
     --time_interval_to_change 900 \

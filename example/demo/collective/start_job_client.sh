@@ -15,7 +15,7 @@ export PADDLE_POD_ID="not set"
 BASEDIR=$(dirname $(readlink -f $0))
 echo $BASEDIR
 
-nohup python -u ${BASEDIR}/job_client_demo.py \
+nohup python -u paddle_edl.demo.collective.job_client_demo \
     --log_level 20 \
     --package_sh ./resnet50/package.sh \
     --pod_path ./resnet50_pod \
