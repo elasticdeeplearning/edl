@@ -548,7 +548,8 @@ def fetch_sample(fetch_data, store_data, recv_id, task_semaphore, samples):
             task_semaphore.release()
             recv_data = store_data.pop(recv_id.val)
             recv_id.val += 1
-            yield recv_data
+            for sample_data in recv_data:
+                yield sample_data
         else:
             break
 
