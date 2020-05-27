@@ -107,12 +107,6 @@ def train(nn_type,
             paddle.dataset.mnist.train(), buf_size=500),
         batch_size=BATCH_SIZE)
 
-    if args.use_distill_service:
-        dr = DistillReader(ins=['img', 'label'], predicts=['prediction'])
-
-        dr.set_sample_list_generator(train_reader)
-        train_reader = dr
-
     test_reader = paddle.batch(
         paddle.dataset.mnist.test(), batch_size=BATCH_SIZE)
 
@@ -132,7 +126,11 @@ def train(nn_type,
 
     inputs = [img, label]
     test_inputs = [img, label]
+
     if args.use_distill_service:
+        dr = DistillReader(ins=['img', 'label'], predicts=['prediction'])
+        train_reader = dr.set_sample_list_generator(train_reader)
+
         soft_label = fluid.data(
             name='soft_label', shape=[None, 10], dtype='float32')
         inputs.append(soft_label)
