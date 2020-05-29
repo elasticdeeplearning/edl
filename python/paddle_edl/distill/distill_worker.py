@@ -15,17 +15,28 @@
 import logging
 import numpy as np
 import os
+import time
 
 from paddle_serving_client import Client
+from six.moves import queue
 from six.moves import reduce
 from .timeline import _TimeLine
-
-# only for local test.
-_NOP_PREDICT_TEST = False
+from ..discovery.server_alive import is_server_alive
 
 logging.basicConfig(
     level=logging.INFO,
     format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
+logger = logging.getLogger(__name__)
+
+# only for local test.
+_NOP_PREDICT_TEST = False
+
+
+def _is_server_alive(server):
+    # only for test, need find a better test method
+    if _NOP_PREDICT_TEST:
+        return True
+    return is_server_alive(server)[0]
 
 
 class ServerItem(object):
@@ -38,6 +49,85 @@ class ServerItem(object):
         self.server = server
         self.stop_event_id = stop_event_id
         self.state = state
+
+
+def predict_manage_worker(process, server_queue, server_result_queue,
+                          require_num, predict_stop_events, get_servers_fun,
+                          stop_event):
+    """ thread that manage predict worker """
+    num_shutdown_process = [0]
+
+    def shutdown_one_process():
+        server_queue.put(None)
+        num_shutdown_process[0] += 1
+
+    server_id = 0  # not yet used
+    server_to_item = dict()  # server to server_item
+    idle_predict_num = require_num
+    event_set = set()
+    for i in range(require_num):
+        event_set.add(i)
+
+    # Fix the order of object destruction
+    first_in = True
+    while not stop_event.is_set():
+        servers = get_servers_fun(first_in)
+        if servers is None:
+            break
+        first_in = False
+
+        servers = set(servers)
+        old_servers = set(server_to_item.keys())
+
+        add_servers = servers - old_servers
+        rm_servers = old_servers - servers
+
+        # Remove servers
+        while len(rm_servers) != 0:
+            server = rm_servers.pop()
+            server_item = server_to_item[server]
+            stop_event_id = server_item.stop_event_id
+            # set stop event
+            if not predict_stop_events[stop_event_id].is_set():
+                predict_stop_events[stop_event_id].set()
+                logger.info('Removing server={}'.format(server))
+
+        # Add servers
+        while len(add_servers) != 0:
+            if idle_predict_num == 0:
+                break
+            assert idle_predict_num > 0, 'idle_predict_num must > 0'
+
+            server = add_servers.pop()
+            if not _is_server_alive(server):
+                logger.warning('server={} is not alive'.format(server))
+                continue
+
+            idle_predict_num -= 1
+            event_id = event_set.pop()
+            server_item = ServerItem(server_id, server, event_id)
+            server_queue.put(server_item)
+            server_to_item[server] = server_item
+            server_id += 1
+            logger.info('Adding server={}'.format(server))
+
+        try:
+            # server job stop, return back stop_event_id
+            server_result_item = server_result_queue.get(timeout=2)
+            stop_event_id = server_result_item.stop_event_id
+            event_set.add(stop_event_id)
+            del server_to_item[server_result_item.server]
+
+            # clear event
+            predict_stop_events[stop_event_id].clear()
+            # directly use count
+            idle_predict_num += 1
+            assert idle_predict_num <= require_num, \
+                'idle_predict_num={} must <= require_num={}'.format(
+                    idle_predict_num, require_num)
+            logger.info('Removed server={}'.format(server_result_item.server))
+        except queue.Empty:
+            pass
 
 
 class _PoisonPill:
@@ -74,7 +164,7 @@ class PaddlePredictServer(PredictServer):
         self._fetchs = fetchs
         self._max_failed_times = max_failed_times
         self.client = None
-        logging.info((server, config_file, feeds, fetchs, max_failed_times))
+        logger.info((server, config_file, feeds, fetchs, max_failed_times))
 
         self._time_line = _TimeLine()
 
@@ -86,9 +176,9 @@ class PaddlePredictServer(PredictServer):
             client.connect([self._server])
             self.client = client
         except Exception as e:
-            logging.error('Exception when connect server={}, Exception is:'.
-                          format(str(self._server)))
-            logging.error(str(e))
+            logger.error('Exception when connect server={}, Exception is:'.
+                         format(str(self._server)))
+            logger.error(str(e))
             return False
 
         self._predict_feed_idxs = []
@@ -123,8 +213,7 @@ class PaddlePredictServer(PredictServer):
                 feed_map[feed_name] = data
             feed_map_list.append(feed_map)
 
-        logging.debug('predict feed_map_list len={}'.format(
-            len(feed_map_list)))
+        logger.debug('predict feed_map_list len={}'.format(len(feed_map_list)))
         return feed_map_list
 
     def _postprocess(self, fetch_map_list, batch_size):
@@ -154,9 +243,9 @@ class PaddlePredictServer(PredictServer):
                     raise Exception('fetch_map_list should not be None')
                 break
             except Exception as e:
-                logging.warning('Failed {} times with server={}'.format(
+                logger.warning('Failed {} times with server={}'.format(
                     i + 1, self._server))
-                logging.warning('Exception:\n{}'.format(str(e)))
+                logger.warning('Exception:\n{}'.format(str(e)))
                 # time.sleep(0.1 * (i + 1))
 
         self._time_line.record('real_predict')
@@ -173,11 +262,11 @@ class PaddlePredictServer(PredictServer):
             if self.client is not None:
                 self.client.release()
         except Exception as e:
-            logging.critical('Release client failed with server={}, '
-                             'there may be an unknown error'.format(
-                                 self._server))
-            logging.critical('Exception:\n{}'.format(str(e)))
-        logging.warning('Stopped predict server={}'.format(self._server))
+            logger.critical('Release client failed with server={}, '
+                            'there may be an unknown error'.format(
+                                self._server))
+            logger.critical('Exception:\n{}'.format(str(e)))
+        logger.warning('Stopped predict server={}'.format(self._server))
 
 
 class _TestNopPaddlePredictServer(PaddlePredictServer):
@@ -210,13 +299,13 @@ def predict_worker(server_queue, server_result_queue, working_predict_count,
 
         server_item.state = ServerItem.FINISHED if success else ServerItem.ERROR
         server_result_queue.put(server_item)
-        logging.info('Stopped server={}'.format(server_item.server))
+        logger.info('Stopped server={}'.format(server_item.server))
 
 
 def predict_loop(server_item, working_predict_count, in_queue, out_queue,
                  feeds, fetchs, conf_file, stop_events, predict_lock,
                  global_finished_task, predict_cond):
-    logging.info('connect server={}'.format(server_item.server))
+    logger.info('connect server={}'.format(server_item.server))
     predict_server = PaddlePredictServer if _NOP_PREDICT_TEST is False else _TestNopPaddlePredictServer
     client = predict_server(server_item.server, conf_file, feeds, fetchs)
     if not client.connect():
@@ -251,8 +340,8 @@ def predict_loop(server_item, working_predict_count, in_queue, out_queue,
                 if working_predict_count.value == 1:
                     if poison_pill.predict_count == poison_pill.feed_count:
                         working_predict_count.value -= 1
-                        logging.debug('pid={} write poison to complete queue'.
-                                      format(os.getpid()))
+                        logger.debug('pid={} write poison to complete queue'.
+                                     format(os.getpid()))
                         all_worker_done = True
                     else:
                         # NOTE. some predict worker failed,
@@ -264,7 +353,7 @@ def predict_loop(server_item, working_predict_count, in_queue, out_queue,
                         in_queue.put(poison_pill)  # write back poison pill
                         continue  # continue process failed task
                 else:  # not last process
-                    logging.debug('pid={} write poison back to ready'.format(
+                    logger.debug('pid={} write poison back to ready'.format(
                         os.getpid()))
                     assert poison_pill.predict_count <= poison_pill.feed_count, \
                         "predict_count={} must <= feed_count={}".format(poison_pill.predict_count,
@@ -528,7 +617,7 @@ def fetch_out(reader_type, in_queue, stop_event, task_semaphore):
                 # From time order, we must want predict_out_queue be ([img0], [img1], poison_pill)
                 # But in fact predict_out_queue may be Queue([img1], poison_pill, [img0]),
                 # for the queue.put() is unordered in multi process.
-                logging.debug('fetch is unordered!!!')
+                logger.debug('fetch is unordered!!!')
                 in_queue.put(poison_pill)  # write back poison
                 continue
 

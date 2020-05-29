@@ -69,19 +69,19 @@ def batch_generator_creator():
 
 def set_data_source(distill_reader):
     if DATA_FORMAT == 'sample_generator':
-        distill_reader.set_sample_generator(sample_generator_creator())
+        return distill_reader.set_sample_generator(sample_generator_creator())
     elif DATA_FORMAT == 'sample_list_generator':
-        distill_reader.set_sample_list_generator(sample_list_generator_creator(
-        ))
+        return distill_reader.set_sample_list_generator(
+            sample_list_generator_creator())
     elif DATA_FORMAT == 'batch_generator':
-        distill_reader.set_batch_generator(batch_generator_creator())
+        return distill_reader.set_batch_generator(batch_generator_creator())
     else:
         raise ValueError('Unsupported data format')
 
 
 # Define DistillReader
 distill_reader = DistillReader(ins=['img', None], predicts=['prediction'])
-set_data_source(distill_reader)
+distill_reader = set_data_source(distill_reader)
 
 if DATA_FORMAT == 'sample_generator':
     step = 0
