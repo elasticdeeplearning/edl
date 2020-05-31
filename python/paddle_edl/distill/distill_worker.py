@@ -482,6 +482,7 @@ def read_sample(reader, teacher_batch_size, out_queue, task_semaphore):
         task_semaphore.acquire()
         task = Task(task_id=task_id)
         out_queue.put((task, send_data))
+        task_id += 1
 
     return task_id
 
