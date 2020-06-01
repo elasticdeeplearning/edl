@@ -273,7 +273,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--server',
         type=str,
-        default='0.0.0.0:9379',
+        default='0.0.0.0:7001',
         help='endpoint of the server, e.g. 127.0.0.1:8888 [default: %(default)s]'
     )
     parser.add_argument(
