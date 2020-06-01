@@ -267,7 +267,47 @@ class BalanceServer(Server):
 if __name__ == '__main__':
     from service_table import ServiceTable
 
-    # service_name = 'TestService'
-    table = ServiceTable('127.0.0.1', 6379)  # connect redis ip:port
-    balance_server = BalanceServer('0.0.0.0', 7001, table)  # listen
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='Discovery server with balance')
+    parser.add_argument(
+        '--server',
+        type=str,
+        default='0.0.0.0:9379',
+        help='endpoint of the server, e.g. 127.0.0.1:8888 [default: %(default)s]'
+    )
+    parser.add_argument(
+        '--worker_num',
+        type=int,
+        default=1,
+        help='worker num of server [default: %(default)s]')
+    parser.add_argument(
+        '--db_endpoints',
+        type=str,
+        default='127.0.0.1:6379',
+        help='database endpoints, e.g. 127.0.0.1:2379,127.0.0.1:2380 [default: %(default)s]'
+    )
+    parser.add_argument(
+        '--db_passwd',
+        type=str,
+        default=None,
+        help='detabase password [default: %(default)s]')
+    parser.add_argument(
+        '--db_type',
+        type=str,
+        default='redis',
+        help='database type, only support redis for now [default: %(default)s]')
+
+    args = parser.parse_args()
+    server = args.server
+    worker_num = args.worker_num
+    db_endpoints = args.db_endpoints.split(',')
+
+    redis_ip_port = db_endpoints[0].split(':')
+    server_ip_port = server.split(':')
+
+    table = ServiceTable(redis_ip_port[0],
+                         int(redis_ip_port[1]))  # connect redis ip:port
+    balance_server = BalanceServer(server_ip_port[0],
+                                   int(server_ip_port[1]), table)  # listen
     balance_server.server_forever()

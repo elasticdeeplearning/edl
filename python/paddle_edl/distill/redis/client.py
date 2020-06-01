@@ -99,10 +99,15 @@ class Client(object):
                 continue
             elif msg['type'] == 'servers_change':
                 self._is_update = True
-                self._version = int(msg['version'])
+                try:
+                    self._version = int(msg['version'])
+                except KeyError:
+                    # compatible with old balance server
+                    pass
                 self.teacher_list = msg['servers']
-                sys.stderr.write('teachers_change: version={} teachers={}\n'.
-                                 format(self._version, str(self.teacher_list)))
+                sys.stderr.write(
+                    '[INFO] service change version={} teachers={}\n'.format(
+                        self._version, str(self.teacher_list)))
 
     def get_teacher_list(self):
         '''
