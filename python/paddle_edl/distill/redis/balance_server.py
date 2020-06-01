@@ -208,7 +208,6 @@ class BalanceServer(Server):
         self._table = table
         self._handle_func = {
             'register': self._handle_register,
-            'require_service': self._handle_require_service,
             'heartbeat': self._handle_heartbeat
         }
 
@@ -233,25 +232,15 @@ class BalanceServer(Server):
         }
         self._enqueue_response(fd, msg)
 
-    def _handle_require_service(self, fd, msg):
-        require_num = int(msg['num'])
-        print('fd={}, require_num={}'.format(fd, require_num))
-
-        # for debug
-        if self._table is None:
-            teacher_list = ['127.0.0.1:0001', '127.0.0.1:0002']
-            num = len(teacher_list)
-        else:
-            servers = self._table.get_servers(fd, require_num)
-            teacher_list = servers
-            num = len(teacher_list)
-
-        msg = {'type': 'response_service', 'servers': teacher_list, 'num': num}
-        self._enqueue_response(fd, msg)
-
     def _handle_heartbeat(self, fd, msg):
-        is_update, servers = self._table.is_servers_update(fd)
-        if is_update:
+        version = 0
+        try:
+            version = int(msg['version'])
+        except KeyError:
+            # compatible old client
+            pass
+        new_version, servers = self._table.is_servers_update(fd, version)
+        if new_version > version:
             msg = {'type': 'servers_change', 'servers': servers}
         else:
             msg = {'type': 'heartbeat'}
