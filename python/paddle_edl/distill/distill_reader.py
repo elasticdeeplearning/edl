@@ -14,6 +14,7 @@ from . import distill_worker
 logging.basicConfig(
     level=logging.INFO,
     format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
+logger = logging.getLogger(__name__)
 
 
 def is_server_alive(server):
@@ -118,6 +119,7 @@ class DistillReader(object):
         self._predict_cond = None
         # predict worker pool
         self._predict_manage_thread = None
+        self._predict_manage_stop_event = None
 
         # fetch args
         self._fetch_stop_event = None
@@ -127,7 +129,6 @@ class DistillReader(object):
         self._is_reader_start = False
 
         self._is_args_init = False
-        self._already_from_env = False
 
     def _get_servers(self, first_in):
         global _service_discover
@@ -136,7 +137,7 @@ class DistillReader(object):
 
         # FIXME. The order of object destruction
         if not first_in:
-            logging.debug('service discover must have been deconstructed')
+            logger.debug('service discover must have been deconstructed')
             return None
 
         with _service_discover_lock:
@@ -151,86 +152,6 @@ class DistillReader(object):
                 else:
                     raise TypeError('mode must be fixed or discover')
         return _service_discover.get_servers()
-
-    def _predict_manage_worker(self, process):
-        num_shutdown_process = [0]
-
-        def shutdown_one_process():
-            self._predict_server_queue.put(None)
-            num_shutdown_process[0] += 1
-
-        server_id = 0  # not yet used
-        server_to_item = dict()
-        idle_predict_num = self._require_num
-        event_set = set()
-        for i in range(self._require_num):
-            event_set.add(i)
-
-        # Fix the order of object destruction
-        first_in = True
-        while True:
-            try:
-                # server job stop, return back stop_event_id
-                server_result_item = self._predict_server_result_queue.get(
-                    block=False)
-                stop_event_id = server_result_item.stop_event_id
-                event_set.add(stop_event_id)
-                del server_to_item[server_result_item.server]
-
-                # clear event
-                self._predict_stop_events[stop_event_id].clear()
-                # directly use count
-                idle_predict_num += 1
-                assert idle_predict_num <= self._require_num, \
-                    'idle_predict_num={} must <= require_num={}'.format(
-                        idle_predict_num, self._require_num)
-                logging.info('Removed server={}'.format(
-                    server_result_item.server))
-            except queue.Empty:
-                pass
-
-            servers = self._get_servers(first_in)
-            if servers is None:
-                break
-            first_in = False
-
-            servers = set(servers)
-            old_servers = set(server_to_item.keys())
-
-            add_servers = servers - old_servers
-            rm_servers = old_servers - servers
-
-            # Remove servers
-            while len(rm_servers) != 0:
-                server = rm_servers.pop()
-                server_item = server_to_item[server]
-                stop_event_id = server_item.stop_event_id
-                # set stop event
-                if not self._predict_stop_events[stop_event_id].is_set():
-                    self._predict_stop_events[stop_event_id].set()
-                    logging.info('Removing server={}'.format(server))
-
-            # Add servers
-            while len(add_servers) != 0:
-                if idle_predict_num == 0:
-                    break
-                assert idle_predict_num > 0, 'idle_predict_num must > 0'
-
-                server = add_servers.pop()
-                if not is_server_alive(server):
-                    logging.warning('server={} is not alive'.format(server))
-                    continue
-
-                idle_predict_num -= 1
-                event_id = event_set.pop()
-                server_item = distill_worker.ServerItem(server_id, server,
-                                                        event_id)
-                self._predict_server_queue.put(server_item)
-                server_to_item[server] = server_item
-                server_id += 1
-                logging.info('Adding server={}'.format(server))
-
-            time.sleep(1.5)
 
     def _start_reader_worker(self):
         if not self._is_reader_start:
@@ -278,8 +199,17 @@ class DistillReader(object):
         if not self._is_predict_start:
             # start predict worker pool
             process = self._start_predict_worker()
+            self._predict_manage_stop_event = threading.Event()
             self._predict_manage_thread = threading.Thread(
-                target=self._predict_manage_worker, args=(process, ))
+                target=distill_worker.predict_manage_worker,
+                args=(
+                    process,
+                    self._predict_server_queue,
+                    self._predict_server_result_queue,
+                    self._require_num,
+                    self._predict_stop_events,
+                    self._get_servers,
+                    self._predict_manage_stop_event, ))
             self._predict_manage_thread.daemon = True
             self._predict_manage_thread.start()
 
@@ -291,8 +221,8 @@ class DistillReader(object):
 
     def _init_args(self):
         if not self._is_args_init:
-            self._get_conf_file_from_env()
-            self._get_discovery_from_env()
+            self._init_conf_file_from_env()
+            self._init_discovery_from_env()
 
             # reader
             self._reader_out_queue = mps.Queue()
@@ -317,7 +247,7 @@ class DistillReader(object):
 
             self._is_args_init = True
 
-    def _get_conf_file_from_env(self):
+    def _init_conf_file_from_env(self):
         if os.path.isfile(self._serving_conf_file):
             # If there is a file in the default path, or the
             # user has set a conf file, then use this file.
@@ -337,12 +267,8 @@ class DistillReader(object):
 
         self._serving_conf_file = conf_file
 
-    def _get_discovery_from_env(self):
+    def _init_discovery_from_env(self):
         # env have highest priority
-        if self._already_from_env:
-            return
-        self._already_from_env = True
-
         discovery_servers = os.environ.get('PADDLE_DISTILL_BALANCE_SERVER')
         if discovery_servers is not None:
             service_name = os.environ.get('PADDLE_DISTILL_SERVICE_NAME')
@@ -370,16 +296,28 @@ class DistillReader(object):
         self._teacher_batch_size = teacher_batch_size
 
     def set_fixed_teacher(self, teachers):
+        if type(teachers) in (list, tuple):
+            self._teachers = teachers
+        elif type(teachers) == str:
+            self._teachers = teachers.split(',')
+        else:
+            raise TypeError('teachers must be list|tuple|str')
+
         self._mode = 'fixed'
-        self._teachers = teachers
-        self._require_num = len(teachers)
+        self._require_num = len(self._teachers)
 
     def set_dynamic_teacher(self,
                             discovery_servers,
                             teacher_service_name,
                             require_max_teacher=1):
+        if type(discovery_servers) in (list, tuple):
+            self._discovery_servers = discovery_servers
+        elif type(discovery_servers) == str:
+            self._discovery_servers = discovery_servers.split(',')
+        else:
+            raise TypeError('discovery_servers must be list|tuple|str')
+
         self._mode = 'discover'
-        self._discovery_servers = discovery_servers
         self._service_name = teacher_service_name
         self._require_num = require_max_teacher
 
@@ -405,6 +343,26 @@ class DistillReader(object):
         self._reader = reader
         self._reader_type = distill_worker.ReaderType.BATCH
         return self
+
+    def print_config(self):
+        print("------ DistillReader Configuration Arguments ------")
+        if not self._is_args_init:
+            print("DistillReader not start yet, some args may change.")
+        print_config = {
+            'ins': self._feeds,
+            'predicts': self._fetchs,
+            'serving_conf_file': self._serving_conf_file,
+            'teacher_batch_size': self._teacher_batch_size,
+            'distill_mode': self._mode,
+            'teachers': self._teachers,
+            'require_max_teacher': self._require_num,
+            'discovery_servers': self._discovery_servers,
+            'teacher_service_name': self._service_name,
+            'reader_type': self._reader_type,
+        }
+        for config, value in print_config.iteritems():
+            print("%s: %s" % (config, value))
+        print("------------------------------------------------")
 
     def __call__(self):
         assert self._reader is not None, "must set reader before iter DistillReader"

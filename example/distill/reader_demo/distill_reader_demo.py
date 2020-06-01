@@ -69,23 +69,23 @@ def batch_generator_creator():
 
 def set_data_source(distill_reader):
     if DATA_FORMAT == 'sample_generator':
-        distill_reader.set_sample_generator(sample_generator_creator())
+        return distill_reader.set_sample_generator(sample_generator_creator())
     elif DATA_FORMAT == 'sample_list_generator':
-        distill_reader.set_sample_list_generator(sample_list_generator_creator(
-        ))
+        return distill_reader.set_sample_list_generator(
+            sample_list_generator_creator())
     elif DATA_FORMAT == 'batch_generator':
-        distill_reader.set_batch_generator(batch_generator_creator())
+        return distill_reader.set_batch_generator(batch_generator_creator())
     else:
         raise ValueError('Unsupported data format')
 
 
 # Define DistillReader
 distill_reader = DistillReader(ins=['img', None], predicts=['prediction'])
-set_data_source(distill_reader)
+train_reader = set_data_source(distill_reader)
 
 if DATA_FORMAT == 'sample_generator':
     step = 0
-    for img, label, prediction in distill_reader():
+    for img, label, prediction in train_reader():
         assert img.shape == (1, 28, 28)
         assert label.shape == (1, )
         assert prediction.shape == (10, )
@@ -93,7 +93,7 @@ if DATA_FORMAT == 'sample_generator':
             print('one sample prediction={}'.format(prediction))
         step += 1
 elif DATA_FORMAT == 'sample_list_generator':
-    for sample_list in distill_reader():
+    for sample_list in train_reader():
         assert len(sample_list) == BATCH_SIZE
         for img, label, prediction in sample_list:
             assert img.shape == (1, 28, 28)
@@ -101,7 +101,7 @@ elif DATA_FORMAT == 'sample_list_generator':
             assert prediction.shape == (10, )
         print('one sample prediction={}'.format(sample_list[0][2]))
 elif DATA_FORMAT == 'batch_generator':
-    for img, label, prediction in distill_reader():
+    for img, label, prediction in train_reader():
         assert img.shape == (BATCH_SIZE, 1, 28, 28)
         assert label.shape == (BATCH_SIZE, 1)
         assert prediction.shape == (BATCH_SIZE, 10)
