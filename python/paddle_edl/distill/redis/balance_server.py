@@ -241,7 +241,11 @@ class BalanceServer(Server):
             pass
         new_version, servers = self._table.is_servers_update(fd, version)
         if new_version > version:
-            msg = {'type': 'servers_change', 'servers': servers}
+            msg = {
+                'type': 'servers_change',
+                'servers': servers,
+                'version': new_version
+            }
         else:
             msg = {'type': 'heartbeat'}
         self._enqueue_response(fd, msg)
