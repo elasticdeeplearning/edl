@@ -12,11 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import threading
 import time
 import sys
-import heapq
 from redis_store import RedisStore
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
 
 
 class ServiceTable(object):
@@ -193,15 +197,11 @@ class ServiceTable(object):
                 self._fd_to_servers[fd].remove(server)
                 update_fd.add(fd)
                 print('pop fd={} server={}'.format(fd, server))
-            # add heap
-            # heapq.heappush(server_conn, (len(self._server_to_fds[server]), server))
-
-            # Todo. use ReadWrite Lock
         try:
-            # fd greed connect with server
-            for fd in self._service_name_to_fds[service_name]:
+            fds = self._service_name_to_fds[service_name]
+            for fd in fds:
                 max_connect = min(fd_max_connect, self._fd_to_max_num[fd])
-                print('fd={} max_connect={}'.format(fd, max_connect))
+                logging.info('fd={} max_connect={}'.format(fd, max_connect))
                 if fd not in self._fd_to_servers:
                     self._fd_to_servers[fd] = set()
                 # limit connect of fd
@@ -209,8 +209,11 @@ class ServiceTable(object):
                     server = self._fd_to_servers[fd].pop()
                     self._server_to_fds[server].remove(fd)
                     update_fd.add(fd)
-                    print('pop1 fd={} server={}'.format(fd, server))
+                    logging.info('pop1 fd={} server={}'.format(fd, server))
 
+            # fd greed connect with server
+            for fd in fds:
+                max_connect = min(fd_max_connect, self._fd_to_max_num[fd])
                 for server in servers:
                     if len(self._fd_to_servers[fd]) >= max_connect:
                         break
@@ -222,7 +225,7 @@ class ServiceTable(object):
                     self._fd_to_servers[fd].add(server)
                     self._server_to_fds[server].add(fd)
                     update_fd.add(fd)
-                    print('add fd={} server={}'.format(fd, server))
+                    logging.info('add fd={} server={}'.format(fd, server))
         except Exception, e:
             sys.stderr.write(str(e) + '\n')
 
