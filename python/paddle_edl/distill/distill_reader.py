@@ -100,6 +100,7 @@ class DistillReader(object):
         self._service_name = None
 
         # reader worker args
+        self._reader_worker = None
         self._reader = None
         self._reader_type = None
         self._reader_out_queue = None
@@ -167,6 +168,7 @@ class DistillReader(object):
                     self._reader_cond, ))
             reader_worker.daemon = True
             reader_worker.start()
+            self._reader_worker = reader_worker
             self._is_reader_start = True
         else:
             with self._reader_cond:
@@ -209,7 +211,8 @@ class DistillReader(object):
                     self._require_num,
                     self._predict_stop_events,
                     self._get_servers,
-                    self._predict_manage_stop_event, ))
+                    self._predict_manage_stop_event,
+                    self._predict_cond, ))
             self._predict_manage_thread.daemon = True
             self._predict_manage_thread.start()
 
@@ -388,3 +391,19 @@ class DistillReader(object):
                 self._reader_type, self._predict_out_queue,
                 self._fetch_stop_event, self._task_semaphore):
             yield data
+
+    def __del__(self):
+        print('xixixi')
+        if not self._is_args_init:
+            return
+
+        # stop reader worker
+        with self._reader_cond:
+            self._reader_stop_event.set()
+            self._reader_cond.notify()
+
+        self._predict_manage_stop_event.set()
+
+        self._reader_worker.join(10)
+        self._predict_manage_thread.join(20)
+        print('xixixi')

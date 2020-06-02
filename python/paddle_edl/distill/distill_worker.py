@@ -53,7 +53,7 @@ class ServerItem(object):
 
 def predict_manage_worker(process, server_queue, server_result_queue,
                           require_num, predict_stop_events, get_servers_fun,
-                          stop_event):
+                          stop_event, predict_cond):
     """ thread that manage predict worker """
     num_shutdown_process = [0]
 
@@ -128,6 +128,34 @@ def predict_manage_worker(process, server_queue, server_result_queue,
             logger.info('Removed server={}'.format(server_result_item.server))
         except queue.Empty:
             pass
+
+    def clean_queue(data_queue):
+        while True:
+            try:
+                data_queue.get_nowait()
+            except queue.Empty:
+                break
+
+    clean_queue(server_queue)
+    clean_queue(server_result_queue)
+
+    with predict_cond:
+        for predict_stop_event in predict_stop_events:
+            predict_stop_event.set()
+        predict_cond.notify_all()
+
+    for i in range(require_num):
+        shutdown_one_process()
+        clean_queue(server_result_queue)
+
+    for i in range(20):
+        shutdown_process = 0
+        for p in process:
+            if not p.is_alive():
+                shutdown_process += 1
+        if shutdown_process == len(process):
+            break
+        time.sleep(1)
 
 
 class _PoisonPill:
@@ -288,7 +316,8 @@ def predict_worker(server_queue, server_result_queue, working_predict_count,
         # get server
         server_item = server_queue.get()
         if server_item is None:
-            server_queue.put(None)  # poison_pill
+            server_result_queue.put(None)
+            # server_queue.put(None)  # poison_pill
             return
 
         # predict
@@ -365,7 +394,8 @@ def predict_loop(server_item, working_predict_count, in_queue, out_queue,
                     out_queue.put(poison_pill)  # poison consumer
                 else:
                     in_queue.put(poison_pill)  # poison other predict worker
-
+                if stop_event.is_set():
+                    break
                 # wait next reader iter or last failed predict job
                 predict_cond.wait()
 
@@ -449,8 +479,12 @@ def reader_worker(reader, reader_type, teacher_batch_size, out_queue,
         poison_pill = _PoisonPill(task_size)
         with reader_cond:
             out_queue.put(poison_pill)
+            if stop_event.is_set():
+                break
             # wait next reader iter
             reader_cond.wait()
+
+    # out_queue.put(_PoisonPill(-1))
 
 
 def read_sample(reader, teacher_batch_size, out_queue, task_semaphore):
