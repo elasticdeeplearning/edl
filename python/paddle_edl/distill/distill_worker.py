@@ -136,7 +136,7 @@ def predict_manage_worker(process, server_queue, server_result_queue,
         while True:
             try:
                 data_queue.get_nowait()
-            except queue.Empty:
+            except Exception:
                 break
 
     clean_queue(server_queue)

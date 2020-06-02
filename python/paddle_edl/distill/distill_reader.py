@@ -403,5 +403,7 @@ class DistillReader(object):
 
         self._predict_manage_stop_event.set()
 
-        self._reader_worker.join(10)
-        self._predict_manage_thread.join(20)
+        for i in range(20):
+            if self._reader_worker.is_alive() or \
+               self._predict_manage_thread.is_alive():
+                time.sleep(1)
