@@ -15,6 +15,9 @@
 import logging
 import numpy as np
 import os
+import signal
+import six
+import sys
 import time
 
 from paddle_serving_client import Client
@@ -312,23 +315,39 @@ class _TestNopPaddlePredictServer(PaddlePredictServer):
 def predict_worker(server_queue, server_result_queue, working_predict_count,
                    in_queue, out_queue, feeds, fetchs, conf_file, stop_events,
                    predict_lock, global_finished_task, predict_cond):
-    while True:
-        # get server
-        server_item = server_queue.get()
-        if server_item is None:
-            server_result_queue.put(None)
-            # server_queue.put(None)  # poison_pill
-            return
+    signal_exit = [False, ]
 
-        # predict
-        success = predict_loop(server_item, working_predict_count, in_queue,
-                               out_queue, feeds, fetchs, conf_file,
-                               stop_events, predict_lock, global_finished_task,
-                               predict_cond)
+    # Define signal handler function
+    def predict_signal_handle(signum, frame):
+        signal_exit[0] = True
+        exit(0)
 
-        server_item.state = ServerItem.FINISHED if success else ServerItem.ERROR
-        server_result_queue.put(server_item)
-        logger.info('Stopped server={}'.format(server_item.server))
+    # register signal.SIGTERM's handler
+    signal.signal(signal.SIGTERM, predict_signal_handle)
+
+    try:
+        while True:
+            # get server
+            server_item = server_queue.get()
+            if server_item is None:
+                server_result_queue.put(None)
+                # server_queue.put(None)  # poison_pill
+                return
+
+            # predict
+            success = predict_loop(server_item, working_predict_count,
+                                   in_queue, out_queue, feeds, fetchs,
+                                   conf_file, stop_events, predict_lock,
+                                   global_finished_task, predict_cond)
+
+            server_item.state = ServerItem.FINISHED if success else ServerItem.ERROR
+            server_result_queue.put(server_item)
+            logger.info('Stopped server={}'.format(server_item.server))
+    except Exception as e:
+        if signal_exit[0] is True:
+            pass
+        else:
+            six.reraise(*sys.exc_info())
 
 
 def predict_loop(server_item, working_predict_count, in_queue, out_queue,
@@ -465,6 +484,16 @@ def reader_worker(reader, reader_type, teacher_batch_size, out_queue,
     # consumer may recv out-of-order task(3, 1, 2) before task(0), consumer will store then,
     # when task(0) is completed and consumer recv it, it will release semaphore,
     # reader go on working.
+
+    signal_exit = [False, ]
+
+    def reader_signal_handle(signum, frame):
+        signal_exit[0] = True
+        exit(0)
+
+    # register signal.SIGTERM's handler
+    signal.signal(signal.SIGTERM, reader_signal_handle)
+
     read_func_map = {
         ReaderType.SAMPLE: read_sample,
         ReaderType.SAMPLE_LIST: read_sample_list,
@@ -472,19 +501,23 @@ def reader_worker(reader, reader_type, teacher_batch_size, out_queue,
     }
     read_func = read_func_map[reader_type]
 
-    while not stop_event.is_set():
-        task_size = read_func(reader, teacher_batch_size, out_queue,
-                              task_semaphore)
+    try:
+        while not stop_event.is_set():
+            task_size = read_func(reader, teacher_batch_size, out_queue,
+                                  task_semaphore)
 
-        poison_pill = _PoisonPill(task_size)
-        with reader_cond:
-            out_queue.put(poison_pill)
-            if stop_event.is_set():
-                break
-            # wait next reader iter
-            reader_cond.wait()
-
-    # out_queue.put(_PoisonPill(-1))
+            poison_pill = _PoisonPill(task_size)
+            with reader_cond:
+                out_queue.put(poison_pill)
+                if stop_event.is_set():
+                    break
+                # wait next reader iter
+                reader_cond.wait()
+    except Exception as e:
+        if signal_exit[0] is True:
+            pass
+        else:
+            six.reraise(*sys.exc_info())
 
 
 def read_sample(reader, teacher_batch_size, out_queue, task_semaphore):

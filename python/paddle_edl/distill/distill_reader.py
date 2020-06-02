@@ -393,7 +393,6 @@ class DistillReader(object):
             yield data
 
     def __del__(self):
-        print('xixixi')
         if not self._is_args_init:
             return
 
@@ -406,4 +405,3 @@ class DistillReader(object):
 
         self._reader_worker.join(10)
         self._predict_manage_thread.join(20)
-        print('xixixi')
