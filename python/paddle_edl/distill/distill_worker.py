@@ -331,7 +331,6 @@ def predict_worker(server_queue, server_result_queue, working_predict_count,
             server_item = server_queue.get()
             if server_item is None:
                 server_result_queue.put(None)
-                # server_queue.put(None)  # poison_pill
                 return
 
             # predict
