@@ -65,6 +65,11 @@ mkdir -p resnet50_pod
   -  [EDL framework](./doc/edl_collective_design_doc.md)
 
 ## Applications:
+
+<p align="center">
+    <img src="doc/distill.gif" width="700">
+</p>
+
 - EDL Distillation:
   - [EDL Distillation design](./doc/edl_distill_design_doc.md)
   - [Run EDL distillation training demo on Kubernetes or a single node](./example/distill/README.md)
