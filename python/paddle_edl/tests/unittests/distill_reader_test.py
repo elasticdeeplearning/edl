@@ -30,18 +30,18 @@ if __name__ == '__main__':
         yield 2 * [(img, label)]
 
     dr = distill_reader.DistillReader(
-        ins=['img', 'label'],
-        predicts=['prediction'],
-        conf_file='distill_reader_test_mnist_client_conf/serving_client_conf.prototxt'
-    )
+        ins=['img', 'label'], predicts=['prediction'])
     dr.set_teacher_batch_size(4)
     dr.set_fixed_teacher(['127.0.0.1:9292', '127.0.0.1:9293'])
     # dr.set_dynamic_teacher(['127.0.0.1:7001'], 'DistillReaderTest', 3)
 
-    dr.set_sample_list_generator(_reader)
+    train_reader = dr.set_sample_list_generator(_reader)
+    dr.print_config()
 
     for epoch in range(300):
-        for step, batch in enumerate(dr()):
+        for step, batch in enumerate(train_reader()):
+            if epoch == 0 and step == 0:
+                dr.print_config()
             print('----step={}, predict_shape={}, predict[0]={} ----'.format(
                 step, len(batch), batch[-1][-1]))
             pass

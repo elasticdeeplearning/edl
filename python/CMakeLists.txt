@@ -1,4 +1,4 @@
-file(GLOB_RECURSE EDL_FILES collective/*.py demo/*.py demo/*.sh discovery/*.py distill/*.py setup.py)
+file(GLOB_RECURSE EDL_FILES collective/*.py demo/*.py demo/*.sh discovery/*.py distill/*.py distill/redis/*.py setup.py)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in ${CMAKE_CURRENT_BINARY_DIR}/setup.py)
 add_custom_command(
 	OUTPUT ${EDL_BINARY_DIR}/.timestamp

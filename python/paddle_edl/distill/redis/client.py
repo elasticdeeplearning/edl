@@ -26,25 +26,28 @@ class Client(object):
     HEAD_FORMAT = '!4si'
     CRC_CODE = b'\xCB\xEF\x00\x00'
 
-    def __init__(self, ip, port, service_name, token=None):
+    def __init__(self, endpoints, service_name, require_num, token=None):
         """
         Args:
-            ip(str): BalanceServer ip
-            port(int): BalanceServer port
-            service_name(str):
+            endpoints(list|tuple): BalanceServer endpoints
+            service_name(str): service name
+            require_num(int): require max teacher
             token(str):
         """
+        ip, port = endpoints[0].split(':')
         self._ip = ip
-        self._port = port
+        self._port = int(port)
+
         self._service_name = service_name
+        self._require_num = require_num
         self._token = token
         self._need_stop = False
 
-        balance_server = ip + ':' + str(port)
-        self._balance_list = [balance_server, ]
+        self._balance_list = endpoints
         self.teacher_list = []
         self._is_update = False
 
+        self._thread = None
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def _recv_msg(self):
@@ -122,12 +125,14 @@ class Client(object):
         self._is_update = False
         return is_update, self.teacher_list
 
-    def start(self, require_num=1):
+    def get_servers(self):
+        return self.teacher_list
+
+    def start(self, daemon=True):
         self.client.connect((self._ip, self._port))
         # self.client.settimeout(6)
 
-        self.teacher_list = self._register(require_num)
-        #self.teacher_list = self._require(require_num)
+        self.teacher_list = self._register(self._require_num)
         self._thread = threading.Thread(target=self._heartbeat)
         self._thread.daemon = True
         self._need_stop = False
@@ -142,8 +147,8 @@ class Client(object):
 
 
 if __name__ == '__main__':
-    client = Client('127.0.0.1', 9379, 'TestService')
-    teacher_list = client.start(4)
+    client = Client(['127.0.0.1:9379'], 'TestService', 4)
+    teacher_list = client.start()
     print(teacher_list)
     time.sleep(100)
     print(client.get_teacher_list())
