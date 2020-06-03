@@ -6,4 +6,4 @@ set -eu
 export PADDLE_DISTILL_BALANCE_SERVER='10.255.100.13:9379'
 export PADDLE_DISTILL_SERVICE_NAME=MnistDistill
 
-CUDA_VISIBLE_DEVICES=0 python train_student_with_fleet.py
+CUDA_VISIBLE_DEVICES=0 python train_with_fleet.py
