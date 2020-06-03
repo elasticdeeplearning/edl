@@ -1,17 +1,18 @@
 # 服务型蒸馏训练示例
-该代码示例修改自[paddle book 数字识别](https://github.com/PaddlePaddle/book/tree/develop/02.recognize_digits),
-示例主要展示服务型蒸馏训练的整个流程。
+代码示例修改自[paddle book 数字识别](https://github.com/PaddlePaddle/book/tree/develop/02.recognize_digits),
+示例用于展示服务型蒸馏训练的整个流程。
 
 ## 1. 服务型蒸馏训练简介
-蒸馏训练分为teacher和student两部分，一般会将teacher和student放在同一张卡上。
-服务型蒸馏则将teacher和student分开，将teacher当做inference服务，student除了需要从teacher获取预测结果，其余和普通训练一致。
+蒸馏训练包含teacher和student两部分，一般会将teacher和student放在同一张卡上。
+服务型蒸馏则将teacher和student分开，将teacher当做inference服务。student发送样本数据到teacher，从服务中获取预测结果用于训练。
+edl将student发送接收数据的部分封装成了DistillReader，用户关注这部分如何使用即可。
 
 ## 2. 本地训练调试
 服务型训练的整个流程主要可分为两大部分：
 - teacher模型的获取与部署
 - student模型定义与服务的获取
 
-本节先介绍在已有teacher模型和student训练代码下的本地训练调试。训练启动脚本见[run.sh](./run.sh)。
+本节将介绍在已有teacher模型和student训练代码下的本地训练调试。训练启动脚本见[run.sh](./run.sh)。
 ### 2.1 启动本地teacher服务
 teacher服务使用paddle_serving部署(serving使用详细请参考[PaddleServing](https://github.com/PaddlePaddle/Serving))。
 启动命令如下，其中mnist_model为保存的serving模型，指定线程数为4，服务端口为9292，开启显存优化，使用0号GPU卡。
@@ -53,7 +54,7 @@ serving_io.inference_model_to_serving('recognize_digits_convolutional_neural_net
     serving_server='mnist_model', serving_client='serving_conf')
 ```
 #### 3.1.2 teacher模型的部署
-见2.1 [2.1](#21-teacher)
+见2.1。
 
 ### 3.2 student模型定义与服务获取
 #### 3.2.1 student模型定义
@@ -88,7 +89,8 @@ dr.set_fixed_teacher('127.0.0.1:9292')
 # 设置服务发现地址，及需要获取的teacher服务名
 dr.set_dynamic_teacher(discovery_servers, teacher_service_name)
 ```
-如果在百度内部，已经在PaddleCloud部署好了整套蒸馏训练流程。可以不用这个部分。
+#### 3.2.3 启动训练
+见2.2。
 
 ### 4. 部署服务发现服务&Teacher服务注册
 TODO。
