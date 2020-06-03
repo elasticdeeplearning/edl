@@ -43,6 +43,17 @@ def parse_args():
         default=False,
         type=ast.literal_eval,
         help="Whether to use distill service train. 'True' or 'False'")
+    parser.add_argument(
+        '--save_serving_model',
+        default=False,
+        type=ast.literal_eval,
+        help="Whether to save paddle serving model. 'True' or 'False'")
+    parser.add_argument(
+        '--distill_teachers',
+        defalut='127.0.0.1:9292',
+        type=str,
+        help="teachers of distill train. such as '127.0.0.1:9292,127.0.0.1:9293'"
+    )
     args = parser.parse_args()
     return args
 
@@ -122,6 +133,7 @@ def train(nn_type,
 
     if args.use_distill_service:
         dr = DistillReader(ins=['img', 'label'], predicts=['prediction'])
+        dr.set_fixed_teacher(args.distill_teachers)
         train_reader = dr.set_sample_list_generator(train_reader)
 
         soft_label = fluid.data(
@@ -206,7 +218,7 @@ def train(nn_type,
     if train_rank == 0:
         if args.save_serving_model:
             import paddle_serving_client.io as serving_io
-            serving_io.save_model("mnist_model", "mnist_client_conf",
+            serving_io.save_model("mnist_model", "serving_conf",
                                   {img.name: img},
                                   {prediction.name: prediction}, test_program)
             print('save serving model, feed_names={}, fetch_names={}'.format(
