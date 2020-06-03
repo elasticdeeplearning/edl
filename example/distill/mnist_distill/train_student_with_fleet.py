@@ -25,10 +25,8 @@ from PIL import Image
 import numpy
 import paddle
 import paddle.fluid as fluid
-from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
+from paddle.fluid.incubate.fleet.collective import fleet
 from paddle.fluid.incubate.fleet.base import role_maker
-
-trainer_id = int(os.environ.get('PADDLE_TRAINER_ID', 0))
 
 
 def parse_args():
@@ -36,18 +34,13 @@ def parse_args():
     parser.add_argument(
         '--use_gpu',
         type=bool,
-        default=True,
+        default=False,
         help="Whether to use GPU or not.")
     parser.add_argument(
         '--num_epochs', type=int, default=5, help="number of epochs.")
     parser.add_argument(
-        '--use_dgc',
-        type=bool,
-        default=False,
-        help="Whether to use DGC or not.")
-    parser.add_argument(
         '--use_distill_service',
-        default=True,
+        default=False,
         type=ast.literal_eval,
         help="Whether to use distill service train. 'True' or 'False'")
     args = parser.parse_args()
@@ -143,27 +136,25 @@ def train(nn_type,
     else:
         loss = avg_loss
 
-    dist_strategy = DistributedStrategy()
-    if args.use_dgc:
-        # use dgc must close fuse for now
-        dist_strategy.fuse_all_reduce_ops = False
-        optimizer = fluid.optimizer.DGCMomentumOptimizer(
-            learning_rate=0.001, momentum=0.9, rampup_begin_step=0)
-    else:
-        optimizer = fluid.optimizer.Momentum(learning_rate=0.001, momentum=0.9)
-
     role = role_maker.PaddleCloudRoleMaker(is_collective=True)
     fleet.init(role)
+    train_rank = fleet.worker_index()
+    train_nranks = fleet.worker_num()
 
-    optimizer = fleet.distributed_optimizer(optimizer, strategy=dist_strategy)
-    optimizer.minimize(loss, fluid.default_startup_program())
+    optimizer = fluid.optimizer.Momentum(learning_rate=0.001, momentum=0.9)
+    if train_nranks != 1:
+        optimizer = fleet.distributed_optimizer(optimizer)
+    optimizer.minimize(loss)
 
-    def train_test(train_test_program, train_test_feed, train_test_reader):
+    main_program = fleet.main_program if train_nranks != 1 else main_program
+    gpu_id = int(os.getenv("FLAGS_selected_gpus", "0"))
+
+    def train_test(train_test_program, train_test_reader):
         acc_set = []
         avg_loss_set = []
         for test_data in train_test_reader():
             acc_np, avg_loss_np = exe.run(program=train_test_program,
-                                          feed=train_test_feed.feed(test_data),
+                                          feed=test_data,
                                           fetch_list=[acc, avg_loss])
             acc_set.append(float(acc_np))
             avg_loss_set.append(float(avg_loss_np))
@@ -172,19 +163,17 @@ def train(nn_type,
         avg_loss_val_mean = numpy.array(avg_loss_set).mean()
         return avg_loss_val_mean, acc_val_mean
 
-    main_program = fleet.main_program
-
-    gpu_id = int(os.getenv("FLAGS_selected_gpus", "0"))
     place = fluid.CUDAPlace(gpu_id) if use_cuda else fluid.CPUPlace()
-
-    exe = fluid.Executor(place)
+    reader_places = fluid.cuda_places() if use_cuda else fluid.CPUPlace()
 
     py_train_reader = fluid.io.DataLoader.from_generator(
-        feed_list=inputs, capacity=16)
-    py_train_reader.set_sample_list_generator(train_reader,
-                                              fluid.cuda_places())
+        feed_list=inputs, capacity=64)
+    py_train_reader.set_sample_list_generator(train_reader, reader_places)
+    py_test_reader = fluid.io.DataLoader.from_generator(
+        feed_list=test_inputs, capacity=64)
+    py_test_reader.set_sample_list_generator(test_reader, reader_places)
 
-    test_feeder = fluid.DataFeeder(feed_list=test_inputs, place=place)
+    exe = fluid.Executor(place)
     exe.run(startup_program)
     epochs = [epoch_id for epoch_id in range(PASS_NUM)]
 
@@ -198,12 +187,11 @@ def train(nn_type,
                                                           metrics[0]))
             step += 1
 
-        if trainer_id == 0:
+        if train_rank == 0:
             # test for epoch
             avg_loss_val, acc_val = train_test(
                 train_test_program=test_program,
-                train_test_reader=test_reader,
-                train_test_feed=test_feeder)
+                train_test_reader=py_test_reader)
 
             print("Test with Epoch %d, avg_cost: %s, acc: %s" %
                   (epoch_id, avg_loss_val, acc_val))
@@ -215,7 +203,7 @@ def train(nn_type,
                     model_filename=model_filename,
                     params_filename=params_filename)
 
-    if trainer_id == 0:
+    if train_rank == 0:
         # find the best pass
         best = sorted(lists, key=lambda list: float(list[1]))[0]
         print('Best pass is %s, testing Avgcost is %s' % (best[0], best[1]))
@@ -286,8 +274,6 @@ if __name__ == '__main__':
     BATCH_SIZE = 64
     PASS_NUM = args.num_epochs
     use_cuda = args.use_gpu
-    if args.use_dgc:
-        assert args.use_gpu is True, "DGC only support gpu"
     # predict = 'softmax_regression' # uncomment for Softmax
     #predict = 'multilayer_perceptron' # uncomment for MLP
     predict = 'convolutional_neural_network'  # uncomment for LeNet5
