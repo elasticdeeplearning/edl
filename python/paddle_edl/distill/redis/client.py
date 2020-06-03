@@ -46,6 +46,7 @@ class Client(object):
         self._balance_list = endpoints
         self.teacher_list = []
         self._is_update = False
+        self._version = 0
 
         self._thread = None
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -86,22 +87,10 @@ class Client(object):
         servers = msg['servers']
         return servers
 
-    def _require(self, require_num):
-        # require service
-        msg = {'type': 'require_service', 'num': require_num}
-        self._send_msg(msg)
-
-        # get servers
-        msg = self._recv_msg()
-        assert msg['type'] == 'response_service'
-        response_num = msg['num']
-        servers = msg['servers']
-        return servers
-
     def _heartbeat(self):
         while self._need_stop is False:
             time.sleep(2)
-            msg = {'type': 'heartbeat'}
+            msg = {'type': 'heartbeat', 'version': self._version}
             self._send_msg(msg)
             msg = self._recv_msg()
 
@@ -110,11 +99,15 @@ class Client(object):
                 continue
             elif msg['type'] == 'servers_change':
                 self._is_update = True
+                try:
+                    self._version = int(msg['version'])
+                except KeyError:
+                    # compatible with old balance server
+                    pass
                 self.teacher_list = msg['servers']
-                sys.stderr.write('servers_change: ' + str(msg['servers']) +
-                                 '\n')
-                # Todo
-                pass
+                sys.stderr.write(
+                    '[INFO] service change version={} teachers={}\n'.format(
+                        self._version, str(self.teacher_list)))
 
     def get_teacher_list(self):
         '''

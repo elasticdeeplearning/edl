@@ -1,13 +1,9 @@
 # -*- coding: utf-8 -*-
 import logging
 import multiprocessing as mps
-import socket
-import time
-import threading
 import os
-
-from contextlib import closing
-from six.moves import queue
+import threading
+import time
 
 from . import distill_worker
 
@@ -15,22 +11,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
 logger = logging.getLogger(__name__)
-
-
-def is_server_alive(server):
-    # FIXME. only for test, need find a better test method
-    if distill_worker._NOP_PREDICT_TEST:
-        return True
-    alive = True
-    ip, port = server.split(":")
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        try:
-            s.settimeout(1.5)
-            s.connect((ip, int(port)))
-            s.shutdown(socket.SHUT_RDWR)
-        except:
-            alive = False
-        return alive
 
 
 class ServiceDiscover(object):
