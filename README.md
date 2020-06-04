@@ -50,7 +50,7 @@ for pass_id in range(train_status.next(), params["num_epochs"]):
 ```
 
 ## Quickstart
-# EDL Resnet50 experiments on a single machine in docker:
+### EDL Resnet50 experiments on a single machine in docker:
 
 1. Start a JobServer on one node which generates changing scripts.
  
