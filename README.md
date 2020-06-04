@@ -3,7 +3,7 @@
 <img src="https://github.com/elasticdeeplearning/artwork/blob/master/horizontal/color/edl-horizontal-color.png" width="500" style="display:inline;vertical-align:middle;padding:2%">
 
 # Motivation
-Elastic Deep Learning(EDL) is a framework with the ability to dynamically adjust the parallelism (number of training workers) for deep neural network training. It can support multi-tenant cluster management to balance job completion time and job waiting time, maximize the use of idle resources, and so on.
+Elastic Deep Learning(EDL) is a framework with the ability to dynamically adjust the parallelism (number of training workers) for deep neural network training. It can support multi-tenant cluster management to balance job completion time and job waiting time, maximize the use of idle resources, and so on.
 
 This project contains EDL framework and its applications such as distillation and NAS.
 
