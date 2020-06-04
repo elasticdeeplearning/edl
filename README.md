@@ -51,15 +51,13 @@ for pass_id in range(train_status.next(), params["num_epochs"]):
 
 ## Quickstart demo: EDL Resnet50 experiments on a single machine:  
 
-1. Start a Jobserver on one node.
+1. Start a JobServer on one node which generates changing scripts.
  
 ```
-docker pull hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
-cd example/demo/collective
 ./start_job_server.sh
 ```
 
-2. Start a Jobclient which controls the worker process.
+1. Start a Jobclient which controls the worker process.
 
 ```
 #Set the ImageNet data path
@@ -71,11 +69,12 @@ mkdir -p resnet50_pod
 ./start_job_client.sh
 ```
 
-3. Experiments result
+1. Experiments result
  
 | total batch size | acc1 | acc5 |
 | :-----: | ----: | ----: |
-| 1024 | 76.0 | 75.8 |
+| 1024 | 75.5 | 92.8 |
+
 
 ## FAQ
 
