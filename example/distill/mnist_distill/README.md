@@ -12,7 +12,7 @@ edl将student发送接收数据的部分封装成了DistillReader，用户关注
 - teacher模型的获取与部署
 - student模型定义与服务的获取
 
-本节将介绍在已有teacher模型和student训练代码下的本地训练调试。训练启动脚本见[run.sh](./run.sh)。
+这两部分在后面章节介绍，本节先介绍在已有teacher模型和student训练代码下，本地蒸馏训练调试的流程，启动脚本见[run.sh](./run.sh)。
 ### 2.1 启动本地teacher服务
 teacher服务使用paddle_serving部署(serving使用详细请参考[PaddleServing](https://github.com/PaddlePaddle/Serving))。
 启动命令如下，其中mnist_model为保存的serving模型，指定线程数为4，服务端口为9292，开启显存优化，使用0号GPU卡。
@@ -47,9 +47,8 @@ serving_io.save_model("mnist_model", "serving_conf",
                       test_program)
 ```
 2. 或者在训练完成后，从已保存的paddle inference模型中导出。
-``` bash
-python train_with_fleet.py
-python -c "import paddle_serving_client.io as serving_io; \
+``` python
+import paddle_serving_client.io as serving_io
 serving_io.inference_model_to_serving('recognize_digits_convolutional_neural_network.inference.model', \
     serving_server='mnist_model', serving_client='serving_conf')
 ```

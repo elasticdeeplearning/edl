@@ -50,7 +50,7 @@ def parse_args():
         help="Whether to save paddle serving model. 'True' or 'False'")
     parser.add_argument(
         '--distill_teachers',
-        defalut='127.0.0.1:9292',
+        default='127.0.0.1:9292',
         type=str,
         help="teachers of distill train. such as '127.0.0.1:9292,127.0.0.1:9293'"
     )
