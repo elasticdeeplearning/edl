@@ -12,8 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import numpy as np
 from paddle_edl.distill.distill_reader import DistillReader
+
+parser = argparse.ArgumentParser("distill reader demo")
+parser.add_argument(
+    '--distill_teachers',
+    default='127.0.0.1:9292',
+    type=str,
+    help="teachers endpoints. e.g. '127.0.0.1:9292,127.0.0.1:9293'")
+args = parser.parse_args()
 
 BATCH_NUM = 10
 BATCH_SIZE = 16
@@ -80,8 +89,9 @@ def set_data_source(distill_reader):
 
 
 # Define DistillReader
-distill_reader = DistillReader(ins=['img', None], predicts=['fc_0.tmp_2'])
-train_reader = set_data_source(distill_reader)
+dr = DistillReader(ins=['img', None], predicts=['fc_0.tmp_2'])
+dr.set_fixed_teacher(args.distill_teachers)
+train_reader = set_data_source(dr)
 
 if DATA_FORMAT == 'sample_generator':
     step = 0
