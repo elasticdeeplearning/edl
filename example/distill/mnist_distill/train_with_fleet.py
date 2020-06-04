@@ -219,7 +219,7 @@ def train(nn_type,
     if train_rank == 0:
         if args.save_serving_model:
             import paddle_serving_client.io as serving_io
-            serving_io.save_model("mnist_model", "serving_conf",
+            serving_io.save_model("mnist_cnn_model", "serving_conf",
                                   {img.name: img},
                                   {prediction.name: prediction}, test_program)
             print('save serving model, feed_names={}, fetch_names={}'.format(

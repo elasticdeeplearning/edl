@@ -5,27 +5,27 @@
 ## 1. 服务型蒸馏训练简介
 蒸馏训练包含teacher和student两部分，一般会将teacher和student放在同一张卡上。
 服务型蒸馏则将teacher和student分开，将teacher当做inference服务。student发送样本数据到teacher，从服务中获取预测结果用于训练。
-edl将student发送接收数据的部分封装成了DistillReader，用户关注这部分如何使用即可。
+edl将student的发送接收数据部分封装成了DistillReader，用户关注这部分如何使用即可。
 
 ## 2. 本地训练调试
 服务型训练的整个流程主要可分为两大部分：
 - teacher模型的获取与部署
 - student模型定义与服务的获取
 
-这两部分在后面章节介绍，本节先介绍在已有teacher模型和student训练代码下，本地蒸馏训练调试的流程，启动脚本见[run.sh](./run.sh)。
+这两部分在后面章节介绍，本节介绍在已有teacher模型和student训练代码下，本地蒸馏训练调试的流程，启动脚本见[run.sh](./run.sh)。
 ### 2.1 启动本地teacher服务
 teacher服务使用paddle_serving部署(serving使用详细请参考[PaddleServing](https://github.com/PaddlePaddle/Serving))。
-启动命令如下，其中mnist_model为保存的serving模型，指定线程数为4，服务端口为9292，开启显存优化，使用0号GPU卡。
+启动命令如下，其中mnist_cnn_model为下载解压后的serving模型，指定线程数为4，服务端口为9292，开启显存优化，使用0号GPU卡。
 ``` bash
 python -m paddle_serving_server_gpu.serve \
-  --model mnist_model \
+  --model mnist_cnn_model \
   --thread 4 \
   --port 9292 \
   --mem_optim True \
   --gpu_ids 0
 ```
 ### 2.2 运行蒸馏训练
-训练启动命令如下，启动服务型蒸馏训练，设置本地固定teacher用于训练调试。
+训练启动命令如下，use_distill_service设置训练为蒸馏训练，distill_teachers设置本地固定teacher地址用于训练。
 ``` bash
 export CUDA_VISIBLE_DEVICES=0 
 python train_with_fleet.py --use_distill_service True --distill_teachers 127.0.0.1:9292
@@ -42,7 +42,7 @@ python train_with_fleet.py --save_serving_model
 保存的代码见[train_with_fleet.py](train_with_fleet.py)。模型输入为img，模型输出为prediction，mnist_model为serving模型的目录。
 serving_conf为保存的client配置文件。
 ``` bash
-serving_io.save_model("mnist_model", "serving_conf",
+serving_io.save_model("mnist_cnn_model", "serving_conf",
                       {img.name: img}, {prediction.name: prediction},
                       test_program)
 ```
@@ -50,7 +50,7 @@ serving_io.save_model("mnist_model", "serving_conf",
 ``` python
 import paddle_serving_client.io as serving_io
 serving_io.inference_model_to_serving('recognize_digits_convolutional_neural_network.inference.model', \
-    serving_server='mnist_model', serving_client='serving_conf')
+    serving_server='mnist_cnn_model', serving_client='serving_conf')
 ```
 #### 3.1.2 teacher模型的部署
 见2.1。
@@ -64,7 +64,8 @@ inputs = [img, label]
 soft_label = fluid.data(name='soft_label', shape=[None, 10], dtype='float32')
 inputs.append(soft_label)
 ```
-2. 使用蒸馏reader包装原训练reader，返回生成的蒸馏reader
+2. 使用蒸馏reader包装原训练reader，返回生成的蒸馏reader。
+其中'img'和'label'对应原训练reader的输入，teacher的输入为'img'，输出为'fc_0.tmp_2'(注：原teacher模型的prediction的变量名)。
 ``` python
 dr = DistillReader(ins=['img', 'label'], predicts=['prediction'])
 train_reader = dr.set_sample_list_generator(train_reader)
@@ -92,4 +93,23 @@ dr.set_dynamic_teacher(discovery_servers, teacher_service_name)
 见2.2。
 
 ### 4. 部署服务发现服务&Teacher服务注册
-TODO。
+#### 4.1 部署服务发现
+1. 依赖于redis数据库，[下载安装redis](https://redis.io/download)。
+2. 部署balance服务发现。其中server指定balance服务对外服务的地址，db_endpoints为启动的redis数据库地址。
+``` python
+python -m paddle_edl.distill.redis.balance_server \
+  --server 127.0.0.1:7001 \
+  --db_endpoints 127.0.0.1:6379```
+```
+#### 4.2 服务注册
+在已启动好teacher后，需要往redis数据库注册teacher服务。
+其中db_endpoints为redis数据库地址，server为teacher对应的地址，service_name为teacher注册的服务名。
+``` python
+python -m paddle_edl.distill.redis.server_register \
+  --db_endpoints 127.0.0.1:6379 \
+  --server 127.0.0.1:9292 \
+  --service_name MnistDistill
+```
+
+服务发现部署完成后，使用set_dynamic_teacher('127.0.0.1:7001', 'MnistDistill')接口，student会向发现服务请求
+所需的teacher，服务发现服务则会从数据中查询已注册的服务，返回给student。
