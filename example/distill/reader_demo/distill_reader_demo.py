@@ -80,7 +80,7 @@ def set_data_source(distill_reader):
 
 
 # Define DistillReader
-distill_reader = DistillReader(ins=['img', None], predicts=['prediction'])
+distill_reader = DistillReader(ins=['img', None], predicts=['fc_0.tmp_2'])
 train_reader = set_data_source(distill_reader)
 
 if DATA_FORMAT == 'sample_generator':
