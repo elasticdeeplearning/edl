@@ -9,7 +9,7 @@ feed_var {
 }
 fetch_var {
   name: "fc_0.tmp_2"
-  alias_name: "prediction"
+  alias_name: "fc_0.tmp_2"
   is_lod_tensor: false
   fetch_type: 1
   shape: 10

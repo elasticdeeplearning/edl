@@ -132,7 +132,7 @@ def train(nn_type,
     test_inputs = [img, label]
 
     if args.use_distill_service:
-        dr = DistillReader(ins=['img', 'label'], predicts=['prediction'])
+        dr = DistillReader(ins=['img', 'label'], predicts=['fc_0.tmp_2'])
         dr.set_fixed_teacher(args.distill_teachers)
         train_reader = dr.set_sample_list_generator(train_reader)
 
