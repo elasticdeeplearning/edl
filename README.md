@@ -20,12 +20,15 @@ nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest
 ```  
 
 # EDL Applications:
-
+## EDL Distill Training
 <p align="center">
     <img src="doc/distill.gif" width="700">
 </p>
+The distillation training consists of two parts, teacher and student. Generally, the teacher and student are placed on the same card.
+EDL distillation training separates teacher and student, treats teacher as a inference service.
+Students send sample data to the teacher and obtain prediction results for training.
 
-## Quick Start
+### Quick Start
 - [Run EDL distillation training demo on Kubernetes or a single node](./example/distill/README.md)
 
 # EDL Framework
