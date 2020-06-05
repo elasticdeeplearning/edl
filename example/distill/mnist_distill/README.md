@@ -13,10 +13,16 @@ edl将student的发送接收数据部分封装成了DistillReader，用户关注
 - student模型定义与服务的获取
 
 这两部分在后面章节介绍，本节介绍在已有teacher模型和student训练代码下，本地蒸馏训练调试的流程，启动脚本见[run.sh](./run.sh)。
+启动前先安装依赖的python包
+``` bash
+pip install paddle-edl paddle-serving-client paddle-serving-server-gpu
+```
 ### 2.1 启动本地teacher服务
 teacher服务使用paddle_serving部署(serving使用详细请参考[PaddleServing](https://github.com/PaddlePaddle/Serving))。
-启动命令如下，其中mnist_cnn_model为下载解压后的serving模型，指定线程数为4，服务端口为9292，开启显存优化，使用0号GPU卡。
+其中teacher模型是mnist训练出的一个cnn模型，输入为{name='img', shape=(1, 28, 28), dtype='float32'}的图像，
+输出为{name='fc_0.tmp_2', shape=(10,), dtype='float32'}的图像类别预测概率值。
 ``` bash
+wget --no-check-certificate https://paddle-edl.bj.bcebos.com/distill_teacher_model/mnist_cnn_model.tar.gz
 python -m paddle_serving_server_gpu.serve \
   --model mnist_cnn_model \
   --thread 4 \
@@ -64,10 +70,10 @@ inputs = [img, label]
 soft_label = fluid.data(name='soft_label', shape=[None, 10], dtype='float32')
 inputs.append(soft_label)
 ```
-2. 使用蒸馏reader包装原训练reader，返回生成的蒸馏reader。
-其中'img'和'label'对应原训练reader的输入，teacher的输入为'img'，输出为'fc_0.tmp_2'(注：原teacher模型的prediction的变量名)。
+2. 定义蒸馏Reader输入及需获取的预测结果。按原DataLoader使用方式，包装训练reader，返回蒸馏训练reader。
+返回的结果会将输入预测拼接起来，下面代码的表现为返回(img, label, fc_0.tmp_2)组成的列表。
 ``` python
-dr = DistillReader(ins=['img', 'label'], predicts=['prediction'])
+dr = DistillReader(ins=['img', 'label'], predicts=['fc_0.tmp_2'])
 train_reader = dr.set_sample_list_generator(train_reader)
 ```
 3. 定义蒸馏loss
@@ -89,8 +95,6 @@ dr.set_fixed_teacher('127.0.0.1:9292')
 # 设置服务发现地址，及需要获取的teacher服务名
 dr.set_dynamic_teacher(discovery_servers, teacher_service_name)
 ```
-#### 3.2.3 启动训练
-见2.2。
 
 ### 4. 部署服务发现服务&Teacher服务注册
 #### 4.1 部署服务发现
