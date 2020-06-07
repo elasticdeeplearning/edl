@@ -7,3 +7,5 @@ protobuf==3.8.0
 kubernetes
 redis
 paddle-serving-client
+paddle-serving-server-gpu
+paddle-serving-app

@@ -20,13 +20,31 @@ nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest
 ```  
 
 # EDL Applications:
-
+## EDL Distill Training
 <p align="center">
     <img src="doc/distill.gif" width="700">
 </p>
+The distillation training consists of two parts, teacher and student. Generally, the teacher and student are placed on the same card.
+EDL distillation training decouple teacher and student, treats teacher as a inference service.
+Students send sample data to the teacher and obtain prediction results for training.
 
-## Quick Start
-- [Run EDL distillation training demo on Kubernetes or a single node](./example/distill/README.md)
+### Quick Start: Run with fixed teacher in docker
+1. First, you need deploy teacher.
+``` bash
+cd example/distill/mnist_distill
+python -m paddle_serving_server_gpu.serve \
+  --model mnist_cnn_model \
+  --port 9292 \
+  --gpu_ids 0
+```
+2. Run student.
+``` python
+python train_with_fleet.py \
+  --use_distill_service True \
+  --distill_teachers 127.0.0.1:9292
+```
+**A complete example is [here](./mnist_distill).**
+More detail usage, please see [Run EDL distillation training](./example/distill/README.md)
 
 # EDL Framework
 ## How to change from a normal train program to an EDL train program

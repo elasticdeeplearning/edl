@@ -320,6 +320,7 @@ def predict_worker(server_queue, server_result_queue, working_predict_count,
     # Define signal handler function
     def predict_signal_handle(signum, frame):
         signal_exit[0] = True
+        out_queue.cancel_join_thread()
         exit(0)
 
     # register signal.SIGTERM's handler
