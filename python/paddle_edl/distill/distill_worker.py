@@ -195,6 +195,7 @@ class PaddlePredictServer(PredictServer):
         self._fetchs = fetchs
         self._max_failed_times = max_failed_times
         self.client = None
+        self._has_predict = False
         logger.info((server, config_file, feeds, fetchs, max_failed_times))
 
         self._time_line = _TimeLine()
@@ -261,6 +262,7 @@ class PaddlePredictServer(PredictServer):
     def predict(self, feed_data):
         """ predict success, return (True, predict_data),
         else return (False, None)"""
+        self._has_predict = True
         self._time_line.reset()
         feed_map_list = self._preprocess(feed_data)
         self._time_line.record('predict_preprocess')
@@ -290,7 +292,8 @@ class PaddlePredictServer(PredictServer):
 
     def __del__(self):
         try:
-            if self.client is not None:
+            # avoid serving exit bug when hasn't predict
+            if self.client is not None and self._has_predict:
                 self.client.release()
         except Exception as e:
             logger.critical('Release client failed with server={}, '
@@ -320,6 +323,10 @@ def predict_worker(server_queue, server_result_queue, working_predict_count,
     # Define signal handler function
     def predict_signal_handle(signum, frame):
         signal_exit[0] = True
+        # fix infinite reader hang
+        server_queue.cancel_join_thread()
+        server_result_queue.cancel_join_thread()
+        in_queue.cancel_join_thread()
         out_queue.cancel_join_thread()
         exit(0)
 
@@ -489,6 +496,7 @@ def reader_worker(reader, reader_type, teacher_batch_size, out_queue,
 
     def reader_signal_handle(signum, frame):
         signal_exit[0] = True
+        out_queue.cancel_join_thread()
         exit(0)
 
     # register signal.SIGTERM's handler
