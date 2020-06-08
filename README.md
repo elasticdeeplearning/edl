@@ -54,10 +54,11 @@ python -m paddle.distributed.launch --selected_gpus 0 \
 
 - Performance comparison
 
-| teacher resource | student resource | total batch size | acc1 | acc5 | speed |
-| :-----: | ----: | ----: | ----: | ----: | ----: |
-| None | 16 * v100 | 512 | 77.1 | 93.5 | 3103 img/s |
-| 96 * P4 | 16 * v100 | 512 | 79.1 | 94.4 | 2892 img/s |
+| mode | teacher resource | student resource | total batch size | acc1 | acc5 | speed |
+| :----: | :-----: | ----: | ----: | ----: | ----: | ----: |
+| pure train                    | None      | 8 * v100 | 256 | 77.1 | 93.5 | 1828 img/s |
+| teacher stduent on same cards | 8 * v100  | 8 * v100 | 256 | 79.0 | 94.3 | 656 img/s |
+| edl service distill           | 40 * P4   | 8 * v100 | 256 | 79.0 | 94.5 | 1514 img/s |
 
 <h3 align="center">About Knowledge Distillation in EDL</h3>
 
