@@ -101,6 +101,7 @@ add_arg('image_std', nargs='+', type=float, default=[0.229, 0.224, 0.225], help=
 add_arg('interpolation',    int,  None,                 "The interpolation mode")
 add_arg('use_recompute',           bool,  False,          "Whether use Recompute Optimizer or not")
 add_arg('use_distill_service',     bool,  True,     "Whether to use distill service train")
+add_arg('teachers',         str,  None,  "distill service fixed teacher")
 
 def get_momentum_optimizer(momentum_kwargs, use_dgc=False, dgc_kwargs={}):
     if not use_dgc:
@@ -465,6 +466,8 @@ def train(args):
         if args.use_distill_service:
             dr = DistillReader(['image', 'label'], predicts=['score'])
             dr.set_teacher_batch_size(16)
+            if args.teachers is not None:
+                dr.set_fixed_teacher(args.teachers)
             train_batch_reader = dr.set_sample_list_generator(train_batch_reader)
 
         train_data_loader.set_sample_list_generator(train_batch_reader, places)

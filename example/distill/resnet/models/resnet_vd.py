@@ -33,7 +33,7 @@ class ResNet():
         self.layers = layers
         self.is_3x3 = is_3x3
 
-    def net(self, input, class_dim=1000):
+    def net(self, input, args, class_dim=1000, data_format="NCHW"):
         is_3x3 = self.is_3x3
         layers = self.layers
         supported_layers = [18, 34, 50, 101, 152, 200]

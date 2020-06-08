@@ -13,12 +13,12 @@ unset https_proxy http_proxy
 
 set -xe
 
-MODEL=ResNet50 #VGG16
+MODEL=ResNet50_vd #VGG16
 MODEL_SAVE_PATH="output/"
 
 # training params
 NUM_EPOCHS=90
-BATCH_SIZE=128
+BATCH_SIZE=32
 LR=0.1
 LR_STRATEGY=piecewise_decay
 
@@ -27,7 +27,7 @@ DATA_PATH="./ImageNet"
 TOTAL_IMAGES=1281167
 CLASS_DIM=1000
 IMAGE_SHAPE=3,224,224
-DATA_FORMAT="NHWC"
+DATA_FORMAT="NCHW"
 
 #gpu params
 FUSE=True
@@ -35,8 +35,8 @@ NCCL_COMM_NUM=1
 NUM_THREADS=2
 USE_HIERARCHICAL_ALLREDUCE=False
 NUM_CARDS=8
-FP16=True #whether to use float16
-use_dali=True
+FP16=False #whether to use float16
+use_dali=False
 if [[ ${use_dali} == "True" ]]; then
     export FLAGS_fraction_of_gpu_memory_to_use=0.8
 fi
@@ -88,4 +88,5 @@ python -m paddle.distributed.launch ${distributed_args}  --log_dir log \
        --do_test=True \
        --profile=False \
        --rampup_begin_step=${DGC_RAMPUP_BEGIN_STEP} \
-       --use_recompute=False
+       --use_recompute=False \
+       --use_distill_service=True
