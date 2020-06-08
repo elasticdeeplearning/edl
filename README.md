@@ -29,7 +29,7 @@ nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest
 
 <h3 align="center">Quick start on a signal machine</h3>
 
-- The Teacher Model: [ResNeXt101_32x16d_wsl](https://github.com/facebookresearch/WSL-Images). Start ResNeXt101_32x16d_wsl teacher on gpu 1.
+- The Teacher Model: [ResNeXt101_32x16d_wsl](https://github.com/facebookresearch/WSL-Images). Start teacher on gpu 1.
 ``` bash
 cd example/distill/resnet
 
@@ -42,7 +42,7 @@ python -m paddle_serving_server_gpu.serve \
   --gpu_ids 1
 ```
 
-- The Student Model: [ResNet50_vd](https://arxiv.org/pdf/1812.01187.pdf)(that is ResNet-D in paper). Train ResNet50_vd student on gpu 0.
+- The Student Model: [ResNet50_vd](https://arxiv.org/pdf/1812.01187.pdf)(that is ResNet-D in paper). Train student on gpu 0.
 ``` bash
 python -m paddle.distributed.launch --selected_gpus 0 \
   ./train_with_fleet.py \
@@ -54,9 +54,10 @@ python -m paddle.distributed.launch --selected_gpus 0 \
 
 - Performance comparison
 
-| total batch size | acc1 | acc5 |
-| :-----: | ----: | ----: |
-| 512 | 79.1 | 94.4 |
+| teacher resource | student resource | total batch size | acc1 | acc5 | speed |
+| :-----: | ----: | ----: | ----: | ----: | ----: |
+| None | 16cards v100 | 512 | 77.1 | 93.5 | 3103 img/s |
+| 96cards P4 | 16cards v100 | 512 | 79.1 | 94.4 | 2892 img/s |
 
 <h3 align="center">About Knowledge Distillation in EDL</h3>
 
