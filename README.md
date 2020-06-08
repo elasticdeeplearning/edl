@@ -27,30 +27,38 @@ nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest
 - Inference type services are automatically registered through service discovery in EDL
 - Knowledge distillation examples in computer vision and natural language processing
 
-<h3 align="center">Quick start on single GPU</h3>
+<h3 align="center">Quick start on a single machine</h3>
 
-- The Teacher Model: mnist_cnn_model?
-
+- The Teacher Model: [ResNeXt101_32x16d_wsl](https://github.com/facebookresearch/WSL-Images). Start teacher on gpu 1.
 ``` bash
-cd example/distill/mnist_distill
+cd example/distill/resnet
+
+wget --no-check-certificate https://paddle-edl.bj.bcebos.com/distill_teacher_model/ResNeXt101_32x16d_wsl_model.tar.gz
+tar -zxf ResNeXt101_32x16d_wsl_model.tar.gz
+
 python -m paddle_serving_server_gpu.serve \
-  --model mnist_cnn_model \
-  --port 9292 \
-  --gpu_ids 0
+  --model ResNeXt101_32x16d_wsl_model \
+  --port 9898 \
+  --gpu_ids 1
 ```
 
-- The Student Model: xx?
-``` python
-python train_with_fleet.py \
-  --use_distill_service True \
-  --distill_teachers 127.0.0.1:9292
+- The Student Model: [ResNet50_vd](https://arxiv.org/pdf/1812.01187.pdf)(that is ResNet-D in paper). Train student on gpu 0.
+``` bash
+python -m paddle.distributed.launch --selected_gpus 0 \
+  ./train_with_fleet.py \
+  --model=ResNet50_vd \
+  --data_dir=./ImageNet \
+  --use_distill_service=True \
+  --distill_teachers=127.0.0.1:9898
 ```
 
 - Performance comparison
 
-| total batch size | acc1 | acc5 |
-| :-----: | ----: | ----: |
-| 1024 | 75.5 | 92.8 |
+| mode | teacher resource | student resource | total batch size | acc1 | acc5 | speed(img/s) |
+| :----: | :-----: | :----: | :----: | :----: | :----: | :----: |
+| pure train                       | None     | 8 * v100 | 256 | 77.1 | 93.5 | 1828 |
+| teacher stduent on the same gpus | 8 * v100 | 8 * v100 | 256 | 79.0 | 94.3 | 656 |
+| EDL service distill              | 40 * P4  | 8 * v100 | 256 | 79.0 | 94.5 | 1514 |
 
 <h3 align="center">About Knowledge Distillation in EDL</h3>
 
