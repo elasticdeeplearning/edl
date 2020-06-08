@@ -56,8 +56,8 @@ python -m paddle.distributed.launch --selected_gpus 0 \
 
 | teacher resource | student resource | total batch size | acc1 | acc5 | speed |
 | :-----: | ----: | ----: | ----: | ----: | ----: |
-| None | 16cards v100 | 512 | 77.1 | 93.5 | 3103 img/s |
-| 96cards P4 | 16cards v100 | 512 | 79.1 | 94.4 | 2892 img/s |
+| None | 16 * v100 | 512 | 77.1 | 93.5 | 3103 img/s |
+| 96 * P4 | 16 * v100 | 512 | 79.1 | 94.4 | 2892 img/s |
 
 <h3 align="center">About Knowledge Distillation in EDL</h3>
 
