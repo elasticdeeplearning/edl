@@ -46,9 +46,10 @@ nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest
     <img src="doc/distill.gif" width="550">
 </p>
 
+<h3 align="center">Quick start on single GPU</h3>
 
-### Quick Start: Run with fixed teacher in docker
-1. First, you need deploy teacher.
+- The Teacher Model: mnist_cnn_model?
+
 ``` bash
 cd example/distill/mnist_distill
 python -m paddle_serving_server_gpu.serve \
@@ -56,14 +57,21 @@ python -m paddle_serving_server_gpu.serve \
   --port 9292 \
   --gpu_ids 0
 ```
-2. Run student.
+
+- The Student Model: xx?
 ``` python
 python train_with_fleet.py \
   --use_distill_service True \
   --distill_teachers 127.0.0.1:9292
 ```
-**A complete example is [here](./mnist_distill).**
-More detail usage, please see [Run EDL distillation training](./example/distill/README.md)
+
+- Performance comparison
+
+| total batch size | acc1 | acc5 |
+| :-----: | ----: | ----: |
+| 1024 | 75.5 | 92.8 |
+
+- To run distillation on clusters, please reference [Run EDL distillation training](./example/distill/README.md)
 
 # EDL Framework
 ## How to change from a normal train program to an EDL train program
