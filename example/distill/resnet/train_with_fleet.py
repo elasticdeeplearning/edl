@@ -159,18 +159,15 @@ def optimizer_setting(params):
         optimizer = get_momentum_optimizer(momentum_kwargs, use_dgc, dgc_kwargs)
 
     elif ls["name"] == "cosine_warmup_decay":
-        assert "total_images" in params
-        total_images = params["total_images"]
-        images_per_trainer = int(math.ceil(float(total_images) / num_trainers))
-        batch_size = ls["batch_size"]
-        step = int(math.ceil(float(images_per_trainer) / batch_size))
-        l2_decay = params["l2_decay"]
-        momentum_rate = params["momentum_rate"]
-        lr = params["lr"]
-        num_epochs = params["num_epochs"]
+        global_batch_size = ls["batch_size"] * num_trainers
+        steps_per_pass = int(math.ceil(params["total_images"] * 1.0 / global_batch_size))
 
+        batch_denom = 256
+        base_lr = params["lr"] * global_batch_size / batch_denom
+
+        num_epochs = params["num_epochs"]
         momentum_kwargs['learning_rate'] = cosine_decay_with_warmup(
-            learning_rate=lr, step_each_epoch=step, epochs=num_epochs)
+            learning_rate=base_lr, step_each_epoch=steps_per_pass, epochs=num_epochs)
 
         optimizer = get_momentum_optimizer(momentum_kwargs, use_dgc, dgc_kwargs)
 
