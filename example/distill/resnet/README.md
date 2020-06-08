@@ -1,32 +1,13 @@
-# ResNet50 and VGG16 on ImageNet with Fleet APIs
-## How to change different model
-you can change Resnet50 or VGG16 model easily by editing scripts/train_gpu.sh:
-```
-MODEL=ResNet50  
-# MODEL=VGG16
-```
+# ResNeXt101_32x16d_wsl distill ResNet50_vd
 
-## How to run
-### with single gpu single card
-```
-scripts/train_gpu.sh:
-set NUM_CARDS=1
-
-sh scripts/train_gpu.sh
-```
-
-### with single gpu multiple cards
-```
-scripts/train_gpu.sh:
-set NUM_CARDS=8 (your gpu cards number)
-
-sh scripts/train_gpu.sh
-```
-
-## How to use DGC
-Set USE_DGC=True. Note, use DGC must close fuse&fp16 for now, but we've added this logic
-to the code, so you don't need to change the value of FUSE in scripts/train_gpus.sh.
+## Local test
+### start local teacher
+start ResNeXt101_32x16d_wsl teacher on gpu 1
 ``` bash
-USE_DGC=True
-DGC_RAMPUP_BEGIN_STEP=5008 # for 32 cards, DGC start from 4 epochs
+bash ./scripts/start_local_teacher.sh
+```
+### train student with local teacher
+At another terminal, train resnet50_vd student on gpu 0.
+``` bash
+bash ./scripts/train_student.sh
 ```
