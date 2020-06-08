@@ -1,6 +1,7 @@
 <p align="center">
     <br>
-<img src='https://github.com/elasticdeeplearning/artwork/blob/master/horizontal/color/edl-horizontal-color.png' width = "500">
+<img src='https://github.com/elasticdeeplearning/artwork/blob/master/horizontal/color/edl-horizontal-color.png' width = "450">
+    <img src='https://github.com/lfai/artwork/blob/master/lfai-project-badge/incubation/color/lfai-projectlogos_incubation-color.png' width = "200">
     <br>
 <p>
 
@@ -10,12 +11,6 @@ Computing resources on cloud such as [Amazon AWS](https://aws.amazon.com/cn/)、
 
 Now EDL is an incubation-stage project of the [LF AI Foundation](https://lfai.foundation).
 
-
-<p align="center">
-    <br>
-<img src='https://github.com/lfai/artwork/blob/master/lfai-project-badge/incubation/color/lfai-projectlogos_incubation-color.png' width = "200">
-    <br>
-<p>
 
 <h2 align="center">Installation</h2>
 
