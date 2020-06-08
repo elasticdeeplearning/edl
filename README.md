@@ -27,7 +27,7 @@ nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest
 - Inference type services are automatically registered through service discovery in EDL
 - Knowledge distillation examples in computer vision and natural language processing
 
-<h3 align="center">Quick start on a signal machine</h3>
+<h3 align="center">Quick start on a single machine</h3>
 
 - The Teacher Model: [ResNeXt101_32x16d_wsl](https://github.com/facebookresearch/WSL-Images). Start teacher on gpu 1.
 ``` bash
@@ -55,10 +55,10 @@ python -m paddle.distributed.launch --selected_gpus 0 \
 - Performance comparison
 
 | mode | teacher resource | student resource | total batch size | acc1 | acc5 | speed(img/s) |
-| :----: | :-----: | ----: | ----: | ----: | ----: | ----: |
-| pure train                    | None     | 8 * v100 | 256 | 77.1 | 93.5 | 1828 |
-| teacher stduent on same cards | 8 * v100 | 8 * v100 | 256 | 79.0 | 94.3 | 656 |
-| EDL service distill           | 40 * P4  | 8 * v100 | 256 | 79.0 | 94.5 | 1514 |
+| :----: | :-----: | :----: | :----: | :----: | :----: | :----: |
+| pure train                       | None     | 8 * v100 | 256 | 77.1 | 93.5 | 1828 |
+| teacher stduent on the same gpus | 8 * v100 | 8 * v100 | 256 | 79.0 | 94.3 | 656 |
+| EDL service distill              | 40 * P4  | 8 * v100 | 256 | 79.0 | 94.5 | 1514 |
 
 <h3 align="center">About Knowledge Distillation in EDL</h3>
 
