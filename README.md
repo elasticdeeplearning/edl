@@ -23,17 +23,29 @@ nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest
 
 <h2 align="center">Latest Release(0.3.0)</h2>
 
-- Support elastic training with inference type services during training, such as knowledge distillation
+- Support elastic training with inference type services during training, such as knowledge distillationo 
 - Inference type services are automatically registered through service discovery in EDL
 - Knowledge distillation examples in computer vision and natural language processing
+
+<h3 align="center">Knowledge Distillation in EDL</h3>
+
+- Theory: [Distilling the Knowledge in a Neural Network](https://arxiv.org/abs/1503.02531)
+    - Knowledge distillation consists of two parts in general, i.e. strong teachers and weak students. 
+    - Student model learns from a teacher or mixture-of-teachers model's feed-forward results to achieve better results.
+- Application scenarios of EDL knowledge distillation
+    - Teacher models and student models are runing on the same GPU devices that training throughputs are not maximized
+    - Offline GPU cluster has limited resources but some online GPU resources can be used during training.
+    - Heterogenous teacher models can improve student model's performance but are hard to deploy on single GPU card due to memory limitation.
+    - Computation burden of teacher models and student models are hard to balanced to maximize the training throughputs.
+- Solution:     
+    - Deploy teacher models as online inference service through [Paddle Serving](https://github.com/PaddlePaddle/Serving)
+    - Online inference services are elastic and are registered to EDL service management modules.
+    - Dynamical adaptation of teacher models' online instance to maximize students' training throughputs and resources utilization.
 
 <p align="center">
     <img src="doc/distill.gif" width="550">
 </p>
 
-The distillation training consists of two parts, teacher and student. Generally, the teacher and student are placed on the same card.
-EDL distillation training decouple teacher and student, treats teacher as a inference service.
-Students send sample data to the teacher and obtain prediction results for training.
 
 ### Quick Start: Run with fixed teacher in docker
 1. First, you need deploy teacher.
