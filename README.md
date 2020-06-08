@@ -21,13 +21,16 @@ docker pull hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
 nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7 /bin/bash
 ```  
 
-This project contains EDL framework and its applications such as distillation and NAS.
+<h2 align="center">Latest Release(0.3.0)</h2>
 
-# EDL Applications:
-## EDL Distill Training
+- Support elastic training with inference type services during training, such as knowledge distillation
+- Inference type services are automatically registered through service discovery in EDL
+- Knowledge distillation examples in computer vision and natural language processing
+
 <p align="center">
-    <img src="doc/distill.gif" width="700">
+    <img src="doc/distill.gif" width="550">
 </p>
+
 The distillation training consists of two parts, teacher and student. Generally, the teacher and student are placed on the same card.
 EDL distillation training decouple teacher and student, treats teacher as a inference service.
 Students send sample data to the teacher and obtain prediction results for training.
