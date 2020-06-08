@@ -29,7 +29,7 @@ nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest
 
 <h3 align="center">Quick start on a signal machine</h3>
 
-- The Teacher Model: [ResNeXt101_32x16d_wsl](https://arxiv.org/pdf/1907.07640.pdf)
+- The Teacher Model: [ResNeXt101_32x16d_wsl](https://github.com/facebookresearch/WSL-Images)
 
 Start ResNeXt101_32x16d_wsl teacher on gpu 1.
 ``` bash
@@ -44,7 +44,7 @@ python -m paddle_serving_server_gpu.serve \
   --gpu_ids 1
 ```
 
-- The Student Model: [ResNet50_vd](https://arxiv.org/pdf/1812.01187.pdf)(ResNet-D in paper)
+- The Student Model: [ResNet50_vd](https://arxiv.org/pdf/1812.01187.pdf)(that is ResNet-D in paper)
 
 Train ResNet50_vd student on gpu 0.
 ``` bash
