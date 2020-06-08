@@ -27,30 +27,38 @@ nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest
 - Inference type services are automatically registered through service discovery in EDL
 - Knowledge distillation examples in computer vision and natural language processing
 
-<h3 align="center">Quick start on single GPU</h3>
+<h3 align="center">Quick start on a signal machine</h3>
 
-- The Teacher Model: mnist_cnn_model?
-
+- The Teacher Model: ResNeXt101_32x16d_wsl
+Start ResNeXt101_32x16d_wsl teacher on gpu 1.
 ``` bash
-cd example/distill/mnist_distill
+cd example/distill/resnet
+
+wget --no-check-certificate https://paddle-edl.bj.bcebos.com/distill_teacher_model/ResNeXt101_32x16d_wsl_model.tar.gz
+tar -zxf ResNeXt101_32x16d_wsl_model.tar.gz
+
 python -m paddle_serving_server_gpu.serve \
-  --model mnist_cnn_model \
-  --port 9292 \
-  --gpu_ids 0
+  --model ResNeXt101_32x16d_wsl_model \
+  --port 9898 \
+  --gpu_ids 1
 ```
 
-- The Student Model: xx?
-``` python
-python train_with_fleet.py \
-  --use_distill_service True \
-  --distill_teachers 127.0.0.1:9292
+- The Student Model: ResNet50_vd
+Train ResNet50_vd student on gpu 0.
+``` bash
+python -m paddle.distributed.launch --selected_gpus 0 \
+  ./train_with_fleet.py \
+  --model=ResNet50_vd \
+  --data_dir=./ImageNet \
+  --use_distill_service=True \
+  --distill_teachers=127.0.0.1:9898
 ```
 
 - Performance comparison
 
 | total batch size | acc1 | acc5 |
 | :-----: | ----: | ----: |
-| 1024 | 75.5 | 92.8 |
+| 512 | 79.1 | 94.4 |
 
 <h3 align="center">About Knowledge Distillation in EDL</h3>
 
