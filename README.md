@@ -1,4 +1,4 @@
-<p align="center">
+<p align="left">
     <br>
 <img src='https://github.com/elasticdeeplearning/artwork/blob/master/horizontal/color/edl-horizontal-color.png' width = "450">
     <img src='https://github.com/lfai/artwork/blob/master/lfai-project-badge/incubation/color/lfai-projectlogos_incubation-color.png' width = "200">
