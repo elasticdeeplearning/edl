@@ -3,9 +3,7 @@
 <img src="https://github.com/elasticdeeplearning/artwork/blob/master/horizontal/color/edl-horizontal-color.png" width="500" style="display:inline;vertical-align:middle;padding:2%">
 
 # Motivation
-Elastic Deep Learning(EDL) is a framework with the ability to dynamically adjust the parallelism (number of training workers) for deep neural network training. It can support multi-tenant cluster management to balance job completion time and job waiting time, maximize the use of idle resources, and so on.
-
-This project contains EDL framework and its applications such as distillation and NAS.
+Computing resources on cloud such as [Amazon AWS](https://aws.amazon.com/cn/)、[Baidu Cloud](https://cloud.baidu.com/) have multi-tenancy. Deep learning model training and inference with elastic resources will be common on cloud. We propose Elastic Deep Learning (EDL) that makes distributed training and inference of deep learning model on cloud easier and more efficient.
 
 Now EDL is an incubation-stage project of the [LF AI Foundation](https://lfai.foundation).
 
@@ -18,6 +16,8 @@ You can install with ```pip install paddle_edl```. But we highly **recommend** y
 docker pull hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
 nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7 /bin/bash
 ```  
+
+This project contains EDL framework and its applications such as distillation and NAS.
 
 # EDL Applications:
 ## EDL Distill Training
