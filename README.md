@@ -1,15 +1,19 @@
-# EDL: Elastic Deep Learning
+<p align="center">
+    <br>
+<img src='https://github.com/elasticdeeplearning/artwork/blob/master/horizontal/color/edl-horizontal-color.png' width = "500">
+    <br>
+<p>
 
-<img src="https://github.com/elasticdeeplearning/artwork/blob/master/horizontal/color/edl-horizontal-color.png" width="500" style="display:inline;vertical-align:middle;padding:2%">
+<h2 align="center">Motivation</h2>
 
-# Motivation
 Computing resources on cloud such as [Amazon AWS](https://aws.amazon.com/cn/)、[Baidu Cloud](https://cloud.baidu.com/) have multi-tenancy. Deep learning model training and inference with elastic resources will be common on cloud. We propose Elastic Deep Learning (EDL) that makes training and inference of deep learning model on cloud easier and more efficient.
 
 Now EDL is an incubation-stage project of the [LF AI Foundation](https://lfai.foundation).
 
 <img src="https://github.com/lfai/artwork/blob/master/lfai-project-badge/incubation/color/lfai-projectlogos_incubation-color.png"  width="200" style="display:inline;vertical-align:middle;padding:2%">
 
-# Installation
+<h2 align="center">Installation</h2>
+
 You can install with ```pip install paddle_edl```. But we highly **recommend** you use it in our docker:
 
 ```
