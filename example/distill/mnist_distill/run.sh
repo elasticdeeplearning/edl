@@ -17,7 +17,11 @@ nohup python -m paddle_serving_server_gpu.serve \
   --gpu_ids 0 &
 serving_pid=$!
 
-python distill_reader_demo.py --distill_teachers 127.0.0.1:${port}
+# start distill train
+export CUDA_VISIBLE_DEVICES=0
+python train_with_fleet.py \
+  --use_distill_service True \
+  --distill_teachers 127.0.0.1:${port}
 
 # kill serving server
 pstree -p ${serving_pid} | awk -F"[()]" '{print $2}'| xargs kill -9

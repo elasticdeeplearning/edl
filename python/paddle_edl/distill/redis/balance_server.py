@@ -208,7 +208,6 @@ class BalanceServer(Server):
         self._table = table
         self._handle_func = {
             'register': self._handle_register,
-            'require_service': self._handle_require_service,
             'heartbeat': self._handle_heartbeat
         }
 
@@ -233,26 +232,20 @@ class BalanceServer(Server):
         }
         self._enqueue_response(fd, msg)
 
-    def _handle_require_service(self, fd, msg):
-        require_num = int(msg['num'])
-        print('fd={}, require_num={}'.format(fd, require_num))
-
-        # for debug
-        if self._table is None:
-            teacher_list = ['127.0.0.1:0001', '127.0.0.1:0002']
-            num = len(teacher_list)
-        else:
-            servers = self._table.get_servers(fd, require_num)
-            teacher_list = servers
-            num = len(teacher_list)
-
-        msg = {'type': 'response_service', 'servers': teacher_list, 'num': num}
-        self._enqueue_response(fd, msg)
-
     def _handle_heartbeat(self, fd, msg):
-        is_update, servers = self._table.is_servers_update(fd)
-        if is_update:
-            msg = {'type': 'servers_change', 'servers': servers}
+        version = 0
+        try:
+            version = int(msg['version'])
+        except KeyError:
+            # compatible old client
+            pass
+        new_version, servers = self._table.is_servers_update(fd, version)
+        if new_version > version:
+            msg = {
+                'type': 'servers_change',
+                'servers': servers,
+                'version': new_version
+            }
         else:
             msg = {'type': 'heartbeat'}
         self._enqueue_response(fd, msg)
@@ -274,7 +267,47 @@ class BalanceServer(Server):
 if __name__ == '__main__':
     from service_table import ServiceTable
 
-    # service_name = 'TestService'
-    table = ServiceTable('127.0.0.1', 6379)  # connect redis ip:port
-    balance_server = BalanceServer('0.0.0.0', 7001, table)  # listen
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='Discovery server with balance')
+    parser.add_argument(
+        '--server',
+        type=str,
+        default='0.0.0.0:7001',
+        help='endpoint of the server, e.g. 127.0.0.1:8888 [default: %(default)s]'
+    )
+    parser.add_argument(
+        '--worker_num',
+        type=int,
+        default=1,
+        help='worker num of server [default: %(default)s]')
+    parser.add_argument(
+        '--db_endpoints',
+        type=str,
+        default='127.0.0.1:6379',
+        help='database endpoints, e.g. 127.0.0.1:2379,127.0.0.1:2380 [default: %(default)s]'
+    )
+    parser.add_argument(
+        '--db_passwd',
+        type=str,
+        default=None,
+        help='detabase password [default: %(default)s]')
+    parser.add_argument(
+        '--db_type',
+        type=str,
+        default='redis',
+        help='database type, only support redis for now [default: %(default)s]')
+
+    args = parser.parse_args()
+    server = args.server
+    worker_num = args.worker_num
+    db_endpoints = args.db_endpoints.split(',')
+
+    redis_ip_port = db_endpoints[0].split(':')
+    server_ip_port = server.split(':')
+
+    table = ServiceTable(redis_ip_port[0],
+                         int(redis_ip_port[1]))  # connect redis ip:port
+    balance_server = BalanceServer(server_ip_port[0],
+                                   int(server_ip_port[1]), table)  # listen
     balance_server.server_forever()
