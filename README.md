@@ -27,7 +27,12 @@ nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest
 - Inference type services are automatically registered through service discovery in EDL
 - Knowledge distillation examples in computer vision and natural language processing
 
-<h3 align="center">Quick start on a single machine</h3>
+<h3 align="center">Quick start Demo</h3>
+
+- Install Paddle Serving
+``` bash
+pip install paddle-serving-server-gpu
+```
 
 - The Teacher Model: [ResNeXt101_32x16d_wsl](https://github.com/facebookresearch/WSL-Images). Start teacher on gpu 1.
 ``` bash
@@ -52,7 +57,9 @@ python -m paddle.distributed.launch --selected_gpus 0 \
   --distill_teachers=127.0.0.1:9898
 ```
 
-- Performance comparison
+- To run distillation on clusters, please reference [Run EDL distillation training](./example/distill/README.md)
+
+- Performance benchmark on industrial cluster
 
 | mode | teacher resource | student resource | total batch size | acc1 | acc5 | speed(img/s) |
 | :----: | :-----: | :----: | :----: | :----: | :----: | :----: |
@@ -79,7 +86,7 @@ python -m paddle.distributed.launch --selected_gpus 0 \
     <img src="doc/distill.gif" width="550">
 </p>
 
-- To run distillation on clusters, please reference [Run EDL distillation training](./example/distill/README.md)
+
 
 # EDL Framework
 ## How to change from a normal train program to an EDL train program
