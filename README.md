@@ -96,6 +96,7 @@ python -m paddle.distributed.launch --selected_gpus 0 \
 1. Start a JobServer on one node which generates changing scripts.
  
 ```
+cd example/demo/collective
 node_ips="127.0.0.1"
 python -u paddle_edl.demo.collective.job_server_demo \
     --node_ips ${node_ips} \

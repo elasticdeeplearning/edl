@@ -26,9 +26,9 @@ for pass_id in range(train_status.next(), params["num_epochs"]):
             path=args.checkpoint, fs=fs)
 ```
 
-The epoch's number is stored in train_status and the epoch number will be restored when the checkpoint is loaded.
+The epoch's number is stored in `train_status` and the epoch number will be restored when the checkpoint is loaded.
 
-## Start Resnet0 demo training multiple nodes:
+## Start Resnet50 demo training multiple nodes:
 
 1. Start a JobServer on one node which generates changing scripts.
  
