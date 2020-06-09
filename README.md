@@ -7,7 +7,7 @@
 
 <h2 align="center">Motivation</h2>
 
-Computing resources on the cloud such as [Amazon AWS](https://aws.amazon.com/cn/)、[Baidu Cloud](https://cloud.baidu.com/) have multi-tenancy. Deep learning model training and inference with elastic resources will be common on the cloud. We propose Elastic Deep Learning (EDL) that makes training and inference of deep learning models on the cloud easier and more efficient.
+Computing resources on cloud such as [Amazon AWS](https://aws.amazon.com/cn/)、[Baidu Cloud](https://cloud.baidu.com/) have multi-tenancy. Deep learning model training and inference with elastic resources will be common on cloud. We propose Elastic Deep Learning (EDL) that makes training and inference of deep learning models on cloud easier and more efficient.
 
 Now EDL is an incubation-stage project of the [LF AI Foundation](https://lfai.foundation).
 
@@ -75,12 +75,12 @@ python -m paddle.distributed.launch --selected_gpus 0 \
 
 - Theory: [Distilling the Knowledge in a Neural Network](https://arxiv.org/abs/1503.02531)
     - Knowledge distillation consists of two parts in general, i.e. strong teachers and weak students. 
-    - The student model learns from a teacher or mixture-of-teachers model's feed-forward results to achieve better results.
+    - Student model learns from a teacher or mixture-of-teachers model's feed-forward results to achieve better results.
 - Application scenarios of EDL knowledge distillation
     - Teacher models and student models are running on the same GPU devices that training throughputs are not maximized
     - Offline GPU cluster has limited resources but some online GPU resources can be used during training.
     - Heterogenous teacher models can improve student model's performance but are hard to deploy on a single GPU card due to memory limitation.
-    - The computation burden of teacher models and student models is hard to balance to maximize the training throughputs.
+    - Computation burden of teacher models and student models is hard to balance to maximize the training throughputs.
 - Solution:     
     - Deploy teacher models as online inference service through [Paddle Serving](https://github.com/PaddlePaddle/Serving)
     - Online inference services are elastic and are registered to EDL service management modules.
