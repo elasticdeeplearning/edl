@@ -69,6 +69,10 @@ python -m paddle.distributed.launch --selected_gpus 0 \
 
 <h3 align="center">About Knowledge Distillation in EDL</h3>
 
+<p align="center">
+    <img src="doc/distill.gif" width="550">
+</p>
+
 - Theory: [Distilling the Knowledge in a Neural Network](https://arxiv.org/abs/1503.02531)
     - Knowledge distillation consists of two parts in general, i.e. strong teachers and weak students. 
     - Student model learns from a teacher or mixture-of-teachers model's feed-forward results to achieve better results.
@@ -81,10 +85,6 @@ python -m paddle.distributed.launch --selected_gpus 0 \
     - Deploy teacher models as online inference service through [Paddle Serving](https://github.com/PaddlePaddle/Serving)
     - Online inference services are elastic and are registered to EDL service management modules.
     - Dynamical adaptation of teacher models' online instance to maximize students' training throughputs and resources utilization.
-
-<p align="center">
-    <img src="doc/distill.gif" width="550">
-</p>
 
 
 
