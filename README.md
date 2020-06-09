@@ -43,6 +43,7 @@ tar -zxf ResNeXt101_32x16d_wsl_model.tar.gz
 
 python -m paddle_serving_server_gpu.serve \
   --model ResNeXt101_32x16d_wsl_model \
+  --mem_optim True \
   --port 9898 \
   --gpu_ids 1
 ```
