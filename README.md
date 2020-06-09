@@ -17,7 +17,7 @@ Now EDL is an incubation-stage project of the [LF AI Foundation](https://lfai.fo
 You can install with ```pip install paddle_edl```. But we highly **recommend** you use it in our docker:
 
 ```
-docker pull hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda10.0-cudnn7
+docker pull hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda9.0-cudnn7
 nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda9.0-cudnn7 /bin/bash
 ```  
 
