@@ -432,7 +432,7 @@ def train(args):
                                 gpu_id=gpu_id, data_layout=args.data_format)
     else:
         train_reader = reader.train(settings=args, data_dir=args.data_dir,
-                                    pass_id_as_seed=shuffle_seed, data_layout=args.data_format, threads=10)
+                                    pass_id_as_seed=shuffle_seed, data_layout=args.data_format, threads=4)
         train_batch_reader=paddle.batch(train_reader, batch_size=train_batch_size)
 
         test_reader = reader.val(settings=args, data_dir=args.data_dir, data_layout=args.data_format, threads=10)
@@ -475,9 +475,8 @@ def train(args):
         if not args.use_dali:
             train_iter = train_data_loader()
 
+        t1 = time.time()
         for data in train_iter:
-            t1 = time.time()
-
             if batch_id % args.fetch_steps != 0:
                 train_exe.run(train_prog, feed=data)
             else:
@@ -493,6 +492,7 @@ def train(args):
             t2 = time.time()
             period = t2 - t1
             time_record.append(period)
+            t1 = t2
 
             if args.profile and batch_id == 100:
                 print("begin profiler")
@@ -542,13 +542,14 @@ def train(args):
                 test_iter = test_data_loader()
 
             test_batch_id = 0
+            t1 = time.time()
             for data in test_iter:
-                t1 = time.time()
                 loss, acc1, acc5 = exe.run(program=test_prog,
                                            feed=data,
                                            fetch_list=test_fetch_list)
                 t2 = time.time()
                 period = t2 - t1
+                t1 = t2
                 loss = np.mean(loss)
                 acc1 = np.mean(acc1)
                 acc5 = np.mean(acc5)
