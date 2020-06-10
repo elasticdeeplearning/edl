@@ -149,9 +149,10 @@ The whole example is [here](example/demo/collective)
 <h2 align="center"> Community </h2>
 
 ### FAQ
+- [FAQ](https://github.com/elasticdeeplearning/edl/blob/develop/FAQ.md)
 
 ### License
-EDL is provided under the [Apache-2.0 license](LICENSE).
+- EDL is provided under the [Apache-2.0 license](LICENSE).
 
 ### Contribution
-If you want to contribute code to Paddle Serving, please reference [Contribution Guideline](https://github.com/elasticdeeplearning/edl/blob/develop/CONTRIBUTING.md)
+- If you want to contribute code to Paddle Serving, please reference [Contribution Guideline](https://github.com/elasticdeeplearning/edl/blob/develop/CONTRIBUTING.md)
