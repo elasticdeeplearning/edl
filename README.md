@@ -154,4 +154,4 @@ The whole example is [here](example/demo/collective)
 EDL is provided under the [Apache-2.0 license](LICENSE).
 
 ### Contribution
-If you want to contribute code to Paddle Serving, please reference
+If you want to contribute code to Paddle Serving, please reference [Contribution Guideline](https://github.com/elasticdeeplearning/edl/blob/develop/CONTRIBUTING.md)
