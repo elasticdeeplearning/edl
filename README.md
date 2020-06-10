@@ -137,9 +137,9 @@ python -u paddle_edl.demo.collective.job_client_demo \
 The whole example is [here](example/demo/collective)
 
 
-## FAQ
+## TODO
 
-TBD
+update readme pages
 
 ## License
 
