@@ -11,5 +11,6 @@ protoc --go_out=plugins=grpc:./  common.proto
 mkdir -p ../../../pkg/masterpb
 mv *.go ../../../pkg/masterpb
 # see the build.sh to get the pakage version
+which python
 python ./run_codegen.py
  

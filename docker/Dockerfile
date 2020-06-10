@@ -12,7 +12,10 @@ ENV PATH=$PATH:{GOROOT}/bin:${GOPATH}/bin
 
 # python
 ADD ./docker/requirements.txt /root/paddle_edl/requirements.txt
+RUN python -m pip install pip==20.1.1
+RUN python3.6 -m pip install pip==20.1.1
 RUN python -m pip install -r /root/paddle_edl/requirements.txt
+RUN python3.6 -m pip install -r /root/paddle_edl/requirements.txt
 
 #etcd
 ENV HOME /root
