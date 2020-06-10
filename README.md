@@ -146,11 +146,12 @@ python -u paddle_edl.demo.collective.job_client_demo \
 The whole example is [here](example/demo/collective)
 
 
-<h2 align="center"> FAQ </h2>
+<h2 align="center"> Community </h2>
 
+### FAQ
 
-<h2 align="center"> License </h2>
+### License
 EDL is provided under the [Apache-2.0 license](LICENSE).
 
-<h2 align="center"> Contribution </h2>
+### Contribution
 If you want to contribute code to Paddle Serving, please reference
