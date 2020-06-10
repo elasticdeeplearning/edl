@@ -102,7 +102,7 @@ python -m paddle.distributed.launch --selected_gpus 0 \
 
 <h3 align="center"> Resnet50 experiments on a single machine in docker </h3>
 
-1. Start a JobServer on one node which generates changing scripts.
+- Start a JobServer on one node which generates changing scripts.
  
 ```
 cd example/demo/collective
@@ -114,7 +114,7 @@ python -u paddle_edl.demo.collective.job_server_demo \
     --gpu_num_of_node 8
 ```
 
-1. Start a Jobclient which controls the worker process.
+- Start a Jobclient which controls the worker process.
 
 ```
 # set the ImageNet data path
@@ -137,7 +137,7 @@ python -u paddle_edl.demo.collective.job_client_demo \
     ./train_pretrain.sh
 ```
 
-1. Experiments result on 2 nodes cluster
+- Experiments result on 2 nodes cluster
  
 | model| dataset | gpu cards | total batch size | acc1 | acc5 |
 | :-----: | ----: | ----: | ----: | ----: | ----: |
