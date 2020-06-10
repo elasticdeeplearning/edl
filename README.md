@@ -90,8 +90,17 @@ python -m paddle.distributed.launch --selected_gpus 0 \
     <img src="doc/distill.gif" width="550">
 </p>
 
-# EDL Framework
-## Quickstart:EDL Resnet50 experiments on a single machine in docker:
+<h2 align="center"> Release 0.2.0 </h2>
+
+<h3 align="center"> Checkpoint based elastic training on multiple GPUs </h3>
+
+- We have several training nodes running on each GPU.
+- A master node is responsible for checkpoint saving and all the other nodes are elastic nodes.
+- When elastic nodes join or leave current training job, training hyper-parameter will be adjusted automatically.
+- Newly comming training nodes will load checkpoint from remote FS automatically.
+- A model checkpoint is saved every serveral steps given by user
+
+<h3 align="center"> Resnet50 experiments on a single machine in docker </h3>
 
 1. Start a JobServer on one node which generates changing scripts.
  
@@ -137,10 +146,11 @@ python -u paddle_edl.demo.collective.job_client_demo \
 The whole example is [here](example/demo/collective)
 
 
-## FAQ
+<h2 align="center"> FAQ </h2>
 
-TBD
 
-## License
-
+<h2 align="center"> License </h2>
 EDL is provided under the [Apache-2.0 license](LICENSE).
+
+<h2 align="center"> Contribution </h2>
+If you want to contribute code to Paddle Serving, please reference
