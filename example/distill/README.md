@@ -82,7 +82,7 @@ train_reader = dr.set_sample_list_generator(train_reader)
 ``` 
 The run student code.
 ``` python
-python train_student.py
+python train_with_fleet.py --use_distill_service True
 ```
 
 ## On Kubernetes
