@@ -90,10 +90,19 @@ python -m paddle.distributed.launch --selected_gpus 0 \
     <img src="doc/distill.gif" width="550">
 </p>
 
-# EDL Framework
-## Quickstart:EDL Resnet50 experiments on a single machine in docker:
+<h2 align="center"> Release 0.2.0 </h2>
 
-1. Start a JobServer on one node which generates changing scripts.
+<h3 align="center"> Checkpoint based elastic training on multiple GPUs </h3>
+
+- We have several training nodes running on each GPU.
+- A master node is responsible for checkpoint saving and all the other nodes are elastic nodes.
+- When elastic nodes join or leave current training job, training hyper-parameter will be adjusted automatically.
+- Newly comming training nodes will load checkpoint from remote FS automatically.
+- A model checkpoint is saved every serveral steps given by user
+
+<h3 align="center"> Resnet50 experiments on a single machine in docker </h3>
+
+- Start a JobServer on one node which generates changing scripts.
  
 ```
 cd example/demo/collective
@@ -105,7 +114,7 @@ python -u paddle_edl.demo.collective.job_server_demo \
     --gpu_num_of_node 8
 ```
 
-1. Start a Jobclient which controls the worker process.
+- Start a Jobclient which controls the worker process.
 
 ```
 # set the ImageNet data path
@@ -128,7 +137,7 @@ python -u paddle_edl.demo.collective.job_client_demo \
     ./train_pretrain.sh
 ```
 
-1. Experiments result on 2 nodes cluster
+- Experiments result on 2 nodes cluster
  
 | model| dataset | gpu cards | total batch size | acc1 | acc5 |
 | :-----: | ----: | ----: | ----: | ----: | ----: |
@@ -137,10 +146,13 @@ python -u paddle_edl.demo.collective.job_client_demo \
 The whole example is [here](example/demo/collective)
 
 
-## FAQ
+<h2 align="center"> Community </h2>
 
-TBD
+### FAQ
+- [FAQ](https://github.com/elasticdeeplearning/edl/blob/develop/FAQ.md)
 
-## License
+### License
+- EDL is provided under the [Apache-2.0 license](LICENSE).
 
-EDL is provided under the [Apache-2.0 license](LICENSE).
+### Contribution
+- If you want to contribute code to Paddle Serving, please reference [Contribution Guideline](https://github.com/elasticdeeplearning/edl/blob/develop/CONTRIBUTING.md)
