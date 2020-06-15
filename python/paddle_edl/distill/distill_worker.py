@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import logging
 import numpy as np
 import os
@@ -21,7 +22,7 @@ import sys
 import time
 import threading
 
-from paddle_serving_client import Client
+from paddle_serving_client import Client, MultiLangClient
 from six.moves import queue
 from six.moves import reduce
 from .timeline import _TimeLine
@@ -499,23 +500,30 @@ class PredictPool(object):
                     self.rm_client(client)
                     continue
 
-                def predict_call_back(call_future):
-                    success, predict_data = client.result(call_future,
-                                                          read_data)
+                def predict_call_back(
+                        call_future,
+                        _client,
+                        _data, ):
+                    _task, _read_data = _data
+                    success, predict_data = _client.result(call_future,
+                                                           _read_data)
                     if not success:
                         in_queue.put(data)
-                        client.need_stop = True  # FIXME. stop?
+                        _client.need_stop = True  # FIXME. stop?
                         return
 
-                    out_data = read_data
+                    out_data = _read_data
                     for i in range(len(out_data)):
                         out_data[i] += predict_data[i]
-                    out_queue.put((task, out_data))
+                    out_queue.put((_task, out_data))
                     with task_count_lock:
                         finished_task_count[0] += 1
 
+                #logger.info('client={}'.format(client))
                 future = client.predict(read_data)
-                future.add_done_callback(predict_call_back)
+                future.add_done_callback(
+                    functools.partial(
+                        predict_call_back, _client=client, _data=data))
 
                 self._clients.put(client)
                 break
