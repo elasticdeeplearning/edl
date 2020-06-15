@@ -177,6 +177,40 @@ class DistillReader(object):
             process.append(worker)
         return process
 
+    def _start_predict_process(self):
+        if not self._is_predict_start:
+            stop_event = mps.Event()
+            predict_process = mps.Process(
+                target=distill_worker.predict_process,
+                args=(self._predict_server_queue,
+                      self._predict_server_result_queue,
+                      self._reader_out_queue, self._predict_out_queue,
+                      self._feeds, self._fetchs, self._serving_conf_file,
+                      stop_event, self._predict_cond))
+            predict_process.daemon = True
+            predict_process.start()
+
+            self._predict_manage_stop_event = threading.Event()
+            self._predict_manage_thread = threading.Thread(
+                target=distill_worker.predict_manage_worker,
+                args=(
+                    [predict_process],
+                    self._predict_server_queue,
+                    self._predict_server_result_queue,
+                    self._require_num,
+                    self._predict_stop_events,
+                    self._get_servers,
+                    self._predict_manage_stop_event,
+                    self._predict_cond, ))
+            self._predict_manage_thread.daemon = True
+            self._predict_manage_thread.start()
+
+            self._is_predict_start = True
+        else:
+            # wake up predict process
+            with self._predict_cond:
+                self._predict_cond.notify()
+
     def _start_predict_worker_pool(self):
         if not self._is_predict_start:
             # start predict worker pool
@@ -365,7 +399,8 @@ class DistillReader(object):
         # >>> there will only be thread 2 and the lock will be held forever.
         # So need to move start_predict_worker_pool to the end if we use logging in predict
         # manager thread, or for the sake of safety, don't use logging?
-        self._start_predict_worker_pool()
+        # self._start_predict_worker_pool()
+        self._start_predict_process()
 
         for data in distill_worker.fetch_out(
                 self._reader_type, self._predict_out_queue,

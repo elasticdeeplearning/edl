@@ -19,6 +19,7 @@ import signal
 import six
 import sys
 import time
+import threading
 
 from paddle_serving_client import Client
 from six.moves import queue
@@ -46,6 +47,8 @@ class ServerItem(object):
     PENDING = 'pending'
     ERROR = 'error'
     FINISHED = 'finished'
+    ADD = 'add'
+    STOP = 'stop'
 
     def __init__(self, server_id, server, stop_event_id, state=PENDING):
         self.server_id = server_id
@@ -313,6 +316,243 @@ class _TestNopPaddlePredictServer(PaddlePredictServer):
 
     def __del__(self):
         pass
+
+
+class AsyncPredictClient(object):
+    def __init__(self, server, config_file, feeds, fetchs, max_failed_times=3):
+        self.server = server
+        self._config_file = config_file
+        self._predict_feed_idxs = []
+        self._predict_feed_shapes = dict()
+        self._predict_feed_size = dict()
+        self._feeds = feeds
+        self._fetchs = fetchs
+        self._max_failed_times = max_failed_times
+        self.client = None
+        self._has_predict = False
+        self.need_stop = False
+        self.future_count = 0
+        logger.info((server, config_file, feeds, fetchs, max_failed_times))
+
+    def __lt__(self, other):
+        return self.future_count < other.future_count
+
+    def connect(self):
+        """ connect success, return True, else return False"""
+        try:
+            client = MultiLangClient()
+            client.load_client_config(self._config_file)
+            client.connect([self.server])
+            self.client = client
+        except Exception as e:
+            logger.error('Exception when connect server={}, Exception is:'.
+                         format(str(self.server)))
+            logger.error(str(e))
+            return False
+
+        self._predict_feed_idxs = []
+        self._predict_feed_shapes = dict()
+        self._predict_feed_size = dict()
+        for feed_idx, feed_name in enumerate(self._feeds):
+            if feed_name in self.client.get_feed_names():
+                self._predict_feed_idxs.append(feed_idx)
+                self._predict_feed_shapes[feed_name] = tuple(
+                    self.client.feed_shapes_[feed_name])
+                self._predict_feed_size[feed_name] = reduce(
+                    lambda x, y: x * y, self._predict_feed_shapes[feed_name])
+        return True
+
+    def _preprocess(self, feed_data):
+        """ feed_data(list). format e.g. [(img, label, img1, label1), (img, label, img1, label1)]
+        However, predict may only need (img, img1).
+        return [{'img': img, 'img1': img1}, {'img': img, 'img1': img1}]
+        """
+        feed_map_list = []
+        for batch_idx in range(len(feed_data)):
+            feed_map = dict()
+            for feed_idx in self._predict_feed_idxs:
+                feed_name = self._feeds[feed_idx]
+                feed_size = self._predict_feed_size[feed_name]
+                feed_shape = self._predict_feed_shapes[feed_name]
+
+                data = feed_data[batch_idx][feed_idx]
+                if data.size == feed_size:
+                    data = data.reshape(feed_shape)
+
+                feed_map[feed_name] = data
+            feed_map_list.append(feed_map)
+
+        logger.debug('predict feed_map_list len={}'.format(len(feed_map_list)))
+        return feed_map_list
+
+    def _postprocess(self, fetch_map_list, batch_size):
+        """ fetch_map_list(map): format e.g. {'predict0': np[bsize, ..], 'predict1': np[bsize, ..]}
+        return [(predict0, predict1), (predict0, predict1)]
+        """
+        predict_data = [tuple() for _ in range(batch_size)]
+        for fetch_name in self._fetchs:
+            batch_fetch_data = fetch_map_list[fetch_name]
+            for batch_idx, fetch_data in enumerate(batch_fetch_data):
+                predict_data[batch_idx] += (fetch_data, )
+        return predict_data
+
+    def predict(self, feed_data):
+        """ predict success, return (True, predict_data),
+        else return (False, None)"""
+        self._has_predict = True
+        feed_map_list = self._preprocess(feed_data)
+        future = self.client.predict(
+            feed=feed_map_list, fetch=self._fetchs, asyn=True)
+        self.future_count += 1
+        return future
+
+    def result(self, future, feed_data):
+        fetch_map_list = None
+        try:
+            fetch_map_list = future.result()
+        except Exception as e:
+            logger.warning('Failed with server={}'.format(self.server))
+            logger.warning('Exception:\n{}'.format(str(e)))
+
+        self.future_count -= 1
+
+        if fetch_map_list is None:
+            return False, None
+
+        predict_data = self._postprocess(fetch_map_list, len(feed_data))
+        return True, predict_data
+
+
+class _TestNopAsyncPredictClient(AsyncPredictClient):
+    class _Future(object):
+        def __init__(self, feed_data):
+            self._feed_data = feed_data
+
+        def add_done_callback(self, call_back):
+            call_back(self)
+
+    def connect(self):
+        return True
+
+    def predict(self, feed_data):
+        return self._Future(feed_data)
+
+    def result(self, future, feed_data):
+        predict_data = [tuple() for _ in range(len(feed_data))]
+        return True, predict_data
+
+
+class PredictPool(object):
+    def __init__(self, server_result_queue, max_clients=1):
+        self._clients = queue.PriorityQueue()
+        self._server_to_clients = dict()
+
+        self._server_result_queue = server_result_queue
+
+    def add_client(self, server_item, feeds, fetchs, conf_file):
+        server = server_item.server
+        if server_item.server in self._server_to_clients:
+            return True
+
+        predict_server = AsyncPredictClient if _NOP_PREDICT_TEST is False else _TestNopAsyncPredictClient
+        client = predict_server(server, conf_file, feeds, fetchs)
+        if not client.connect():
+            return False
+
+        self._server_to_clients[server] = (server_item, client)
+        self._clients.put(client)
+        return True
+
+    def stop_client(self, server_item):
+        server = server_item.server
+        client = self._server_to_clients[server]
+        client.need_stop = True
+
+    def rm_client(self, client):
+        server = client.server
+        server_item, client = self._server_to_clients[server]
+        del self._server_to_clients[server]
+
+        server_item.state = ServerItem.FINISHED
+        self._server_result_queue.put(server_item)
+
+    def run(self, in_queue, out_queue):
+        finished_task_count = [0]
+        task_count_lock = threading.Lock()
+
+        while True:
+            data = in_queue.get()
+            if isinstance(data, _PoisonPill):
+                poison_pill = data
+                if finished_task_count[0] == poison_pill.feed_count:
+                    poison_pill.predict_count = poison_pill.feed_count
+                    out_queue.put(poison_pill)
+                    break  # all task finished
+
+                in_queue.put(poison_pill)  # write back poison pill
+                continue  # continue process failed task
+
+            task, read_data = data
+            while True:
+                client = self._clients.get()
+                if client.need_stop:
+                    self.rm_client(client)
+                    continue
+
+                def predict_call_back(call_future):
+                    success, predict_data = client.result(call_future,
+                                                          read_data)
+                    if not success:
+                        in_queue.put(data)
+                        client.need_stop = True  # FIXME. stop?
+                        return
+
+                    out_data = read_data
+                    for i in range(len(out_data)):
+                        out_data[i] += predict_data[i]
+                    out_queue.put((task, out_data))
+                    with task_count_lock:
+                        finished_task_count[0] += 1
+
+                future = client.predict(read_data)
+                future.add_done_callback(predict_call_back)
+
+                self._clients.put(client)
+                break
+
+
+def predict_process(server_queue, server_result_queue, in_queue, out_queue,
+                    feeds, fetchs, conf_file, stop_event, predict_cond):
+    client_pool = PredictPool(server_result_queue)
+    manager_need_stop = False
+
+    def server_manager():
+        while not manager_need_stop:
+            try:
+                server_item = server_queue.get(timeout=1)
+            except queue.Empty:
+                continue
+
+            if server_item is None:
+                server_result_queue.put(None)
+                return
+
+            if server_item.state == ServerItem.PENDING:
+                client_pool.add_client(server_item, feeds, fetchs, conf_file)
+            elif server_item.state == ServerItem.STOP:
+                client_pool.stop_client(server_item)
+
+    manage_thread = threading.Thread(target=server_manager, )
+    manage_thread.daemon = True
+    manage_thread.start()
+
+    while not stop_event.is_set():
+        client_pool.run(in_queue, out_queue)
+        with predict_cond:
+            predict_cond.wait()
+
+    manager_need_stop = True
+    manage_thread.join()
 
 
 def predict_worker(server_queue, server_result_queue, working_predict_count,
