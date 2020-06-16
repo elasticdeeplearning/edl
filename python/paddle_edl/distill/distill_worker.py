@@ -423,6 +423,18 @@ class AsyncPredictClient(object):
         predict_data = self._postprocess(fetch_map_list, len(feed_data))
         return True, predict_data
 
+    def __del__(self):
+        try:
+            # avoid serving exit bug when hasn't predict
+            if self.client is not None and self._has_predict:
+                self.client.release()
+        except Exception as e:
+            logger.critical('Release client failed with server={}, '
+                            'there may be an unknown error'.format(
+                                self.server))
+            logger.critical('Exception:\n{}'.format(str(e)))
+        logger.warning('Stopped predict server={}'.format(self.server))
+
 
 class _TestNopAsyncPredictClient(AsyncPredictClient):
     class _Future(object):
@@ -445,7 +457,8 @@ class _TestNopAsyncPredictClient(AsyncPredictClient):
 
 class PredictPool(object):
     def __init__(self, server_result_queue, max_clients=1):
-        self._clients = queue.PriorityQueue()
+        #self._clients = queue.PriorityQueue()
+        self._clients = queue.Queue()
         self._server_to_clients = dict()
 
         self._server_result_queue = server_result_queue
@@ -495,6 +508,7 @@ class PredictPool(object):
 
             task, read_data = data
             while True:
+                #logger.info('task_id={}'.format(task.task_id))
                 client = self._clients.get()
                 if client.need_stop:
                     self.rm_client(client)
@@ -508,7 +522,7 @@ class PredictPool(object):
                     success, predict_data = _client.result(call_future,
                                                            _read_data)
                     if not success:
-                        in_queue.put(data)
+                        in_queue.put(_data)
                         _client.need_stop = True  # FIXME. stop?
                         return
 
@@ -519,7 +533,6 @@ class PredictPool(object):
                     with task_count_lock:
                         finished_task_count[0] += 1
 
-                #logger.info('client={}'.format(client))
                 future = client.predict(read_data)
                 future.add_done_callback(
                     functools.partial(
@@ -546,7 +559,10 @@ def predict_process(server_queue, server_result_queue, in_queue, out_queue,
                 return
 
             if server_item.state == ServerItem.PENDING:
-                client_pool.add_client(server_item, feeds, fetchs, conf_file)
+                if not client_pool.add_client(server_item, feeds, fetchs,
+                                              conf_file):
+                    server_item.state = ServerItem.FINISHED
+                    server_result_queue.put(server_item)
             elif server_item.state == ServerItem.STOP:
                 client_pool.stop_client(server_item)
 
