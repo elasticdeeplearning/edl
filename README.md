@@ -99,6 +99,9 @@ python -m paddle.distributed.launch --selected_gpus 0 \
 - When elastic nodes join or leave current training job, training hyper-parameter will be adjusted automatically.
 - Newly comming training nodes will load checkpoint from remote FS automatically.
 - A model checkpoint is saved every serveral steps given by user
+<p align="center">
+    <img src="doc/checkpoint_based_edl.gif" width="550">
+</p>
 
 <h3 align="center"> Resnet50 experiments on a single machine in docker </h3>
 
