@@ -245,7 +245,7 @@ class DistillReader(object):
             self._reader_out_queue = mps.Queue()
             self._reader_stop_event = mps.Event()
             self._reader_cond = mps.Condition()
-            self._task_semaphore = mps.Semaphore(2 * self._require_num + 2)
+            self._task_semaphore = mps.Semaphore(3 * self._require_num + 1)
 
             # predict
             self._predict_server_queue = mps.Queue(self._require_num)
@@ -377,7 +377,7 @@ class DistillReader(object):
             'teacher_service_name': self._service_name,
             'reader_type': self._reader_type,
         }
-        for config, value in print_config.iteritems():
+        for config, value in print_config.items():
             print("%s: %s" % (config, value))
         print("------------------------------------------------")
 
