@@ -30,6 +30,7 @@ import os
 import sys
 from paddle_serving_client import Client
 from paddle_serving_app.reader import ChineseBertReader
+from model import CNN, AdamW, evaluate_student
 
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument(
@@ -37,31 +38,41 @@ parser.add_argument(
     type=str,
     default=None,
     help="fixed teacher for debug local distill")
-parser.add_argument("--s_weight", type=float, help="weight of student in loss")
 parser.add_argument(
-    "--LR", type=float, default=5e-5, help="weight of student in loss")
+    "--s_weight", type=float, default=0.4, help="weight of student in loss")
 parser.add_argument(
-    "--epoch_num", type=int, default=20, help="weight of student in loss")
+    "--LR", type=float, default=5e-5 * 1.5, help="weight of student in loss")
+parser.add_argument(
+    "--epoch_num", type=int, default=10, help="weight of student in loss")
 parser.add_argument(
     "--T", type=float, default=None, help="weight of student in loss")
+parser.add_argument(
+    "--opt", type=str, default="AdamW", help="weight of student in loss")
+parser.add_argument("--train_range", type=int, default=10, help="train range")
 args = parser.parse_args()
-print("args:", args)
+print("parsed args:", args)
+
+g_max_acc = []
 
 
-def train_with_distill(train_reader,
-                       test_reader,
-                       word_dict,
-                       orig_reader,
-                       epoch_num=EPOCH):
+def train_with_distill(train_reader, test_reader, word_dict, orig_reader,
+                       epoch_num):
     model = CNN(word_dict)
     g_clip = F.clip.GradientClipByGlobalNorm(1.0)  #experimental
-    #opt = F.optimizer.Adam(learning_rate=LR, parameter_list=model.parameters(), grad_clip=g_clip)
-    opt = AdamW(
-        learning_rate=LR,
-        parameter_list=model.parameters(),
-        weight_decay=0.01,
-        grad_clip=g_clip)
+    if args.opt == "Adam":
+        opt = F.optimizer.Adam(
+            learning_rate=args.LR,
+            parameter_list=model.parameters(),
+            grad_clip=g_clip)
+    else:
+        opt = AdamW(
+            learning_rate=args.LR,
+            parameter_list=model.parameters(),
+            weight_decay=0.01,
+            grad_clip=g_clip)
+
     model.train()
+    max_acc = 0.0
     for epoch in range(epoch_num):
         for step, output in enumerate(train_reader()):
             (_, _, _, _, ids_student, labels, logits_t) = output
@@ -73,18 +84,19 @@ def train_with_distill(train_reader,
 
             _, logits_s = model(ids_student)  # student 模型输出logits
             loss_ce, _ = model(ids_student, labels=labels)
+
             if args.T is None:
-                loss = args.s_weight / 100.0 * loss_ce + (
-                    1.0 - args.s_weight / 100.0
-                ) * L.softmax_with_cross_entropy(
+                loss_s_t = L.softmax_with_cross_entropy(
                     logits_s, logits_t, soft_label=True)
+                loss = args.s_weight * loss_ce + (1.0 - args.s_weight
+                                                  ) * loss_s_t
             else:
-                Tf = args.T / 10.0
-                p = L.softmax(logits_t / Tf)
-                loss = args.s_weight / 100.0 * loss_ce + (
-                    1.0 - args.s_weight / 100.0
-                ) * Tf * Tf * L.softmax_with_cross_entropy(
-                    logits_s / Tf, p, soft_label=True)
+                p = L.softmax(logits_t / T)
+                loss_s_t = L.softmax_with_cross_entropy(
+                    logits_s, p, soft_label=True)
+                loss = args.s_weight * loss_ce + (1.0 - args.s_weight
+                                                  ) * Tf * Tf * loss_s_t
+
             loss = L.reduce_mean(loss)
             loss.backward()
             if step % 10 == 0:
@@ -94,6 +106,9 @@ def train_with_distill(train_reader,
             model.clear_gradients()
         f1, acc = evaluate_student(model, test_reader)
         print('teacher:with distillation student f1 %.5f acc %.5f' % (f1, acc))
+
+        if max_acc < acc:
+            max_acc = acc
 
         for step, (ids_student, labels, sentence) in enumerate(orig_reader()):
             loss, _ = model(ids_student, labels=labels)
@@ -107,6 +122,11 @@ def train_with_distill(train_reader,
 
         f1, acc = evaluate_student(model, test_reader)
         print('hard:with distillation student f1 %.5f acc %.5f' % (f1, acc))
+
+        if max_acc < acc:
+            max_acc = acc
+
+    g_max_acc.append(max_acc)
 
 
 def ernie_reader(s_reader, key_list):
@@ -171,4 +191,13 @@ if __name__ == "__main__":
         "./data/train.part.0", word_dict, batch_size=batch_size)
     dr_t = dr.set_batch_generator(ernie_reader(dr_train_reader, feed_keys))
 
-    train_with_distill(dr_t, dev_reader, word_dict, train_reader)
+    for i in range(args.train_range):
+        train_with_distill(
+            dr_t,
+            dev_reader,
+            word_dict,
+            train_reader,
+            epoch_num=args.epoch_num)
+
+    arr = np.array(g_max_acc)
+    print("max_acc:", arr, "average:", np.average(arr), "train_args:", args)

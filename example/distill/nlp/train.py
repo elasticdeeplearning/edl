@@ -79,7 +79,7 @@ if __name__ == "__main__":
     dev_reader = ds.pad_batch_reader(
         "./data/dev.part.0", word_dict, batch_size=batch_size)
 
-    for i in range(1, 10):
+    for i in range(10):
         train_without_distill(
             train_reader, dev_reader, word_dict, epoch_num=10, lr=5e-5)
 
