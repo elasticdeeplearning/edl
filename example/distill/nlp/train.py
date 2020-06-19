@@ -29,22 +29,27 @@ import re
 import os
 import sys
 
-from model import CNN
+from model import CNN, AdamW, evaluate_student
+
+g_max_acc = []
 
 
-def train_without_distill(train_reader, test_reader, word_dict, epoch_num):
+def train_without_distill(train_reader, test_reader, word_dict, epoch_num, lr):
     model = CNN(word_dict)
     g_clip = F.clip.GradientClipByGlobalNorm(1.0)  #experimental
-    #opt = F.optimizer.Adam(learning_rate=LR, parameter_list=model.parameters(), grad_clip=g_clip)
+    #opt = F.optimizer.Adam(learning_rate=lr, parameter_list=model.parameters(), grad_clip=g_clip)
     opt = AdamW(
-        learning_rate=LR,
+        learning_rate=lr,
         parameter_list=model.parameters(),
         weight_decay=0.01,
         grad_clip=g_clip)
     model.train()
+
+    max_acc = 0.0
     for epoch in range(epoch_num):
         for step, (ids_student, labels, sentence) in enumerate(train_reader()):
             loss, _ = model(ids_student, labels=labels)
+            loss = L.reduce_mean(loss)
             loss.backward()
             if step % 10 == 0:
                 print('[step %03d] distill train loss %.5f lr %.3e' %
@@ -53,6 +58,11 @@ def train_without_distill(train_reader, test_reader, word_dict, epoch_num):
             model.clear_gradients()
         f1, acc = evaluate_student(model, test_reader)
         print('without distillation student f1 %.5f acc %.5f' % (f1, acc))
+
+        if max_acc < acc:
+            max_acc = acc
+
+    g_max_acc.append(max_acc)
 
 
 if __name__ == "__main__":
@@ -69,4 +79,9 @@ if __name__ == "__main__":
     dev_reader = ds.pad_batch_reader(
         "./data/dev.part.0", word_dict, batch_size=batch_size)
 
-    train_without_distill(train_reader, dev_reader, word_dict, epoch_num=10)
+    for i in range(1, 10):
+        train_without_distill(
+            train_reader, dev_reader, word_dict, epoch_num=10, lr=5e-5)
+
+    arr = np.array(g_max_acc)
+    print("max_acc:", arr, "average:", np.average(arr))

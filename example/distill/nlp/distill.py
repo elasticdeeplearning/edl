@@ -154,8 +154,6 @@ if __name__ == "__main__":
     dev_reader = ds.pad_batch_reader(
         "./data/dev.part.0", word_dict, batch_size=batch_size)
 
-    #train_without_distill(train_reader, dev_reader, word_dict)
-
     feed_keys = [
         "input_ids", "position_ids", "segment_ids", "input_mask",
         "ids_student", "labels"
