@@ -39,7 +39,7 @@ parser.add_argument(
     default=None,
     help="fixed teacher for debug local distill")
 parser.add_argument(
-    "--s_weight", type=float, default=0.4, help="weight of student in loss")
+    "--s_weight", type=float, default=0.04, help="weight of student in loss")
 parser.add_argument(
     "--LR", type=float, default=5e-5 * 1.5, help="weight of student in loss")
 parser.add_argument(
@@ -63,6 +63,7 @@ def train_with_distill(train_reader, test_reader, word_dict, orig_reader,
         opt = F.optimizer.Adam(
             learning_rate=args.LR,
             parameter_list=model.parameters(),
+            regularization=F.regularizer.L2Decay(regularization_coeff=0.0001),
             grad_clip=g_clip)
     else:
         opt = AdamW(
@@ -86,8 +87,9 @@ def train_with_distill(train_reader, test_reader, word_dict, orig_reader,
             loss_ce, _ = model(ids_student, labels=labels)
 
             if args.T is None:
+                p = L.softmax(logits_t)
                 loss_s_t = L.softmax_with_cross_entropy(
-                    logits_s, logits_t, soft_label=True)
+                    logits_s, p, soft_label=True)
                 loss = args.s_weight * loss_ce + (1.0 - args.s_weight
                                                   ) * loss_s_t
             else:
@@ -109,7 +111,7 @@ def train_with_distill(train_reader, test_reader, word_dict, orig_reader,
 
         if max_acc < acc:
             max_acc = acc
-
+        """
         for step, (ids_student, labels, sentence) in enumerate(orig_reader()):
             loss, _ = model(ids_student, labels=labels)
             loss = L.reduce_mean(loss)
@@ -125,6 +127,7 @@ def train_with_distill(train_reader, test_reader, word_dict, orig_reader,
 
         if max_acc < acc:
             max_acc = acc
+        """
 
     g_max_acc.append(max_acc)
 
