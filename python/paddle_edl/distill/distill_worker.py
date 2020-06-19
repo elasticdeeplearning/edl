@@ -57,16 +57,9 @@ class ServerItem(object):
         self.state = state
 
 
-def predict_manage_worker(process, server_queue, server_result_queue,
-                          require_num, get_servers_fun, stop_event,
-                          predict_cond):
+def predict_manage_worker(server_queue, server_result_queue, require_num,
+                          get_servers_fun, stop_event):
     """ thread that manage predict worker """
-    num_shutdown_process = [0]
-
-    def shutdown_one_process():
-        server_queue.put(None)
-        num_shutdown_process[0] += 1
-
     server_id = 0  # not yet used
     server_to_item = dict()  # server to server_item
     idle_predict_num = require_num
@@ -136,22 +129,6 @@ def predict_manage_worker(process, server_queue, server_result_queue,
 
     clean_queue(server_queue)
     clean_queue(server_result_queue)
-
-    with predict_cond:
-        predict_cond.notify_all()
-
-    for i in range(require_num):
-        shutdown_one_process()
-        clean_queue(server_result_queue)
-
-    for i in range(20):
-        shutdown_process = 0
-        for p in process:
-            if not p.is_alive():
-                shutdown_process += 1
-        if shutdown_process == len(process):
-            break
-        time.sleep(1)
 
 
 class _PoisonPill:
@@ -447,10 +424,10 @@ def predict_process(server_queue, server_result_queue, in_queue, out_queue,
 
     try:
         client_pool = PredictPool(server_result_queue)
-        manager_need_stop = False
+        manager_need_stop = threading.Event()
 
         def server_manager():
-            while not manager_need_stop:
+            while not manager_need_stop.is_set():
                 try:
                     server_item = server_queue.get(timeout=1)
                 except queue.Empty:
@@ -478,7 +455,7 @@ def predict_process(server_queue, server_result_queue, in_queue, out_queue,
                 out_queue.put(poison_pill)
                 predict_cond.wait()
 
-        manager_need_stop = True
+        manager_need_stop.set()
         manage_thread.join()
     except Exception as e:
         if signal_exit[0] is True:

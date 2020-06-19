@@ -90,10 +90,12 @@ class DistillReader(object):
         self._task_semaphore = None
 
         # predict worker args
+        self._predict_worker = None
         self._predict_server_queue = None
         self._predict_server_result_queue = None
         self._predict_out_queue = None
         self._predict_cond = None
+        self._predict_stop_event = None
         # predict worker pool
         self._predict_manage_thread = None
         self._predict_manage_stop_event = None
@@ -152,28 +154,27 @@ class DistillReader(object):
 
     def _start_predict_process(self):
         if not self._is_predict_start:
-            stop_event = mps.Event()
+            self._predict_stop_event = mps.Event()
             predict_process = mps.Process(
                 target=distill_worker.predict_process,
                 args=(self._predict_server_queue,
                       self._predict_server_result_queue,
                       self._reader_out_queue, self._predict_out_queue,
                       self._feeds, self._fetchs, self._serving_conf_file,
-                      stop_event, self._predict_cond))
+                      self._predict_stop_event, self._predict_cond))
             predict_process.daemon = True
             predict_process.start()
+            self._predict_worker = predict_process
 
             self._predict_manage_stop_event = threading.Event()
             self._predict_manage_thread = threading.Thread(
                 target=distill_worker.predict_manage_worker,
                 args=(
-                    [predict_process],
                     self._predict_server_queue,
                     self._predict_server_result_queue,
                     self._require_num,
                     self._get_servers,
-                    self._predict_manage_stop_event,
-                    self._predict_cond, ))
+                    self._predict_manage_stop_event, ))
             self._predict_manage_thread.daemon = True
             self._predict_manage_thread.start()
 
@@ -358,6 +359,10 @@ class DistillReader(object):
             self._reader_cond.notify()
 
         self._predict_manage_stop_event.set()
+
+        self._predict_stop_event.set()
+        with self._predict_cond:
+            self._predict_cond.notify()
 
         for i in range(20):
             if self._reader_worker.is_alive() or \
