@@ -154,29 +154,6 @@ class DistillReader(object):
             with self._reader_cond:
                 self._reader_cond.notify()
 
-    def _start_predict_worker(self):
-        process = []
-        for i in range(self._require_num):
-            worker = mps.Process(
-                target=distill_worker.predict_worker,
-                args=(
-                    self._predict_server_queue,
-                    self._predict_server_result_queue,
-                    self._working_predict_count,
-                    self._reader_out_queue,
-                    self._predict_out_queue,
-                    self._feeds,
-                    self._fetchs,
-                    self._serving_conf_file,
-                    self._predict_stop_events,
-                    self._predict_lock,
-                    self._predict_finished_task,
-                    self._predict_cond, ))
-            worker.daemon = True
-            worker.start()
-            process.append(worker)
-        return process
-
     def _start_predict_process(self):
         if not self._is_predict_start:
             stop_event = mps.Event()
@@ -210,31 +187,6 @@ class DistillReader(object):
             # wake up predict process
             with self._predict_cond:
                 self._predict_cond.notify()
-
-    def _start_predict_worker_pool(self):
-        if not self._is_predict_start:
-            # start predict worker pool
-            process = self._start_predict_worker()
-            self._predict_manage_stop_event = threading.Event()
-            self._predict_manage_thread = threading.Thread(
-                target=distill_worker.predict_manage_worker,
-                args=(
-                    process,
-                    self._predict_server_queue,
-                    self._predict_server_result_queue,
-                    self._require_num,
-                    self._predict_stop_events,
-                    self._get_servers,
-                    self._predict_manage_stop_event,
-                    self._predict_cond, ))
-            self._predict_manage_thread.daemon = True
-            self._predict_manage_thread.start()
-
-            self._is_predict_start = True
-        else:
-            # wake up predict worker pool
-            with self._predict_cond:
-                self._predict_cond.notify_all()
 
     def _init_args(self):
         if not self._is_args_init:
