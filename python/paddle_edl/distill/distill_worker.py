@@ -46,16 +46,14 @@ def _is_server_alive(server):
 
 
 class ServerItem(object):
-    PENDING = 'pending'
+    RUNNING = 'pending'
     ERROR = 'error'
     FINISHED = 'finished'
-    ADD = 'add'
-    STOP = 'stop'
+    STOPPING = 'stopping'
 
-    def __init__(self, server_id, server, stop_event_id, state=PENDING):
+    def __init__(self, server_id, server, state=RUNNING):
         self.server_id = server_id
         self.server = server
-        self.stop_event_id = stop_event_id
         self.state = state
 
 
@@ -72,9 +70,6 @@ def predict_manage_worker(process, server_queue, server_result_queue,
     server_id = 0  # not yet used
     server_to_item = dict()  # server to server_item
     idle_predict_num = require_num
-    event_set = set()
-    for i in range(require_num):
-        event_set.add(i)
 
     # Fix the order of object destruction
     first_in = True
@@ -94,10 +89,11 @@ def predict_manage_worker(process, server_queue, server_result_queue,
         while len(rm_servers) != 0:
             server = rm_servers.pop()
             server_item = server_to_item[server]
-            stop_event_id = server_item.stop_event_id
-            # set stop event
-            if not predict_stop_events[stop_event_id].is_set():
-                predict_stop_events[stop_event_id].set()
+
+            # need stop
+            if server_item.state != ServerItem.STOPPING:
+                server_item.state = ServerItem.STOPPING
+                server_queue.put(server_item)
                 logger.info('Removing server={}'.format(server))
 
         # Add servers
@@ -112,8 +108,7 @@ def predict_manage_worker(process, server_queue, server_result_queue,
                 continue
 
             idle_predict_num -= 1
-            event_id = event_set.pop()
-            server_item = ServerItem(server_id, server, event_id)
+            server_item = ServerItem(server_id, server)
             server_queue.put(server_item)
             server_to_item[server] = server_item
             server_id += 1
@@ -122,13 +117,8 @@ def predict_manage_worker(process, server_queue, server_result_queue,
         try:
             # server job stop, return back stop_event_id
             server_result_item = server_result_queue.get(timeout=2)
-            stop_event_id = server_result_item.stop_event_id
-            event_set.add(stop_event_id)
             del server_to_item[server_result_item.server]
 
-            # clear event
-            predict_stop_events[stop_event_id].clear()
-            # directly use count
             idle_predict_num += 1
             assert idle_predict_num <= require_num, \
                 'idle_predict_num={} must <= require_num={}'.format(
@@ -359,8 +349,11 @@ class PredictPool(object):
 
     def stop_client(self, server_item):
         server = server_item.server
-        client = self._server_to_clients[server]
-        client.need_stop = True
+        item_client = self._server_to_clients.get(server)
+        # client may removed before this
+        if item_client is not None:
+            _, client = item_client
+            client.need_stop = True
 
     def rm_client(self, client):
         server = client.server
@@ -470,12 +463,12 @@ def predict_process(server_queue, server_result_queue, in_queue, out_queue,
                     server_result_queue.put(None)
                     return
 
-                if server_item.state == ServerItem.PENDING:
+                if server_item.state == ServerItem.RUNNING:
                     if not client_pool.add_client(server_item, feeds, fetchs,
                                                   conf_file):
                         server_item.state = ServerItem.FINISHED
                         server_result_queue.put(server_item)
-                elif server_item.state == ServerItem.STOP:
+                elif server_item.state == ServerItem.STOPPING:
                     client_pool.stop_client(server_item)
 
         manage_thread = threading.Thread(target=server_manager, )

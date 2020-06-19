@@ -197,7 +197,7 @@ class DistillReader(object):
             self._reader_out_queue = mps.Queue()
             self._reader_stop_event = mps.Event()
             self._reader_cond = mps.Condition()
-            self._task_semaphore = mps.Semaphore(3 * self._require_num + 1)
+            self._task_semaphore = mps.Semaphore(4 * self._require_num)
 
             # predict
             self._predict_server_queue = mps.Queue(self._require_num)
