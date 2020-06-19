@@ -92,11 +92,7 @@ class DistillReader(object):
         # predict worker args
         self._predict_server_queue = None
         self._predict_server_result_queue = None
-        self._working_predict_count = None
         self._predict_out_queue = None
-        self._predict_stop_events = None
-        self._predict_lock = None
-        self._predict_finished_task = None
         self._predict_cond = None
         # predict worker pool
         self._predict_manage_thread = None
@@ -175,7 +171,6 @@ class DistillReader(object):
                     self._predict_server_queue,
                     self._predict_server_result_queue,
                     self._require_num,
-                    self._predict_stop_events,
                     self._get_servers,
                     self._predict_manage_stop_event,
                     self._predict_cond, ))
@@ -202,13 +197,7 @@ class DistillReader(object):
             # predict
             self._predict_server_queue = mps.Queue(self._require_num)
             self._predict_server_result_queue = mps.Queue(self._require_num)
-            self._working_predict_count = mps.Value('i', 0, lock=False)
             self._predict_out_queue = mps.Queue()
-            self._predict_stop_events = [
-                mps.Event() for i in range(self._require_num)
-            ]
-            self._predict_lock = mps.Lock()
-            self._predict_finished_task = mps.Value('i', 0, lock=False)
             self._predict_cond = mps.Condition()
 
             # fetch

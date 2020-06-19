@@ -58,8 +58,8 @@ class ServerItem(object):
 
 
 def predict_manage_worker(process, server_queue, server_result_queue,
-                          require_num, predict_stop_events, get_servers_fun,
-                          stop_event, predict_cond):
+                          require_num, get_servers_fun, stop_event,
+                          predict_cond):
     """ thread that manage predict worker """
     num_shutdown_process = [0]
 
@@ -138,8 +138,6 @@ def predict_manage_worker(process, server_queue, server_result_queue,
     clean_queue(server_result_queue)
 
     with predict_cond:
-        for predict_stop_event in predict_stop_events:
-            predict_stop_event.set()
         predict_cond.notify_all()
 
     for i in range(require_num):
@@ -378,8 +376,7 @@ class PredictPool(object):
                 poison_pill = data
                 if finished_task_count[0] == poison_pill.feed_count:
                     poison_pill.predict_count = poison_pill.feed_count
-                    out_queue.put(poison_pill)
-                    break  # all task finished
+                    return poison_pill  # all task finished
 
                 in_queue.put(poison_pill)  # write back poison pill
                 continue  # continue process failed task
@@ -476,8 +473,9 @@ def predict_process(server_queue, server_result_queue, in_queue, out_queue,
         manage_thread.start()
 
         while not stop_event.is_set():
-            client_pool.run(in_queue, out_queue)
+            poison_pill = client_pool.run(in_queue, out_queue)
             with predict_cond:
+                out_queue.put(poison_pill)
                 predict_cond.wait()
 
         manager_need_stop = True
