@@ -29,13 +29,13 @@ import re
 import os
 import sys
 
-from model import CNN, AdamW, evaluate_student
+from model import CNN, AdamW, evaluate_student, BOW
 
 g_max_acc = []
 
 
 def train_without_distill(train_reader, test_reader, word_dict, epoch_num, lr):
-    model = CNN(word_dict)
+    model = BOW(word_dict)
     g_clip = F.clip.GradientClipByGlobalNorm(1.0)  #experimental
     #opt = F.optimizer.Adam(learning_rate=lr, parameter_list=model.parameters(), grad_clip=g_clip)
     opt = AdamW(

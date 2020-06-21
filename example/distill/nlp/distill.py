@@ -30,7 +30,7 @@ import os
 import sys
 from paddle_serving_client import Client
 from paddle_serving_app.reader import ChineseBertReader
-from model import CNN, AdamW, evaluate_student
+from model import CNN, AdamW, evaluate_student, KL, BOW
 
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument(
@@ -49,6 +49,7 @@ parser.add_argument(
 parser.add_argument(
     "--opt", type=str, default="AdamW", help="weight of student in loss")
 parser.add_argument("--train_range", type=int, default=10, help="train range")
+parser.add_argument("--kl", type=int, default=0, help="train range")
 args = parser.parse_args()
 print("parsed args:", args)
 
@@ -57,7 +58,7 @@ g_max_acc = []
 
 def train_with_distill(train_reader, test_reader, word_dict, orig_reader,
                        epoch_num):
-    model = CNN(word_dict)
+    model = BOW(word_dict)
     g_clip = F.clip.GradientClipByGlobalNorm(1.0)  #experimental
     if args.opt == "Adam":
         opt = F.optimizer.Adam(
@@ -82,24 +83,44 @@ def train_with_distill(train_reader, test_reader, word_dict, orig_reader,
                 pad_batch_data(ids_student, 'int64'))
             labels = D.base.to_variable(np.array(labels).astype('int64'))
             logits_t = D.base.to_variable(np.array(logits_t).astype('float32'))
+            logits_t.stop_gradient = True
 
+            #print("ids_student:", ids_student.shape, ids_student)
             _, logits_s = model(ids_student)  # student 模型输出logits
             loss_ce, _ = model(ids_student, labels=labels)
 
             if args.T is None:
-                p = L.softmax(logits_t)
-                loss_s_t = L.softmax_with_cross_entropy(
-                    logits_s, p, soft_label=True)
+                if not args.kl:
+                    teacher_softmax_out = L.softmax(logits_t)
+                    teacher_smooth_out = L.label_smooth(
+                        label=teacher_softmax_out,
+                        epsilon=0.0,
+                        dtype="float32")
+                    student_softmax_out = L.softmax(logits_s)
+                    student_smooth_out = L.label_smooth(
+                        label=student_softmax_out,
+                        epsilon=0.0,
+                        dtype="float32")
+                    #p=logits_t
+                    loss_kd = L.cross_entropy(
+                        student_smooth_out,
+                        teacher_smooth_out,
+                        soft_label=True)
+                    loss_kd = L.reduce_mean(loss_kd)
+                else:
+                    loss_kd = KL(logits_s, logits_t)  # 由KL divergence度量两个分布的距离
+
                 loss = args.s_weight * loss_ce + (1.0 - args.s_weight
-                                                  ) * loss_s_t
+                                                  ) * loss_kd
+                print("labels:", labels)
+                print("logits_s:", logits_s, "logits_t:", logits_t)
+                #sys.exit(0)
             else:
-                p = L.softmax(logits_t / T)
+                p = L.softmax(logits_t / args.T)
                 loss_s_t = L.softmax_with_cross_entropy(
                     logits_s, p, soft_label=True)
                 loss = args.s_weight * loss_ce + (1.0 - args.s_weight
                                                   ) * Tf * Tf * loss_s_t
-
-            loss = L.reduce_mean(loss)
             loss.backward()
             if step % 10 == 0:
                 print('[step %03d] distill train loss %.5f lr %.3e' %

@@ -85,12 +85,19 @@ class BOW(D.Layer):
     def forward(self, ids, labels=None):
         embbed = self.emb(ids)
         pad_mask = L.unsqueeze(L.cast(ids != 0, 'float32'), [-1])
+        #print("embbed:", embbed.shape,
+        #      "pad_mask", pad_mask.shape)
+
+        mul = embbed * pad_mask
+        #print("mul:", mul.shape)
+
+        #print("embbed:", embbed)
+        #print("pad_mask:", pad_mask)
+        #print("mul:", mul.shape, mul)
 
         embbed = L.reduce_sum(embbed * pad_mask, 1)
         embbed = L.softsign(embbed)
         logits = self.fc(embbed)
-        #print("embbed:", embbed.shape,
-        #      "pad_mask", pad_mak.shape)
 
         if labels is not None:
             if len(labels.shape) == 1:
@@ -128,7 +135,7 @@ class CNN(D.Layer):
             if len(labels.shape) == 1:
                 labels = L.reshape(labels, [-1, 1])
             loss = L.softmax_with_cross_entropy(logits, labels)
-            #loss = L.reduce_mean(loss)
+            loss = L.reduce_mean(loss)
         else:
             loss = None
         return loss, logits
