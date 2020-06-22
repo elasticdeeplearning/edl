@@ -41,11 +41,13 @@ parser.add_argument(
 parser.add_argument(
     "--s_weight", type=float, default=0.04, help="weight of student in loss")
 parser.add_argument(
-    "--LR", type=float, default=5e-5 * 1.5, help="weight of student in loss")
+    "--LR", type=float, default=1e-4 * 1.5, help="weight of student in loss")
 parser.add_argument(
     "--epoch_num", type=int, default=10, help="weight of student in loss")
 parser.add_argument(
     "--T", type=float, default=None, help="weight of student in loss")
+parser.add_argument(
+    "--decay", type=float, default=0.01, help="weight of student in loss")
 parser.add_argument(
     "--opt", type=str, default="AdamW", help="weight of student in loss")
 parser.add_argument("--train_range", type=int, default=10, help="train range")
@@ -64,13 +66,14 @@ def train_with_distill(train_reader, test_reader, word_dict, orig_reader,
         opt = F.optimizer.Adam(
             learning_rate=args.LR,
             parameter_list=model.parameters(),
-            regularization=F.regularizer.L2Decay(regularization_coeff=0.0001),
+            regularization=F.regularizer.L2Decay(
+                regularization_coeff=args.decay),
             grad_clip=g_clip)
     else:
         opt = AdamW(
             learning_rate=args.LR,
             parameter_list=model.parameters(),
-            weight_decay=0.01,
+            weight_decay=args.decay,
             grad_clip=g_clip)
 
     model.train()
@@ -89,40 +92,25 @@ def train_with_distill(train_reader, test_reader, word_dict, orig_reader,
             _, logits_s = model(ids_student)  # student 模型输出logits
             loss_ce, _ = model(ids_student, labels=labels)
 
+            p = None
             if args.T is None:
-                if not args.kl:
-                    teacher_softmax_out = L.softmax(logits_t)
-                    teacher_smooth_out = L.label_smooth(
-                        label=teacher_softmax_out,
-                        epsilon=0.0,
-                        dtype="float32")
-                    student_softmax_out = L.softmax(logits_s)
-                    student_smooth_out = L.label_smooth(
-                        label=student_softmax_out,
-                        epsilon=0.0,
-                        dtype="float32")
-                    #p=logits_t
-                    loss_kd = L.cross_entropy(
-                        student_smooth_out,
-                        teacher_smooth_out,
-                        soft_label=True)
-                    loss_kd = L.reduce_mean(loss_kd)
-                else:
-                    loss_kd = KL(logits_s, logits_t)  # 由KL divergence度量两个分布的距离
-
+                loss_kd = KL(logits_s, logits_t)  # 由KL divergence度量两个分布的距离
                 loss = args.s_weight * loss_ce + (1.0 - args.s_weight
                                                   ) * loss_kd
-                print("labels:", labels)
-                print("logits_s:", logits_s, "logits_t:", logits_t)
-                #sys.exit(0)
             else:
                 p = L.softmax(logits_t / args.T)
                 loss_s_t = L.softmax_with_cross_entropy(
-                    logits_s, p, soft_label=True)
-                loss = args.s_weight * loss_ce + (1.0 - args.s_weight
-                                                  ) * Tf * Tf * loss_s_t
+                    logits_s / args.T, p, soft_label=True)
+                loss = args.T * args.T * (args.s_weight * loss_ce +
+                                          (1.0 - args.s_weight) * loss_s_t)
+            #loss = L.reduce_mean(loss)
             loss.backward()
             if step % 10 == 0:
+                print("labels:", labels)
+                print("logits_s:", logits_s, "logits_t:", logits_t)
+                if p is not None:
+                    print("p:", p)
+
                 print('[step %03d] distill train loss %.5f lr %.3e' %
                       (step, loss.numpy(), opt.current_step_lr()))
             opt.minimize(loss)

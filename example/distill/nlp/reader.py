@@ -105,27 +105,29 @@ class ChnSentiCorp(BaseNLPDataset):
 
         return self._word_dict
 
-    def student_reader(self, input_file, word_dict):
+    def student_reader(self, input_files, word_dict):
         """
         return [([segment_sentence_idxs], label, sentence), ()...]
         """
 
         def reader():
-            for t in self.__read_file(input_file):
-                s = []
-                for word in space_tokenizer(t[1]):
-                    idx = word_dict[word] if word in word_dict else word_dict[
-                        '[UNK]']
-                    s.append(idx)
+            for data_file in input_files:
+                print("open file:", data_file)
+                for t in self.__read_file(data_file):
+                    s = []
+                    for word in space_tokenizer(t[1]):
+                        idx = word_dict[
+                            word] if word in word_dict else word_dict['[UNK]']
+                        s.append(idx)
 
-                yield s, t[2], t[0]
+                    yield s, t[2], t[0]
 
         return reader
 
     def batch_reader(self, input_file, word_dict, batch_size):
         def reader():
             s_reader = P.reader.shuffle(
-                self.student_reader(input_file, word_dict), buf_size=10000)
+                self.student_reader(input_file, word_dict), buf_size=2000)
 
             b = [[], [], []]
             for rec in s_reader():

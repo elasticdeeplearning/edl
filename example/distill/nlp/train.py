@@ -48,11 +48,13 @@ def train_without_distill(train_reader, test_reader, word_dict, epoch_num, lr):
     max_acc = 0.0
     for epoch in range(epoch_num):
         for step, (ids_student, labels, sentence) in enumerate(train_reader()):
+            _, logits_s = model(ids_student)
             loss, _ = model(ids_student, labels=labels)
             loss = L.reduce_mean(loss)
             loss.backward()
-            if step % 10 == 0:
-                print('[step %03d] distill train loss %.5f lr %.3e' %
+            if step % 100 == 0:
+                #print("labels:", labels, "logits_s:", logits_s, "softmax logits_s:", L.softmax(logits_s))
+                print('[step %03d] train loss %.5f lr %.3e' %
                       (step, loss.numpy(), opt.current_step_lr()))
             opt.minimize(loss)
             model.clear_gradients()
@@ -74,14 +76,18 @@ if __name__ == "__main__":
     batch_size = 16
 
     # student train and dev
+    input_files = []
+    for i in range(1, 5):
+        input_files.append("./data/train-data-augmented/part.{}".format(i))
+    print(input_files)
     train_reader = ds.pad_batch_reader(
-        "./data/train.part.0", word_dict, batch_size=batch_size)
+        input_files, word_dict, batch_size=batch_size)
     dev_reader = ds.pad_batch_reader(
-        "./data/dev.part.0", word_dict, batch_size=batch_size)
+        ["./data/dev.part.0"], word_dict, batch_size=batch_size)
 
     for i in range(10):
         train_without_distill(
-            train_reader, dev_reader, word_dict, epoch_num=10, lr=5e-5)
+            train_reader, dev_reader, word_dict, epoch_num=10, lr=1e-4)
 
     arr = np.array(g_max_acc)
     print("max_acc:", arr, "average:", np.average(arr))
