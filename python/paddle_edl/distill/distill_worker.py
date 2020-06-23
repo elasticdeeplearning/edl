@@ -336,22 +336,25 @@ def predict_worker(server_queue, server_result_queue, working_predict_count,
     signal.signal(signal.SIGTERM, predict_signal_handle)
 
     try:
-        while True:
-            # get server
-            server_item = server_queue.get()
-            if server_item is None:
-                server_result_queue.put(None)
-                return
+        max_concurrent = 3
+        with futures.ThreadPoolExecutor(max_concurrent) as thread_pool:
+            while True:
+                # get server
+                server_item = server_queue.get()
+                if server_item is None:
+                    server_result_queue.put(None)
+                    return
 
-            # predict
-            success = predict_loop(server_item, working_predict_count,
-                                   in_queue, out_queue, feeds, fetchs,
-                                   conf_file, stop_events, predict_lock,
-                                   global_finished_task, predict_cond)
+                # predict
+                success = predict_loop(server_item, working_predict_count,
+                                       in_queue, out_queue, feeds, fetchs,
+                                       conf_file, stop_events, predict_lock,
+                                       global_finished_task, predict_cond,
+                                       thread_pool, max_concurrent)
 
-            server_item.state = ServerItem.FINISHED if success else ServerItem.ERROR
-            server_result_queue.put(server_item)
-            logger.info('Stopped server={}'.format(server_item.server))
+                server_item.state = ServerItem.FINISHED if success else ServerItem.ERROR
+                server_result_queue.put(server_item)
+                logger.info('Stopped server={}'.format(server_item.server))
     except Exception as e:
         if signal_exit[0] is True:
             pass
@@ -370,6 +373,7 @@ def predict_loop(server_item,
                  predict_lock,
                  global_finished_task,
                  predict_cond,
+                 thread_pool,
                  max_concurrent=3):
     logger.info('connect server={}'.format(server_item.server))
     predict_server = PaddlePredictServer if _NOP_PREDICT_TEST is False else _TestNopPaddlePredictServer
@@ -386,9 +390,6 @@ def predict_loop(server_item,
     stop_event = stop_events[server_item.stop_event_id]
     with predict_lock:
         working_predict_count.value += 1
-
-    thread_pool = futures.ThreadPoolExecutor(
-        max_concurrent, thread_name_prefix=server_item.server)
 
     time_line = _TimeLine()
     finished_task = 0
