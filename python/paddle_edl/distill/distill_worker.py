@@ -20,6 +20,7 @@ import six
 import sys
 import time
 
+from collections import deque
 from concurrent import futures
 from paddle_serving_client import Client
 from six.moves import queue
@@ -380,7 +381,7 @@ def predict_loop(server_item,
             return False
         clients.append(client)
 
-    tasks = [None for _ in range(max_concurrent)]
+    tasks = deque(maxlen=max_concurrent)
 
     stop_event = stop_events[server_item.stop_event_id]
     with predict_lock:
@@ -391,17 +392,17 @@ def predict_loop(server_item,
 
     time_line = _TimeLine()
     finished_task = 0
+    delay = 0.0005  # 500us
     # predict loop
     while not stop_event.is_set():
-        if tasks[idx] is not None:
-            task = tasks[idx]
-            tasks[idx] = None
-
+        if len(tasks) == max_concurrent:
+            # full, sync wait
+            task = tasks.popleft()
             success, out_data = task.result()
             if not success:
                 failed_datas = [out_data, ]
                 finished_task += process_remain_predict_data(
-                    idx, tasks, max_concurrent, failed_datas, out_queue)
+                    tasks, failed_datas, out_queue)
 
                 with predict_lock:
                     global_finished_task.value += finished_task
@@ -416,17 +417,57 @@ def predict_loop(server_item,
                     working_predict_count.value -= 1
                     return False
 
+            logger.debug('task_id={}'.format(out_data[0].task_id))
             out_queue.put(out_data)
             finished_task += 1
+        elif len(tasks) > 0:
+            # not full, query left
+            task = tasks.popleft()
+            if task.done():
+                success, out_data = task.result()
+                if not success:
+                    failed_datas = [out_data, ]
+                    finished_task += process_remain_predict_data(
+                        tasks, failed_datas, out_queue)
 
-        data = in_queue.get()
+                    with predict_lock:
+                        global_finished_task.value += finished_task
+                        for failed_data in failed_datas:
+                            in_queue.put(
+                                failed_data)  # write back failed task data
+                        # last process
+                        if working_predict_count.value == 1:
+                            # NOTE. need notify other predict worker, or maybe deadlock
+                            with predict_cond:
+                                predict_cond.notify_all()
+                        working_predict_count.value -= 1
+                        return False
+
+                logger.debug('task_id={}'.format(out_data[0].task_id))
+                out_queue.put(out_data)
+                finished_task += 1
+            else:
+                # not done, write back left
+                tasks.appendleft(task)
+
+        if len(tasks) == 0:
+            data = in_queue.get()
+        else:
+            # avoid hang
+            try:
+                data = in_queue.get(timeout=delay)
+                delay = 0.0005  # 500us
+            except queue.Empty:
+                delay = min(delay * 2, 0.032)  # max 32ms
+                continue
+
         time_line.record('get_data')
 
         # Poison
         if isinstance(data, _PoisonPill):
             failed_datas = []
-            finished_task += process_remain_predict_data(
-                idx, tasks, max_concurrent, failed_datas, out_queue)
+            finished_task += process_remain_predict_data(tasks, failed_datas,
+                                                         out_queue)
 
             if len(failed_datas) != 0:
                 failed_datas.append(data)
@@ -496,13 +537,13 @@ def predict_loop(server_item,
             continue
 
         client = clients[idx]
-        tasks[idx] = thread_pool.submit(client_predict, client, data)
         idx = (idx + 1) % max_concurrent
+        future = thread_pool.submit(client_predict, client, data)
+        tasks.append(future)
 
-    idx = (idx + max_concurrent - 1) % max_concurrent
     failed_datas = []
-    finished_task += process_remain_predict_data(idx, tasks, max_concurrent,
-                                                 failed_datas, out_queue)
+    finished_task += process_remain_predict_data(tasks, failed_datas,
+                                                 out_queue)
     if len(failed_datas) != 0:
         with predict_lock:
             global_finished_task.value += finished_task
@@ -528,20 +569,16 @@ def predict_loop(server_item,
     return True
 
 
-def process_remain_predict_data(idx, tasks, max_concurrent, failed_datas,
-                                out_queue):
+def process_remain_predict_data(tasks, failed_datas, out_queue):
     finished_task = 0
-    for i in range(max_concurrent):
-        next_idx = (idx + i + 1) % max_concurrent
-        if tasks[next_idx] is None:
-            break
-        next_task = tasks[next_idx]
-        tasks[next_idx] = None
-        next_success, next_out_data = next_task.result()
-        if not next_success:
-            failed_datas.append(next_out_data)
+    remain_task_count = len(tasks)
+    for i in range(remain_task_count):
+        task = tasks.popleft()
+        success, out_data = task.result()
+        if not success:
+            failed_datas.append(out_data)
         else:
-            out_queue.put(next_out_data)
+            out_queue.put(out_data)
             finished_task += 1
     return finished_task
 
