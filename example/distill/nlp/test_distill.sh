@@ -16,7 +16,7 @@ do
             --opt=AdamW \
             --s_weight $wf \
             --train_range 10 \
-            --LR 5e-5 \
+            --LR 1e-4 \
             --kl 0 \
             --T $Tf \
             --epoch_num 20 > log/d_w${wf}_T${Tf}.log 2>&1

@@ -47,10 +47,8 @@ class AdamW(F.optimizer.AdamOptimizer):
     def apply_optimize(self, loss, startup_program, params_grads):
         super(AdamW, self).apply_optimize(loss, startup_program, params_grads)
         for p, g in params_grads:
-            #log.debug(L.reduce_mean(p))
             if not self.pat.match(p.name):
                 L.assign(p * (1. - self.wd * self.current_step_lr()), p)
-            #log.debug(L.reduce_mean(p))
 
 
 def KL(pred, target):

@@ -31,21 +31,21 @@ import sys
 
 from model import CNN, AdamW, evaluate_student, BOW
 
-g_max_acc = []
+g_max_dev_acc = []
+g_max_test_acc = []
 
 
-def train_without_distill(train_reader, test_reader, word_dict, epoch_num, lr):
+def train_without_distill(train_reader, dev_reader, test_reader, word_dict,
+                          epoch_num, lr):
     model = BOW(word_dict)
-    g_clip = F.clip.GradientClipByGlobalNorm(1.0)  #experimental
+    #g_clip = F.clip.GradientClipByGlobalNorm(1.0)  #experimental
     #opt = F.optimizer.Adam(learning_rate=lr, parameter_list=model.parameters(), grad_clip=g_clip)
     opt = AdamW(
-        learning_rate=lr,
-        parameter_list=model.parameters(),
-        weight_decay=0.01,
-        grad_clip=g_clip)
+        learning_rate=lr, parameter_list=model.parameters(), weight_decay=0.01)
     model.train()
 
-    max_acc = 0.0
+    max_dev_acc = 0.0
+    max_test_acc = 0.0
     for epoch in range(epoch_num):
         for step, (ids_student, labels, sentence) in enumerate(train_reader()):
             _, logits_s = model(ids_student)
@@ -58,13 +58,20 @@ def train_without_distill(train_reader, test_reader, word_dict, epoch_num, lr):
                       (step, loss.numpy(), opt.current_step_lr()))
             opt.minimize(loss)
             model.clear_gradients()
+        f1, acc = evaluate_student(model, dev_reader)
+        print('train_without_distill on dev f1 %.5f acc %.5f' % (f1, acc))
+
+        if max_dev_acc < acc:
+            max_dev_acc = acc
+
         f1, acc = evaluate_student(model, test_reader)
-        print('without distillation student f1 %.5f acc %.5f' % (f1, acc))
+        print('train_without_distill on test f1 %.5f acc %.5f' % (f1, acc))
 
-        if max_acc < acc:
-            max_acc = acc
+        if max_test_acc < acc:
+            max_test_acc = acc
 
-    g_max_acc.append(max_acc)
+    g_max_dev_acc.append(max_dev_acc)
+    g_max_test_acc.append(max_test_acc)
 
 
 if __name__ == "__main__":
@@ -76,18 +83,30 @@ if __name__ == "__main__":
     batch_size = 16
 
     # student train and dev
+    """
     input_files = []
     for i in range(1, 5):
         input_files.append("./data/train-data-augmented/part.{}".format(i))
     print(input_files)
+    """
     train_reader = ds.pad_batch_reader(
-        input_files, word_dict, batch_size=batch_size)
+        "./data/train.part.0", word_dict, batch_size=batch_size)
     dev_reader = ds.pad_batch_reader(
-        ["./data/dev.part.0"], word_dict, batch_size=batch_size)
+        "./data/dev.part.0", word_dict, batch_size=batch_size)
+    test_reader = ds.pad_batch_reader(
+        "./data/test.part.0", word_dict, batch_size=batch_size)
 
     for i in range(10):
         train_without_distill(
-            train_reader, dev_reader, word_dict, epoch_num=10, lr=1e-4)
+            train_reader,
+            dev_reader,
+            test_reader,
+            word_dict,
+            epoch_num=10,
+            lr=1e-4)
 
-    arr = np.array(g_max_acc)
-    print("max_acc:", arr, "average:", np.average(arr))
+    arr = np.array(g_max_dev_acc)
+    print("max_dev_acc:", arr, "average:", np.average(arr))
+
+    arr = np.array(g_max_test_acc)
+    print("max_test_acc:", arr, "average:", np.average(arr))

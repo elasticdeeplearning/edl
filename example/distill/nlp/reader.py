@@ -105,12 +105,19 @@ class ChnSentiCorp(BaseNLPDataset):
 
         return self._word_dict
 
-    def student_reader(self, input_files, word_dict):
+    def student_reader(self, input_file, word_dict):
         """
         return [([segment_sentence_idxs], label, sentence), ()...]
         """
 
         def reader():
+            input_files = []
+            if isinstance(input_file, str):
+                input_files.append(input_file)
+            else:
+                input_files = input_file
+                assert isinstance(input_file, list)
+
             for data_file in input_files:
                 print("open file:", data_file)
                 for t in self.__read_file(data_file):
