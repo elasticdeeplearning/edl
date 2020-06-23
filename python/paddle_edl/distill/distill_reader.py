@@ -343,7 +343,7 @@ class DistillReader(object):
             'teacher_service_name': self._service_name,
             'reader_type': self._reader_type,
         }
-        for config, value in print_config.iteritems():
+        for config, value in print_config.items():
             print("%s: %s" % (config, value))
         print("------------------------------------------------")
 
