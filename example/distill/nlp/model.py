@@ -52,10 +52,16 @@ class AdamW(F.optimizer.AdamOptimizer):
 
 
 def KL(pred, target):
-    #print("KL", pred.shape, target.shape)
     pred = L.log(L.softmax(pred))
     target = L.softmax(target)
     loss = L.kldiv_loss(pred, target)
+    return loss
+
+
+def KL_T(logits_s, logits_t, T=2.0):
+    p = L.softmax(logits_t / T)
+    loss = L.softmax_with_cross_entropy(logits_s / T, p, soft_label=True)
+
     return loss
 
 
@@ -83,15 +89,8 @@ class BOW(D.Layer):
     def forward(self, ids, labels=None):
         embbed = self.emb(ids)
         pad_mask = L.unsqueeze(L.cast(ids != 0, 'float32'), [-1])
-        #print("embbed:", embbed.shape,
-        #      "pad_mask", pad_mask.shape)
 
         mul = embbed * pad_mask
-        #print("mul:", mul.shape)
-
-        #print("embbed:", embbed)
-        #print("pad_mask:", pad_mask)
-        #print("mul:", mul.shape, mul)
 
         embbed = L.reduce_sum(embbed * pad_mask, 1)
         embbed = L.softsign(embbed)
@@ -101,7 +100,6 @@ class BOW(D.Layer):
             if len(labels.shape) == 1:
                 labels = L.reshape(labels, [-1, 1])
             loss = L.softmax_with_cross_entropy(logits, labels)
-            loss = L.reduce_mean(loss)
         else:
             loss = None
         return loss, logits
@@ -117,8 +115,6 @@ class CNN(D.Layer):
 
     def forward(self, ids, labels=None):
         embbed = self.emb(ids)
-        #print("ids shape:", ids.shape)
-        #d_batch, d_seqlen = ids.shape
         hidden = embbed
         hidden = L.transpose(hidden, [0, 2, 1])  #change to NCWH
         hidden = L.unsqueeze(hidden, [2])
@@ -133,7 +129,6 @@ class CNN(D.Layer):
             if len(labels.shape) == 1:
                 labels = L.reshape(labels, [-1, 1])
             loss = L.softmax_with_cross_entropy(logits, labels)
-            loss = L.reduce_mean(loss)
         else:
             loss = None
         return loss, logits
