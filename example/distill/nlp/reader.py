@@ -131,10 +131,10 @@ class ChnSentiCorp(BaseNLPDataset):
 
         return reader
 
-    def batch_reader(self, input_file, word_dict, batch_size):
+    def batch_reader(self, input_file, word_dict, batch_size, buf_size=10000):
         def reader():
             s_reader = P.reader.shuffle(
-                self.student_reader(input_file, word_dict), buf_size=2000)
+                self.student_reader(input_file, word_dict), buf_size=buf_size)
 
             b = [[], [], []]
             for rec in s_reader():

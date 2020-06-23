@@ -39,45 +39,48 @@ parser.add_argument(
     default=None,
     help="fixed teacher for debug local distill")
 parser.add_argument(
-    "--s_weight", type=float, default=0.04, help="weight of student in loss")
-parser.add_argument(
-    "--LR", type=float, default=1e-4 * 1.5, help="weight of student in loss")
+    "--s_weight", type=float, default=0.5, help="weight of student in loss")
 parser.add_argument(
     "--epoch_num", type=int, default=10, help="weight of student in loss")
 parser.add_argument(
-    "--T", type=float, default=None, help="weight of student in loss")
+    "--T", type=float, default=2.0, help="weight of student in loss")
 parser.add_argument(
-    "--decay", type=float, default=0.01, help="weight of student in loss")
+    "--weight_decay",
+    type=float,
+    default=0.01,
+    help="weight of student in loss")
 parser.add_argument(
     "--opt", type=str, default="AdamW", help="weight of student in loss")
-parser.add_argument("--train_range", type=int, default=10, help="train range")
+parser.add_argument("--train_range", type=int, default=1, help="train range")
 parser.add_argument("--kl", type=int, default=0, help="use kl distance or not")
 parser.add_argument(
     "--use_data_au", type=int, default=1, help="use data augmentation")
 args = parser.parse_args()
 print("parsed args:", args)
 
-g_max_acc = []
+g_max_dev_acc = []
+g_max_test_acc = []
 
 
-def train_with_distill(train_reader, dev_reader, word_dict, orig_reader,
+def train_with_distill(train_reader, dev_reader, word_dict, test_reader,
                        epoch_num):
     model = BOW(word_dict)
     g_clip = F.clip.GradientClipByGlobalNorm(1.0)  #experimental
-    boundaries = [1190 * 2, 1190 * 4, 1190 * 6]
+    boundaries = [2380 * 2, 2380 * 4, 2380 * 6]
     values = [1e-4, 1.5e-4, 2.5e-4, 4e-4]
+    lr = D.PiecewiseDecay(boundaries, values, 0)
     if args.opt == "Adam":
         opt = F.optimizer.Adam(
-            learning_rate=args.LR,
+            learning_rate=lr,
             parameter_list=model.parameters(),
             regularization=F.regularizer.L2Decay(
-                regularization_coeff=args.decay),
+                regularization_coeff=args.weight_decay),
             grad_clip=g_clip)
     else:
         opt = AdamW(
-            learning_rate=args.LR,
+            learning_rate=lr,
             parameter_list=model.parameters(),
-            weight_decay=args.decay,
+            weight_decay=args.weight_decay,
             grad_clip=g_clip)
 
     model.train()
@@ -103,7 +106,8 @@ def train_with_distill(train_reader, dev_reader, word_dict, orig_reader,
                 loss = args.s_weight * loss_ce + (1.0 - args.s_weight
                                                   ) * loss_kd
             else:
-                loss_kd = KL_T(logits_s, logits_t)  # 由KL divergence度量两个分布的距离
+                loss_kd = KL_T(logits_s, logits_t,
+                               args.T)  # 由KL divergence度量两个分布的距离
                 loss = args.T * args.T * (args.s_weight * loss_ce +
                                           (1.0 - args.s_weight) * loss_kd)
             loss = L.reduce_mean(loss)
@@ -130,7 +134,7 @@ def train_with_distill(train_reader, dev_reader, word_dict, orig_reader,
 
 def ernie_reader(s_reader, key_list):
     bert_reader = ChineseBertReader({
-        'max_seq_len': 256,
+        'max_seq_len': 512,
         "vocab_file": "./data/vocab.txt"
     })
 
@@ -163,7 +167,7 @@ if __name__ == "__main__":
 
     ds = ChnSentiCorp()
     word_dict = ds.student_word_dict("./data/vocab.bow.txt")
-    batch_size = 100
+    batch_size = 16
 
     input_files = []
     if args.use_data_au:
@@ -175,6 +179,8 @@ if __name__ == "__main__":
     # student train and dev
     dev_reader = ds.pad_batch_reader(
         "./data/dev.part.0", word_dict, batch_size=batch_size)
+    test_reader = ds.pad_batch_reader(
+        "./data/test.part.0", word_dict, batch_size=batch_size)
 
     feed_keys = [
         "input_ids", "position_ids", "segment_ids", "input_mask",
@@ -195,7 +201,7 @@ if __name__ == "__main__":
 
     for i in range(args.train_range):
         train_with_distill(
-            dr_t, dev_reader, word_dict, None, epoch_num=args.epoch_num)
+            dr_t, dev_reader, word_dict, test_reader, epoch_num=args.epoch_num)
 
     arr = np.array(g_max_dev_acc)
     print("max_dev_acc:", arr, "average:", np.average(arr), "train_args:",
