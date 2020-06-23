@@ -66,7 +66,7 @@ def train_with_distill(train_reader, dev_reader, word_dict, test_reader,
                        epoch_num):
     model = BOW(word_dict)
     g_clip = F.clip.GradientClipByGlobalNorm(1.0)  #experimental
-    boundaries = [2380 * 2, 2380 * 4, 2380 * 6]
+    boundaries = [1190 * 2, 1190 * 4, 1190 * 6]
     values = [1e-4, 1.5e-4, 2.5e-4, 4e-4]
     lr = D.PiecewiseDecay(boundaries, values, 0)
     if args.opt == "Adam":
@@ -134,7 +134,7 @@ def train_with_distill(train_reader, dev_reader, word_dict, test_reader,
 
 def ernie_reader(s_reader, key_list):
     bert_reader = ChineseBertReader({
-        'max_seq_len': 512,
+        'max_seq_len': 256,
         "vocab_file": "./data/vocab.txt"
     })
 
@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
     ds = ChnSentiCorp()
     word_dict = ds.student_word_dict("./data/vocab.bow.txt")
-    batch_size = 16
+    batch_size = 32
 
     input_files = []
     if args.use_data_au:
