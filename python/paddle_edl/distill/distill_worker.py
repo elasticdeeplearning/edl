@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import functools
+import gc
 import logging
 import numpy as np
 import os
@@ -22,8 +23,8 @@ import sys
 import time
 import threading
 
-# from paddle_serving_client import Client, MultiLangClient
-from paddle_serving_client import Client
+from paddle_serving_client import MultiLangClient
+#from paddle_serving_client import Client
 from six.moves import queue
 from six.moves import reduce
 from .timeline import _TimeLine
@@ -179,7 +180,7 @@ class AsyncPredictClient(object):
         """ connect success, return True, else return False"""
         try:
             client = MultiLangClient()
-            client.load_client_config(self._config_file)
+            #client.load_client_config(self._config_file)
             client.connect([self.server])
             self.client = client
         except Exception as e:
@@ -260,6 +261,11 @@ class AsyncPredictClient(object):
         if fetch_map_list is None:
             return False, None
 
+        if fetch_map_list['status_code'] != 0:
+            logger.warning('Failed status code={}'.format(fetch_map_list[
+                'status_code']))
+            return False, None
+
         predict_data = self._postprocess(fetch_map_list, len(feed_data))
         return True, predict_data
 
@@ -298,6 +304,7 @@ class _TestNopAsyncPredictClient(AsyncPredictClient):
 class PredictPool(object):
     def __init__(self, server_result_queue, max_concurrent=3):
         self._clients = queue.PriorityQueue()
+        #self._clients = queue.Queue()
         self._server_to_clients = dict()
 
         self._client_num_lock = threading.Lock()
@@ -305,6 +312,10 @@ class PredictPool(object):
         self._max_concurrent = max_concurrent
 
         self._server_result_queue = server_result_queue
+
+        self.finished_task_count_lock = threading.Lock()
+        self.running_task_count_lock = threading.Lock()
+        self.task_cond = threading.Condition()
 
     def add_client(self, server_item, feeds, fetchs, conf_file):
         server = server_item.server
@@ -341,22 +352,42 @@ class PredictPool(object):
         self._server_result_queue.put(server_item)
 
     def run(self, in_queue, out_queue):
-        finished_task_count_lock = threading.Lock()
+        finished_task_count_lock = self.finished_task_count_lock
         finished_task_count = [0]
-        running_task_count_lock = threading.Lock()
+        running_task_count_lock = self.running_task_count_lock
         running_task_count = [0]
-        task_cond = threading.Condition()
+        task_cond = self.task_cond
 
         while True:
             data = in_queue.get()
             if isinstance(data, _PoisonPill):
                 poison_pill = data
-                if finished_task_count[0] == poison_pill.feed_count:
+                task_count = -1
+                with finished_task_count_lock:
+                    task_count = finished_task_count[0]
+                if task_count == poison_pill.feed_count:
                     poison_pill.predict_count = poison_pill.feed_count
                     return poison_pill  # all task finished
 
-                in_queue.put(poison_pill)  # write back poison pill
+                #time.sleep(0.005)
+                #logger.info('put poison pill back')
+                in_queue.put(data)  # write back poison pill
+                #logger.info('put poison pill back ok')
                 continue  # continue process failed task
+
+            #if isinstance(data, _PoisonPill):
+            #    poison_pill = data
+            #    logger.info('ending ------------')
+            #    all_count = finished_task_count[0]
+            #    while all_count < poison_pill.feed_count:
+            #        time.sleep(0.005)
+            #        logger.info('wait 0.005')
+            #        all_count = finished_task_count[0]
+
+            #    logger.info('ended ------------')
+            #    assert finished_task_count[0] == poison_pill.feed_count
+            #    poison_pill.predict_count = poison_pill.feed_count
+            #    return poison_pill
 
             task, read_data = data
             while True:
@@ -373,40 +404,66 @@ class PredictPool(object):
                     with task_cond:
                         task_cond.wait()
 
-                def predict_call_back(call_future, _predict_client, _in_data):
-                    with running_task_count_lock:
-                        running_task_count[0] -= 1
-                    with task_cond:
-                        task_cond.notify()
+                try:
+                    future = client.predict(read_data)
+                except:
+                    logger.info('?????????????')
 
-                    _task, _read_data = _in_data
-                    success, predict_data = _predict_client.result(call_future,
-                                                                   _read_data)
-                    if not success:
-                        in_queue.put(_in_data)
-                        _predict_client.need_stop = True
-                        return
-
-                    out_data = _read_data
-                    for i in range(len(out_data)):
-                        out_data[i] += predict_data[i]
-                    out_queue.put((_task, out_data))
-                    with finished_task_count_lock:
-                        finished_task_count[0] += 1
-
-                future = client.predict(read_data)
-                future.add_done_callback(
-                    functools.partial(
-                        predict_call_back,
-                        _predict_client=client,
-                        _in_data=data))
+                call_back = predict_call_back(
+                    in_queue, out_queue, client, data, running_task_count_lock,
+                    running_task_count, finished_task_count_lock,
+                    finished_task_count, task_cond)
+                future.add_done_callback(call_back)
 
                 self._clients.put(client)
+                #logger.info('garbage collector output is {}'.format(gc.get_stats()))
+                #gc.collect(0)
                 break
+
+
+def predict_call_back(
+        in_queue,
+        out_queue,
+        client,
+        data,
+        running_task_count_lock,
+        running_task_count,
+        finished_task_count_lock,
+        finished_task_count,
+        task_cond, ):
+    def _call_back(future):
+        with running_task_count_lock:
+            running_task_count[0] -= 1
+        with task_cond:
+            task_cond.notify()
+
+        task, read_data = data
+        success = False
+        try:
+            success, predict_data = client.result(future, read_data)
+        except Exception as e:
+            print('result error={}'.format(e))
+        if not success:
+            try:
+                in_queue.put(data)
+            except Exception as e:
+                logger.info('failed inque error={}'.format(e))
+            client.need_stop = True
+            return
+
+        out_data = read_data
+        for i in range(len(out_data)):
+            out_data[i] += predict_data[i]
+        out_queue.put((task, out_data))
+        with finished_task_count_lock:
+            finished_task_count[0] += 1
+
+    return _call_back
 
 
 def predict_process(server_queue, server_result_queue, in_queue, out_queue,
                     feeds, fetchs, conf_file, stop_event, predict_cond):
+    logger.info('predict process pid={}'.format(os.getpid()))
     signal_exit = [False, ]
 
     # Define signal handler function
@@ -449,6 +506,8 @@ def predict_process(server_queue, server_result_queue, in_queue, out_queue,
         manage_thread.daemon = True
         manage_thread.start()
 
+        #gc.set_debug(gc.DEBUG_LEAK)
+
         while not stop_event.is_set():
             poison_pill = client_pool.run(in_queue, out_queue)
             with predict_cond:
@@ -458,10 +517,11 @@ def predict_process(server_queue, server_result_queue, in_queue, out_queue,
         manager_need_stop.set()
         manage_thread.join()
     except Exception as e:
-        if signal_exit[0] is True:
-            pass
-        else:
-            six.reraise(*sys.exc_info())
+        #if signal_exit[0] is True:
+        #    pass
+        #else:
+        print('error={}'.format(e))
+        six.reraise(*sys.exc_info())
 
 
 class ReaderType(object):
