@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
 import gc
 import logging
 import numpy as np
@@ -24,7 +23,7 @@ import time
 import threading
 
 from paddle_serving_client import MultiLangClient
-#from paddle_serving_client import Client
+# from paddle_serving_client import Client
 from six.moves import queue
 from six.moves import reduce
 from .timeline import _TimeLine
@@ -156,7 +155,7 @@ class PredictServer(object):
 
 
 class AsyncPredictClient(object):
-    def __init__(self, server, config_file, feeds, fetchs, max_failed_times=3):
+    def __init__(self, server, config_file, feeds, fetchs):
         self.server = server
         self._config_file = config_file
         self._predict_feed_idxs = []
@@ -164,17 +163,11 @@ class AsyncPredictClient(object):
         self._predict_feed_size = dict()
         self._feeds = feeds
         self._fetchs = fetchs
-        self._max_failed_times = max_failed_times
         self.client = None
         self._has_predict = False
         self.need_stop = False
 
-        self.lock = None
-        self.future_count = 0
-        logger.info((server, config_file, feeds, fetchs, max_failed_times))
-
-    def __lt__(self, other):
-        return self.future_count < other.future_count
+        logger.info((server, config_file, feeds, fetchs))
 
     def connect(self):
         """ connect success, return True, else return False"""
@@ -199,7 +192,6 @@ class AsyncPredictClient(object):
                     self.client.feed_shapes_[feed_name])
                 self._predict_feed_size[feed_name] = reduce(
                     lambda x, y: x * y, self._predict_feed_shapes[feed_name])
-        self.lock = threading.Lock()
         return True
 
     def _preprocess(self, feed_data):
@@ -243,8 +235,6 @@ class AsyncPredictClient(object):
         feed_map_list = self._preprocess(feed_data)
         future = self.client.predict(
             feed=feed_map_list, fetch=self._fetchs, asyn=True)
-        with self.lock:
-            self.future_count += 1
         return future
 
     def result(self, future, feed_data):
@@ -254,9 +244,6 @@ class AsyncPredictClient(object):
         except Exception as e:
             logger.warning('Failed with server={}'.format(self.server))
             logger.warning('Exception:\n{}'.format(str(e)))
-
-        with self.lock:
-            self.future_count -= 1
 
         if fetch_map_list is None:
             return False, None
@@ -302,24 +289,15 @@ class _TestNopAsyncPredictClient(AsyncPredictClient):
 
 
 class PredictPool(object):
-    def __init__(self, server_result_queue, max_concurrent=3):
-        self._clients = queue.PriorityQueue()
-        #self._clients = queue.Queue()
+    def __init__(self):
+        self._client_queue = queue.Queue()
         self._server_to_clients = dict()
 
-        self._client_num_lock = threading.Lock()
-        self._client_num = 0
-        self._max_concurrent = max_concurrent
-
-        self._server_result_queue = server_result_queue
-
-        self.finished_task_count_lock = threading.Lock()
-        self.running_task_count_lock = threading.Lock()
-        self.task_cond = threading.Condition()
-
-    def add_client(self, server_item, feeds, fetchs, conf_file):
+    def add_client(self, server_item, feeds, fetchs, conf_file, concurrent=3):
         server = server_item.server
         if server_item.server in self._server_to_clients:
+            logger.warning('server={} in predict client?'.format(
+                server_item.server))
             return True
 
         predict_server = AsyncPredictClient if _NOP_PREDICT_TEST is False else _TestNopAsyncPredictClient
@@ -328,9 +306,8 @@ class PredictPool(object):
             return False
 
         self._server_to_clients[server] = (server_item, client)
-        self._clients.put(client)
-        with self._client_num_lock:
-            self._client_num += 1
+        for _ in range(concurrent):
+            self._client_queue.put(client)
         return True
 
     def stop_client(self, server_item):
@@ -341,81 +318,49 @@ class PredictPool(object):
             _, client = item_client
             client.need_stop = True
 
-    def rm_client(self, client):
+    def rm_client(self, client, server_result_queue):
         server = client.server
-        server_item, client = self._server_to_clients[server]
+        item_client = self._server_to_clients.get(server)
+        # client already removed
+        if item_client is None:
+            return
+        server_item, client = item_client
         del self._server_to_clients[server]
-        with self._client_num_lock:
-            self._client_num -= 1
 
         server_item.state = ServerItem.FINISHED
-        self._server_result_queue.put(server_item)
+        server_result_queue.put(server_item)
 
-    def run(self, in_queue, out_queue):
-        finished_task_count_lock = self.finished_task_count_lock
+    def run(self, in_queue, out_queue, server_result_queue):
+        finished_task_count_lock = threading.Lock()
         finished_task_count = [0]
-        running_task_count_lock = self.running_task_count_lock
-        running_task_count = [0]
-        task_cond = self.task_cond
 
         while True:
             data = in_queue.get()
             if isinstance(data, _PoisonPill):
                 poison_pill = data
-                task_count = -1
-                with finished_task_count_lock:
-                    task_count = finished_task_count[0]
-                if task_count == poison_pill.feed_count:
+                if finished_task_count[0] == poison_pill.feed_count:
                     poison_pill.predict_count = poison_pill.feed_count
                     return poison_pill  # all task finished
 
-                #time.sleep(0.005)
-                #logger.info('put poison pill back')
                 in_queue.put(data)  # write back poison pill
-                #logger.info('put poison pill back ok')
+                time.sleep(0.003)  # wait 3ms
                 continue  # continue process failed task
-
-            #if isinstance(data, _PoisonPill):
-            #    poison_pill = data
-            #    logger.info('ending ------------')
-            #    all_count = finished_task_count[0]
-            #    while all_count < poison_pill.feed_count:
-            #        time.sleep(0.005)
-            #        logger.info('wait 0.005')
-            #        all_count = finished_task_count[0]
-
-            #    logger.info('ended ------------')
-            #    assert finished_task_count[0] == poison_pill.feed_count
-            #    poison_pill.predict_count = poison_pill.feed_count
-            #    return poison_pill
 
             task, read_data = data
             while True:
-                client = self._clients.get()
+                client = self._client_queue.get()
                 if client.need_stop:
-                    self.rm_client(client)
+                    self.rm_client(client, server_result_queue)
                     continue
 
-                with running_task_count_lock:
-                    running_task_count[0] += 1
-                # limit max concurrent of client
-                while running_task_count[0] > self._client_num * \
-                        self._max_concurrent:
-                    with task_cond:
-                        task_cond.wait()
+                # FIXME. may failed
+                future = client.predict(read_data)
 
-                try:
-                    future = client.predict(read_data)
-                except:
-                    logger.info('?????????????')
-
-                call_back = predict_call_back(
-                    in_queue, out_queue, client, data, running_task_count_lock,
-                    running_task_count, finished_task_count_lock,
-                    finished_task_count, task_cond)
+                call_back = predict_call_back(in_queue, out_queue, client,
+                                              data, finished_task_count_lock,
+                                              finished_task_count,
+                                              self._client_queue)
                 future.add_done_callback(call_back)
-
-                self._clients.put(client)
                 #logger.info('garbage collector output is {}'.format(gc.get_stats()))
                 #gc.collect(0)
                 break
@@ -426,34 +371,29 @@ def predict_call_back(
         out_queue,
         client,
         data,
-        running_task_count_lock,
-        running_task_count,
         finished_task_count_lock,
         finished_task_count,
-        task_cond, ):
+        client_queue, ):
     def _call_back(future):
-        with running_task_count_lock:
-            running_task_count[0] -= 1
-        with task_cond:
-            task_cond.notify()
-
         task, read_data = data
+        batch_size = len(read_data)
         success = False
         try:
             success, predict_data = client.result(future, read_data)
         except Exception as e:
-            print('result error={}'.format(e))
+            logger.info('predict error={}'.format(e))
         if not success:
-            try:
-                in_queue.put(data)
-            except Exception as e:
-                logger.info('failed inque error={}'.format(e))
+            in_queue.put(data)
             client.need_stop = True
+
+        client_queue.put(client)  # complete, put back
+        if not success:
             return
 
         out_data = read_data
-        for i in range(len(out_data)):
+        for i in range(batch_size):
             out_data[i] += predict_data[i]
+
         out_queue.put((task, out_data))
         with finished_task_count_lock:
             finished_task_count[0] += 1
@@ -480,13 +420,13 @@ def predict_process(server_queue, server_result_queue, in_queue, out_queue,
     signal.signal(signal.SIGTERM, predict_signal_handle)
 
     try:
-        client_pool = PredictPool(server_result_queue)
+        client_pool = PredictPool()
         manager_need_stop = threading.Event()
 
         def server_manager():
             while not manager_need_stop.is_set():
                 try:
-                    server_item = server_queue.get(timeout=1)
+                    server_item = server_queue.get(timeout=2)
                 except queue.Empty:
                     continue
 
@@ -509,7 +449,8 @@ def predict_process(server_queue, server_result_queue, in_queue, out_queue,
         #gc.set_debug(gc.DEBUG_LEAK)
 
         while not stop_event.is_set():
-            poison_pill = client_pool.run(in_queue, out_queue)
+            poison_pill = client_pool.run(in_queue, out_queue,
+                                          server_result_queue)
             with predict_cond:
                 out_queue.put(poison_pill)
                 predict_cond.wait()
@@ -517,11 +458,11 @@ def predict_process(server_queue, server_result_queue, in_queue, out_queue,
         manager_need_stop.set()
         manage_thread.join()
     except Exception as e:
-        #if signal_exit[0] is True:
-        #    pass
-        #else:
-        print('error={}'.format(e))
-        six.reraise(*sys.exc_info())
+        if signal_exit[0] is True:
+            pass
+        else:
+            print('error={}'.format(e))
+            six.reraise(*sys.exc_info())
 
 
 class ReaderType(object):
