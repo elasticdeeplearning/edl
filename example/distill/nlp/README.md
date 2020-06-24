@@ -1,7 +1,7 @@
 # ERNIE distillation
 
 ## Dataset
-Chinese senti
+Chinese sentiment dataset
 
 ## Local test
 ## Finetune or downlod finetuned model
