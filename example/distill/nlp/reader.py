@@ -131,10 +131,14 @@ class ChnSentiCorp(BaseNLPDataset):
 
         return reader
 
-    def batch_reader(self, input_file, word_dict, batch_size):
+    def batch_reader(self, input_file, word_dict, batch_size, shuffle=True):
         def reader():
-            s_reader = P.reader.shuffle(
-                self.student_reader(input_file, word_dict), buf_size=2000)
+            if shuffle:
+                s_reader = P.reader.shuffle(
+                    self.student_reader(input_file, word_dict),
+                    buf_size=100000)
+            else:
+                s_reader = self.student_reader(input_file, word_dict)
 
             b = [[], [], []]
             for rec in s_reader():
@@ -151,9 +155,11 @@ class ChnSentiCorp(BaseNLPDataset):
 
         return reader
 
-    def pad_batch_reader(self, input_file, word_dict, batch_size):
+    def pad_batch_reader(self, input_file, word_dict, batch_size,
+                         shuffle=True):
         def reader():
-            b_reader = self.batch_reader(input_file, word_dict, batch_size)
+            b_reader = self.batch_reader(
+                input_file, word_dict, batch_size, shuffle=shuffle)
             for b in b_reader():
                 b[0] = D.base.to_variable(pad_batch_data(b[0], 'int64'))
                 b[1] = D.base.to_variable(np.array(b[1]).astype('int64'))

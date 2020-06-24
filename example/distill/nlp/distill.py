@@ -39,26 +39,24 @@ parser.add_argument(
     default=None,
     help="fixed teacher for debug local distill")
 parser.add_argument(
-    "--s_weight", type=float, default=0.04, help="weight of student in loss")
+    "--s_weight", type=float, default=0.5, help="weight of student in loss")
 parser.add_argument(
-    "--LR", type=float, default=1e-4 * 1.5, help="weight of student in loss")
+    "--LR", type=float, default=1e-4, help="weight of student in loss")
 parser.add_argument(
     "--epoch_num", type=int, default=10, help="weight of student in loss")
-parser.add_argument(
-    "--T", type=float, default=None, help="weight of student in loss")
 parser.add_argument(
     "--decay", type=float, default=0.01, help="weight of student in loss")
 parser.add_argument(
     "--opt", type=str, default="AdamW", help="weight of student in loss")
 parser.add_argument("--train_range", type=int, default=10, help="train range")
-parser.add_argument("--kl", type=int, default=0, help="train range")
 args = parser.parse_args()
 print("parsed args:", args)
 
-g_max_acc = []
+g_max_dev_acc = []
+g_max_test_acc = []
 
 
-def train_with_distill(train_reader, test_reader, word_dict, orig_reader,
+def train_with_distill(train_reader, dev_reader, word_dict, test_reader,
                        epoch_num):
     model = BOW(word_dict)
     g_clip = F.clip.GradientClipByGlobalNorm(1.0)  #experimental
@@ -88,62 +86,34 @@ def train_with_distill(train_reader, test_reader, word_dict, orig_reader,
             logits_t = D.base.to_variable(np.array(logits_t).astype('float32'))
             logits_t.stop_gradient = True
 
-            #print("ids_student:", ids_student.shape, ids_student)
             _, logits_s = model(ids_student)  # student 模型输出logits
             loss_ce, _ = model(ids_student, labels=labels)
 
-            p = None
-            if args.T is None:
-                loss_kd = KL(logits_s, logits_t)  # 由KL divergence度量两个分布的距离
-                loss = args.s_weight * loss_ce + (1.0 - args.s_weight
-                                                  ) * loss_kd
-            else:
-                p = L.softmax(logits_t / args.T)
-                loss_s_t = L.softmax_with_cross_entropy(
-                    logits_s / args.T, p, soft_label=True)
-                loss = args.T * args.T * (args.s_weight * loss_ce +
-                                          (1.0 - args.s_weight) * loss_s_t)
-            #loss = L.reduce_mean(loss)
+            loss_kd = KL(logits_s, logits_t)  # 由KL divergence度量两个分布的距离
+            loss = loss_ce + loss_kd
+            loss = L.reduce_mean(loss)
             loss.backward()
             if step % 10 == 0:
-                print("labels:", labels)
-                print("logits_s:", logits_s, "logits_t:", logits_t)
-                if p is not None:
-                    print("p:", p)
-
                 print('[step %03d] distill train loss %.5f lr %.3e' %
                       (step, loss.numpy(), opt.current_step_lr()))
             opt.minimize(loss)
             model.clear_gradients()
-        f1, acc = evaluate_student(model, test_reader)
-        print('teacher:with distillation student f1 %.5f acc %.5f' % (f1, acc))
+        f1, acc = evaluate_student(model, dev_reader)
+        print('student on dev f1 %.5f acc %.5f' % (f1, acc))
 
         if max_acc < acc:
             max_acc = acc
-        """
-        for step, (ids_student, labels, sentence) in enumerate(orig_reader()):
-            loss, _ = model(ids_student, labels=labels)
-            loss = L.reduce_mean(loss)
-            loss.backward()
-            if step % 10 == 0:
-                print('[step %03d] train loss %.5f lr %.3e' %
-                      (step, loss.numpy(), opt.current_step_lr()))
-            opt.minimize(loss)
-            model.clear_gradients()
 
         f1, acc = evaluate_student(model, test_reader)
-        print('hard:with distillation student f1 %.5f acc %.5f' % (f1, acc))
+        print('student on test f1 %.5f acc %.5f' % (f1, acc))
 
-        if max_acc < acc:
-            max_acc = acc
-        """
-
-    g_max_acc.append(max_acc)
+    g_max_dev_acc.append(max_acc)
+    g_max_test_acc.append(test_acc)
 
 
 def ernie_reader(s_reader, key_list):
     bert_reader = ChineseBertReader({
-        'max_seq_len': 512,
+        'max_seq_len': 256,
         "vocab_file": "./data/vocab.txt"
     })
 
@@ -153,11 +123,9 @@ def ernie_reader(s_reader, key_list):
             for k in key_list:
                 b[k] = []
 
-            #print("ids_student batch_size:", len(ids_student), len(labels), len(ss))
             for s in ss:
                 feed_dict = bert_reader.process(s)
                 for k in feed_dict:
-                    #print("reader process:", k, len(feed_dict[k])
                     b[k].append(feed_dict[k])
             b["ids_student"] = ids_student
             b["labels"] = labels
@@ -166,7 +134,6 @@ def ernie_reader(s_reader, key_list):
             for k in key_list:
                 l.append(b[k])
 
-            #print("ernie_reader batch_size:", len(l[0]))
             yield l
 
     return reader
@@ -185,6 +152,8 @@ if __name__ == "__main__":
         "./data/train.part.0", word_dict, batch_size=batch_size)
     dev_reader = ds.pad_batch_reader(
         "./data/dev.part.0", word_dict, batch_size=batch_size)
+    test_reader = ds.pad_batch_reader(
+        "./data/test.part.0", word_dict, batch_size=batch_size)
 
     feed_keys = [
         "input_ids", "position_ids", "segment_ids", "input_mask",
@@ -205,11 +174,12 @@ if __name__ == "__main__":
 
     for i in range(args.train_range):
         train_with_distill(
-            dr_t,
-            dev_reader,
-            word_dict,
-            train_reader,
-            epoch_num=args.epoch_num)
+            dr_t, dev_reader, word_dict, test_reader, epoch_num=args.epoch_num)
 
-    arr = np.array(g_max_acc)
-    print("max_acc:", arr, "average:", np.average(arr), "train_args:", args)
+    arr = np.array(g_max_dev_acc)
+    print("max_dev_acc:", arr, "average:", np.average(arr), "train_args:",
+          args)
+
+    arr = np.array(g_max_test_acc)
+    print("max_test_acc:", arr, "average:", np.average(arr), "train_args:",
+          args)

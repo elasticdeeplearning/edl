@@ -31,7 +31,7 @@ parser.add_argument("--learning_rate", type=float, default=5e-5, help="Learning 
 parser.add_argument("--weight_decay", type=float, default=0.01, help="Weight decay rate for L2 regularizer.")
 parser.add_argument("--warmup_proportion", type=float, default=0.1, help="Warmup proportion params for warmup strategy")
 parser.add_argument("--checkpoint_dir", type=str, default=None, help="Directory to model checkpoint")
-parser.add_argument("--max_seq_len", type=int, default=512, help="Number of words of the longest seqence.")
+parser.add_argument("--max_seq_len", type=int, default=256, help="Number of words of the longest seqence.")
 parser.add_argument("--batch_size", type=int, default=16, help="Total examples' number in batch for training.")
 parser.add_argument("--use_data_parallel", type=ast.literal_eval, default=False, help="Whether use data parallel.")
 args = parser.parse_args()
@@ -43,9 +43,6 @@ def save_model(inputs, output, program, logits):
     fetch_keys = ["pooled_output", "sequence_output"]
     fetch_dict = dict(zip(fetch_keys, [outputs[x] for x in fetch_keys]))
     fetch_dict["logits"]=logits
-    print(logits)
-    #fetch_dict={"pooled_output":outputs["pooled_output"], "logits":logits}
-    #print(feed_dict)
 
     serving_io.save_model("ernie_senti_server", "ernie_senti_client", feed_dict, fetch_dict, main_program=program)
 
@@ -55,13 +52,8 @@ if __name__ == '__main__':
     module = hub.Module(name="ernie")
     inputs, outputs, program = module.context(
         trainable=True, max_seq_len=args.max_seq_len)
-    #print(program)
-    #for k in outputs:
-    #    print("outputs:",k, outputs[k])
-    #print("program:", program_to_code(program))
 
     # Download dataset and use accuracy as metrics
-    # Choose dataset: GLUE/XNLI/ChinesesGLUE/NLPCC-DBQA/LCQMC
     # metric should be acc, f1 or matthews
     #dataset = hub.dataset.ChnSentiCorp()
     dataset = ChnSentiCorp()
@@ -106,7 +98,6 @@ if __name__ == '__main__':
         checkpoint_dir=args.checkpoint_dir,
         strategy=strategy)
 
-    #print("num_labels:", dataset.num_labels)
     # Define a classfication finetune task by PaddleHub's API
     cls_task = hub.TextClassifierTask(
         data_reader=reader,
@@ -119,11 +110,10 @@ if __name__ == '__main__':
     logits=None
     program = None
     with cls_task.phase_guard('train'):
-        #for l in cls_task.outputs:
-        #    print("cls_task outputs:", l)
+        for l in cls_task.outputs:
+            print("cls_task outputs:", l)
         logits = cls_task.outputs[0]
         program = cls_task.main_program
-        #program_to_code(program)
 
     if args.checkpoint_dir:
         cls_task.load_checkpoint()
@@ -131,5 +121,4 @@ if __name__ == '__main__':
     # Finetune and evaluate by PaddleHub's API
     # will finish training, evaluation, testing, save model automatically
     cls_task.finetune_and_eval()
-    #cls_task.save_inference_model("cls_fintune_1")
     save_model(inputs, outputs, program, logits)

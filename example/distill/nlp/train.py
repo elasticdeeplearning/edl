@@ -38,8 +38,6 @@ g_max_test_acc = []
 def train_without_distill(train_reader, dev_reader, test_reader, word_dict,
                           epoch_num, lr):
     model = BOW(word_dict)
-    #g_clip = F.clip.GradientClipByGlobalNorm(1.0)  #experimental
-    #opt = F.optimizer.Adam(learning_rate=lr, parameter_list=model.parameters(), grad_clip=g_clip)
     opt = AdamW(
         learning_rate=lr, parameter_list=model.parameters(), weight_decay=0.01)
     model.train()
@@ -53,7 +51,6 @@ def train_without_distill(train_reader, dev_reader, test_reader, word_dict,
             loss = L.reduce_mean(loss)
             loss.backward()
             if step % 100 == 0:
-                #print("labels:", labels, "logits_s:", logits_s, "softmax logits_s:", L.softmax(logits_s))
                 print('[step %03d] train loss %.5f lr %.3e' %
                       (step, loss.numpy(), opt.current_step_lr()))
             opt.minimize(loss)
@@ -83,12 +80,6 @@ if __name__ == "__main__":
     batch_size = 16
 
     # student train and dev
-    """
-    input_files = []
-    for i in range(1, 5):
-        input_files.append("./data/train-data-augmented/part.{}".format(i))
-    print(input_files)
-    """
     train_reader = ds.pad_batch_reader(
         "./data/train.part.0", word_dict, batch_size=batch_size)
     dev_reader = ds.pad_batch_reader(
