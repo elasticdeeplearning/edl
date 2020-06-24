@@ -123,8 +123,8 @@ def train_with_distill(train_reader, dev_reader, word_dict, test_reader,
         if max_test_acc < acc:
             max_test_acc = acc
 
-    g_max_dev_acc.append(g_max_acc)
-    g_max_test_acc.append(g_test_acc)
+    g_max_dev_acc.append(g_max_dev_acc)
+    g_max_test_acc.append(g_max_test_acc)
 
 
 def ernie_reader(s_reader, key_list):
