@@ -51,7 +51,7 @@ class AdamW(F.optimizer.AdamOptimizer):
                 L.assign(p * (1. - self.wd * self.current_step_lr()), p)
 
 
-def KL(pred, target, logits=True):
+def KL(pred, target, logits=False):
     pred = L.log(L.softmax(pred))
     if logits:
         target = L.softmax(target)
