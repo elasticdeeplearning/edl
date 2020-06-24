@@ -51,8 +51,8 @@ class TestDataServer(unittest.TestCase):
         data_server.wait(2)
 
     def test_data_server(self):
-        data_server, endpoint = self._start_data_server(6700)
-        channel = grpc.insecure_channel("127.0.0.1:6700")
+        data_server, endpoint = self._start_data_server(9700)
+        channel = grpc.insecure_channel("127.0.0.1:9700")
         stub = data_server_pb2_grpc.DataServerStub(channel)
 
         a = ["a0", "a1", "a2"]
@@ -84,9 +84,9 @@ class TestDataServer(unittest.TestCase):
         self._shut_down(data_server, stub)
 
     def test_clear_cache(self):
-        data_server, endpoint = self._start_data_server(6701)
+        data_server, endpoint = self._start_data_server(9701)
 
-        channel = grpc.insecure_channel("127.0.0.1:6701")
+        channel = grpc.insecure_channel("127.0.0.1:9701")
         stub = data_server_pb2_grpc.DataServerStub(channel)
 
         request = data_server_pb2.DataRequest()
