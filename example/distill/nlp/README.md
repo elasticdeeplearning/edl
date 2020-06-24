@@ -45,6 +45,6 @@ python -u distill.py --fixed_teacher 127.0.0.1:19290
 
 ### Result
 | model | dev dataset(acc) | test dataset(acc) | 
-| :----: | :-----: | :----: | :----: | 
+| :----: | :-----: | :----: | 
 | BOW     |  0.901    | 0.908 | 
 | BOW + distillation | 0.905 | 0.915 |
