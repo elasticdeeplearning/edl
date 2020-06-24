@@ -30,7 +30,7 @@ import os
 import sys
 from paddle_serving_client import Client
 from paddle_serving_app.reader import ChineseBertReader
-from model import CNN, AdamW, evaluate_student, KL, BOW
+from model import CNN, AdamW, evaluate_student, KL, BOW, KL_T
 
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument(
@@ -52,6 +52,8 @@ parser.add_argument(
 parser.add_argument("--train_range", type=int, default=10, help="train range")
 parser.add_argument(
     "--use_data_au", type=int, default=1, help="use data augmentation")
+parser.add_argument(
+    "--T", type=float, default=2.0, help="weight of student in loss")
 args = parser.parse_args()
 print("parsed args:", args)
 
@@ -90,12 +92,18 @@ def train_with_distill(train_reader, dev_reader, word_dict, test_reader,
             logits_t = D.base.to_variable(np.array(logits_t).astype('float32'))
             logits_t.stop_gradient = True
 
-            _, logits_s = model(ids_student)  # student 模型输出logits
+            _, logits_s = model(ids_student)
             loss_ce, _ = model(ids_student, labels=labels)
 
-            loss_kd = KL(logits_s, logits_t)  # 由KL divergence度量两个分布的距离
-            loss = loss = 1.0 / args.s_weight * (
-                args.s_weight * loss_ce + (1.0 - args.s_weight) * loss_kd)
+            if args.T is None:
+                loss_kd = KL(logits_s, logits_t)
+                loss = args.s_weight * loss_ce + (1.0 - args.s_weight
+                                                  ) * loss_kd
+            else:
+                loss_kd = KL_T(logits_s, logits_t, args.T)
+                loss = args.T * args.T * (args.s_weight * loss_ce +
+                                          (1.0 - args.s_weight) * loss_kd)
+
             loss = L.reduce_mean(loss)
             loss.backward()
             if step % 10 == 0:

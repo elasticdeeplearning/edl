@@ -21,6 +21,7 @@ import paddlehub as hub
 from reader import ChnSentiCorp
 from paddle.fluid.transpiler.details import program_to_code
 import paddle_serving_client.io as serving_io
+from paddlehub.reader.nlp_reader import ClassifyReader
 #from paddle.fluid.transpiler.details import program_to_code
 
 # yapf: disable
@@ -36,6 +37,81 @@ parser.add_argument("--batch_size", type=int, default=16, help="Total examples' 
 parser.add_argument("--use_data_parallel", type=ast.literal_eval, default=False, help="Whether use data parallel.")
 args = parser.parse_args()
 # yapf: enable.
+
+class TextClassifierTask(hub.TextClassifierTask):
+    def __init__(self,
+                 num_classes,
+                 feed_list,
+                 data_reader,
+                 feature=None,
+                 token_feature=None,
+                 network=None,
+                 startup_program=None,
+                 config=None,
+                 hidden_units=None,
+                 metrics_choices="default"):
+        super(TextClassifierTask, self).__init__(num_classes=num_classes,
+                                                 feed_list=feed_list,
+                                                 data_reader=data_reader,
+                                                 feature=feature,
+                                                 token_feature=token_feature,
+                                                 network=network,
+                                                 startup_program=startup_program,
+                                                 config=config,
+                                                 hidden_units=hidden_units,
+                                                 metrics_choices=metrics_choices)
+        self._logits = None
+
+    def _build_net(self):
+        if isinstance(self._base_data_reader, ClassifyReader):
+            # ClassifyReader will return the seqence length of an input text
+            self.seq_len = fluid.layers.data(
+                name="seq_len", shape=[1], dtype='int64', lod_level=0)
+            self.seq_len_used = fluid.layers.squeeze(self.seq_len, axes=[1])
+
+            # unpad the token_feature
+            unpad_feature = fluid.layers.sequence_unpad(
+                self.feature, length=self.seq_len_used)
+
+        if self.network:
+            # add pre-defined net
+            net_func = getattr(net.classification, self.network)
+            if self.network == 'dpcnn':
+                # deepcnn network is no need to unpad
+                cls_feats = net_func(
+                    self.feature, emb_dim=self.feature.shape[-1])
+            else:
+                cls_feats = net_func(unpad_feature)
+            logger.info(
+                "%s has been added in the TextClassifierTask!" % self.network)
+        else:
+            # not use pre-defined net but to use fc net
+            cls_feats = fluid.layers.dropout(
+                x=self.feature,
+                dropout_prob=0.1,
+                dropout_implementation="upscale_in_train")
+
+        if self.hidden_units is not None:
+            for n_hidden in self.hidden_units:
+                cls_feats = fluid.layers.fc(
+                    input=cls_feats, size=n_hidden, act="relu")
+
+        self._logits = fluid.layers.fc(
+            input=cls_feats,
+            size=self.num_classes,
+            param_attr=fluid.ParamAttr(
+                name="cls_out_w",
+                initializer=fluid.initializer.TruncatedNormal(scale=0.02)),
+            bias_attr=fluid.ParamAttr(
+                name="cls_out_b", initializer=fluid.initializer.Constant(0.)))
+
+
+        logits = fluid.layers.softmax(self._logits)
+
+        self.ret_infers = fluid.layers.reshape(
+            x=fluid.layers.argmax(logits, axis=1), shape=[-1, 1])
+
+        return [logits]
 
 def save_model(inputs, output, program, logits):
     feed_keys = ["input_ids", "position_ids", "segment_ids", "input_mask"]
@@ -99,7 +175,7 @@ if __name__ == '__main__':
         strategy=strategy)
 
     # Define a classfication finetune task by PaddleHub's API
-    cls_task = hub.TextClassifierTask(
+    cls_task = TextClassifierTask(
         data_reader=reader,
         feature=pooled_output,
         feed_list=feed_list,
@@ -112,7 +188,8 @@ if __name__ == '__main__':
     with cls_task.phase_guard('train'):
         for l in cls_task.outputs:
             print("cls_task outputs:", l)
-        logits = cls_task.outputs[0]
+        logits = cls_task._logits
+        print("logits:", logits)
         program = cls_task.main_program
 
     if args.checkpoint_dir:

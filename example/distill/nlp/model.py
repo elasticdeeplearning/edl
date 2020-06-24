@@ -51,11 +51,18 @@ class AdamW(F.optimizer.AdamOptimizer):
                 L.assign(p * (1. - self.wd * self.current_step_lr()), p)
 
 
-def KL(pred, target, logits=False):
+def KL(pred, target, logits=True):
     pred = L.log(L.softmax(pred))
     if logits:
         target = L.softmax(target)
     loss = L.kldiv_loss(pred, target, reduction='none')
+    return loss
+
+
+def KL_T(logits_s, logits_t, T=2.0):
+    p = L.softmax(logits_t / T)
+    loss = L.softmax_with_cross_entropy(logits_s / T, p, soft_label=True)
+
     return loss
 
 
