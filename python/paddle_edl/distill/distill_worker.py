@@ -187,7 +187,7 @@ class PredictServer(object):
 
 
 class PaddlePredictServer(PredictServer):
-    def __init__(self, server, config_file, feeds, fetchs, max_failed_times=3):
+    def __init__(self, server, config_file, feeds, fetchs, max_failed_times=2):
         self._server = server
         self._config_file = config_file
         self._predict_feed_idxs = []
@@ -295,14 +295,15 @@ class PaddlePredictServer(PredictServer):
     def __del__(self):
         try:
             # avoid serving exit bug when hasn't predict
-            if self.client is not None and self._has_predict:
-                self.client.release()
+            #if self.client is not None and self._has_predict:
+            #    self.client.release()
+            pass
         except Exception as e:
             logger.critical('Release client failed with server={}, '
                             'there may be an unknown error'.format(
                                 self._server))
             logger.critical('Exception:\n{}'.format(str(e)))
-        logger.warning('Stopped predict server={}'.format(self._server))
+        #logger.warning('Stopped predict server={}'.format(self._server))
 
 
 class _TestNopPaddlePredictServer(PaddlePredictServer):
@@ -362,19 +363,10 @@ def predict_worker(server_queue, server_result_queue, working_predict_count,
             six.reraise(*sys.exc_info())
 
 
-def predict_loop(server_item,
-                 working_predict_count,
-                 in_queue,
-                 out_queue,
-                 feeds,
-                 fetchs,
-                 conf_file,
-                 stop_events,
-                 predict_lock,
-                 global_finished_task,
-                 predict_cond,
-                 thread_pool,
-                 max_concurrent=3):
+def predict_loop(server_item, working_predict_count, in_queue, out_queue,
+                 feeds, fetchs, conf_file, stop_events, predict_lock,
+                 global_finished_task, predict_cond, thread_pool,
+                 max_concurrent):
     logger.info('connect server={}'.format(server_item.server))
     predict_server = PaddlePredictServer if _NOP_PREDICT_TEST is False else _TestNopPaddlePredictServer
     idx = 0
