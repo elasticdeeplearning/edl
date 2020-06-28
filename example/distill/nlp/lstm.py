@@ -62,9 +62,9 @@ class DynamicGRU(fluid.dygraph.Layer):
 
 
 class GRU(fluid.dygraph.Layer):
-    def __init__(self, dict_dim, batch_size, seq_len):
+    def __init__(self, word_dict, batch_size=16, seq_len=256):
         super(GRU, self).__init__()
-        self.dict_dim = dict_dim
+        self.dict_dim = len(word_dict)
         self.emb_dim = 128
         self.hid_dim = 128
         self.fc_hid_dim = 96
