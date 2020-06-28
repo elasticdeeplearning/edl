@@ -12,48 +12,100 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-
+import paddle.fluid as fluid
+from paddle.fluid.dygraph.nn import Conv2D, Pool2D, Linear, Embedding
+from paddle.fluid.dygraph import GRUUnit
+from paddle.fluid.dygraph.base import to_variable
 import numpy as np
-import argparse
-from sklearn.metrics import f1_score, accuracy_score
-import paddle as P
-import paddle.fluid as F
-import paddle.fluid.layers as L
-import paddle.fluid.dygraph as D
-from reader import ChnSentiCorp, pad_batch_data
-from paddle_edl.distill.distill_reader import DistillReader
-import re
-
-import os
-import sys
-from paddle_serving_client import Client
-from paddle_serving_app.reader import ChineseBertReader
-from paddle.incubate.hapi.text import LSTM
 
 
-class LSTM(D.layer):
-    def __init__(self, word_dict):
-        super().__init__()
+class DynamicGRU(fluid.dygraph.Layer):
+    def __init__(self,
+                 size,
+                 param_attr=None,
+                 bias_attr=None,
+                 is_reverse=False,
+                 gate_activation='sigmoid',
+                 candidate_activation='tanh',
+                 h_0=None,
+                 origin_mode=False,
+                 init_size=None):
+        super(DynamicGRU, self).__init__()
+        self.gru_unit = GRUUnit(
+            size * 3,
+            param_attr=param_attr,
+            bias_attr=bias_attr,
+            activation=candidate_activation,
+            gate_activation=gate_activation,
+            origin_mode=origin_mode)
+        self.size = size
+        self.h_0 = h_0
+        self.is_reverse = is_reverse
 
-        self.emb = D.Embedding(len(word_dict), 300)
-        self.lstm = LSTM(input_size=300, hidden_size=150)
-        self.fc = D.Linear(150, 2)
+    def forward(self, inputs):
+        hidden = self.h_0
+        res = []
+        for i in range(inputs.shape[1]):
+            if self.is_reverse:
+                i = inputs.shape[1] - 1 - i
+            input_ = inputs[:, i:i + 1, :]
+            input_ = fluid.layers.reshape(
+                input_, [-1, input_.shape[2]], inplace=False)
+            hidden, reset, gate = self.gru_unit(input_, hidden)
+            hidden_ = fluid.layers.reshape(
+                hidden, [-1, 1, hidden.shape[1]], inplace=False)
+            res.append(hidden_)
+        if self.is_reverse:
+            res = res[::-1]
+        res = fluid.layers.concat(res, axis=1)
+        return res
 
-    def forward(self, ids, labels=None):
-        embbed = self.emb(ids)
-        lstm_out, self.hidden = self.lstm(embbed)
-        logits = self.fc(lstm_out[-1])
 
-        if labels is not None:
-            if len(labels.shape) == 1:
-                labels = L.reshape(labels, [-1, 1])
-            loss = L.softmax_with_cross_entropy(logits, labels)
+class GRU(fluid.dygraph.Layer):
+    def __init__(self, dict_dim, batch_size, seq_len):
+        super(GRU, self).__init__()
+        self.dict_dim = dict_dim
+        self.emb_dim = 128
+        self.hid_dim = 128
+        self.fc_hid_dim = 96
+        self.class_dim = 2
+        self.batch_size = batch_size
+        self.seq_len = seq_len
+        self.embedding = Embedding(
+            size=[self.dict_dim + 1, self.emb_dim],
+            dtype='float32',
+            param_attr=fluid.ParamAttr(learning_rate=30),
+            is_sparse=False)
+        h_0 = np.zeros((self.batch_size, self.hid_dim), dtype="float32")
+        h_0 = to_variable(h_0)
+        self._fc1 = Linear(input_dim=self.hid_dim, output_dim=self.hid_dim * 3)
+        self._fc2 = Linear(
+            input_dim=self.hid_dim, output_dim=self.fc_hid_dim, act="tanh")
+        self._fc_prediction = Linear(
+            input_dim=self.fc_hid_dim,
+            output_dim=self.class_dim,
+            act="softmax")
+        self._gru = DynamicGRU(size=self.hid_dim, h_0=h_0)
+
+    def forward(self, inputs, label=None):
+        emb = self.embedding(inputs)
+        o_np_mask = to_variable(
+            inputs.numpy().reshape(-1, 1) != self.dict_dim).astype('float32')
+        mask_emb = fluid.layers.expand(
+            to_variable(o_np_mask), [1, self.hid_dim])
+        emb = emb * mask_emb
+        emb = fluid.layers.reshape(
+            emb, shape=[self.batch_size, -1, self.hid_dim])
+        fc_1 = self._fc1(emb)
+        gru_hidden = self._gru(fc_1)
+        gru_hidden = fluid.layers.reduce_max(gru_hidden, dim=1)
+        tanh_1 = fluid.layers.tanh(gru_hidden)
+        fc_2 = self._fc2(tanh_1)
+        prediction = self._fc_prediction(fc_2)
+        if label:
+            cost = fluid.layers.cross_entropy(input=prediction, label=label)
+            avg_cost = fluid.layers.mean(x=cost)
+            #acc = fluid.layers.accuracy(input=prediction, label=label)
+            return avg_cost, prediction
         else:
-            loss = None
-
-        return loss, logits
-
-    def lr(self, steps_per_epoch=None):
-        return 1e-3
+            return None, prediction
