@@ -29,15 +29,21 @@ import re
 import os
 import sys
 
-from model import CNN, AdamW, evaluate_student, BOW
+from model import CNN, AdamW, evaluate_student, BOW, model_factory
 
 g_max_dev_acc = []
 g_max_test_acc = []
 
+parser = argparse.ArgumentParser(__doc__)
+parser.add_argument(
+    "--model", type=str, default="BOW", help="student model name")
+args = parser.parse_args()
+print("parsed args:", args)
+
 
 def train_without_distill(train_reader, dev_reader, test_reader, word_dict,
                           epoch_num, lr):
-    model = BOW(word_dict)
+    model = model_factory(args.model, word_dict)
     opt = AdamW(
         learning_rate=lr, parameter_list=model.parameters(), weight_decay=0.01)
     model.train()

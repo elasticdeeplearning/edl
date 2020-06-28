@@ -30,7 +30,7 @@ import os
 import sys
 from paddle_serving_client import Client
 from paddle_serving_app.reader import ChineseBertReader
-from model import CNN, AdamW, evaluate_student, KL, BOW, KL_T
+from model import CNN, AdamW, evaluate_student, KL, BOW, KL_T, model_factory
 
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument(
@@ -54,6 +54,8 @@ parser.add_argument(
     "--use_data_au", type=int, default=1, help="use data augmentation")
 parser.add_argument(
     "--T", type=float, default=2.0, help="weight of student in loss")
+parser.add_argument(
+    "--model", type=str, default="BOW", help="student model name")
 args = parser.parse_args()
 print("parsed args:", args)
 
@@ -63,19 +65,16 @@ g_max_test_acc = []
 
 def train_with_distill(train_reader, dev_reader, word_dict, test_reader,
                        epoch_num):
-    boundaries = [2250 * 2, 2250 * 4, 2250 * 6]
-    values = [1e-4, 1.5e-4, 2.5e-4, 4e-4]
-    lr = D.PiecewiseDecay(boundaries, values, 0)
-    model = BOW(word_dict)
+    model = model_factory(args.model, word_dict)
     if args.opt == "Adam":
         opt = F.optimizer.Adam(
-            learning_rate=lr,
+            learning_rate=model.lr(steps_per_epoch=2250),
             parameter_list=model.parameters(),
             regularization=F.regularizer.L2Decay(
                 regularization_coeff=args.weight_decay))
     else:
         opt = AdamW(
-            learning_rate=lr,
+            learning_rate=model.lr(steps_per_epoch=2250),
             parameter_list=model.parameters(),
             weight_decay=args.weight_decay)
 
