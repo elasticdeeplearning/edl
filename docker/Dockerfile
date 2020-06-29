@@ -1,4 +1,4 @@
-FROM hub.baidubce.com/paddlepaddle/paddle:latest-gpu-cuda10.0-cudnn7-dev
+FROM hub.baidubce.com/paddlepaddle/paddle:<baseimg>
 
 # Install Go
 RUN rm -rf /usr/local/go && wget -qO- https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz | \
@@ -37,3 +37,4 @@ RUN mkdir -p /tmp/protoc && cd /tmp/protoc && \
 RUN echo "go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.io,direct" >> /root/.bashrc
 ENV GO111MODULE=on
 ENV GOPROXY=https://goproxy.io,direct
+

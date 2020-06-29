@@ -1,4 +1,4 @@
-FROM hub.baidubce.com/paddlepaddle/paddle:1.8.0-gpu-cuda10.0-cudnn7
+FROM hub.baidubce.com/paddlepaddle/paddle:<baseimg>
 
 # Install Go
 RUN rm -rf /usr/local/go && wget -qO- https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz | \
@@ -11,7 +11,7 @@ ENV GOROOT=/usr/local/go GOPATH=/root/gopath
 ENV PATH=$PATH:{GOROOT}/bin:${GOPATH}/bin
 
 ADD ./docker/requirements.txt /root/paddle_edl/requirements.txt
-RUN python -m pip install -r /root/paddle_edl/requirements.txt
+RUN python -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # etcd
 ENV HOME /root
@@ -35,3 +35,8 @@ RUN rm -f /tmp/paddle_edl-0.0.0-py2-none-any.whl
 # add example
 ADD ./example /root/paddle_edl/example
 ADD  ./k8s/k8s_tools.py ./example/distill/k8s/edl_k8s /root/paddle_edl/
+
+# add mnist distill teacher model
+RUN cd /root/paddle_edl/example/distill/mnist_distill && \
+    wget -q https://paddle-edl.bj.bcebos.com/distill_teacher_model/mnist_cnn_model.tar.gz && \
+    tar xzf mnist_cnn_model.tar.gz
