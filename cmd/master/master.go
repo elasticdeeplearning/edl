@@ -30,22 +30,62 @@ import (
 	grpc "google.golang.org/grpc"
 )
 
-func main() {
-	port := flag.Int("port", 8080, "port of the master server.")
+type args struct {
+	port           uint
+	ttlSec         int
+	jobID          string
+	etcd_endpoints []string
+	taskTimeoutDur time.Duration
+	taskTimeoutMax int
+	logLevel       string
+	local_ip       string
+	listen_port    int
+}
+
+func parseArgs() *args {
+	port := flag.Uint("port", 0, "port of the master server.")
 	ttlSec := flag.Int("ttl", 10, "etcd lease TTL in seconds.")
-	endpoints := flag.String("endpoints", "http://127.0.0.1:2379", "comma separated etcd endpoints. If empty, fault tolerance will not be enabled.")
-	jobID := *flag.String("jobID", "", "jobID of this master")
+	etcd_endpoints := flag.String("endpoints", "http://127.0.0.1:2379", "comma separated etcd endpoints. If empty, fault tolerance will not be enabled.")
+	jobID := flag.String("jobID", "", "jobID of this master")
 	taskTimeoutDur := flag.Duration("task-timout-dur", 20*time.Minute, "task timout duration.")
 	taskTimeoutMax := flag.Int("task-timeout-max", 3, "max timtout count for each task before it being declared failed task.")
 	logLevel := flag.String("log-level", "info",
 		"log level, possible values: debug, info, warn, error, crit")
 	flag.Parse()
 
-	if jobID == "" {
+	if *jobID == "" {
 		panic("jobID must set")
 	}
 
-	lvl, err := log.LvlFromString(*logLevel)
+	if *etcd_endpoints == "" {
+		log.Crit("-endpoints not set!.")
+		panic("")
+	}
+
+	eps := strings.Split(*etcd_endpoints, ",")
+	ip, err := utils.GetExternalIP()
+	if err != nil {
+		log.Crit("get external ip error", log.Ctx{"error": err})
+		panic(err)
+	}
+
+	a := &args{}
+	a.port = *port
+	a.ttlSec = *ttlSec
+	a.etcd_endpoints = eps
+	a.local_ip = ip
+	a.jobID = *jobID
+	a.taskTimeoutMax = *taskTimeoutMax
+	a.taskTimeoutDur = *taskTimeoutDur
+	a.logLevel = *logLevel
+
+	return a
+}
+
+func main() {
+	a := parseArgs()
+
+	lvl, err := log.LvlFromString(a.logLevel)
 	if err != nil {
 		panic(err)
 	}
@@ -54,23 +94,11 @@ func main() {
 		log.LvlFilterHandler(lvl, log.CallerStackHandler("%+v", log.StderrHandler)),
 	)
 
-	if *endpoints == "" {
-		log.Crit("-endpoints not set!.")
-		panic("")
-	}
-
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt)
 
-	eps := strings.Split(*endpoints, ",")
-	ip, err := utils.GetExternalIP()
-	if err != nil {
-		log.Crit("get external ip error", log.Ctx{"error": err})
-		panic(err)
-	}
-
-	addr := fmt.Sprintf("%s:%d", ip, *port)
-	store, err := master.NewEtcdClient(jobID, eps, addr, *ttlSec)
+	addr := fmt.Sprintf("%s:%d", a.local_ip, a.port)
+	store, err := master.NewEtcdClient(a.jobID, a.etcd_endpoints, addr, a.ttlSec)
 	if err != nil {
 		log.Crit("error creating etcd client.", log.Ctx{"error": err})
 		panic(err)
@@ -87,7 +115,7 @@ func main() {
 	// Guaranteed to run even panic happens.
 	defer shutdown()
 
-	s, err := master.NewService(jobID, store, *taskTimeoutDur, *taskTimeoutMax)
+	s, err := master.NewService(a.jobID, store, a.taskTimeoutDur, a.taskTimeoutMax)
 	if err != nil {
 		log.Crit("error creating new service.", log.Ctx{"error": err})
 		panic(err)
@@ -95,14 +123,16 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterMasterServer(grpcServer, s)
-	listen, err := net.Listen("tcp", fmt.Sprintf(":%v", *port))
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", a.port))
 	if err != nil {
-		log.Crit("could not listen to 0.0.0.0:%v %v", port, err)
+		log.Crit("could not listen to 0.0.0.0:%v %v", a.port, err)
 	}
+	a.listen_port = listener.Addr().(*net.TCPAddr).Port
 
 	go func() {
 		log.Info("Server starting...")
-		err = grpcServer.Serve(listen)
+		err = grpcServer.Serve(listener)
 		if err != nil {
 			log.Crit("error serving", log.Ctx{"error": err})
 			panic(err)
