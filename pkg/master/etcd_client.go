@@ -18,10 +18,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	log "github.com/inconshreveable/log15"
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
-	"time"
 )
 
 const (
@@ -45,11 +46,11 @@ const (
 // EtcdClient is the etcd client that the master uses for fault
 // tolerance and service registry.
 type EtcdClient struct {
-	lockPath  string
-	statePath string
-	client    *clientv3.Client
-	lock      *concurrency.Mutex
-	sess      *concurrency.Session
+	//lockPath  string
+	//statePath string
+	client *clientv3.Client
+	lock   *concurrency.Mutex
+	sess   *concurrency.Session
 }
 
 type meta struct {
@@ -57,20 +58,20 @@ type meta struct {
 	Endpoint string `json:"endpoint"`
 }
 
-func lockPath(jogID) string {
-	return fmt.Sprintf("/%s%s", jogID, DefaultLockPath)
+func lockPath(jobID string) string {
+	return fmt.Sprintf("/%s%s", jobID, DefaultLockPath)
 }
 
-func metaPath(jogID) string {
-	return fmt.Sprintf("/%s%s", jogID, DefaultMetaPath)
+func metaPath(jobID string) string {
+	return fmt.Sprintf("/%s%s", jobID, DefaultMetaPath)
 }
 
-func statePath(jogID) string {
-	return fmt.Sprintf("/%s%s", jogID, DefaultStatePath)
+func statePath(jobID string) string {
+	return fmt.Sprintf("/%s%s", jobID, DefaultStatePath)
 }
 
 // NewEtcdClient creates a new EtcdClient.
-func NewEtcdClient(jogID string, endpoints []string, addr string, ttlSec int) (*EtcdClient, error) {
+func NewEtcdClient(jobID string, endpoints []string, addr string, ttlSec int) (*EtcdClient, error) {
 	log.Debug("Connecting to etcd", log.Ctx{"endpoint": endpoints})
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   endpoints,
@@ -85,23 +86,24 @@ func NewEtcdClient(jogID string, endpoints []string, addr string, ttlSec int) (*
 		return nil, err
 	}
 
-	lock := concurrency.NewMutex(sess, lockPath(jogID))
+	lock := concurrency.NewMutex(sess, lockPath(jobID))
 	// It's fine for the lock to get stuck, in this case we have
 	// multiple master servers running (only configured to have
 	// one master running, but split-brain problem may cause
 	// multiple master servers running), and the cluster management
 	// software will kill one of them.
-	log.Info("Trying to acquire lock.", log.Ctx{"path": lockPath})
+	log.Info("Trying to acquire lock.", log.Ctx{"path": lockPath(jobID)})
 	err = lock.Lock(context.TODO())
 	if err != nil {
 		return nil, err
 	}
-	log.Info("Successfully acquired lock at: ", log.Ctx{"path": lockPath})
+	log.Info("Successfully acquired lock at: ", log.Ctx{"path": lockPath(jobID)})
 
-	// FIXME(gongwb): master should support fail over
 	m := meta{"INITIAL", addr}
 
-	put := clientv3.OpPut(metaPath, json.Marshal(m))
+	d, _ := json.Marshal(m)
+
+	put := clientv3.OpPut(metaPath(jobID), string(d))
 	resp, err := cli.Txn(context.Background()).If(lock.IsOwner()).Then(put).Commit()
 	if err != nil {
 		return nil, err
@@ -113,11 +115,9 @@ func NewEtcdClient(jogID string, endpoints []string, addr string, ttlSec int) (*
 	}
 
 	e := &EtcdClient{
-		lockPath:  lockPath(jogID),
-		statePath: statePath(jogID),
-		client:    cli,
-		lock:      lock,
-		sess:      sess,
+		client: cli,
+		lock:   lock,
+		sess:   sess,
 	}
 
 	return e, nil
@@ -129,16 +129,16 @@ func (e *EtcdClient) GetNextVersion() (string, error) {
 }
 
 // Save saves the version state to etcd
-func (e *EtcdClient) Save(state []byte, version string) error {
+func (e *EtcdClient) Save(jobID string, state []byte) error {
 	// save the new version
-	statePath := fmt.Sprintf("/%s/%s/%s", e.jogID, DefaultStatePath, version)
-	return e.save(state, statePath)
+	// path := fmt.Sprintf("/%s/%s/%s", jobID, statePath(jobID), version)
+	return e.save(jobID, state, "")
 }
 
 // Save saves the state into the etcd.
-func (e *EtcdClient) save(state []byte, statePath string) error {
+func (e *EtcdClient) save(jobID string, state []byte, path string) error {
 	ctx := context.TODO()
-	put := clientv3.OpPut(statePath, string(state))
+	put := clientv3.OpPut(path, string(state))
 	resp, err := e.client.Txn(ctx).If(e.lock.IsOwner()).Then(put).Commit()
 	if err != nil {
 		return err
@@ -159,20 +159,20 @@ func (e *EtcdClient) save(state []byte, statePath string) error {
 			// to kill current master server. The current
 			// state is not saved, but the trainer's RPC
 			// call will fail, so the trainer will retry.
-			log.Crit("Could not acquire the lock at %s: %v. Exiting.", log.Ctx{"path": e.lockPath, "error": err})
+			log.Crit("Could not acquire the lock at %s: %v. Exiting.", log.Ctx{"path": lockPath(jobID), "error": err})
 			panic("Could not acquire the lock at %s: %v. Exiting.")
 		}
-		log.Info("Successfully acquired lock at %s.", e.lockPath)
-		return e.Save(state)
+		log.Info("Successfully acquired lock at %s.", lockPath(jobID))
+		return e.Save(jobID, state)
 	}
 
 	return nil
 }
 
 // Load loads the state from etcd.
-func (e *EtcdClient) Load(statePath) ([]byte, error) {
+func (e *EtcdClient) Load(jobID string) ([]byte, error) {
 	ctx := context.TODO()
-	get := clientv3.OpGet(statePath)
+	get := clientv3.OpGet(statePath(jobID))
 
 	resp, err := e.client.Txn(ctx).If(e.lock.IsOwner()).Then(get).Commit()
 	if err != nil {
@@ -186,7 +186,7 @@ func (e *EtcdClient) Load(statePath) ([]byte, error) {
 			return nil, err
 		}
 
-		return e.Load()
+		return e.Load(jobID)
 	}
 
 	kvs := resp.Responses[0].GetResponseRange().Kvs

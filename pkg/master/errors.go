@@ -2,6 +2,7 @@ package master
 
 import (
 	"fmt"
+
 	pb "github.com/paddlepaddle/edl/pkg/masterpb"
 )
 
@@ -56,5 +57,5 @@ func (v *Error) ToRPCRet() *pb.RPCRet {
 
 // DuplicateInitDataSet make the correspond error.
 func DuplicateInitDataSet(detail string) *Error {
-	return &Error{ErrorTypeDuplicateInitDataSet, detail}
+	return &Error{DuplicateInitDataSetError, detail}
 }

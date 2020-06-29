@@ -3,10 +3,11 @@ package master
 import (
 	"context"
 	"fmt"
-	log "github.com/inconshreveable/log15"
-	pb "github.com/paddlepaddle/edl/pkg/masterpb"
 	"sync"
 	"time"
+
+	log "github.com/inconshreveable/log15"
+	pb "github.com/paddlepaddle/edl/pkg/masterpb"
 )
 
 const (
@@ -64,7 +65,7 @@ type Service struct {
 }
 
 // NewService creates a new service.
-func NewService(etcd *EtcdClient, timeoutDur time.Duration, failureMax int) (*Service, error) {
+func NewService(jobID string, etcd *EtcdClient, timeoutDur time.Duration, failureMax int) (*Service, error) {
 	s := &Service{}
 	s.timeoutDur = timeoutDur
 	s.failureMax = failureMax
@@ -134,6 +135,12 @@ func (s *Service) SetDataSet(globPaths []string, _ *int) error {
 // return true if all task are done or failed.
 func (s *Service) processFailedTask(t taskEntry, epoch int) {
 	return
+}
+
+// processFailedTask retry s.failureMax times for failed task.
+// return true if all task are done or failed.
+func (s *Service) GetID(ctx context.Context, in *pb.EmptyRequest) (*pb.Entity, error) {
+	return nil, nil
 }
 
 func (s *Service) checkTimeoutFunc(taskID int, epoch int) func() {

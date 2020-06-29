@@ -16,32 +16,33 @@ package main
 
 import (
 	"fmt"
+	"net"
+	"os"
+	"os/signal"
+	"strings"
+	"time"
+
 	log "github.com/inconshreveable/log15"
 	"github.com/namsral/flag"
 	master "github.com/paddlepaddle/edl/pkg/master"
 	pb "github.com/paddlepaddle/edl/pkg/masterpb"
 	utils "github.com/paddlepaddle/edl/pkg/utils"
 	grpc "google.golang.org/grpc"
-	"net"
-	"os"
-	"os/signal"
-	"strings"
-	"time"
 )
 
 func main() {
 	port := flag.Int("port", 8080, "port of the master server.")
 	ttlSec := flag.Int("ttl", 10, "etcd lease TTL in seconds.")
 	endpoints := flag.String("endpoints", "http://127.0.0.1:2379", "comma separated etcd endpoints. If empty, fault tolerance will not be enabled.")
-	jogID := flag.String("jogID", "", "jogID of this master")
+	jobID := *flag.String("jobID", "", "jobID of this master")
 	taskTimeoutDur := flag.Duration("task-timout-dur", 20*time.Minute, "task timout duration.")
 	taskTimeoutMax := flag.Int("task-timeout-max", 3, "max timtout count for each task before it being declared failed task.")
 	logLevel := flag.String("log-level", "info",
 		"log level, possible values: debug, info, warn, error, crit")
 	flag.Parse()
 
-	if jogID == "" {
-		panic("jogID must set")
+	if jobID == "" {
+		panic("jobID must set")
 	}
 
 	lvl, err := log.LvlFromString(*logLevel)
@@ -69,7 +70,7 @@ func main() {
 	}
 
 	addr := fmt.Sprintf("%s:%d", ip, *port)
-	store, err := master.NewEtcdClient(jogID, eps, addr, master.DefaultLockPath, master.DefaultAddrPath, master.DefaultStatePath, *ttlSec)
+	store, err := master.NewEtcdClient(jobID, eps, addr, *ttlSec)
 	if err != nil {
 		log.Crit("error creating etcd client.", log.Ctx{"error": err})
 		panic(err)
@@ -86,7 +87,7 @@ func main() {
 	// Guaranteed to run even panic happens.
 	defer shutdown()
 
-	s, err := master.NewService(jogID, store, *taskTimeoutDur, *taskTimeoutMax)
+	s, err := master.NewService(jobID, store, *taskTimeoutDur, *taskTimeoutMax)
 	if err != nil {
 		log.Crit("error creating new service.", log.Ctx{"error": err})
 		panic(err)
