@@ -30,21 +30,27 @@ import os
 import sys
 from paddle_serving_client import Client
 from paddle_serving_app.reader import ChineseBertReader
-from text_basic import LSTM
+from text_basic import LSTM as basic_lstm
 
 
-class LSTM(D.layer):
+class LSTM(D.Layer):
     def __init__(self, word_dict):
         super().__init__()
 
-        self.emb = D.Embedding(len(word_dict), 300)
-        self.lstm = LSTM(input_size=300, hidden_size=150)
+        self.emb = D.Embedding([len(word_dict), 300])
+        self.lstm = basic_lstm(input_size=300, hidden_size=150)
         self.fc = D.Linear(150, 2)
 
     def forward(self, ids, labels=None):
         embbed = self.emb(ids)
-        lstm_out, self.hidden = self.lstm(embbed)
-        logits = self.fc(lstm_out[-1])
+        #print("embed shape:", embbed.shape)
+
+        lstm_out, hidden = self.lstm(embbed)
+        #print("lstm_out shape:", lstm_out.shape)
+        #print("hiden list len:", len(hidden))
+
+        logits = self.fc(lstm_out[:, -1])
+        #print("logits shape:", logits.shape)
 
         if labels is not None:
             if len(labels.shape) == 1:
