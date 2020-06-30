@@ -10,10 +10,6 @@ import (
 	pb "github.com/paddlepaddle/edl/pkg/masterpb"
 )
 
-const (
-	port = ":50051"
-)
-
 // Store is the interface for save and load the master state.
 type Store interface {
 	Save([]byte) error

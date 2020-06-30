@@ -29,10 +29,9 @@ const (
 	// DefaultLockPath is the default etcd master lock path.
 	DefaultLockPath = "/master/lock"
 	// DefaultStatePath is the default etcd key for master state.
-	// version_0, version_1 ..., reserve last 3
 	DefaultStatePath = "/master/state"
 	// DefaultMetaPath is the default etcd key for master address.
-	// {job_stage:"", endpoint:""}
+	// {old_stages:[], now_stage:"", endpoint:""}
 	DefaultMetaPath = "/master/meta"
 	// DefaultAdjustPath is the the default etcd key for pod changes.
 	// operation1, operatrion2, ...
@@ -46,8 +45,6 @@ const (
 // EtcdClient is the etcd client that the master uses for fault
 // tolerance and service registry.
 type EtcdClient struct {
-	//lockPath  string
-	//statePath string
 	client *clientv3.Client
 	lock   *concurrency.Mutex
 	sess   *concurrency.Session
@@ -70,8 +67,64 @@ func statePath(jobID string) string {
 	return fmt.Sprintf("/%s%s", jobID, DefaultStatePath)
 }
 
-// NewEtcdClient creates a new EtcdClient.
-func NewEtcdClient(jobID string, endpoints []string, addr string, ttlSec int) (*EtcdClient, error) {
+func DetectIsOwner(jobID string, c *EtcdClient) {
+	for {
+		err := c.lock.Lock(context.Background())
+		if err != nil {
+			s := "Master miss lock now, so exit!"
+			log.Info(s)
+			panic(s)
+		}
+
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func recordMeta(jobID, c *EtcdClient) error {
+	m := meta{"INITIAL", addr}
+
+	d, _ := json.Marshal(m)
+
+	put := clientv3.OpPut(metaPath(jobID), string(d))
+	resp, err := c.Txn(context.Background()).If(lock.IsOwner()).Then(put).Commit()
+	if err != nil {
+		return err
+	}
+
+	if !resp.Succeeded {
+		log.Crit("No longer owns the master lock. Exiting.")
+		panic("No longer owns the master lock. Exiting.")
+	}
+
+	return nil
+}
+
+func Election(jobID string, endpoints []string, ttlSec int) *EtcdClient {
+	var cli *EtcdClient
+	var err error
+	for {
+		cli, err = tryToLock(jobID, endpoints, ttlSec)
+		if err != nil {
+			log.Debug("Elect failed:", err)
+			time.Sleep(1 * time.Minute)
+			continue
+		}
+
+		err := load
+
+		err := recordMeta(cli)
+		if err != nil {
+			cli = nil
+			log.Crit("Record master info error:", err)
+			continue
+		}
+
+		go DetectIsOwner(jobID, cli)
+		return cli
+	}
+}
+
+func tryToLock(jobID string, endpoints []string, ttlSec int) (*EtcdClient, error) {
 	log.Debug("Connecting to etcd", log.Ctx{"endpoint": endpoints})
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   endpoints,
@@ -99,46 +152,20 @@ func NewEtcdClient(jobID string, endpoints []string, addr string, ttlSec int) (*
 	}
 	log.Info("Successfully acquired lock at: ", log.Ctx{"path": lockPath(jobID)})
 
-	m := meta{"INITIAL", addr}
-
-	d, _ := json.Marshal(m)
-
-	put := clientv3.OpPut(metaPath(jobID), string(d))
-	resp, err := cli.Txn(context.Background()).If(lock.IsOwner()).Then(put).Commit()
-	if err != nil {
-		return nil, err
-	}
-
-	if !resp.Succeeded {
-		log.Crit("No longer owns the master lock. Exiting.")
-		panic("No longer owns the master lock. Exiting.")
-	}
-
 	e := &EtcdClient{
 		client: cli,
 		lock:   lock,
 		sess:   sess,
 	}
 
+	//statePath string
 	return e, nil
 }
 
-// GetNextVersion gets next version by etcd_list
-func (e *EtcdClient) GetNextVersion() (string, error) {
-	return "", nil
-}
-
-// Save saves the version state to etcd
-func (e *EtcdClient) Save(jobID string, state []byte) error {
-	// save the new version
-	// path := fmt.Sprintf("/%s/%s/%s", jobID, statePath(jobID), version)
-	return e.save(jobID, state, "")
-}
-
 // Save saves the state into the etcd.
-func (e *EtcdClient) save(jobID string, state []byte, path string) error {
+func (e *EtcdClient) Save(jobID string, v []byte, path string) error {
 	ctx := context.TODO()
-	put := clientv3.OpPut(path, string(state))
+	put := clientv3.OpPut(path, string(v))
 	resp, err := e.client.Txn(ctx).If(e.lock.IsOwner()).Then(put).Commit()
 	if err != nil {
 		return err
@@ -163,16 +190,16 @@ func (e *EtcdClient) save(jobID string, state []byte, path string) error {
 			panic("Could not acquire the lock at %s: %v. Exiting.")
 		}
 		log.Info("Successfully acquired lock at %s.", lockPath(jobID))
-		return e.Save(jobID, state)
+		return e.Save(jobID, v, path)
 	}
 
 	return nil
 }
 
-// Load loads the state from etcd.
-func (e *EtcdClient) Load(jobID string) ([]byte, error) {
+// Load load value from etcd by path.
+func (e *EtcdClient) Load(jobID string, path string) ([]byte, error) {
 	ctx := context.TODO()
-	get := clientv3.OpGet(statePath(jobID))
+	get := clientv3.OpGet(path)
 
 	resp, err := e.client.Txn(ctx).If(e.lock.IsOwner()).Then(get).Commit()
 	if err != nil {
@@ -195,8 +222,8 @@ func (e *EtcdClient) Load(jobID string) ([]byte, error) {
 		return nil, nil
 	}
 
-	state := kvs[0].Value
-	return state, nil
+	v := kvs[0].Value
+	return v, nil
 }
 
 // Shutdown shuts down the etcd client gracefully.
