@@ -18,6 +18,7 @@ import json
 import struct
 import sys
 import time
+import os
 
 
 class Client(object):
@@ -122,7 +123,12 @@ class Client(object):
         return self.teacher_list
 
     def start(self, daemon=True):
-        self.client.connect((self._ip, self._port))
+        try:
+            self.client.connect((self._ip, self._port))
+        except socket.error:
+            sys.stderr.write('ERROR: connect with balance server failed, '
+                             'please check if balance server is alive\n')
+            os._exit(-1)
         # self.client.settimeout(6)
 
         self.teacher_list = self._register(self._require_num)
