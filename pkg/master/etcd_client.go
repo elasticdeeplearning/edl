@@ -48,6 +48,7 @@ type EtcdClient struct {
 	client *clientv3.Client
 	lock   *concurrency.Mutex
 	sess   *concurrency.Session
+	jobID  string
 }
 
 type meta struct {
@@ -67,9 +68,9 @@ func statePath(jobID string) string {
 	return fmt.Sprintf("/%s%s", jobID, DefaultStatePath)
 }
 
-func DetectIsOwner(jobID string, c *EtcdClient) {
+func (e *EtcdClient) detectIsOwner() {
 	for {
-		err := c.lock.Lock(context.Background())
+		err := e.lock.Lock(context.Background())
 		if err != nil {
 			s := "Master miss lock now, so exit!"
 			log.Info(s)
@@ -80,27 +81,37 @@ func DetectIsOwner(jobID string, c *EtcdClient) {
 	}
 }
 
-func recordMeta(jobID, c *EtcdClient) error {
+func (e *EtcdClient) recordMeta(addr string) error {
 	m := meta{"INITIAL", addr}
 
 	d, _ := json.Marshal(m)
 
-	put := clientv3.OpPut(metaPath(jobID), string(d))
-	resp, err := c.Txn(context.Background()).If(lock.IsOwner()).Then(put).Commit()
+	return e.Save(d, metaPath(jobID))
+}
+
+func (e *EtcdClient) loadState() (*masterState, error) {
+	state, err := e.Load(statePath(jobID))
 	if err != nil {
-		return err
+		log.Crit("load state info error:", err)
+		return nil, err
 	}
 
-	if !resp.Succeeded {
-		log.Crit("No longer owns the master lock. Exiting.")
-		panic("No longer owns the master lock. Exiting.")
+	return state, nil
+}
+
+func (e *EtcdClient) loadMeta() (*masterMeta, error) {
+	meta, err := e.Load(metaPath(e.jobID))
+	if err != nil {
+		log.Crit("load state info error:", err)
+		return nil, err
 	}
 
-	return nil
+	return meta, nil
 }
 
 func Election(jobID string, endpoints []string, ttlSec int) *EtcdClient {
 	var cli *EtcdClient
+	cli.jobID = jobID
 	var err error
 	for {
 		cli, err = tryToLock(jobID, endpoints, ttlSec)
@@ -110,16 +121,7 @@ func Election(jobID string, endpoints []string, ttlSec int) *EtcdClient {
 			continue
 		}
 
-		err := load
-
-		err := recordMeta(cli)
-		if err != nil {
-			cli = nil
-			log.Crit("Record master info error:", err)
-			continue
-		}
-
-		go DetectIsOwner(jobID, cli)
+		go detectIsOwner(jobID, cli)
 		return cli
 	}
 }
@@ -162,8 +164,33 @@ func tryToLock(jobID string, endpoints []string, ttlSec int) (*EtcdClient, error
 	return e, nil
 }
 
+func (e *EtcdClient) reGetLock(miss bool) {
+	if miss {
+		log.Error("No longer owns the lock, trying to lock again")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	err := e.lock.Lock(ctx)
+	cancel()
+	if err != nil {
+		// We lost the master lock and can not acquire
+		// it back, it means some other master is
+		// already started. We don't want cluster
+		// management system to kill the master server
+		// who is holding the lock and running
+		// correctly. So the most feasible solution is
+		// to kill current master server. The current
+		// state is not saved, but the trainer's RPC
+		// call will fail, so the trainer will retry.
+		log.Crit("Could not acquire the lock at %s: %v. Exiting.", log.Ctx{"path": lockPath(jobID), "error": err})
+		panic("Could not acquire the lock at %s: %v. Exiting.")
+	}
+	if miss {
+		log.Info("Successfully acquired lock at %s.", lockPath(e.jobID))
+	}
+}
+
 // Save saves the state into the etcd.
-func (e *EtcdClient) Save(jobID string, v []byte, path string) error {
+func (e *EtcdClient) Save(path string, v []byte) error {
 	ctx := context.TODO()
 	put := clientv3.OpPut(path, string(v))
 	resp, err := e.client.Txn(ctx).If(e.lock.IsOwner()).Then(put).Commit()
@@ -172,32 +199,15 @@ func (e *EtcdClient) Save(jobID string, v []byte, path string) error {
 	}
 
 	if !resp.Succeeded {
-		log.Error("No longer owns the lock, trying to lock again")
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		err := e.lock.Lock(ctx)
-		cancel()
-		if err != nil {
-			// We lost the master lock and can not acquire
-			// it back, it means some other master is
-			// already started. We don't want cluster
-			// management system to kill the master server
-			// who is holding the lock and running
-			// correctly. So the most feasible solution is
-			// to kill current master server. The current
-			// state is not saved, but the trainer's RPC
-			// call will fail, so the trainer will retry.
-			log.Crit("Could not acquire the lock at %s: %v. Exiting.", log.Ctx{"path": lockPath(jobID), "error": err})
-			panic("Could not acquire the lock at %s: %v. Exiting.")
-		}
-		log.Info("Successfully acquired lock at %s.", lockPath(jobID))
-		return e.Save(jobID, v, path)
+		e.reGetLock(true)
+		return e.Save(path, v)
 	}
 
 	return nil
 }
 
 // Load load value from etcd by path.
-func (e *EtcdClient) Load(jobID string, path string) ([]byte, error) {
+func (e *EtcdClient) Load(path string) ([]byte, error) {
 	ctx := context.TODO()
 	get := clientv3.OpGet(path)
 
@@ -207,13 +217,8 @@ func (e *EtcdClient) Load(jobID string, path string) ([]byte, error) {
 	}
 
 	if !resp.Succeeded {
-		log.Error("No longer owns the lock, trying to lock and load again.")
-		err = e.lock.Lock(context.Background())
-		if err != nil {
-			return nil, err
-		}
-
-		return e.Load(jobID)
+		e.reGetLock(true)
+		return e.Load(path)
 	}
 
 	kvs := resp.Responses[0].GetResponseRange().Kvs

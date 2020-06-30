@@ -40,6 +40,7 @@ type args struct {
 	logLevel       string
 	local_ip       string
 	listen_port    int
+	endpoint       string
 }
 
 func parseArgs() *args {
@@ -78,6 +79,7 @@ func parseArgs() *args {
 	a.taskTimeoutMax = *taskTimeoutMax
 	a.taskTimeoutDur = *taskTimeoutDur
 	a.logLevel = *logLevel
+	a.endpoint = fmt.Sprintf("%s:%d", a.local_ip, a.port)
 
 	return a
 }
@@ -97,8 +99,7 @@ func main() {
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt)
 
-	addr := fmt.Sprintf("%s:%d", a.local_ip, a.port)
-	store, err := master.NewEtcdClient(a.jobID, a.etcd_endpoints, addr, a.ttlSec)
+	store := master.Election(a.jobID, a.etcd_endpoints, a.ttlSec)
 	if err != nil {
 		log.Crit("error creating etcd client.", log.Ctx{"error": err})
 		panic(err)
@@ -127,8 +128,12 @@ func main() {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", a.port))
 	if err != nil {
 		log.Crit("could not listen to 0.0.0.0:%v %v", a.port, err)
+		panic(err)
 	}
 	a.listen_port = listener.Addr().(*net.TCPAddr).Port
+	a.endpoint = fmt.Sprintf("%s:%d", a.local_ip, a.listen_port)
+
+	s.Register(a.endpoint)
 
 	go func() {
 		log.Info("Server starting...")
