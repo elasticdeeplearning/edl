@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import gc
 import logging
 import numpy as np
 import os
@@ -19,8 +20,10 @@ import signal
 import six
 import sys
 import time
+import threading
 
-from paddle_serving_client import Client
+from paddle_serving_client import MultiLangClient
+# from paddle_serving_client import Client
 from six.moves import queue
 from six.moves import reduce
 from .timeline import _TimeLine
@@ -43,33 +46,23 @@ def _is_server_alive(server):
 
 
 class ServerItem(object):
-    PENDING = 'pending'
+    RUNNING = 'pending'
     ERROR = 'error'
     FINISHED = 'finished'
+    STOPPING = 'stopping'
 
-    def __init__(self, server_id, server, stop_event_id, state=PENDING):
+    def __init__(self, server_id, server, state=RUNNING):
         self.server_id = server_id
         self.server = server
-        self.stop_event_id = stop_event_id
         self.state = state
 
 
-def predict_manage_worker(process, server_queue, server_result_queue,
-                          require_num, predict_stop_events, get_servers_fun,
-                          stop_event, predict_cond):
+def predict_manage_worker(server_queue, server_result_queue, require_num,
+                          get_servers_fun, stop_event):
     """ thread that manage predict worker """
-    num_shutdown_process = [0]
-
-    def shutdown_one_process():
-        server_queue.put(None)
-        num_shutdown_process[0] += 1
-
     server_id = 0  # not yet used
     server_to_item = dict()  # server to server_item
     idle_predict_num = require_num
-    event_set = set()
-    for i in range(require_num):
-        event_set.add(i)
 
     # Fix the order of object destruction
     first_in = True
@@ -89,10 +82,11 @@ def predict_manage_worker(process, server_queue, server_result_queue,
         while len(rm_servers) != 0:
             server = rm_servers.pop()
             server_item = server_to_item[server]
-            stop_event_id = server_item.stop_event_id
-            # set stop event
-            if not predict_stop_events[stop_event_id].is_set():
-                predict_stop_events[stop_event_id].set()
+
+            # need stop
+            if server_item.state != ServerItem.STOPPING:
+                server_item.state = ServerItem.STOPPING
+                server_queue.put(server_item)
                 logger.info('Removing server={}'.format(server))
 
         # Add servers
@@ -107,8 +101,7 @@ def predict_manage_worker(process, server_queue, server_result_queue,
                 continue
 
             idle_predict_num -= 1
-            event_id = event_set.pop()
-            server_item = ServerItem(server_id, server, event_id)
+            server_item = ServerItem(server_id, server)
             server_queue.put(server_item)
             server_to_item[server] = server_item
             server_id += 1
@@ -117,13 +110,8 @@ def predict_manage_worker(process, server_queue, server_result_queue,
         try:
             # server job stop, return back stop_event_id
             server_result_item = server_result_queue.get(timeout=2)
-            stop_event_id = server_result_item.stop_event_id
-            event_set.add(stop_event_id)
             del server_to_item[server_result_item.server]
 
-            # clear event
-            predict_stop_events[stop_event_id].clear()
-            # directly use count
             idle_predict_num += 1
             assert idle_predict_num <= require_num, \
                 'idle_predict_num={} must <= require_num={}'.format(
@@ -141,24 +129,6 @@ def predict_manage_worker(process, server_queue, server_result_queue,
 
     clean_queue(server_queue)
     clean_queue(server_result_queue)
-
-    with predict_cond:
-        for predict_stop_event in predict_stop_events:
-            predict_stop_event.set()
-        predict_cond.notify_all()
-
-    for i in range(require_num):
-        shutdown_one_process()
-        clean_queue(server_result_queue)
-
-    for i in range(20):
-        shutdown_process = 0
-        for p in process:
-            if not p.is_alive():
-                shutdown_process += 1
-        if shutdown_process == len(process):
-            break
-        time.sleep(1)
 
 
 class _PoisonPill:
@@ -184,32 +154,31 @@ class PredictServer(object):
         raise NotImplementedError()
 
 
-class PaddlePredictServer(PredictServer):
-    def __init__(self, server, config_file, feeds, fetchs, max_failed_times=3):
-        self._server = server
+class AsyncPredictClient(object):
+    def __init__(self, server, config_file, feeds, fetchs):
+        self.server = server
         self._config_file = config_file
         self._predict_feed_idxs = []
         self._predict_feed_shapes = dict()
         self._predict_feed_size = dict()
         self._feeds = feeds
         self._fetchs = fetchs
-        self._max_failed_times = max_failed_times
         self.client = None
         self._has_predict = False
-        logger.info((server, config_file, feeds, fetchs, max_failed_times))
+        self.need_stop = False
 
-        self._time_line = _TimeLine()
+        logger.info((server, config_file, feeds, fetchs))
 
     def connect(self):
         """ connect success, return True, else return False"""
         try:
-            client = Client()
-            client.load_client_config(self._config_file)
-            client.connect([self._server])
+            client = MultiLangClient()
+            #client.load_client_config(self._config_file)
+            client.connect([self.server])
             self.client = client
         except Exception as e:
             logger.error('Exception when connect server={}, Exception is:'.
-                         format(str(self._server)))
+                         format(str(self.server)))
             logger.error(str(e))
             return False
 
@@ -263,31 +232,28 @@ class PaddlePredictServer(PredictServer):
         """ predict success, return (True, predict_data),
         else return (False, None)"""
         self._has_predict = True
-        self._time_line.reset()
         feed_map_list = self._preprocess(feed_data)
-        self._time_line.record('predict_preprocess')
+        future = self.client.predict(
+            feed=feed_map_list, fetch=self._fetchs, asyn=True)
+        return future
 
+    def result(self, future, feed_data):
         fetch_map_list = None
-        for i in range(self._max_failed_times):
-            try:
-                fetch_map_list = self.client.predict(
-                    feed=feed_map_list, fetch=self._fetchs)
-                if fetch_map_list is None:
-                    raise Exception('fetch_map_list should not be None')
-                break
-            except Exception as e:
-                logger.warning('Failed {} times with server={}'.format(
-                    i + 1, self._server))
-                logger.warning('Exception:\n{}'.format(str(e)))
-                # time.sleep(0.1 * (i + 1))
-
-        self._time_line.record('real_predict')
+        try:
+            fetch_map_list = future.result()
+        except Exception as e:
+            logger.warning('Failed with server={}'.format(self.server))
+            logger.warning('Exception:\n{}'.format(str(e)))
 
         if fetch_map_list is None:
             return False, None
 
+        if fetch_map_list['status_code'] != 0:
+            logger.warning('Failed status code={}'.format(fetch_map_list[
+                'status_code']))
+            return False, None
+
         predict_data = self._postprocess(fetch_map_list, len(feed_data))
-        self._time_line.record('postprocess')
         return True, predict_data
 
     def __del__(self):
@@ -298,26 +264,146 @@ class PaddlePredictServer(PredictServer):
         except Exception as e:
             logger.critical('Release client failed with server={}, '
                             'there may be an unknown error'.format(
-                                self._server))
+                                self.server))
             logger.critical('Exception:\n{}'.format(str(e)))
-        logger.warning('Stopped predict server={}'.format(self._server))
+        logger.warning('Stopped predict server={}'.format(self.server))
 
 
-class _TestNopPaddlePredictServer(PaddlePredictServer):
+class _TestNopAsyncPredictClient(AsyncPredictClient):
+    class _Future(object):
+        def __init__(self, feed_data):
+            self._feed_data = feed_data
+
+        def add_done_callback(self, call_back):
+            call_back(self)
+
     def connect(self):
         return True
 
     def predict(self, feed_data):
+        return self._Future(feed_data)
+
+    def result(self, future, feed_data):
         predict_data = [tuple() for _ in range(len(feed_data))]
         return True, predict_data
 
-    def __del__(self):
-        pass
+
+class PredictPool(object):
+    def __init__(self):
+        self._client_queue = queue.Queue()
+        self._server_to_clients = dict()
+
+    def add_client(self, server_item, feeds, fetchs, conf_file, concurrent=3):
+        server = server_item.server
+        if server_item.server in self._server_to_clients:
+            logger.warning('server={} in predict client?'.format(
+                server_item.server))
+            return True
+
+        predict_server = AsyncPredictClient if _NOP_PREDICT_TEST is False else _TestNopAsyncPredictClient
+        client = predict_server(server, conf_file, feeds, fetchs)
+        if not client.connect():
+            return False
+
+        self._server_to_clients[server] = (server_item, client)
+        for _ in range(concurrent):
+            self._client_queue.put(client)
+        return True
+
+    def stop_client(self, server_item):
+        server = server_item.server
+        item_client = self._server_to_clients.get(server)
+        # client may removed before this
+        if item_client is not None:
+            _, client = item_client
+            client.need_stop = True
+
+    def rm_client(self, client, server_result_queue):
+        server = client.server
+        item_client = self._server_to_clients.get(server)
+        # client already removed
+        if item_client is None:
+            return
+        server_item, client = item_client
+        del self._server_to_clients[server]
+
+        server_item.state = ServerItem.FINISHED
+        server_result_queue.put(server_item)
+
+    def run(self, in_queue, out_queue, server_result_queue):
+        finished_task_count_lock = threading.Lock()
+        finished_task_count = [0]
+
+        while True:
+            data = in_queue.get()
+            if isinstance(data, _PoisonPill):
+                poison_pill = data
+                if finished_task_count[0] == poison_pill.feed_count:
+                    poison_pill.predict_count = poison_pill.feed_count
+                    return poison_pill  # all task finished
+
+                in_queue.put(data)  # write back poison pill
+                time.sleep(0.003)  # wait 3ms
+                continue  # continue process failed task
+
+            task, read_data = data
+            while True:
+                client = self._client_queue.get()
+                if client.need_stop:
+                    self.rm_client(client, server_result_queue)
+                    continue
+
+                # FIXME. may failed
+                future = client.predict(read_data)
+
+                call_back = predict_call_back(in_queue, out_queue, client,
+                                              data, finished_task_count_lock,
+                                              finished_task_count,
+                                              self._client_queue)
+                future.add_done_callback(call_back)
+                #logger.info('garbage collector output is {}'.format(gc.get_stats()))
+                #gc.collect(0)
+                break
 
 
-def predict_worker(server_queue, server_result_queue, working_predict_count,
-                   in_queue, out_queue, feeds, fetchs, conf_file, stop_events,
-                   predict_lock, global_finished_task, predict_cond):
+def predict_call_back(
+        in_queue,
+        out_queue,
+        client,
+        data,
+        finished_task_count_lock,
+        finished_task_count,
+        client_queue, ):
+    def _call_back(future):
+        task, read_data = data
+        batch_size = len(read_data)
+        success = False
+        try:
+            success, predict_data = client.result(future, read_data)
+        except Exception as e:
+            logger.info('predict error={}'.format(e))
+        if not success:
+            in_queue.put(data)
+            client.need_stop = True
+
+        client_queue.put(client)  # complete, put back
+        if not success:
+            return
+
+        out_data = read_data
+        for i in range(batch_size):
+            out_data[i] += predict_data[i]
+
+        out_queue.put((task, out_data))
+        with finished_task_count_lock:
+            finished_task_count[0] += 1
+
+    return _call_back
+
+
+def predict_process(server_queue, server_result_queue, in_queue, out_queue,
+                    feeds, fetchs, conf_file, stop_event, predict_cond):
+    logger.info('predict process pid={}'.format(os.getpid()))
     signal_exit = [False, ]
 
     # Define signal handler function
@@ -334,148 +420,49 @@ def predict_worker(server_queue, server_result_queue, working_predict_count,
     signal.signal(signal.SIGTERM, predict_signal_handle)
 
     try:
-        while True:
-            # get server
-            server_item = server_queue.get()
-            if server_item is None:
-                server_result_queue.put(None)
-                return
+        client_pool = PredictPool()
+        manager_need_stop = threading.Event()
 
-            # predict
-            success = predict_loop(server_item, working_predict_count,
-                                   in_queue, out_queue, feeds, fetchs,
-                                   conf_file, stop_events, predict_lock,
-                                   global_finished_task, predict_cond)
+        def server_manager():
+            while not manager_need_stop.is_set():
+                try:
+                    server_item = server_queue.get(timeout=2)
+                except queue.Empty:
+                    continue
 
-            server_item.state = ServerItem.FINISHED if success else ServerItem.ERROR
-            server_result_queue.put(server_item)
-            logger.info('Stopped server={}'.format(server_item.server))
+                if server_item is None:
+                    server_result_queue.put(None)
+                    return
+
+                if server_item.state == ServerItem.RUNNING:
+                    if not client_pool.add_client(server_item, feeds, fetchs,
+                                                  conf_file):
+                        server_item.state = ServerItem.FINISHED
+                        server_result_queue.put(server_item)
+                elif server_item.state == ServerItem.STOPPING:
+                    client_pool.stop_client(server_item)
+
+        manage_thread = threading.Thread(target=server_manager, )
+        manage_thread.daemon = True
+        manage_thread.start()
+
+        #gc.set_debug(gc.DEBUG_LEAK)
+
+        while not stop_event.is_set():
+            poison_pill = client_pool.run(in_queue, out_queue,
+                                          server_result_queue)
+            with predict_cond:
+                out_queue.put(poison_pill)
+                predict_cond.wait()
+
+        manager_need_stop.set()
+        manage_thread.join()
     except Exception as e:
         if signal_exit[0] is True:
             pass
         else:
+            print('error={}'.format(e))
             six.reraise(*sys.exc_info())
-
-
-def predict_loop(server_item, working_predict_count, in_queue, out_queue,
-                 feeds, fetchs, conf_file, stop_events, predict_lock,
-                 global_finished_task, predict_cond):
-    logger.info('connect server={}'.format(server_item.server))
-    predict_server = PaddlePredictServer if _NOP_PREDICT_TEST is False else _TestNopPaddlePredictServer
-    client = predict_server(server_item.server, conf_file, feeds, fetchs)
-    if not client.connect():
-        return False
-
-    stop_event = stop_events[server_item.stop_event_id]
-    with predict_lock:
-        working_predict_count.value += 1
-
-    time_line = _TimeLine()
-    finished_task = 0
-    # predict loop
-    while not stop_event.is_set():
-        data = in_queue.get()
-        time_line.record('get_data')
-
-        # Poison
-        if isinstance(data, _PoisonPill):
-            poison_pill = data
-            all_worker_done = False
-
-            with predict_lock:
-                # accumulate success predict task count
-                poison_pill.predict_count += finished_task
-                poison_pill.predict_count += global_finished_task.value
-
-                # clean local and global finished task
-                finished_task = 0
-                global_finished_task.value = 0
-
-                # last process
-                if working_predict_count.value == 1:
-                    if poison_pill.predict_count == poison_pill.feed_count:
-                        working_predict_count.value -= 1
-                        logger.debug('pid={} write poison to complete queue'.
-                                     format(os.getpid()))
-                        all_worker_done = True
-                    else:
-                        # NOTE. some predict worker failed,
-                        # there are still tasks that have not been processed.
-                        assert poison_pill.predict_count < poison_pill.feed_count, \
-                            "if failed, predict_count={} must < feed_count={}".\
-                            format(poison_pill.predict_count, poison_pill.feed_count)
-
-                        in_queue.put(poison_pill)  # write back poison pill
-                        continue  # continue process failed task
-                else:  # not last process
-                    logger.debug('pid={} write poison back to ready'.format(
-                        os.getpid()))
-                    assert poison_pill.predict_count <= poison_pill.feed_count, \
-                        "predict_count={} must <= feed_count={}".format(poison_pill.predict_count,
-                                                                        poison_pill.feed_count)
-                    working_predict_count.value -= 1
-
-            with predict_cond:
-                if all_worker_done is True:
-                    out_queue.put(poison_pill)  # poison consumer
-                else:
-                    in_queue.put(poison_pill)  # poison other predict worker
-                if stop_event.is_set():
-                    break
-                # wait next reader iter or last failed predict job
-                predict_cond.wait()
-
-            with predict_lock:
-                # go on working
-                working_predict_count.value += 1
-            continue
-
-        success, out_data = client_predict(client, data)
-        time_line.record('predict')
-
-        if not success:
-            with predict_lock:
-                global_finished_task.value += finished_task
-                in_queue.put(data)  # write back failed task data
-                # last process
-                if working_predict_count.value == 1:
-                    # NOTE. need notify other predict worker, or maybe deadlock
-                    with predict_cond:
-                        predict_cond.notify_all()
-                working_predict_count.value -= 1
-                return False
-
-        out_queue.put(out_data)
-        finished_task += 1
-        time_line.record('put_data')
-
-    # disconnect with server
-    with predict_lock:
-        global_finished_task.value += finished_task
-        # last process
-        if working_predict_count.value == 1:
-            # NOTE. need notify other predict worker, or maybe deadlock.
-            with predict_cond:
-                predict_cond.notify_all()
-        working_predict_count.value -= 1
-    return True
-
-
-def client_predict(client, data):
-    # read_data format e.g. [(img, label, img1, label1), (img, label, img1, label1)]
-    # predict_data format e.g. [(predict0, predict1), (predict0, predict1)]
-    # out_data = read_data + predict_data, will be
-    # [(img, label, img1, label1, predict0, predict1),
-    #  (img, label, img1, label1, predict0, predict1)]
-    task, read_data = data
-    success, predict_data = client.predict(read_data)
-    if not success:
-        return False, None
-
-    out_data = read_data
-    for i in range(len(out_data)):
-        out_data[i] += predict_data[i]
-    return True, (task, out_data)
 
 
 class ReaderType(object):

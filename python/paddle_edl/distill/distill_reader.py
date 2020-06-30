@@ -90,14 +90,12 @@ class DistillReader(object):
         self._task_semaphore = None
 
         # predict worker args
+        self._predict_worker = None
         self._predict_server_queue = None
         self._predict_server_result_queue = None
-        self._working_predict_count = None
         self._predict_out_queue = None
-        self._predict_stop_events = None
-        self._predict_lock = None
-        self._predict_finished_task = None
         self._predict_cond = None
+        self._predict_stop_event = None
         # predict worker pool
         self._predict_manage_thread = None
         self._predict_manage_stop_event = None
@@ -154,53 +152,37 @@ class DistillReader(object):
             with self._reader_cond:
                 self._reader_cond.notify()
 
-    def _start_predict_worker(self):
-        process = []
-        for i in range(self._require_num):
-            worker = mps.Process(
-                target=distill_worker.predict_worker,
-                args=(
-                    self._predict_server_queue,
-                    self._predict_server_result_queue,
-                    self._working_predict_count,
-                    self._reader_out_queue,
-                    self._predict_out_queue,
-                    self._feeds,
-                    self._fetchs,
-                    self._serving_conf_file,
-                    self._predict_stop_events,
-                    self._predict_lock,
-                    self._predict_finished_task,
-                    self._predict_cond, ))
-            worker.daemon = True
-            worker.start()
-            process.append(worker)
-        return process
-
-    def _start_predict_worker_pool(self):
+    def _start_predict_process(self):
         if not self._is_predict_start:
-            # start predict worker pool
-            process = self._start_predict_worker()
+            self._predict_stop_event = mps.Event()
+            predict_process = mps.Process(
+                target=distill_worker.predict_process,
+                args=(self._predict_server_queue,
+                      self._predict_server_result_queue,
+                      self._reader_out_queue, self._predict_out_queue,
+                      self._feeds, self._fetchs, self._serving_conf_file,
+                      self._predict_stop_event, self._predict_cond))
+            predict_process.daemon = True
+            predict_process.start()
+            self._predict_worker = predict_process
+
             self._predict_manage_stop_event = threading.Event()
             self._predict_manage_thread = threading.Thread(
                 target=distill_worker.predict_manage_worker,
                 args=(
-                    process,
                     self._predict_server_queue,
                     self._predict_server_result_queue,
                     self._require_num,
-                    self._predict_stop_events,
                     self._get_servers,
-                    self._predict_manage_stop_event,
-                    self._predict_cond, ))
+                    self._predict_manage_stop_event, ))
             self._predict_manage_thread.daemon = True
             self._predict_manage_thread.start()
 
             self._is_predict_start = True
         else:
-            # wake up predict worker pool
+            # wake up predict process
             with self._predict_cond:
-                self._predict_cond.notify_all()
+                self._predict_cond.notify()
 
     def _init_args(self):
         if not self._is_args_init:
@@ -211,18 +193,12 @@ class DistillReader(object):
             self._reader_out_queue = mps.Queue()
             self._reader_stop_event = mps.Event()
             self._reader_cond = mps.Condition()
-            self._task_semaphore = mps.Semaphore(2 * self._require_num + 2)
+            self._task_semaphore = mps.Semaphore(4 * self._require_num)
 
             # predict
             self._predict_server_queue = mps.Queue(self._require_num)
             self._predict_server_result_queue = mps.Queue(self._require_num)
-            self._working_predict_count = mps.Value('i', 0, lock=False)
             self._predict_out_queue = mps.Queue()
-            self._predict_stop_events = [
-                mps.Event() for i in range(self._require_num)
-            ]
-            self._predict_lock = mps.Lock()
-            self._predict_finished_task = mps.Value('i', 0, lock=False)
             self._predict_cond = mps.Condition()
 
             # fetch
@@ -343,7 +319,7 @@ class DistillReader(object):
             'teacher_service_name': self._service_name,
             'reader_type': self._reader_type,
         }
-        for config, value in print_config.iteritems():
+        for config, value in print_config.items():
             print("%s: %s" % (config, value))
         print("------------------------------------------------")
 
@@ -365,7 +341,8 @@ class DistillReader(object):
         # >>> there will only be thread 2 and the lock will be held forever.
         # So need to move start_predict_worker_pool to the end if we use logging in predict
         # manager thread, or for the sake of safety, don't use logging?
-        self._start_predict_worker_pool()
+        # self._start_predict_worker_pool()
+        self._start_predict_process()
 
         for data in distill_worker.fetch_out(
                 self._reader_type, self._predict_out_queue,
@@ -382,6 +359,10 @@ class DistillReader(object):
             self._reader_cond.notify()
 
         self._predict_manage_stop_event.set()
+
+        self._predict_stop_event.set()
+        with self._predict_cond:
+            self._predict_cond.notify()
 
         for i in range(20):
             if self._reader_worker.is_alive() or \
