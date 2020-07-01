@@ -14,7 +14,7 @@ build_image(){
     cuda_version=$1
     latest_image=hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda${cuda_version}-cudnn7
     sed 's/<baseimg>/1.8.0-gpu-cuda'"${cuda_version}"'-cudnn7/g' docker/Dockerfile.runtime > docker/Dockerfile.runtime.cuda${cuda_version}
-    docker build --network host . -t ${latest_image} -f docker/Dockerfile.runtime.cuda${cuda_version}
+    docker build --pull  --network host . -t ${latest_image} -f docker/Dockerfile.runtime.cuda${cuda_version}
     docker push ${latest_image}
 
     version=$2
