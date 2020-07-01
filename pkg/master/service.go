@@ -12,11 +12,12 @@ import (
 
 	log "github.com/inconshreveable/log15"
 	pb "github.com/paddlepaddle/edl/pkg/masterpb"
+	"gopkg.in/square/go-jose.v2/json"
 )
 
 // Store is the interface for save and load the master state.
 type Store interface {
-	Save([]byte, string) error
+	Save(string, []byte) error
 	Load(string) ([]byte, error)
 	Shutdown() error
 }
@@ -27,14 +28,21 @@ type taskEntry struct {
 	NumFailure int
 }
 
+type checkPoint() struct{
+	Stage string // master stage
+	Checkpoint string // trainer checkpoint
+	Endpoint string // master endpoint
+	C Cluster // cluster
+}
+
 type masterState struct {
 	Todo     []taskEntry
 	Pending  map[int]taskEntry // map from task ID to task entry
 	Done     []taskEntry
 	Failed   []taskEntry
 	CurEpoch int
-	Stage    string // generate by master and Pods change job stage change.
-	version  string // should equal with the trainer's checkpoint
+	snap Checkpoint // current checkpoint
+	snaps map[string][]checkPoint // stage -> checkPoint
 }
 
 type launcher struct {
@@ -43,9 +51,7 @@ type launcher struct {
 }
 
 type masterMeta struct {
-	Endpoint string
-	JobStage string
-	OldStage map[string][]string
+	Endpoint string `endpoint`
 }
 
 // Service is the master server service.
@@ -176,15 +182,15 @@ func (s *Service) recoverMeta() (bool, error) {
 		return false, nil
 	}
 
-	dec := gob.NewDecoder(r)
 	var m masterMeta
-	err = dec.Decode(&m)
+	err = json.Unmarshal(d, &m)
 	if err != nil {
-		message = ""
-		return false, err
+		message := fmt.Sprintf("recover master meta error:%v", err)
+		log.Crit(message)
+		panic(message)
 	}
 
-	log.Info("Loaded master meta.", log.Ctx{"size": len(m)})
+	log.Info("Loaded master meta.", log.Ctx{"master meta": string(d)})
 	return true, nil
 }
 
@@ -203,17 +209,20 @@ func (s *Service) recover() (bool, error) {
 }
 
 // snapshot *must* be called with s.mu being held.
-func (s *Service) snapshot(v interface{}, path string) error {
+func (s *Service) snapshotState() error {
 	// TODO(helin): etcd request has a size limit, so the snapshot
 	// size is limited by the max request size. We should either
 	// divide the snapshot into smaller chunks and save under
 	// different keys, or configure the request size to be big
 	// enough:
 	// https://github.com/coreos/etcd/blob/2f84f3d8d8ed8f9537ab6ffa44a3a1c7eddfa9b1/embed/config.go#L44
+
+	path := statePath(s.jobID)
+
 	var buf bytes.Buffer
 	gw := gzip.NewWriter(&buf)
 	enc := gob.NewEncoder(gw)
-	err := enc.Encode(v)
+	err := enc.Encode(s.state)
 	if err != nil {
 		return err
 	}
@@ -224,7 +233,18 @@ func (s *Service) snapshot(v interface{}, path string) error {
 
 	state := buf.Bytes()
 	log.Info("Saving snapshot.", log.Ctx{"size bytes": len(state)})
-	return s.store.Save(s.jobId, state, path)
+	return s.store.Save(path, state)
+}
+
+func (s *Service) snapshotMeta() error {
+	path := metaPath(s.jobID)
+
+	b, err := json.Marshal(s.meta)
+	if err != nil {
+		return err
+	}
+
+	return s.etcd.Save(path, b)
 }
 
 func readChunks(globPaths []string) ([]pb.Chunk, error) {

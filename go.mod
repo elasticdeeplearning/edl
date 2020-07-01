@@ -22,6 +22,7 @@ require (
 	golang.org/x/sys v0.0.0-20200501145240-bc7a7d42d5c3 // indirect
 	golang.org/x/text v0.3.2 // indirect
 	google.golang.org/grpc v1.26.0
+	gopkg.in/square/go-jose.v2 v2.5.1
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
