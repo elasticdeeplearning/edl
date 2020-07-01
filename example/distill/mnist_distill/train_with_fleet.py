@@ -154,11 +154,11 @@ def train(nn_type,
     train_nranks = fleet.worker_num()
 
     optimizer = fluid.optimizer.Momentum(learning_rate=0.001, momentum=0.9)
-    if train_nranks != 1:
+    if use_cuda:
         optimizer = fleet.distributed_optimizer(optimizer)
     optimizer.minimize(loss)
 
-    main_program = fleet.main_program if train_nranks != 1 else main_program
+    main_program = fleet.main_program if use_cuda else main_program
     gpu_id = int(os.getenv("FLAGS_selected_gpus", "0"))
 
     def train_test(train_test_program, train_test_reader):
@@ -183,11 +183,11 @@ def train(nn_type,
     py_train_reader.set_sample_list_generator(train_reader, reader_places)
     py_test_reader = fluid.io.DataLoader.from_generator(
         feed_list=test_inputs, capacity=64)
-    py_test_reader.set_sample_list_generator(test_reader, reader_places)
+    py_test_reader.set_sample_list_generator(test_reader, place)
 
     exe = fluid.Executor(place)
     exe.run(startup_program)
-    epochs = [epoch_id for epoch_id in range(PASS_NUM)]
+    epochs = [epoch_id for epoch_id in range(NUM_EPOCHS)]
 
     lists = []
     step = 0
@@ -195,8 +195,8 @@ def train(nn_type,
         for step_id, data in enumerate(py_train_reader()):
             metrics = exe.run(main_program, feed=data, fetch_list=[loss, acc])
             if step % 100 == 0:
-                print("Pass {}, Epoch {}, Cost {}".format(step, epoch_id,
-                                                          metrics[0]))
+                print("Pass {}, Step {}, Cost {}".format(epoch_id, step,
+                                                         metrics[0].mean()))
             step += 1
 
         if train_rank == 0:
@@ -205,7 +205,7 @@ def train(nn_type,
                 train_test_program=test_program,
                 train_test_reader=py_test_reader)
 
-            print("Test with Epoch %d, avg_cost: %s, acc: %s" %
+            print("Test with Pass %d, avg_cost: %s, acc: %s" %
                   (epoch_id, avg_loss_val, acc_val))
             lists.append((epoch_id, avg_loss_val, acc_val))
             if save_dirname is not None:
@@ -218,15 +218,17 @@ def train(nn_type,
     if train_rank == 0:
         if args.save_serving_model:
             import paddle_serving_client.io as serving_io
-            serving_io.save_model("mnist_cnn_model", "serving_conf",
-                                  {img.name: img},
+            if not os.path.isdir('output'):
+                os.mkdir('output')
+            serving_io.save_model("output/mnist_cnn_model",
+                                  "output/serving_conf", {img.name: img},
                                   {prediction.name: prediction}, test_program)
             print('save serving model, feed_names={}, fetch_names={}'.format(
                 [img.name], [prediction.name]))
 
         # find the best pass
         best = sorted(lists, key=lambda list: float(list[1]))[0]
-        print('Best pass is %s, testing Avgcost is %s' % (best[0], best[1]))
+        print('Best pass is %s, testing Avg cost is %s' % (best[0], best[1]))
         print('The classification accuracy is %.2f%%' % (float(best[2]) * 100))
 
 
@@ -292,7 +294,7 @@ def main(use_cuda, nn_type):
 if __name__ == '__main__':
     args = parse_args()
     BATCH_SIZE = 64
-    PASS_NUM = args.num_epochs
+    NUM_EPOCHS = args.num_epochs
     use_cuda = args.use_gpu
     # predict = 'softmax_regression' # uncomment for Softmax
     #predict = 'multilayer_perceptron' # uncomment for MLP

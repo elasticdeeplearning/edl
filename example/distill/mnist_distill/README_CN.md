@@ -43,12 +43,12 @@ python train_with_fleet.py --use_distill_service True --distill_teachers 127.0.0
 teacher服务使用paddle_serving部署，需保存成serving模型。可以有两种方式获取(详见[如何保存Serving模型](https://github.com/PaddlePaddle/Serving/blob/develop/doc/SAVE.md))。
 1. 直接在训练中保存serving模型。
 ``` bash
-python train_with_fleet.py --save_serving_model
+python train_with_fleet.py --save_serving_model True
 ```
-保存的代码见[train_with_fleet.py](train_with_fleet.py)。模型输入为img，模型输出为prediction，mnist_model为serving模型的目录。
-serving_conf为保存的client配置文件。
+保存的代码见[train_with_fleet.py](train_with_fleet.py)。模型输入为img，模型输出为prediction。
+模型保存到output目录，mnist_model为保存的serving模型，serving_conf为保存的client配置文件。
 ``` bash
-serving_io.save_model("mnist_cnn_model", "serving_conf",
+serving_io.save_model("output/mnist_cnn_model", "output/serving_conf",
                       {img.name: img}, {prediction.name: prediction},
                       test_program)
 ```
@@ -103,7 +103,7 @@ dr.set_dynamic_teacher(discovery_servers, teacher_service_name)
 ``` python
 python -m paddle_edl.distill.redis.balance_server \
   --server 127.0.0.1:7001 \
-  --db_endpoints 127.0.0.1:6379```
+  --db_endpoints 127.0.0.1:6379
 ```
 #### 4.2 服务注册
 在已启动好teacher后，需要往redis数据库注册teacher服务。

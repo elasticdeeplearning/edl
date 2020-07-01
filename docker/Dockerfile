@@ -8,7 +8,7 @@ RUN rm -rf /usr/local/go && wget -qO- https://dl.google.com/go/go1.13.10.linux-a
     mkdir -p /root/gopath/src
 ENV GOROOT=/usr/local/go GOPATH=/root/gopath
 # should not be in the same line with GOROOT definition, otherwise docker build could not find GOROOT.
-ENV PATH=$PATH:{GOROOT}/bin:${GOPATH}/bin
+ENV PATH=$PATH:${GOROOT}/bin:${GOPATH}/bin
 
 # python
 ADD ./docker/requirements.txt /root/paddle_edl/requirements.txt
