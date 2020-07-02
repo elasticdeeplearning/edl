@@ -64,4 +64,3 @@ protoc.main((
     '--python_out=.',
     '--grpc_python_out=.',
     'distill_discovery.proto', ))
-

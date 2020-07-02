@@ -25,13 +25,13 @@ import os
 import logging
 from threading import Thread, Lock
 from six.moves.queue import Queue
-from . exception import *
-from . dataset import EdlDataSet, TxtDataSet
+from .exception import *
+from .dataset import EdlDataSet, TxtDataSet
 import signal
 import threading
 import copy
 import paddle_edl.utils.utils as utils
-from . utils import logger
+from .utils import logger
 
 
 class Record(object):
