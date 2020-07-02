@@ -23,6 +23,7 @@ import threading
 import grpc
 import signal
 import paddle_edl.utils.common_pb2 as common_pb2
+from paddle_edl.utils.utils import bytes_to_string
 import os
 
 os.environ["https_proxy"] = ""
@@ -73,19 +74,13 @@ class TestDataServer(unittest.TestCase):
                     f_d.idx_in_list)
                 for c in f_d.data:
                     for r in c.records:
-                        d = r.data
-                        if not isinstance(d, str):
-                            d = d.decode("utf-8")
-                        assert d == a[r.record_no]
+                        assert bytes_to_string(r.data) == a[r.record_no]
             elif f_d.file_path == "data_server/b.txt":
                 assert f_d.idx_in_list == 1, "f_d.idx_in_list:{}".format(
                     f_d.idx_in_list)
                 for c in f_d.data:
                     for r in c.records:
-                        d = r.data
-                        if not isinstance(d, str):
-                            d = d.decode("utf-8")
-                        assert d == b[r.record_no]
+                        assert bytes_to_string(r.data) == b[r.record_no]
 
         self._shut_down(data_server, stub)
 

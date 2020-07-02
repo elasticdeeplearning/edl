@@ -87,8 +87,8 @@ def chunk_to_string(rs):
     return ret
 
 
-def conver_bytes_to_string(o):
+def bytes_to_string(o, codec='utf-8'):
     if not isinstance(o, str):
-        return o.decode(o)
+        return o.decode(codec)
 
     return o

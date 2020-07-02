@@ -39,8 +39,8 @@ class Server(object):
         # request & response message
         self._requests = {}
         self._responses = {}
-        self._request_queue = Queue.Queue()
-        self._response_queue = Queue.Queue()
+        self._request_queue = Queue()
+        self._response_queue = Queue()
 
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.setblocking(False)

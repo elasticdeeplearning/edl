@@ -22,7 +22,7 @@ function build_edl(){
     export PATH=$old_path
 }
 
-#build_edl 2.7
+build_edl 2.7
 
 python3.6 -m pip install pip==20.1.1
 build_edl 3.6

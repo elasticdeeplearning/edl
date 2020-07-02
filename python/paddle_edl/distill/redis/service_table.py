@@ -16,7 +16,7 @@ import logging
 import threading
 import time
 import sys
-from redis_store import RedisStore
+from .redis_store import RedisStore
 
 logging.basicConfig(
     level=logging.DEBUG,
