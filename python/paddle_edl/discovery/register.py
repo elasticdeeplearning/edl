@@ -18,8 +18,8 @@ import time
 import threading
 
 from contextlib import closing
-from etcd_client import EtcdClient
-from server_alive import is_server_alive
+from .etcd_client import EtcdClient
+from .server_alive import is_server_alive
 
 logging.basicConfig(
     level=logging.INFO,

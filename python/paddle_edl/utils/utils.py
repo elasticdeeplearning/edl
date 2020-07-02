@@ -85,3 +85,10 @@ def chunk_to_string(rs):
         ret += "(record_no:{}) ".format(rec_no)
 
     return ret
+
+
+def conver_bytes_to_string(o):
+    if not isinstance(o, str):
+        return o.decode(o)
+
+    return o

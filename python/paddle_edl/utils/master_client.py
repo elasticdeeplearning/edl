@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import master_pb2
-import master_pb2_grpc
+from . import master_pb2
+from . import master_pb2_grpc
 import grpc
 
 

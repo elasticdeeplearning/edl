@@ -18,6 +18,8 @@ import time
 import threading
 from etcd3.events import PutEvent, DeleteEvent
 
+from paddle_edl.utils.utils import conver_bytes_to_string
+
 
 class TestEtcd(unittest.TestCase):
     def setUp(self):
@@ -34,8 +36,8 @@ class TestEtcd(unittest.TestCase):
         assert len(servers) == 2, "must two servers"
 
         for server_meta in servers:
-            value = local_servers[server_meta.server]
-            assert value == server_meta.info
+            value = local_servers[conver_bytes_to_string(server_meta.server)]
+            assert value == conver_bytes_to_string(server_meta.info)
 
     def refresh(self):
         self.etcd.refresh("job_1", "127.0.0.1:1")

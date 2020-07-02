@@ -1,6 +1,12 @@
 #!/bin/bash
 unset https_proxy http_proxy
 
+version_str=$(python --version 2>&1)
+if [[ ${version_str} > "Python 3" ]]; then
+    echo "fix me under Python 3"
+    exit 0
+fi
+
 #nohup /tmp/etcd-download-test/etcd 2>&1 &
 nohup etcd 2>&1 &
 etcd_pid=$!

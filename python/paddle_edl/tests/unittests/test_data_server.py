@@ -73,13 +73,19 @@ class TestDataServer(unittest.TestCase):
                     f_d.idx_in_list)
                 for c in f_d.data:
                     for r in c.records:
-                        assert r.data.decode("utf-8") == a[r.record_no]
+                        d = r.data
+                        if not isinstance(d, str):
+                            d = d.decode("utf-8")
+                        assert d == a[r.record_no]
             elif f_d.file_path == "data_server/b.txt":
                 assert f_d.idx_in_list == 1, "f_d.idx_in_list:{}".format(
                     f_d.idx_in_list)
                 for c in f_d.data:
                     for r in c.records:
-                        assert r.data.decode("utf-8") == b[r.record_no]
+                        d = r.data
+                        if not isinstance(d, str):
+                            d = d.decode("utf-8")
+                        assert d == b[r.record_no]
 
         self._shut_down(data_server, stub)
 

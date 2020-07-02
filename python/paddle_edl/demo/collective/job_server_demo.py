@@ -95,7 +95,7 @@ class JobInfoManager(object):
         self._gpu_num_of_node = gpu_num_of_node
         assert gpu_num_of_node % pod_num_of_node == 0, "{} % {} must be 0.".format(
             gpu_num_of_node, pod_num_of_node)
-        self._gpu_num_of_pod = gpu_num_of_node / pod_num_of_node
+        self._gpu_num_of_pod = int(gpu_num_of_node / pod_num_of_node)
 
         self._ip_pod_num = []
         pod_num = 0
