@@ -14,24 +14,24 @@
 
 from __future__ import print_function
 from concurrent import futures
-import data_server_pb2
-import data_server_pb2_grpc
-import common_pb2
-import master_pb2
-import master_pb2_grpc
+from . import data_server_pb2
+from . import data_server_pb2_grpc
+from . import common_pb2
+from . import master_pb2
+from . import master_pb2_grpc
 import grpc
 import sys
 import os
 import logging
 from threading import Thread, Lock
-from Queue import Queue
-from exception import *
-from dataset import EdlDataSet, TxtDataSet
+from six.moves.queue import Queue
+from . exception import *
+from . dataset import EdlDataSet, TxtDataSet
 import signal
 import threading
 import copy
 import paddle_edl.utils.utils as utils
-from utils import logger
+from . utils import logger
 
 
 class Record(object):
@@ -180,7 +180,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                     return response
 
                 recs = self._data[file_key]
-                for rec_no in recs.keys():
+                for rec_no in list(recs.keys()):
                     if rec_no not in recs:
                         logger.error("file:{} record_no:{} not in cache:".
                                      format(file_key, rec_no))

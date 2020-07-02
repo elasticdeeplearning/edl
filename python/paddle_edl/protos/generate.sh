@@ -10,7 +10,14 @@ protoc --go_out=plugins=grpc:./  common.proto
 
 mkdir -p ../../../pkg/masterpb
 mv *.go ../../../pkg/masterpb
+
 # see the build.sh to get the pakage version
 which python
 python ./run_codegen.py
- 
+
+# generate python compatabile path
+sed -i -r 's/import (.+_pb2.*)/from . import \1/g' *_pb2*.py
+
+# import os
+mv master*.py common*.py data_server*.py ../utils/
+mv distill_discovery*.py ../distill/

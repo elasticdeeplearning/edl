@@ -4,8 +4,11 @@ import multiprocessing as mps
 import os
 import threading
 import time
+import six
 
 from . import distill_worker
+
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -343,7 +346,7 @@ class DistillReader(object):
             'teacher_service_name': self._service_name,
             'reader_type': self._reader_type,
         }
-        for config, value in print_config.iteritems():
+        for config, value in six.iteritems(print_config)
             print("%s: %s" % (config, value))
         print("------------------------------------------------")
 

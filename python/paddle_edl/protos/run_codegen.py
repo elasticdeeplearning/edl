@@ -30,6 +30,9 @@
 from grpc_tools import protoc
 import pkg_resources
 import os
+import sys
+
+print("run code gen python verion:", sys.version_info)
 
 # python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. data_server.proto
 protoc.main((
@@ -62,6 +65,3 @@ protoc.main((
     '--grpc_python_out=.',
     'distill_discovery.proto', ))
 
-# import os
-os.system("mv master*.py common*.py data_server*.py ../utils/")
-os.system("mv distill_discovery*.py ../distill/")

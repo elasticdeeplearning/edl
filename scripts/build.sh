@@ -24,9 +24,6 @@ pushd python/paddle_edl/protos/
 bash generate.sh
 popd
 
-# TODO(gongwb):mv to devel image
-python -m pip install  paddlepaddle-gpu==1.8.0.post107
-
 # go
 build_dir=build
 rm -rf ${build_dir}
