@@ -20,6 +20,8 @@ import six
 import sys
 import time
 
+from collections import deque
+from concurrent import futures
 from paddle_serving_client import Client
 from six.moves import queue
 from six.moves import reduce
@@ -185,7 +187,7 @@ class PredictServer(object):
 
 
 class PaddlePredictServer(PredictServer):
-    def __init__(self, server, config_file, feeds, fetchs, max_failed_times=3):
+    def __init__(self, server, config_file, feeds, fetchs, max_failed_times=2):
         self._server = server
         self._config_file = config_file
         self._predict_feed_idxs = []
@@ -293,14 +295,15 @@ class PaddlePredictServer(PredictServer):
     def __del__(self):
         try:
             # avoid serving exit bug when hasn't predict
-            if self.client is not None and self._has_predict:
-                self.client.release()
+            #if self.client is not None and self._has_predict:
+            #    self.client.release()
+            pass
         except Exception as e:
             logger.critical('Release client failed with server={}, '
                             'there may be an unknown error'.format(
                                 self._server))
             logger.critical('Exception:\n{}'.format(str(e)))
-        logger.warning('Stopped predict server={}'.format(self._server))
+        #logger.warning('Stopped predict server={}'.format(self._server))
 
 
 class _TestNopPaddlePredictServer(PaddlePredictServer):
@@ -334,22 +337,25 @@ def predict_worker(server_queue, server_result_queue, working_predict_count,
     signal.signal(signal.SIGTERM, predict_signal_handle)
 
     try:
-        while True:
-            # get server
-            server_item = server_queue.get()
-            if server_item is None:
-                server_result_queue.put(None)
-                return
+        max_concurrent = 3
+        with futures.ThreadPoolExecutor(max_concurrent) as thread_pool:
+            while True:
+                # get server
+                server_item = server_queue.get()
+                if server_item is None:
+                    server_result_queue.put(None)
+                    return
 
-            # predict
-            success = predict_loop(server_item, working_predict_count,
-                                   in_queue, out_queue, feeds, fetchs,
-                                   conf_file, stop_events, predict_lock,
-                                   global_finished_task, predict_cond)
+                # predict
+                success = predict_loop(server_item, working_predict_count,
+                                       in_queue, out_queue, feeds, fetchs,
+                                       conf_file, stop_events, predict_lock,
+                                       global_finished_task, predict_cond,
+                                       thread_pool, max_concurrent)
 
-            server_item.state = ServerItem.FINISHED if success else ServerItem.ERROR
-            server_result_queue.put(server_item)
-            logger.info('Stopped server={}'.format(server_item.server))
+                server_item.state = ServerItem.FINISHED if success else ServerItem.ERROR
+                server_result_queue.put(server_item)
+                logger.info('Stopped server={}'.format(server_item.server))
     except Exception as e:
         if signal_exit[0] is True:
             pass
@@ -359,12 +365,19 @@ def predict_worker(server_queue, server_result_queue, working_predict_count,
 
 def predict_loop(server_item, working_predict_count, in_queue, out_queue,
                  feeds, fetchs, conf_file, stop_events, predict_lock,
-                 global_finished_task, predict_cond):
+                 global_finished_task, predict_cond, thread_pool,
+                 max_concurrent):
     logger.info('connect server={}'.format(server_item.server))
     predict_server = PaddlePredictServer if _NOP_PREDICT_TEST is False else _TestNopPaddlePredictServer
-    client = predict_server(server_item.server, conf_file, feeds, fetchs)
-    if not client.connect():
-        return False
+    idx = 0
+    clients = []
+    for _ in range(max_concurrent):
+        client = predict_server(server_item.server, conf_file, feeds, fetchs)
+        if not client.connect():
+            return False
+        clients.append(client)
+
+    tasks = deque(maxlen=max_concurrent)
 
     stop_event = stop_events[server_item.stop_event_id]
     with predict_lock:
@@ -372,13 +385,99 @@ def predict_loop(server_item, working_predict_count, in_queue, out_queue,
 
     time_line = _TimeLine()
     finished_task = 0
+    delay = 0.0005  # 500us
     # predict loop
     while not stop_event.is_set():
-        data = in_queue.get()
+        if len(tasks) == max_concurrent:
+            # full, sync wait
+            task = tasks.popleft()
+            success, out_data = task.result()
+            if not success:
+                failed_datas = [out_data, ]
+                finished_task += process_remain_predict_data(
+                    tasks, failed_datas, out_queue)
+
+                with predict_lock:
+                    global_finished_task.value += finished_task
+                    for failed_data in failed_datas:
+                        in_queue.put(
+                            failed_data)  # write back failed task data
+                    # last process
+                    if working_predict_count.value == 1:
+                        # NOTE. need notify other predict worker, or maybe deadlock
+                        with predict_cond:
+                            predict_cond.notify_all()
+                    working_predict_count.value -= 1
+                    return False
+
+            logger.debug('task_id={}'.format(out_data[0].task_id))
+            out_queue.put(out_data)
+            finished_task += 1
+        elif len(tasks) > 0:
+            # not full, query left
+            task = tasks.popleft()
+            if task.done():
+                success, out_data = task.result()
+                if not success:
+                    failed_datas = [out_data, ]
+                    finished_task += process_remain_predict_data(
+                        tasks, failed_datas, out_queue)
+
+                    with predict_lock:
+                        global_finished_task.value += finished_task
+                        for failed_data in failed_datas:
+                            in_queue.put(
+                                failed_data)  # write back failed task data
+                        # last process
+                        if working_predict_count.value == 1:
+                            # NOTE. need notify other predict worker, or maybe deadlock
+                            with predict_cond:
+                                predict_cond.notify_all()
+                        working_predict_count.value -= 1
+                        return False
+
+                logger.debug('task_id={}'.format(out_data[0].task_id))
+                out_queue.put(out_data)
+                finished_task += 1
+            else:
+                # not done, write back left
+                tasks.appendleft(task)
+
+        if len(tasks) == 0:
+            data = in_queue.get()
+        else:
+            # avoid hang
+            try:
+                data = in_queue.get(timeout=delay)
+                delay = 0.0005  # 500us
+            except queue.Empty:
+                delay = min(delay * 2, 0.032)  # max 32ms
+                continue
+
         time_line.record('get_data')
 
         # Poison
         if isinstance(data, _PoisonPill):
+            failed_datas = []
+            finished_task += process_remain_predict_data(tasks, failed_datas,
+                                                         out_queue)
+
+            if len(failed_datas) != 0:
+                failed_datas.append(data)
+
+                with predict_lock:
+                    global_finished_task.value += finished_task
+                    for failed_data in failed_datas:
+                        in_queue.put(
+                            failed_data)  # write back failed task data
+                    # last process
+                    if working_predict_count.value == 1:
+                        # NOTE. need notify other predict worker, or maybe deadlock
+                        with predict_cond:
+                            predict_cond.notify_all()
+                    working_predict_count.value -= 1
+                    return False
+
             poison_pill = data
             all_worker_done = False
 
@@ -430,24 +529,26 @@ def predict_loop(server_item, working_predict_count, in_queue, out_queue,
                 working_predict_count.value += 1
             continue
 
-        success, out_data = client_predict(client, data)
-        time_line.record('predict')
+        client = clients[idx]
+        idx = (idx + 1) % max_concurrent
+        future = thread_pool.submit(client_predict, client, data)
+        tasks.append(future)
 
-        if not success:
-            with predict_lock:
-                global_finished_task.value += finished_task
-                in_queue.put(data)  # write back failed task data
-                # last process
-                if working_predict_count.value == 1:
-                    # NOTE. need notify other predict worker, or maybe deadlock
-                    with predict_cond:
-                        predict_cond.notify_all()
-                working_predict_count.value -= 1
-                return False
-
-        out_queue.put(out_data)
-        finished_task += 1
-        time_line.record('put_data')
+    failed_datas = []
+    finished_task += process_remain_predict_data(tasks, failed_datas,
+                                                 out_queue)
+    if len(failed_datas) != 0:
+        with predict_lock:
+            global_finished_task.value += finished_task
+            for failed_data in failed_datas:
+                in_queue.put(failed_data)  # write back failed task data
+            # last process
+            if working_predict_count.value == 1:
+                # NOTE. need notify other predict worker, or maybe deadlock
+                with predict_cond:
+                    predict_cond.notify_all()
+            working_predict_count.value -= 1
+            return False
 
     # disconnect with server
     with predict_lock:
@@ -461,6 +562,20 @@ def predict_loop(server_item, working_predict_count, in_queue, out_queue,
     return True
 
 
+def process_remain_predict_data(tasks, failed_datas, out_queue):
+    finished_task = 0
+    remain_task_count = len(tasks)
+    for i in range(remain_task_count):
+        task = tasks.popleft()
+        success, out_data = task.result()
+        if not success:
+            failed_datas.append(out_data)
+        else:
+            out_queue.put(out_data)
+            finished_task += 1
+    return finished_task
+
+
 def client_predict(client, data):
     # read_data format e.g. [(img, label, img1, label1), (img, label, img1, label1)]
     # predict_data format e.g. [(predict0, predict1), (predict0, predict1)]
@@ -470,7 +585,7 @@ def client_predict(client, data):
     task, read_data = data
     success, predict_data = client.predict(read_data)
     if not success:
-        return False, None
+        return False, data
 
     out_data = read_data
     for i in range(len(out_data)):
