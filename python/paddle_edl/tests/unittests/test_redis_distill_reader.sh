@@ -1,6 +1,13 @@
 #!/bin/bash
 unset https_proxy http_proxy
 
+version_str=$(python --version 2>&1)
+if [[ ${version_str} > "Python 3" ]]; then
+    echo "fix me under Python 3"
+    exit 0
+fi
+
+
 nohup redis-server --port 2379 2>&1 &
 redis_pid=$!
 

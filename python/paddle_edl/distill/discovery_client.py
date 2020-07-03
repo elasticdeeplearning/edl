@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import distill_discovery_pb2 as discovery
-import distill_discovery_pb2_grpc
+from . import distill_discovery_pb2 as discovery
+from . import distill_discovery_pb2_grpc
 import functools
 import grpc
 import logging

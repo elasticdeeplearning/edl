@@ -14,7 +14,7 @@
 
 import paddle
 import paddle.fluid.executor.Executor as PaddleExecutor
-import Queue
+from six.moves.queue import Queue
 from meta_reader import MetaReader
 
 

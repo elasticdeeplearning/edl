@@ -48,9 +48,9 @@ import paddle.fluid as fluid
 from contextlib import closing
 import socket
 
-from utils import *
-import edl_utils
-from http_store import kv_server
+from .utils import *
+from . import edl_utils
+from .http_store import kv_server
 
 
 def _print_arguments(args):

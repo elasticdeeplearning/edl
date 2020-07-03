@@ -19,7 +19,7 @@ import errno
 import json
 import threading
 import sys
-import Queue
+from six.moves.queue import Queue
 import time
 
 
@@ -39,8 +39,8 @@ class Server(object):
         # request & response message
         self._requests = {}
         self._responses = {}
-        self._request_queue = Queue.Queue()
-        self._response_queue = Queue.Queue()
+        self._request_queue = Queue()
+        self._response_queue = Queue()
 
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.setblocking(False)
@@ -125,7 +125,7 @@ class Server(object):
     def _handle_in(self, fd):
         try:
             data = self._clients[fd].recv(self.RECV_SIZE)
-        except socket.error, e:
+        except socket.error as e:
             eno = e.args[0]
             if eno not in (errno.EINTR, errno.EWOULDBLOCK, errno.EAGAIN):
                 # connection error
@@ -147,7 +147,7 @@ class Server(object):
         size = len(response)
         try:
             send_size = self._clients[fd].send(response)
-        except socket.error, e:
+        except socket.error as e:
             eno = e.args[0]
             if eno not in (errno.EINTR, errno.EWOULDBLOCK, errno.EAGAIN):
                 # connection error
@@ -265,7 +265,7 @@ class BalanceServer(Server):
 
 
 if __name__ == '__main__':
-    from service_table import ServiceTable
+    from .service_table import ServiceTable
 
     import argparse
     parser = argparse.ArgumentParser(

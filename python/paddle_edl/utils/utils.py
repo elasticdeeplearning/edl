@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import master_pb2
-import data_server_pb2
+from . import master_pb2
+from . import data_server_pb2
 import logging
 import google.protobuf.text_format as text_format
 
@@ -85,3 +85,10 @@ def chunk_to_string(rs):
         ret += "(record_no:{}) ".format(rec_no)
 
     return ret
+
+
+def bytes_to_string(o, codec='utf-8'):
+    if not isinstance(o, str):
+        return o.decode(codec)
+
+    return o

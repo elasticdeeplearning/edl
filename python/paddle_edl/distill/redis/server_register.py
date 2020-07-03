@@ -86,7 +86,7 @@ class ServerRegister(object):
 
 if __name__ == '__main__':
     import sys
-    from redis_store import RedisStore
+    from .redis_store import RedisStore
 
     import argparse
     parser = argparse.ArgumentParser(description='Server Register')

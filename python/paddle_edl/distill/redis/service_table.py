@@ -16,7 +16,7 @@ import logging
 import threading
 import time
 import sys
-from redis_store import RedisStore
+from .redis_store import RedisStore
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -226,7 +226,7 @@ class ServiceTable(object):
                     self._server_to_fds[server].add(fd)
                     update_fd.add(fd)
                     logging.info('add fd={} server={}'.format(fd, server))
-        except Exception, e:
+        except Exception as e:
             sys.stderr.write(str(e) + '\n')
 
         for fd in update_fd:

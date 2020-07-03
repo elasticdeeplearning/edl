@@ -11,7 +11,11 @@ ENV GOROOT=/usr/local/go GOPATH=/root/gopath
 ENV PATH=$PATH:{GOROOT}/bin:${GOPATH}/bin
 
 ADD ./docker/requirements.txt /root/paddle_edl/requirements.txt
+RUN python -m pip install pip==20.1.1
+RUN python3.6 -m pip install pip==20.1.1
+RUN python3.6 -m pip install --upgrade setuptools
 RUN python -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN python3.6 -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # etcd
 ENV HOME /root
@@ -28,9 +32,10 @@ RUN cd /tmp/ && wget -q https://paddle-edl.bj.bcebos.com/redis-6.0.1.tar.gz &&  
     cd .. && rm -rf redis-6.0.1.tar.gz redis-6.0.1
 
 # install edl
-ADD ./build/python/dist/paddle_edl-0.0.0-py2-none-any.whl /tmp/paddle_edl-0.0.0-py2-none-any.whl
-RUN python -m pip install /tmp/paddle_edl-0.0.0-py2-none-any.whl
-RUN rm -f /tmp/paddle_edl-0.0.0-py2-none-any.whl
+ADD ./build/python/dist/paddle_edl-0.0.0-py2.py3-none-any.whl /tmp/paddle_edl-0.0.0-py2.py3-none-any.whl
+RUN python -m pip install /tmp/paddle_edl-0.0.0-py2.py3-none-any.whl
+RUN python3.6 -m pip install /tmp/paddle_edl-0.0.0-py2.py3-none-any.whl
+RUN rm -f /tmp/paddle_edl-0.0.0-py2.py3-none-any.whl
 
 # add example
 ADD ./example /root/paddle_edl/example

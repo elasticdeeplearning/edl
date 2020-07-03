@@ -24,7 +24,7 @@ class EdlDataSet(object):
 
 class TxtDataSet(EdlDataSet):
     def reader(self, txt_file):
-        with open(txt_file, "r") as f:
+        with open(txt_file, "rb") as f:
             for line in f:
                 line = line.strip()
                 if len(line) <= 0:
