@@ -141,9 +141,7 @@ def train(nn_type,
         inputs.append(soft_label)
         distill_loss = fluid.layers.cross_entropy(
             input=prediction, label=soft_label, soft_label=True)
-        #distill_loss = fluid.layers.mse_loss(input=prediction, label=soft_label)
         distill_loss = fluid.layers.mean(distill_loss)
-        #loss = 0.3 * avg_loss + distill_loss
         loss = distill_loss
     else:
         loss = avg_loss
