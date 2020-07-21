@@ -736,7 +736,7 @@ def read_batch(reader, teacher_batch_size, out_queue, task_semaphore):
         for i in range(batch_size):
             slot_data = tuple()
             for j in range(slot_size):
-                slot_data += (read_data[j][i], )
+                slot_data += (np.asarray(read_data[j][i]), )
             send_data.append(slot_data)
 
             sample_size += 1
