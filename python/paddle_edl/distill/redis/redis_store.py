@@ -20,7 +20,8 @@ class RedisStore(object):
         self._ip = ip
         self._port = port
         self._passwd = passwd
-        self._redis = redis.Redis(host=ip, port=port, password=passwd)
+        self._redis = redis.Redis(
+            host=ip, port=port, password=passwd, decode_responses=True)
         print("connected to redis ip:{} port:{}".format(ip, port))
 
     def get_service(self, service_name):
