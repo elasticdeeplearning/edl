@@ -27,7 +27,7 @@ python -m paddle_serving_server_gpu.serve \
   --model mnist_cnn_model \
   --thread 4 \
   --port 9292 \
-  --mem_optim True \
+  --mem_optim \
   --gpu_ids 0
 ```
 ### 2.2 运行蒸馏训练
