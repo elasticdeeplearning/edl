@@ -14,6 +14,7 @@
 
 import copy
 import unittest
+import six
 from paddle_edl.discovery.consistent_hash import ConsistentHash
 
 
@@ -40,7 +41,7 @@ class TestConsistentHash(unittest.TestCase):
                     sample_to_node[key] = node
                     node_to_count[node] += 1
 
-            for node, count in node_to_count.iteritems():
+            for node, count in six.iteritems(node_to_count):
                 print('node={}, count={}'.format(node, count))
 
         hash_test('1.1.1.1')

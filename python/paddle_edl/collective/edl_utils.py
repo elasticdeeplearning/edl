@@ -16,8 +16,8 @@ import os
 import requests
 import time
 import sys
-from utils import Cluster, Pod, Trainer, logger, Hdfs
-from http_store import kv_server
+from .utils import Cluster, Pod, Trainer, logger, Hdfs
+from .http_store import kv_server
 
 
 class Edlenv(object):

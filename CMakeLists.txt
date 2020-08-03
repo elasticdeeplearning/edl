@@ -6,10 +6,16 @@ SET(EDL_INSTALL_DIR ${CMAKE_BINARY_DIR}/output)
 SET(CMAKE_INSTALL_RPATH "$ORIGIN" "${CMAKE_INSTALL_RPATH}")
 project(paddle_edl)
 
-include(python)
-
 option(WITH_TESTING     "Compile EDL with unit testing"        ON)
 option(WITH_COVERAGE    "Compile EDL with code coverage"       OFF)
+option(PY_VERSION       "Compile EDL with python3 support"     ${PY_VERSION})
+
+# PY_VERSION
+if(NOT PY_VERSION)
+  set(PY_VERSION 2.7)
+endif()
+
+include(python)
 
 IF(WITH_TESTING)
     ENABLE_TESTING()

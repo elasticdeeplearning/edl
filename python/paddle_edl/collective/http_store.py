@@ -12,9 +12,9 @@ import functools
 import multiprocessing
 import os
 import sys
-import utils
+from . import utils
 import subprocess
-from utils import logger
+from .utils import logger
 
 app = Flask(__name__)
 
