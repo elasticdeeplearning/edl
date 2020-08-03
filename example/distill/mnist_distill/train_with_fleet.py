@@ -13,33 +13,47 @@
 # limitations under the License.
 
 from __future__ import print_function
-
 import os
+
+if os.environ.get('PADDLE_TRAINER_ENDPOINTS') is None:
+    os.environ['PADDLE_TRAINER_ENDPOINTS'] = '127.0.0.1:0'
+
+from paddle_edl.distill.distill_reader import DistillReader
 import argparse
+import ast
 from PIL import Image
 import numpy
 import paddle
 import paddle.fluid as fluid
-from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
+from paddle.fluid.incubate.fleet.collective import fleet
 from paddle.fluid.incubate.fleet.base import role_maker
-
-trainer_id = int(os.environ.get('PADDLE_TRAINER_ID'))
 
 
 def parse_args():
     parser = argparse.ArgumentParser("mnist")
     parser.add_argument(
         '--use_gpu',
-        type=bool,
+        type=ast.literal_eval,
         default=True,
-        help="Whether to use GPU or not.")
+        help="Whether to use GPU or not. 'True' or 'False'")
     parser.add_argument(
         '--num_epochs', type=int, default=5, help="number of epochs.")
     parser.add_argument(
-        '--use_dgc',
-        type=bool,
+        '--use_distill_service',
         default=False,
-        help="Whether to use DGC or not.")
+        type=ast.literal_eval,
+        help="Whether to use distill service train. 'True' or 'False'")
+    parser.add_argument(
+        '--save_serving_model',
+        default=False,
+        type=ast.literal_eval,
+        help="Whether to save paddle serving model. 'True' or 'False'")
+    parser.add_argument(
+        '--distill_teachers',
+        default='127.0.0.1:9292',
+        type=str,
+        help="teachers of distill train. such as '127.0.0.1:9292,127.0.0.1:9293'"
+    )
     args = parser.parse_args()
     return args
 
@@ -96,11 +110,12 @@ def train(nn_type,
         paddle.reader.shuffle(
             paddle.dataset.mnist.train(), buf_size=500),
         batch_size=BATCH_SIZE)
+
     test_reader = paddle.batch(
         paddle.dataset.mnist.test(), batch_size=BATCH_SIZE)
 
-    img = fluid.layers.data(name='img', shape=[1, 28, 28], dtype='float32')
-    label = fluid.layers.data(name='label', shape=[1], dtype='int64')
+    img = fluid.data(name='img', shape=[None, 1, 28, 28], dtype='float32')
+    label = fluid.data(name='label', shape=[None, 1], dtype='int64')
 
     if nn_type == 'softmax_regression':
         net_conf = softmax_regression
@@ -113,27 +128,43 @@ def train(nn_type,
 
     test_program = main_program.clone(for_test=True)
 
-    dist_strategy = DistributedStrategy()
-    if args.use_dgc:
-        # use dgc must close fuse for now
-        dist_strategy.fuse_all_reduce_ops = False
-        optimizer = fluid.optimizer.DGCMomentumOptimizer(
-            learning_rate=0.001, momentum=0.9, rampup_begin_step=0)
+    inputs = [img, label]
+    test_inputs = [img, label]
+
+    if args.use_distill_service:
+        dr = DistillReader(ins=['img', 'label'], predicts=['fc_0.tmp_2'])
+        dr.set_fixed_teacher(args.distill_teachers)
+        train_reader = dr.set_sample_list_generator(train_reader)
+
+        soft_label = fluid.data(
+            name='soft_label', shape=[None, 10], dtype='float32')
+        inputs.append(soft_label)
+        distill_loss = fluid.layers.cross_entropy(
+            input=prediction, label=soft_label, soft_label=True)
+        distill_loss = fluid.layers.mean(distill_loss)
+        loss = distill_loss
     else:
-        optimizer = fluid.optimizer.Momentum(learning_rate=0.001, momentum=0.9)
+        loss = avg_loss
 
     role = role_maker.PaddleCloudRoleMaker(is_collective=True)
     fleet.init(role)
+    train_rank = fleet.worker_index()
+    train_nranks = fleet.worker_num()
 
-    optimizer = fleet.distributed_optimizer(optimizer, strategy=dist_strategy)
-    optimizer.minimize(avg_loss, fluid.default_startup_program())
+    optimizer = fluid.optimizer.Momentum(learning_rate=0.001, momentum=0.9)
+    if use_cuda:
+        optimizer = fleet.distributed_optimizer(optimizer)
+    optimizer.minimize(loss)
 
-    def train_test(train_test_program, train_test_feed, train_test_reader):
+    main_program = fleet.main_program if use_cuda else main_program
+    gpu_id = int(os.getenv("FLAGS_selected_gpus", "0"))
+
+    def train_test(train_test_program, train_test_reader):
         acc_set = []
         avg_loss_set = []
         for test_data in train_test_reader():
             acc_np, avg_loss_np = exe.run(program=train_test_program,
-                                          feed=train_test_feed.feed(test_data),
+                                          feed=test_data,
                                           fetch_list=[acc, avg_loss])
             acc_set.append(float(acc_np))
             avg_loss_set.append(float(avg_loss_np))
@@ -142,37 +173,37 @@ def train(nn_type,
         avg_loss_val_mean = numpy.array(avg_loss_set).mean()
         return avg_loss_val_mean, acc_val_mean
 
-    main_program = fleet.main_program
-
-    gpu_id = int(os.getenv("FLAGS_selected_gpus", "0"))
     place = fluid.CUDAPlace(gpu_id) if use_cuda else fluid.CPUPlace()
+    reader_places = fluid.cuda_places() if use_cuda else fluid.CPUPlace()
+
+    py_train_reader = fluid.io.DataLoader.from_generator(
+        feed_list=inputs, capacity=64)
+    py_train_reader.set_sample_list_generator(train_reader, reader_places)
+    py_test_reader = fluid.io.DataLoader.from_generator(
+        feed_list=test_inputs, capacity=64)
+    py_test_reader.set_sample_list_generator(test_reader, place)
 
     exe = fluid.Executor(place)
-
-    feeder = fluid.DataFeeder(feed_list=[img, label], place=place)
     exe.run(startup_program)
-    epochs = [epoch_id for epoch_id in range(PASS_NUM)]
+    epochs = [epoch_id for epoch_id in range(NUM_EPOCHS)]
 
     lists = []
     step = 0
     for epoch_id in epochs:
-        for step_id, data in enumerate(train_reader()):
-            metrics = exe.run(main_program,
-                              feed=feeder.feed(data),
-                              fetch_list=[avg_loss, acc])
+        for step_id, data in enumerate(py_train_reader()):
+            metrics = exe.run(main_program, feed=data, fetch_list=[loss, acc])
             if step % 100 == 0:
-                print("Pass %d, Epoch %d, Cost %f" % (step, epoch_id,
-                                                      metrics[0]))
+                print("Pass {}, Step {}, Cost {}".format(epoch_id, step,
+                                                         metrics[0].mean()))
             step += 1
 
-        if trainer_id == 0:
+        if train_rank == 0:
             # test for epoch
             avg_loss_val, acc_val = train_test(
                 train_test_program=test_program,
-                train_test_reader=test_reader,
-                train_test_feed=feeder)
+                train_test_reader=py_test_reader)
 
-            print("Test with Epoch %d, avg_cost: %s, acc: %s" %
+            print("Test with Pass %d, avg_cost: %s, acc: %s" %
                   (epoch_id, avg_loss_val, acc_val))
             lists.append((epoch_id, avg_loss_val, acc_val))
             if save_dirname is not None:
@@ -182,10 +213,20 @@ def train(nn_type,
                     model_filename=model_filename,
                     params_filename=params_filename)
 
-    if trainer_id == 0:
+    if train_rank == 0:
+        if args.save_serving_model:
+            import paddle_serving_client.io as serving_io
+            if not os.path.isdir('output'):
+                os.mkdir('output')
+            serving_io.save_model("output/mnist_cnn_model",
+                                  "output/serving_conf", {img.name: img},
+                                  {prediction.name: prediction}, test_program)
+            print('save serving model, feed_names={}, fetch_names={}'.format(
+                [img.name], [prediction.name]))
+
         # find the best pass
         best = sorted(lists, key=lambda list: float(list[1]))[0]
-        print('Best pass is %s, testing Avgcost is %s' % (best[0], best[1]))
+        print('Best pass is %s, testing Avg cost is %s' % (best[0], best[1]))
         print('The classification accuracy is %.2f%%' % (float(best[2]) * 100))
 
 
@@ -203,7 +244,7 @@ def infer(use_cuda,
     def load_image(file):
         im = Image.open(file).convert('L')
         im = im.resize((28, 28), Image.ANTIALIAS)
-        im = numpy.array(im).reshape(1, 1, 28, 28).astype(numpy.float32)
+        im = numpy.array(im).reshape((1, 1, 28, 28)).astype(numpy.float32)
         im = im / 255.0 * 2.0 - 1.0
         return im
 
@@ -251,11 +292,9 @@ def main(use_cuda, nn_type):
 if __name__ == '__main__':
     args = parse_args()
     BATCH_SIZE = 64
-    PASS_NUM = args.num_epochs
+    NUM_EPOCHS = args.num_epochs
     use_cuda = args.use_gpu
-    if args.use_dgc:
-        assert args.use_gpu is True, "DGC only support gpu"
     # predict = 'softmax_regression' # uncomment for Softmax
-    # predict = 'multilayer_perceptron' # uncomment for MLP
+    #predict = 'multilayer_perceptron' # uncomment for MLP
     predict = 'convolutional_neural_network'  # uncomment for LeNet5
     main(use_cuda=use_cuda, nn_type=predict)

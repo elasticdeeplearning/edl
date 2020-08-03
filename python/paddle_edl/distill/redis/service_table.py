@@ -12,11 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import threading
 import time
 import sys
-import heapq
-from redis_store import RedisStore
+from .redis_store import RedisStore
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
 
 
 class ServiceTable(object):
@@ -43,15 +47,16 @@ class ServiceTable(object):
         # {fd: set(servers), }
         self._fd_to_servers = {}
         self._server_to_fds = {}
-        self._fd_to_update = {}
+        self._fd_to_version = {}
         self._fd_to_max_num = {}
 
-    def is_servers_update(self, fd):
-        ret = self._fd_to_update[fd]
-        self._fd_to_update[fd] = False
-        if ret is True:
-            return ret, list(self._fd_to_servers[fd])
-        return ret, []
+    def is_servers_update(self, fd, version):
+        new_version = self._fd_to_version[fd]
+
+        if new_version > version:  # is update
+            return new_version, list(self._fd_to_servers[fd])
+        else:
+            return new_version, None
 
     def get_servers(self, fd, num):
         if fd not in self._fd_to_service_name:
@@ -62,13 +67,12 @@ class ServiceTable(object):
         if service_name not in self._service_name_to_servers or \
            self._service_name_to_update[service_name] is True:
             self._refresh_service(service_name)
-            self._fd_to_update[fd] = False
 
         return list(self._fd_to_servers[fd])
 
     def add_service_name(self, fd, service_name, num):
         self._fd_to_servers[fd] = set()
-        self._fd_to_update[fd] = False
+        self._fd_to_version[fd] = 0
         self._fd_to_max_num[fd] = num
         print('fd={}, service_name={}, max_num={}'.format(fd, service_name,
                                                           num))
@@ -103,7 +107,7 @@ class ServiceTable(object):
         del self._fd_to_service_name[fd]
 
         del self._fd_to_max_num[fd]
-        del self._fd_to_update[fd]
+        del self._fd_to_version[fd]
 
         for server in self._fd_to_servers[fd]:
             self._server_to_fds[server].remove(fd)
@@ -120,7 +124,15 @@ class ServiceTable(object):
         server_infos = self._store.get_service(service_name)
 
         # list [ip_port, ..., ]. Todo. info
-        servers = [s['server'] for s in server_infos]
+        servers = []
+        for s in server_infos:
+            try:
+                server = s['server']
+                servers.append(server)
+            except KeyError:
+                # when get service, server may expired
+                continue
+
         # update servers in service_name
         self._service_name_to_servers[service_name] = servers
 
@@ -155,7 +167,7 @@ class ServiceTable(object):
         with self._mutex:
             if service_name not in self._service_name_to_fds:
                 for fd in update_fd:
-                    self._fd_to_update[fd] = True
+                    self._fd_to_version[fd] += 1
                 return
             fd_num = len(self._service_name_to_fds[service_name])
 
@@ -164,7 +176,7 @@ class ServiceTable(object):
         if server_num == 0:
             print('service={} server_num=0'.format(service_name))
             for fd in update_fd:
-                self._fd_to_update[fd] = True
+                self._fd_to_version[fd] += 1
             return
         # assume: fd_num=3, server_num=97
         # assign: {fd0:32, fd1:32, fd2:32}
@@ -185,15 +197,11 @@ class ServiceTable(object):
                 self._fd_to_servers[fd].remove(server)
                 update_fd.add(fd)
                 print('pop fd={} server={}'.format(fd, server))
-            # add heap
-            # heapq.heappush(server_conn, (len(self._server_to_fds[server]), server))
-
-            # Todo. use ReadWrite Lock
         try:
-            # fd greed connect with server
-            for fd in self._service_name_to_fds[service_name]:
+            fds = self._service_name_to_fds[service_name]
+            for fd in fds:
                 max_connect = min(fd_max_connect, self._fd_to_max_num[fd])
-                print('fd={} max_connect={}'.format(fd, max_connect))
+                logging.info('fd={} max_connect={}'.format(fd, max_connect))
                 if fd not in self._fd_to_servers:
                     self._fd_to_servers[fd] = set()
                 # limit connect of fd
@@ -201,8 +209,11 @@ class ServiceTable(object):
                     server = self._fd_to_servers[fd].pop()
                     self._server_to_fds[server].remove(fd)
                     update_fd.add(fd)
-                    print('pop1 fd={} server={}'.format(fd, server))
+                    logging.info('pop1 fd={} server={}'.format(fd, server))
 
+            # fd greed connect with server
+            for fd in fds:
+                max_connect = min(fd_max_connect, self._fd_to_max_num[fd])
                 for server in servers:
                     if len(self._fd_to_servers[fd]) >= max_connect:
                         break
@@ -214,12 +225,12 @@ class ServiceTable(object):
                     self._fd_to_servers[fd].add(server)
                     self._server_to_fds[server].add(fd)
                     update_fd.add(fd)
-                    print('add fd={} server={}'.format(fd, server))
-        except Exception, e:
+                    logging.info('add fd={} server={}'.format(fd, server))
+        except Exception as e:
             sys.stderr.write(str(e) + '\n')
 
         for fd in update_fd:
-            self._fd_to_update[fd] = True
+            self._fd_to_version[fd] += 1
 
     def _refresh(self):
         while True:

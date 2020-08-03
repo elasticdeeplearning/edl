@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import master_pb2
-import data_server_pb2
+from . import master_pb2
+from . import data_server_pb2
 import logging
 import google.protobuf.text_format as text_format
 import socket
@@ -115,3 +115,10 @@ def get_gpus(selected_gpus):
             ]
 
     return selected_gpus
+
+
+def bytes_to_string(o, codec='utf-8'):
+    if not isinstance(o, str):
+        return o.decode(codec)
+
+    return o

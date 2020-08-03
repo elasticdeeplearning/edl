@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import distill_discovery_pb2
-import distill_discovery_pb2_grpc
+from . import distill_discovery_pb2
+from . import distill_discovery_pb2_grpc
 import grpc
 import logging
 
 from concurrent import futures
-from balance_table import BalanceTable
+from .balance_table import BalanceTable
 
 logging.basicConfig(
     level=logging.INFO,

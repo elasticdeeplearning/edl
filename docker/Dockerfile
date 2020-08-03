@@ -1,4 +1,4 @@
-FROM hub.baidubce.com/paddlepaddle/paddle:latest-gpu-cuda10.0-cudnn7-dev
+FROM hub.baidubce.com/paddlepaddle/paddle:<baseimg>
 
 # Install Go
 RUN rm -rf /usr/local/go && wget -qO- https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz | \
@@ -8,11 +8,15 @@ RUN rm -rf /usr/local/go && wget -qO- https://dl.google.com/go/go1.13.10.linux-a
     mkdir -p /root/gopath/src
 ENV GOROOT=/usr/local/go GOPATH=/root/gopath
 # should not be in the same line with GOROOT definition, otherwise docker build could not find GOROOT.
-ENV PATH=$PATH:{GOROOT}/bin:${GOPATH}/bin
+ENV PATH=$PATH:${GOROOT}/bin:${GOPATH}/bin
 
 # python
 ADD ./docker/requirements.txt /root/paddle_edl/requirements.txt
-RUN python -m pip install -r /root/paddle_edl/requirements.txt
+RUN python -m pip install pip==20.1.1
+RUN python3.6 -m pip install pip==20.1.1
+RUN python3.6 -m pip install --upgrade setuptools
+RUN python -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN python3.6 -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 #etcd
 ENV HOME /root
@@ -37,3 +41,4 @@ RUN mkdir -p /tmp/protoc && cd /tmp/protoc && \
 RUN echo "go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.io,direct" >> /root/.bashrc
 ENV GO111MODULE=on
 ENV GOPROXY=https://goproxy.io,direct
+

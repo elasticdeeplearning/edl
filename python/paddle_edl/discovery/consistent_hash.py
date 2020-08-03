@@ -15,6 +15,7 @@
 import bisect
 import copy
 import hashlib
+import sys
 
 
 class _ConsistentHashData(object):
@@ -96,7 +97,10 @@ class _ConsistentHashData(object):
 
     @staticmethod
     def _get_slot(key):
-        return int(hashlib.md5(key).hexdigest(), 16)
+        if sys.version_info < (3, ):
+            return int(hashlib.md5(key).hexdigest(), 16)
+        else:
+            return int(hashlib.md5(key.encode('utf-8')).hexdigest(), 16)
 
 
 class ConsistentHash(object):

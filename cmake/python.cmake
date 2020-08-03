@@ -1,4 +1,4 @@
-# Copyright (c) 2019 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+INCLUDE(python_module)
 
 FIND_PACKAGE(PythonInterp ${PY_VERSION} REQUIRED)
 FIND_PACKAGE(PythonLibs ${PY_VERSION} REQUIRED)
@@ -62,4 +64,10 @@ ADD_LIBRARY(python SHARED IMPORTED GLOBAL)
 SET_PROPERTY(TARGET python PROPERTY IMPORTED_LOCATION ${PYTHON_LIBRARIES})
 
 SET(py_env "")
+IF(PYTHONINTERP_FOUND)
+    find_python_module(pip REQUIRED)
+    find_python_module(wheel REQUIRED)
+ENDIF(PYTHONINTERP_FOUND)
 INCLUDE_DIRECTORIES(${PYTHON_INCLUDE_DIR})
+INCLUDE_DIRECTORIES(${PYTHON_NUMPY_INCLUDE_DIR})
+

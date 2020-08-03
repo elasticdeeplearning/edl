@@ -86,24 +86,51 @@ class ServerRegister(object):
 
 if __name__ == '__main__':
     import sys
-    from redis_store import RedisStore
+    from .redis_store import RedisStore
 
-    ip = '127.0.0.1'
-    port = 5458
-    service_name = 'TestService'
-    service_name = 'DistillService'
+    import argparse
+    parser = argparse.ArgumentParser(description='Server Register')
+    parser.add_argument(
+        '--db_endpoints',
+        type=str,
+        default='127.0.0.1:6379',
+        help='database endpoints, e.g. 127.0.0.1:6379 [default: %(default)s]')
+    parser.add_argument(
+        '--db_passwd',
+        type=str,
+        default=None,
+        help='detabase password [default: %(default)s]')
+    parser.add_argument(
+        '--db_type',
+        type=str,
+        default='redis',
+        help='database type, only support redis for now [default: %(default)s]')
+    parser.add_argument(
+        '--service_name',
+        type=str,
+        help='service name where the server is located',
+        required=True)
+    parser.add_argument(
+        '--server',
+        type=str,
+        help='endpoint of the server, e.g. 127.0.0.1:8888',
+        required=True)
+    # TODO. service_token
+    parser.add_argument(
+        '--service_token',
+        type=str,
+        default=None,
+        help='service token, which the same can register [default: %(default)s]'
+    )
 
-    if len(sys.argv) == 2:
-        port = int(sys.argv[1])
-    elif len(sys.argv) >= 3:
-        ip = sys.argv[1]
-        port = int(sys.argv[2])
-        if len(sys.argv) == 4:
-            service_name = sys.argv[3]
+    args = parser.parse_args()
+    server = args.server
+    db_endpoints = args.db_endpoints.split(',')
 
-    print('register {}:{} service_name={}'.format(ip, port, service_name))
+    redis_ip_port = db_endpoints[0].split(':')
+    server_ip_port = server.split(':')
 
-    #store = RedisStore('127.0.0.1', 6379)
-    store = RedisStore('10.255.100.13', 6379)
-    register = ServerRegister(ip, port, service_name, store)
+    store = RedisStore(redis_ip_port[0], int(redis_ip_port[1]))
+    register = ServerRegister(server_ip_port[0],
+                              int(server_ip_port[1]), args.service_name, store)
     register.start()
