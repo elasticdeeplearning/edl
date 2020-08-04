@@ -9,7 +9,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/protobuf v1.4.1
-	github.com/google/uuid v1.1.1 // indirect
+	github.com/google/uuid v1.1.1
 	github.com/gorilla/websocket v1.4.0 // indirect
 	github.com/inconshreveable/log15 v0.0.0-20200109203555-b30bc20e4fd1
 	github.com/json-iterator/go v1.1.8 // indirect
@@ -22,6 +22,7 @@ require (
 	golang.org/x/sys v0.0.0-20200501145240-bc7a7d42d5c3 // indirect
 	golang.org/x/text v0.3.2 // indirect
 	google.golang.org/grpc v1.26.0
+	gopkg.in/square/go-jose.v2 v2.5.1
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 

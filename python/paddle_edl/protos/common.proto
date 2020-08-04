@@ -23,7 +23,7 @@ message RPCRet {
 }
 
 message Trainer {
-  // string id = 5;
+  string id = 5;
   int32 rank_in_pod = 1;
   int32 global_rank = 2;
   string endpoint = 3;
@@ -31,7 +31,7 @@ message Trainer {
 }
 
 message POD {
-  // string id = 1;
+  string id = 1;
   int32 rank = 2;
   string addr = 3;
   int32 port = 4;
@@ -69,4 +69,7 @@ message Chunk {
   DataStatus status = 1;
   // only no
   common.RecordRange meta = 2;
+}
+
+message EmptyRequest{
 }

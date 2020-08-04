@@ -3,20 +3,22 @@ package master
 import (
 	"context"
 	"fmt"
-	log "github.com/inconshreveable/log15"
-	pb "github.com/paddlepaddle/edl/pkg/masterpb"
 	"sync"
 	"time"
-)
 
-const (
-	port = ":50051"
+	"bytes"
+	"compress/gzip"
+	"encoding/gob"
+
+	log "github.com/inconshreveable/log15"
+	pb "github.com/paddlepaddle/edl/pkg/masterpb"
+	"gopkg.in/square/go-jose.v2/json"
 )
 
 // Store is the interface for save and load the master state.
 type Store interface {
-	Save([]byte) error
-	Load() ([]byte, error)
+	Save(string, []byte) error
+	Load(string) ([]byte, error)
 	Shutdown() error
 }
 
@@ -26,14 +28,21 @@ type taskEntry struct {
 	NumFailure int
 }
 
+type checkPoint() struct{
+	Stage string // master stage
+	Checkpoint string // trainer checkpoint
+	Endpoint string // master endpoint
+	C Cluster // cluster
+}
+
 type masterState struct {
 	Todo     []taskEntry
 	Pending  map[int]taskEntry // map from task ID to task entry
 	Done     []taskEntry
 	Failed   []taskEntry
 	CurEpoch int
-	Stage    string // generate by master and Pods change job stage change.
-	version  string // should equal with the trainer's checkpoint
+	snap Checkpoint // current checkpoint
+	snaps map[string][]checkPoint // stage -> checkPoint
 }
 
 type launcher struct {
@@ -41,9 +50,14 @@ type launcher struct {
 	Endpoint string
 }
 
+type masterMeta struct {
+	Endpoint string `endpoint`
+}
+
 // Service is the master server service.
 type Service struct {
 	// pb.UnimplementedMasterServer
+	jobID string
 
 	timeoutDur time.Duration
 	failureMax int
@@ -53,8 +67,9 @@ type Service struct {
 
 	mu sync.Mutex
 
-	// store Store
+	store Store
 	state masterState
+	meta  masterMeta
 
 	Chunks map[string][]pb.Chunk // DataServerID->ChunksArray
 
@@ -64,13 +79,14 @@ type Service struct {
 }
 
 // NewService creates a new service.
-func NewService(etcd *EtcdClient, timeoutDur time.Duration, failureMax int) (*Service, error) {
+func NewService(jobID string, etcd *EtcdClient, timeoutDur time.Duration, failureMax int) (*Service, error) {
 	s := &Service{}
 	s.timeoutDur = timeoutDur
 	s.failureMax = failureMax
 	s.state.Pending = make(map[int]taskEntry)
 	s.ready = make(chan struct{})
 	s.etcd = *etcd
+	s.jobID = jobID
 	if etcd != nil {
 		recovered, err := s.recover()
 		if err != nil {
@@ -92,6 +108,11 @@ func NewService(etcd *EtcdClient, timeoutDur time.Duration, failureMax int) (*Se
 func (s *Service) watchCluster() {
 }
 
+// Register record this endpoint to etcd so others can find it.
+func (s *Service) Register(endpoint string) error {
+	return nil
+}
+
 // GetSubDataSet implements the proto interface.
 func (s *Service) GetSubDataSet(context.Context, *pb.SubDataSetRequest) (*pb.SubDataSetResponse, error) {
 	// return file from file list data set
@@ -110,15 +131,120 @@ func (s *Service) Barrier(ctx context.Context, in *pb.BarrierRequest) (*pb.Clust
 }
 
 // recover recovers service state from etcd.
-// TODO
+func (s *Service) recoverState() (bool, error) {
+	state, err := s.store.Load(statePath(s.jobID))
+	if err != nil {
+		return false, err
+	}
+
+	if state == nil {
+		log.Info("No state exists, not recovered.")
+		return false, nil
+	}
+
+	log.Info("Loaded snapshot.", log.Ctx{"size": len(state)})
+	gr, err := gzip.NewReader(bytes.NewReader(state))
+	if err != nil {
+		return false, err
+	}
+
+	dec := gob.NewDecoder(gr)
+	var tqs masterState
+	err = dec.Decode(&tqs)
+	if err != nil {
+		return false, err
+	}
+
+	err = gr.Close()
+	if err != nil {
+		// Only close failed, recover actually succeed, so
+		// just log error.
+		log.Error("error close recover file.", log.Ctx{"error": err})
+	}
+
+	s.state = tqs
+	log.Info("Master recovered from snapshot, scheduling pending task timeout check.", s.logCtx())
+	for _, t := range s.state.Pending {
+		time.AfterFunc(s.timeoutDur, s.checkTimeoutFunc(t.Task.Meta.ID, t.Task.Meta.Epoch))
+	}
+
+	return true, nil
+}
+
+func (s *Service) recoverMeta() (bool, error) {
+	d, err := s.store.Load(metaPath(s.jobID))
+	if err != nil {
+		return false, err
+	}
+
+	if d == nil {
+		log.Info("No state exists, not recovered.")
+		return false, nil
+	}
+
+	var m masterMeta
+	err = json.Unmarshal(d, &m)
+	if err != nil {
+		message := fmt.Sprintf("recover master meta error:%v", err)
+		log.Crit(message)
+		panic(message)
+	}
+
+	log.Info("Loaded master meta.", log.Ctx{"master meta": string(d)})
+	return true, nil
+}
+
 func (s *Service) recover() (bool, error) {
+	r, err := s.recoverState()
+	if err != nil {
+		return r, err
+	}
+
+	r, err = s.recoverMeta()
+	if err != nil {
+		return r, err
+	}
+
 	return true, nil
 }
 
 // snapshot *must* be called with s.mu being held.
-// TODO
-func (s *Service) snapshot() error {
-	return nil
+func (s *Service) snapshotState() error {
+	// TODO(helin): etcd request has a size limit, so the snapshot
+	// size is limited by the max request size. We should either
+	// divide the snapshot into smaller chunks and save under
+	// different keys, or configure the request size to be big
+	// enough:
+	// https://github.com/coreos/etcd/blob/2f84f3d8d8ed8f9537ab6ffa44a3a1c7eddfa9b1/embed/config.go#L44
+
+	path := statePath(s.jobID)
+
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	enc := gob.NewEncoder(gw)
+	err := enc.Encode(s.state)
+	if err != nil {
+		return err
+	}
+	err = gw.Close()
+	if err != nil {
+		return err
+	}
+
+	state := buf.Bytes()
+	log.Info("Saving snapshot.", log.Ctx{"size bytes": len(state)})
+	return s.store.Save(path, state)
+}
+
+func (s *Service) snapshotMeta() error {
+	path := metaPath(s.jobID)
+
+	b, err := json.Marshal(s.meta)
+	if err != nil {
+		return err
+	}
+
+	return s.etcd.Save(path, b)
 }
 
 func readChunks(globPaths []string) ([]pb.Chunk, error) {
@@ -134,6 +260,12 @@ func (s *Service) SetDataSet(globPaths []string, _ *int) error {
 // return true if all task are done or failed.
 func (s *Service) processFailedTask(t taskEntry, epoch int) {
 	return
+}
+
+// processFailedTask retry s.failureMax times for failed task.
+// return true if all task are done or failed.
+func (s *Service) GetID(ctx context.Context, in *pb.EmptyRequest) (*pb.Entity, error) {
+	return nil, nil
 }
 
 func (s *Service) checkTimeoutFunc(taskID int, epoch int) func() {

@@ -18,20 +18,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	log "github.com/inconshreveable/log15"
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
-	"time"
 )
 
 const (
 	// DefaultLockPath is the default etcd master lock path.
 	DefaultLockPath = "/master/lock"
 	// DefaultStatePath is the default etcd key for master state.
-	// version_0, version_1 ..., reserve last 3
 	DefaultStatePath = "/master/state"
 	// DefaultMetaPath is the default etcd key for master address.
-	// {job_stage:"", endpoint:""}
+	// {old_stages:[], now_stage:"", endpoint:""}
 	DefaultMetaPath = "/master/meta"
 	// DefaultAdjustPath is the the default etcd key for pod changes.
 	// operation1, operatrion2, ...
@@ -45,11 +45,10 @@ const (
 // EtcdClient is the etcd client that the master uses for fault
 // tolerance and service registry.
 type EtcdClient struct {
-	lockPath  string
-	statePath string
-	client    *clientv3.Client
-	lock      *concurrency.Mutex
-	sess      *concurrency.Session
+	client *clientv3.Client
+	lock   *concurrency.Mutex
+	sess   *concurrency.Session
+	jobID  string
 }
 
 type meta struct {
@@ -57,20 +56,77 @@ type meta struct {
 	Endpoint string `json:"endpoint"`
 }
 
-func lockPath(jogID) string {
-	return fmt.Sprintf("/%s%s", jogID, DefaultLockPath)
+func lockPath(jobID string) string {
+	return fmt.Sprintf("/%s%s", jobID, DefaultLockPath)
 }
 
-func metaPath(jogID) string {
-	return fmt.Sprintf("/%s%s", jogID, DefaultMetaPath)
+func metaPath(jobID string) string {
+	return fmt.Sprintf("/%s%s", jobID, DefaultMetaPath)
 }
 
-func statePath(jogID) string {
-	return fmt.Sprintf("/%s%s", jogID, DefaultStatePath)
+func statePath(jobID string) string {
+	return fmt.Sprintf("/%s%s", jobID, DefaultStatePath)
 }
 
-// NewEtcdClient creates a new EtcdClient.
-func NewEtcdClient(jogID string, endpoints []string, addr string, ttlSec int) (*EtcdClient, error) {
+func (e *EtcdClient) detectIsOwner() {
+	for {
+		err := e.lock.Lock(context.Background())
+		if err != nil {
+			s := "Master miss lock now, so exit!"
+			log.Info(s)
+			panic(s)
+		}
+
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func (e *EtcdClient) recordMeta(addr string) error {
+	m := meta{"INITIAL", addr}
+
+	d, _ := json.Marshal(m)
+
+	return e.Save(d, metaPath(jobID))
+}
+
+func (e *EtcdClient) loadState() (*masterState, error) {
+	state, err := e.Load(statePath(jobID))
+	if err != nil {
+		log.Crit("load state info error:", err)
+		return nil, err
+	}
+
+	return state, nil
+}
+
+func (e *EtcdClient) loadMeta() (*masterMeta, error) {
+	meta, err := e.Load(metaPath(e.jobID))
+	if err != nil {
+		log.Crit("load state info error:", err)
+		return nil, err
+	}
+
+	return meta, nil
+}
+
+func Election(jobID string, endpoints []string, ttlSec int) *EtcdClient {
+	var cli *EtcdClient
+	cli.jobID = jobID
+	var err error
+	for {
+		cli, err = tryToLock(jobID, endpoints, ttlSec)
+		if err != nil {
+			log.Debug("Elect failed:", err)
+			time.Sleep(1 * time.Minute)
+			continue
+		}
+
+		go detectIsOwner(jobID, cli)
+		return cli
+	}
+}
+
+func tryToLock(jobID string, endpoints []string, ttlSec int) (*EtcdClient, error) {
 	log.Debug("Connecting to etcd", log.Ctx{"endpoint": endpoints})
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   endpoints,
@@ -85,94 +141,75 @@ func NewEtcdClient(jogID string, endpoints []string, addr string, ttlSec int) (*
 		return nil, err
 	}
 
-	lock := concurrency.NewMutex(sess, lockPath(jogID))
+	lock := concurrency.NewMutex(sess, lockPath(jobID))
 	// It's fine for the lock to get stuck, in this case we have
 	// multiple master servers running (only configured to have
 	// one master running, but split-brain problem may cause
 	// multiple master servers running), and the cluster management
 	// software will kill one of them.
-	log.Info("Trying to acquire lock.", log.Ctx{"path": lockPath})
+	log.Info("Trying to acquire lock.", log.Ctx{"path": lockPath(jobID)})
 	err = lock.Lock(context.TODO())
 	if err != nil {
 		return nil, err
 	}
-	log.Info("Successfully acquired lock at: ", log.Ctx{"path": lockPath})
-
-	// FIXME(gongwb): master should support fail over
-	m := meta{"INITIAL", addr}
-
-	put := clientv3.OpPut(metaPath, json.Marshal(m))
-	resp, err := cli.Txn(context.Background()).If(lock.IsOwner()).Then(put).Commit()
-	if err != nil {
-		return nil, err
-	}
-
-	if !resp.Succeeded {
-		log.Crit("No longer owns the master lock. Exiting.")
-		panic("No longer owns the master lock. Exiting.")
-	}
+	log.Info("Successfully acquired lock at: ", log.Ctx{"path": lockPath(jobID)})
 
 	e := &EtcdClient{
-		lockPath:  lockPath(jogID),
-		statePath: statePath(jogID),
-		client:    cli,
-		lock:      lock,
-		sess:      sess,
+		client: cli,
+		lock:   lock,
+		sess:   sess,
 	}
 
+	//statePath string
 	return e, nil
 }
 
-// GetNextVersion gets next version by etcd_list
-func (e *EtcdClient) GetNextVersion() (string, error) {
-	return "", nil
-}
-
-// Save saves the version state to etcd
-func (e *EtcdClient) Save(state []byte, version string) error {
-	// save the new version
-	statePath := fmt.Sprintf("/%s/%s/%s", e.jogID, DefaultStatePath, version)
-	return e.save(state, statePath)
+func (e *EtcdClient) reGetLock(miss bool) {
+	if miss {
+		log.Error("No longer owns the lock, trying to lock again")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	err := e.lock.Lock(ctx)
+	cancel()
+	if err != nil {
+		// We lost the master lock and can not acquire
+		// it back, it means some other master is
+		// already started. We don't want cluster
+		// management system to kill the master server
+		// who is holding the lock and running
+		// correctly. So the most feasible solution is
+		// to kill current master server. The current
+		// state is not saved, but the trainer's RPC
+		// call will fail, so the trainer will retry.
+		log.Crit("Could not acquire the lock at %s: %v. Exiting.", log.Ctx{"path": lockPath(jobID), "error": err})
+		panic("Could not acquire the lock at %s: %v. Exiting.")
+	}
+	if miss {
+		log.Info("Successfully acquired lock at %s.", lockPath(e.jobID))
+	}
 }
 
 // Save saves the state into the etcd.
-func (e *EtcdClient) save(state []byte, statePath string) error {
+func (e *EtcdClient) Save(path string, v []byte) error {
 	ctx := context.TODO()
-	put := clientv3.OpPut(statePath, string(state))
+	put := clientv3.OpPut(path, string(v))
 	resp, err := e.client.Txn(ctx).If(e.lock.IsOwner()).Then(put).Commit()
 	if err != nil {
 		return err
 	}
 
 	if !resp.Succeeded {
-		log.Error("No longer owns the lock, trying to lock again")
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		err := e.lock.Lock(ctx)
-		cancel()
-		if err != nil {
-			// We lost the master lock and can not acquire
-			// it back, it means some other master is
-			// already started. We don't want cluster
-			// management system to kill the master server
-			// who is holding the lock and running
-			// correctly. So the most feasible solution is
-			// to kill current master server. The current
-			// state is not saved, but the trainer's RPC
-			// call will fail, so the trainer will retry.
-			log.Crit("Could not acquire the lock at %s: %v. Exiting.", log.Ctx{"path": e.lockPath, "error": err})
-			panic("Could not acquire the lock at %s: %v. Exiting.")
-		}
-		log.Info("Successfully acquired lock at %s.", e.lockPath)
-		return e.Save(state)
+		e.reGetLock(true)
+		return e.Save(path, v)
 	}
 
 	return nil
 }
 
-// Load loads the state from etcd.
-func (e *EtcdClient) Load(statePath) ([]byte, error) {
+// Load load value from etcd by path.
+func (e *EtcdClient) Load(path string) ([]byte, error) {
 	ctx := context.TODO()
-	get := clientv3.OpGet(statePath)
+	get := clientv3.OpGet(path)
 
 	resp, err := e.client.Txn(ctx).If(e.lock.IsOwner()).Then(get).Commit()
 	if err != nil {
@@ -180,13 +217,8 @@ func (e *EtcdClient) Load(statePath) ([]byte, error) {
 	}
 
 	if !resp.Succeeded {
-		log.Error("No longer owns the lock, trying to lock and load again.")
-		err = e.lock.Lock(context.Background())
-		if err != nil {
-			return nil, err
-		}
-
-		return e.Load()
+		e.reGetLock(true)
+		return e.Load(path)
 	}
 
 	kvs := resp.Responses[0].GetResponseRange().Kvs
@@ -195,8 +227,8 @@ func (e *EtcdClient) Load(statePath) ([]byte, error) {
 		return nil, nil
 	}
 
-	state := kvs[0].Value
-	return state, nil
+	v := kvs[0].Value
+	return v, nil
 }
 
 // Shutdown shuts down the etcd client gracefully.
