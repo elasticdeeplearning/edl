@@ -12,24 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six.moves.queue import Queue
+import multiprocessing
 
-class EdlDataSet(object):
-    def reader(self, file_path):
-        #yield one record
+
+class DataReader():
+    def __init__(self, data_file):
+        self._data_file = data_file
+
+    def __iter__(self):
         raise NotImplementedError()
 
-    def preprocessor(data):
-        raise NotImplementedError()
 
+class TxtDataReader(DataReader):
+    def __init__(self, data_file):
+        super(self, TxtDataSet).__init__(data_file)
 
-class TxtDataSet(EdlDataSet):
-    def reader(self, txt_file):
-        with open(txt_file, "rb") as f:
+    def __iter__(self):
+        with open(self._data_file, "rb") as f:
             for line in f:
                 line = line.strip()
                 if len(line) <= 0:
                     continue
                 yield line
 
-    def preprocessor(self, data):
-        pass
+
+class EDLReader(object):
+    def __init__(file_list, reader_cls, num_workers=1):
+        self._file_list = file_list
+
+        # master: self, local_list
+        # master: from trainer_0
+        # master: from etcd

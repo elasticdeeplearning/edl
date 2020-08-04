@@ -70,47 +70,26 @@ def _parse_args():
     parser = ArgumentParser(
         description='''start paddle training using multi-process mode.''')
 
-    #Optional arguments for the launch helper
-    parser.add_argument(
-        "--cluster_node_ips",
-        type=str,
-        default="127.0.0.1",
-        help="The initial Paddle cluster nodes ips, such as 192.168.0.16,192.168.0.17.. May be changed in the traning process"
-    )
-    parser.add_argument(
-        "--node_ip",
-        type=str,
-        default="127.0.0.1",
-        help="The current node ip. ")
-    parser.add_argument(
-        "--use_paddlecloud",
-        action='store_true',
-        help="wheter to use paddlecloud platform to run your multi-process job. If false, no need to set this argument."
-    )
-    parser.add_argument(
-        "--started_port",
-        type=int,
-        default=None,
-        help="The trainer's started port on a single node")
+    parser.add_argument("--nodes_range", type=str, default=None, help="")
+
+    parser.add_argument("--selected_gpus", type=str, default=None, help="")
 
     parser.add_argument(
-        "--selected_gpus",
-        type=str,
-        default=None,
-        help="It's for gpu training and the training process will run on the selected_gpus,"
-        "each process is bound to a single GPU. And if it's not set, this module will use all the gpu cards for training."
-    )
+        "--etcd_endpoints", type=str, default=None, help="etcd endpoints")
+
+    parser.add_argument(
+        "--job_id", type=str, default=None, help="The identify id of this job")
 
     parser.add_argument(
         "--log_level",
         type=int,
-        default=20,  # logging.INFO, details are here:https://docs.python.org/3/library/logging.html#levels
+        default=20,
         help="Logging level, default is logging.INFO")
 
     parser.add_argument(
         "--log_dir",
         type=str,
-        default=None,
+        default="./log",
         help="The path for each process's log.If it's not set, the log will printed to default pipe."
     )
 
@@ -132,13 +111,6 @@ def _parse_args():
         type=str,
         default=None,
         help="The hdfs_path used for edl.")
-
-    # checkpoint will saved here
-    parser.add_argument(
-        "--data_server_num",
-        type=int,
-        default=1,
-        help="The data sever number with one trainer.")
 
     #positional
     parser.add_argument(
@@ -176,8 +148,8 @@ def edl_barrier(master_dog, job_env, pod_env, timeout=15):
 
 
 def launch(args):
-    job_env = JobEnv()
-    pod_env = PodEnv(args.selected_gpus)
+    job_env = JobEnv(args)
+    pod_env = PodEnv(job_env)
 
     dog = MasterWatcher(job_env.etcd_endpoints, job_env.job_id)
     pod_reg = LauncherRegister(job_env, pod_env)

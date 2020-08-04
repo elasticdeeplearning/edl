@@ -17,49 +17,100 @@ from paddle_edl.utils.utils import get_gpus
 
 
 class JobEnv(object):
-    def __init__(self, etcd_endoints=None, job_id=None):
-        self.running_env = os.getenv("PADDLE_RUNING_ENV")
-        self.job_id = os.getenv("PADDLE_JOB_ID") if job_id is None else job_id
-        self.etcd_endpoints = os.getenv(
-            "PADDLE_ETCD_ENPOINTS") if etcd_endpoints is None else etcd_endoints
+    def __init__(self, args):
+        # job_id
+        if args.job_id:
+            self._job_id = args.job_id
+        else:
+            self._job_id = os.getenv("PADDLE_JOB_ID")
+        assert self._job_id, "job_id must has valid value "
 
-        assert self.job_id, "job_id must has valid value "
-        assert self.etcd_endpoints, "etcd_endpoints must has valid value "
+        # etcd
+        if args.etcd_endpoints:
+            self._etcd_endpoints = args.etcd_endpoints
+        else:
+            self._etcd_endpoints = os.getenv("PADDLE_ETCD_ENPOINTS")
+        assert self._etcd_endpoints, "etcd_endpoints must has valid value "
+
+        # hdfs
+        if args.hdfs_name:
+            self.__hdfs_name = args.hdfs_name
+        else:
+            self.__hdfs_name = os.getenv("PADDLE_EDL_HDFS_NAME")
+
+        if args.hdfs_path:
+            self._hdfs_name = args.hdfs_path
+        else:
+            self._hdfs_path = os.getenv("PADDLE_EDL_HDFS_PATH")
+
+        if args.hdfs_ugi:
+            self._hdfs_ugi = args.hdfs_ugi
+        else:
+            self._hdfs_ugi = os.getenv("PADDLE_EDL_HDFS_UGI")
+
+        if not self._ce_test:
+            assert len(self._hdfs_home) > 3 and \
+                len(self._hdfs_name) > 6 and \
+                len(self._hdfs_ugi) > 3 and \
+                len(self._hdfs_checkpoint_path) > 0, "hdfs environ must set"
+        else:
+            assert len(self._hdfs_home) > 3 and \
+                len(self._hdfs_checkpoint_path) > 0, "hdfs environ must set"
+
+        # nodes range
+        if args.nodes_range:
+            self._nodes_range = args.nodes_range
+        else:
+            self._nodes_range = os.getenv("PADDLE_EDL_NODES_RANGE")
+
+        assert self._nodes_range is not None, "nodes range must set"
+        a = self._nodes_range.split(":")
+        assert len(a) == 2, "nodes_range not a valid format:{}".format(
+            self._nodes_range)
+        self._min_nodes = a[0]
+        self._max_nodes = a[1]
+
+        # selected gpus
+        if args.selected_gpus:
+            self._selected_gpus = args.selected_gpus
+        else:
+            self._selected_gpus = os.getenv("PADDLE_EDL_SELECTED_GPUS")
+
+    def selected_gpus(self):
+        return self._selected_gpus
 
 
 class PodEnv(object):
-    def __init__(self,
-                 selected_gpus,
-                 pod_id=None,
-                 pod_ip=None,
-                 pod_port=None,
-                 trainer_ports=None):
-        self.port = os.getenv(
-            "PADDLE_POD_PORT") if pod_port is None else pod_port
-        self.addr = os.getenv("PADDLE_POD_IP") if pod_ip is None else pod_ip
-        assert self.port, "pod_port must has valid value "
-        assert self.addr, "pod_ip must has valid value "
-        self.endpoint = "{}:{}".format(self.pod_addr, self.pod_port)
-        self.id = os.getenv("PADDLE_POD_ID") if pod_id is None else pod_id
-        if self.id is None:
-            self.id = self.endpoint
-        assert self.addr, "pod_ip must has valid value "
+    def __init__(self, job_env):
+        self._id = None
+        self._gpus = get_gpus(job_env.selected_gpus)
+        self._rank = None
 
-        ports = os.getenv(
-            "PADDLE_TRAINER_PORTS") if trainer_ports is None else trainer_ports
-        assert ports, "PADDLE_TRAINER_PORTS must has valid value"
+        # trainer ports
+        self._ports = None
+        self._get_ports()
 
-        self.gpus = get_gpus(selected_gpus)
-        self.trainer_ports = ports.split(",")
-        assert len(self.trainer_ports) == gpu_num, "one gpu one port"
+        # hostname, ip
+        self._hostname, self._ip = utils.get_host_name_ip()
+
+    def set_id(self, pod_id):
+        pass
+
+    def _get_ports(self):
+        if self._job_env.run_platform == "PADDLE_CLOUD":
+            ports = os.getenv("PADDLE_TRAINER_PORTS", "")
+            self._ports = ports.split(",")
+
+            assert len(ports) >= len(self._gpus), \
+                "port num:{} must large than gpus:{}".format(len(ports), len(self._gpus))
+            logger.info("get ports from env:{}".format(self._ports))
+        else:
+            self._ports = utils.find_free_ports(len(self, _selected_gpus))
+            logger.info("get ports from unused:{}".format(self._ports))
 
 
 class TrainerEnv(object):
-    def __init__(self, rank_in_pod=None, global_rank=None):
-        self.rank_in_pod = os.getenv("PADDLE_TRAINER_RANK_IN_POD"
-                                     ) if rank_in_pod is None else rank_in_pod
-        self.trainer_global_rank = os.getenv(
-            "PADDLE_TRAINER_ID") if global_rank is None else global_rank
-        assert self.rank_in_pod, "trainer_rank_in_pod must has valid value "
-        assert self.global_rank, "global_rank must has valid value "
-        self.id = self.global_rank
+    def __init__(self):
+        self._id = None
+        self._rank_in_pod = int(os.getenv("PADDLE_TRAINER_ID"))
+        self._rank_in_world = int(os.getenv("PADDLE_TRAINER_RANK_IN_POD"))
