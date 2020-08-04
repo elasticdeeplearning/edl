@@ -127,7 +127,7 @@ def _parse_args():
 
 
 def edl_barrier(master_dog, job_env, pod_env, timeout=15):
-    c = Client(master_dog.get_master().endpoint)
+    c = master_client.Client(master_dog.get_master().endpoint)
     try:
         pb_cluster = c.barrier(job_env.job_id, pod_env.pod_id, timeout)
     except Exception as e:
@@ -147,53 +147,50 @@ def edl_barrier(master_dog, job_env, pod_env, timeout=15):
     return cluster, pod
 
 
-def LocalProcsManager(object):
-    def __init__(self, cluster, pod):
-        self._local_master = None
-        self._local_trainers = None
-        self._cluster = cluster
-        self._pod = pod
-
-    def start_trainers(self, cluster, pod, args):
-        self._local_trainers = start_local_trainers(
-            cluster,
-            pod,
-            args.training_script,
-            args.training_script_args,
-            log_dir=args.log_dir)
-
-        self._local_master = start_master()
-
-    def watch(self):
+def CandidaterManager(self):
+    def __init__(self):
         pass
 
-    def shutdown(self):
-        edl_process.sterminate_local_procs(self._local_trainers)
-        edl_process.sterminate_local_procs(self._local_master)
+
+# wait until master is set
+# or exit 
+def get_master(master_dog):
+    start = time.time()
+    while True:
+        if master_dog.get_master() is None:
+            time.sleep(1)
+            continue
+
+    return master_dog.get_master()
 
 
 def launch(args):
     job_env = JobEnv(args)
     pod_env = Pod()
     pod_env.init_from_env(job_env)
-    proc_manager = LocalProcsManager()
 
-    dog = MasterWatcher(job_env.etcd_endpoints, job_env.job_id)
-    pod_reg = LauncherRegister(job_env, pod_env)
-    cluster, pod = edl_barrier(dog, job_env, pod_env, None, 15 * 60)
+    # pod register
+    pod_register = LauncherRegister(job_env, pod_env)
+
+    # try to register master
+    master_register = MasterRegister()
+
+    # watch master
+    master_watcher = MasterWatcher(job_env.etcd_endpoints, job_env.job_id)
+    global_master = get_master(master_watcher)
+
+    cluster, pod = edl_barrier(master_watcher, job_env, pod_env, None, 15 * 60)
     logger.info("get cluster from edl:{}".format(cluster))
 
-    proc_manager.start(cluster, pod, args)
-
-    client = master_client.Client(master_dog.get_master().endpoint)
+    master_client = master_client.Client(master_watcher)
     while True:
-        cluster2, pod = client.get_cluster(hdfs)
+        cluster2, pod = master_client.get_cluster()
 
         if cluster2.stage != cluster.stage:
             logger.info("Cluster changed. New cluster:{}. Old Cluster:{}".
                         format(cluster2, cluster))
 
-            edl_proces.sterminate_local_procs(procs)
+            edl_process.terminiate(procs)
 
             cluster, pod = edl_barrier(
                 job_env, pod_env, local_procs=procs, timeout=15 * 60)

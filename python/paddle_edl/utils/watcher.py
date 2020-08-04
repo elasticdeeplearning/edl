@@ -28,7 +28,7 @@ class MasterWatcher(object):
     def __init__(self, etcd_endpoints, job_id):
         self._etcd = EtcdClient(edl_env.etcd_endpoints, root=job_id)
         self._job_id = job_id
-        self._master = Master()
+        self._master = None
 
         self._lock = Lock()
         # wait to get master
@@ -43,8 +43,10 @@ class MasterWatcher(object):
             v, _ = self._etcd.get_key("/{}/master/meta".format(self._job_id))
             with self._lock:
                 d = json.loads(v)
-                self.master.endpoint = d['endpoint']
-                self.master.job_stage = d['job_stage']
+                if self._master is None:
+                    self._master = Master()
+                self._master.endpoint = d['endpoint']
+                self._master.job_stage = d['job_stage']
 
             time.sleep(1)
 

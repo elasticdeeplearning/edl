@@ -64,26 +64,65 @@ class PodRegister(object):
         self.stop()
 
 
-"""
-class DataServerRegister(object):
-    def __init__(self, etcd_endpoints, job_id, affinity_pod_id,
-                 affinity_rank_of_pod, endpoint):
-        service_name = "DataServer"
-        info = {
-            "job_id": str(job_id),
-            "affinity_pod_id": str(affinity_pod_id),
-            "affinity_rank_of_pod": str(affinity_rank_of_pod)
-        }
+class MasterRegister(object):
+    def __init__(self, job_env, pod):
+        info = self._generate_info(etcd_endpoints, job_env, pod)
 
-        server = endpoint
+        sefl._service_name = "master"
+        self._server = "master"
+        self._lock = threading.Lock()
+        self._is_master = False
+        self._info = pod.to_json()
 
-        self._register = Register(
-            etcd_endpoints,
-            job_id=job_id,
-            service=service_name,
-            server=server,
-            info=json.dumps(info))
+        self._t_register = Threading(self._refresher)
+        self._t_manager = Threading(self._master_manager)
+        self._proc = None
+
+    def _refresher(self):
+        while not self._stop.is_set():
+            try:
+                if not self._etcd.set_server_not_exists(self._service_name,
+                                                        self._server):
+                    raise exception.EdlRegisterError()
+            except Exception as e:
+                if self._proc is not None:
+                    self._terminate_master()
+                time.sleep(1)
+                continue
+
+            while True:
+                try:
+                    self._etcd.refresh(self._service_name, self._server)
+                    if self._proc is None:
+                        self._start_master()
+                    else:
+                        if self._proc.proc.poll() is not None:  # terminate
+                            self._set_master(False)
+                            break
+
+                    time.sleep(1)
+                except Exception as e:
+                    break
+
+    def _set_master(self, is_master):
+        with self._lock:
+            self._is_master = is_master
+
+    def _start_master(self):
+        with self._lock:
+            self._proc = utils.start_master()
+            self._is_master = True
+
+    def _terminate_master(self):
+        with self._lock:
+            utils.termniate_master()
+            self._proc = None
+            self._is_master = False
 
     def stop(self):
-        self._register.stop()
-"""
+        self._stop.set()
+        self._t_register.join()
+
+    def is_master(self):
+        with self._lock:
+            return self._is_master
