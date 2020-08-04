@@ -35,8 +35,9 @@ message POD {
   int32 rank = 2;
   string addr = 3;
   int32 port = 4;
-  repeated int32 gpus = 5;
-  repeated Trainer trainers = 6;
+  repeated int32 trainer_ports = 5;
+  repeated int32 gpus = 6;
+  repeated Trainer trainers = 7;
 }
 
 message Cluster {
@@ -71,5 +72,4 @@ message Chunk {
   common.RecordRange meta = 2;
 }
 
-message EmptyRequest{
-}
+message EmptyRequest {}

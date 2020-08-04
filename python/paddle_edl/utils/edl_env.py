@@ -34,9 +34,9 @@ class JobEnv(object):
 
         # hdfs
         if args.hdfs_name:
-            self.__hdfs_name = args.hdfs_name
+            self._hdfs_name = args.hdfs_name
         else:
-            self.__hdfs_name = os.getenv("PADDLE_EDL_HDFS_NAME")
+            self._hdfs_name = os.getenv("PADDLE_EDL_HDFS_NAME")
 
         if args.hdfs_path:
             self._hdfs_name = args.hdfs_path
@@ -71,46 +71,26 @@ class JobEnv(object):
         self._max_nodes = a[1]
 
         # selected gpus
-        if args.selected_gpus:
-            self._selected_gpus = args.selected_gpus
-        else:
-            self._selected_gpus = os.getenv("PADDLE_EDL_SELECTED_GPUS")
+        self._selected_gpus = utils.get_gpus(None)
 
+        # proc per node
+        if args.nproc_per_node:
+            self._nproc_per_node = args.nproc_per_node
+        else:
+            nproc_per_node = os.getenv("PADDLE_EDL_NPROC_PERNODE")
+            if nproc_per_node is None:
+                self.nproc_per_node = len(self._selected_gpus)
+            else:
+                self._nproc_per_node = nproc_per_node
+
+        assert len(
+            self._selected_gpus
+        ) >= self._nproc_per_node, "gpu's num must larger than procs need to run"
+
+    @property
     def selected_gpus(self):
         return self._selected_gpus
 
-
-class PodEnv(object):
-    def __init__(self, job_env):
-        self._id = None
-        self._gpus = get_gpus(job_env.selected_gpus)
-        self._rank = None
-
-        # trainer ports
-        self._ports = None
-        self._get_ports()
-
-        # hostname, ip
-        self._hostname, self._ip = utils.get_host_name_ip()
-
-    def set_id(self, pod_id):
-        pass
-
-    def _get_ports(self):
-        if self._job_env.run_platform == "PADDLE_CLOUD":
-            ports = os.getenv("PADDLE_TRAINER_PORTS", "")
-            self._ports = ports.split(",")
-
-            assert len(ports) >= len(self._gpus), \
-                "port num:{} must large than gpus:{}".format(len(ports), len(self._gpus))
-            logger.info("get ports from env:{}".format(self._ports))
-        else:
-            self._ports = utils.find_free_ports(len(self, _selected_gpus))
-            logger.info("get ports from unused:{}".format(self._ports))
-
-
-class TrainerEnv(object):
-    def __init__(self):
-        self._id = None
-        self._rank_in_pod = int(os.getenv("PADDLE_TRAINER_ID"))
-        self._rank_in_world = int(os.getenv("PADDLE_TRAINER_RANK_IN_POD"))
+    @property
+    def nproc_per_node(self):
+        return self._nproc_per_node

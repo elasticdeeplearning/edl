@@ -72,7 +72,7 @@ def _parse_args():
 
     parser.add_argument("--nodes_range", type=str, default=None, help="")
 
-    parser.add_argument("--selected_gpus", type=str, default=None, help="")
+    parser.add_argument("--nproc_per_node", type=int, default=None, help="")
 
     parser.add_argument(
         "--etcd_endpoints", type=str, default=None, help="etcd endpoints")
@@ -147,21 +147,43 @@ def edl_barrier(master_dog, job_env, pod_env, timeout=15):
     return cluster, pod
 
 
+def LocalProcsManager(object):
+    def __init__(self, cluster, pod):
+        self._local_master = None
+        self._local_trainers = None
+        self._cluster = cluster
+        self._pod = pod
+
+    def start(self, cluster, pod, args):
+        self._local_trainers = start_local_trainers(
+            cluster,
+            pod,
+            args.training_script,
+            args.training_script_args,
+            log_dir=args.log_dir)
+
+        self._local_master = start_master()
+
+    def watch(self):
+        pass
+
+    def shutdown(self):
+        edl_process.sterminate_local_procs(self._local_trainers)
+        edl_process.sterminate_local_procs(self._local_master)
+
+
 def launch(args):
     job_env = JobEnv(args)
-    pod_env = PodEnv(job_env)
+    pod_env = Pod()
+    pod_env.init_from_env(job_env)
+    proc_manager = LocalProcsManager()
 
     dog = MasterWatcher(job_env.etcd_endpoints, job_env.job_id)
     pod_reg = LauncherRegister(job_env, pod_env)
     cluster, pod = edl_barrier(dog, job_env, pod_env, None, 15 * 60)
     logger.info("get cluster from edl:{}".format(cluster))
 
-    procs = start_local_trainers(
-        cluster,
-        pod,
-        args.training_script,
-        args.training_script_args,
-        log_dir=args.log_dir)
+    proc_manager.start(cluster, pod, args)
 
     client = master_client.Client(master_dog.get_master().endpoint)
     while True:
