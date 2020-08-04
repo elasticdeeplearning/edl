@@ -154,7 +154,7 @@ def LocalProcsManager(object):
         self._cluster = cluster
         self._pod = pod
 
-    def start(self, cluster, pod, args):
+    def start_trainers(self, cluster, pod, args):
         self._local_trainers = start_local_trainers(
             cluster,
             pod,

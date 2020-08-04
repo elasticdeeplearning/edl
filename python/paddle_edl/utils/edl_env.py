@@ -94,3 +94,11 @@ class JobEnv(object):
     @property
     def nproc_per_node(self):
         return self._nproc_per_node
+
+    @property
+    def etcd_endpoints(self):
+        return self._etcd_endpoints
+
+    @property
+    def job_id(self):
+        return self._job_id

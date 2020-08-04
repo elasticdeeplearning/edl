@@ -39,8 +39,26 @@ class Pod(object):
         self._addr = None
         self._gpus = None
         self._trainers = None
-        self._master = None  # candidates
-        self._trainers = None
+        #self._master = None  # candidates
+
+    def to_json(self):
+        d = {
+            "id": self._id,
+            "rank": self._rank,
+            "port": self._port,
+            "trainer_ports": self._trainer_ports,
+            "addr": self._addr,
+            "gpus": self._gpus,
+            "trainers": self._trainers
+            #"master":self._master
+        }
+
+        s = ""
+        for t in trainers:
+            s += t.to_json()
+        d["trainers"] = s
+
+        return json.dumps(d)
 
     def init_from_env(self, job_env):
         # uuid
@@ -147,10 +165,19 @@ class Pod(object):
 class Trainer(object):
     def __init__(self):
         self._id = None
-        self._rank_in_world = None
+        self._rank_in_pod = None
         self._gpus = []
         self._endpoint = None
         self._global_rank = None
+
+    def to_json(self):
+        d = {
+            "id": self._id,
+            "rank_in_pod": self._rank_in_pod,
+            "gpus": self._gpus,
+            "endpoint": self._endpoint,
+            "global_rank": self._global_rank,
+        }
 
     def __str__(self):
         return "gpu:{} endpoint:{} rank_in_pod:{} global_rank:{}".format(
@@ -198,6 +225,7 @@ class Trainer(object):
             self.gpus.append(g)
 
 
+"""
 class Master(object):
     def __init__(self):
         self._pod_id = None
@@ -206,6 +234,7 @@ class Master(object):
 
     def init_from_etcd(self):
         pass
+"""
 
 
 class Cluster(object):

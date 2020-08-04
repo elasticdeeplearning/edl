@@ -26,7 +26,7 @@ class Register(object):
         self._etcd = EtcdClient(etcd_endpoints, root=job_id, ttl=10)
 
         if not self._etcd.set_server_not_exists(service_name, server):
-            raise exception.CanNotRegister()
+            raise exception.EdlRegisterError()
 
         self._t_register = Threading(self._refresher)
 
@@ -40,62 +40,31 @@ class Register(object):
         self._t_register.join()
 
 
-class LauncherRegister(object):
-    def __init__(self, etcd_endpoints, job_id, pod_id, endpoint, gpus):
-        sefl._service_name = "pod"
-        self._server = endpoint
+class PodRegister(object):
+    def __init__(self, job_env, pod):
+        info = self._generate_info(etcd_endpoints, job_env, pod)
 
-        info = self._get_info(etcd_endpoints, job_id, pod_id, endpoint, gpus)
+        sefl._service_name = "pod"
+        self._server = pod._id
 
         self._register = Register(
-            etcd_endpoints,
-            job_id=job_id,
+            etcd_endpoints=job_env.etcd_endpoints,
+            job_id=job_env.job_id,
             service=self._service_name,
             server=self._server,
-            info=json.dumps(info))
-
-    def get_info(etcd_endpoints, job_id, pod_id, endpoint, gpus, complete=0):
-        info = {
-            "job_id": job_id,
-            "pod_id": pod_id,
-            "gpus": gpus,
-            "complete": complete
-        }
-        return info
+            info=pod.to_json())
 
     def stop(self):
         self._register.stop()
 
     def complete(self):
-        info = self._get_info(
+        info = self._generate_info(
             etcd_endpoints, job_id, pod_id, endpoint, gpus, complete=1)
         self._etcd.set_server_permanent(self._server_name, self._server, info)
         self.stop()
 
 
 """
-class TrainerRegister(object):
-    def __init__(self, etcd_endpoints, job_id, pod_id, rank_of_pod, endpoint):
-        service_name = "Trainer"
-        server = endpoint
-        info = {
-            "job_id": job_id,
-            "pod_id": pod_id,
-            "rank_of_pod": rank_of_pod,
-        }
-
-        self._register = Register(
-            etcd_endpoints,
-            job_id=job_id,
-            service=service_name,
-            server=server,
-            info=json.dumps(info))
-
-    def stop(self):
-        self._register.stop()
-"""
-
-
 class DataServerRegister(object):
     def __init__(self, etcd_endpoints, job_id, affinity_pod_id,
                  affinity_rank_of_pod, endpoint):
@@ -117,3 +86,4 @@ class DataServerRegister(object):
 
     def stop(self):
         self._register.stop()
+"""
