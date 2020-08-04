@@ -38,21 +38,21 @@ function(bash_test_modules TARGET_NAME)
     set(multiValueArgs MODULES DEPS ENVS LABELS)
     cmake_parse_arguments(bash_test_modules "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-    set(timeout 80)
+    set(timeout 350)
     if(${bash_test_modules_TIMEOUT})
         set(timeout ${bash_test_modules_TIMEOUT})
     endif()
 
     if(WITH_COVERAGE)
         add_test(NAME ${TARGET_NAME}
-            COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${EDL_BINARY_DIR}/python 
+            COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${PADDLE_BINARY_DIR}/python
             TEST_TARGET_NAME=${TARGET_NAME} TEST_TIMEOUT=${timeout} ${bash_test_modules_ENVS}
-            WITH_COVERAGE=ON COVERAGE_FILE=${EDL_BINARY_DIR}/python-coverage.data
+            WITH_COVERAGE=ON COVERAGE_FILE=${PADDLE_BINARY_DIR}/python-coverage.data
             bash ${CMAKE_CURRENT_BINARY_DIR}/${bash_test_modules_MODULES}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     else()
         add_test(NAME ${TARGET_NAME}
-            COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${EDL_BINARY_DIR}/python 
+            COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${PADDLE_BINARY_DIR}/python
             TEST_TARGET_NAME=${TARGET_NAME} TEST_TIMEOUT=${timeout} ${bash_test_modules_ENVS}
             bash ${CMAKE_CURRENT_BINARY_DIR}/${bash_test_modules_MODULES}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})

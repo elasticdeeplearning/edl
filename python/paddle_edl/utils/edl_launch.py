@@ -147,14 +147,8 @@ def edl_barrier(master_dog, job_env, pod_env, timeout=15):
     return cluster, pod
 
 
-def CandidaterManager(self):
-    def __init__(self):
-        pass
-
-
-# wait until master is set
-# or exit 
-def get_master(master_dog):
+# wait until master is set or timeout
+def get_master(master_dog, timeout=300):  #s
     start = time.time()
     while True:
         if master_dog.get_master() is None:
@@ -170,7 +164,7 @@ def launch(args):
     pod_env.init_from_env(job_env)
 
     # pod register
-    pod_register = LauncherRegister(job_env, pod_env)
+    pod_register = PodRegister(job_env, pod_env)
 
     # try to register master
     master_register = MasterRegister()
