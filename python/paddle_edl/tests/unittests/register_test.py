@@ -19,6 +19,10 @@ import threading
 from etcd3.events import PutEvent, DeleteEvent
 
 from paddle_edl.utils.utils import bytes_to_string
+from paddle_edl.utils.register import PodRegister, MasterRegister
+from paddle_edl.utils.cluster import Pod, Trainer
+from paddle_edl.utils.edl_env import JobEnv
+from paddle_edl.utils.edl_launch import _parse_args
 
 
 class TestRegister(unittest.TestCase):
@@ -26,21 +30,58 @@ class TestRegister(unittest.TestCase):
         self.etcd = EtcdClient()
         self.etcd.init()
 
-    def _register_pod(self):
-        pass
+        self._pod_register = None
+        self._master_register = None
+        self._args = _parse_args()
+        self._old_environ = dict(os.environ)
+        proc_env = {
+            "PADDLE_TRAINER_ID": "0",
+            "PADDLE_RUNNING_PLATFORM": "PADDLE_CLOUD",
+            "PADDLE_JOB_ID": "test_register",
+            "PADDLE_EDL_HDFS_HOME": "/usr/local/hadoop-2.7.7",
+            "PADDLE_EDL_HDFS_NAME": "",
+            "PADDLE_EDL_HDFS_UGI": "",
+            "PADDLE_EDL_HDFS_PATH": "test_register_path",
+            "PADDLE_EDL_ONLY_FOR_CE_TEST": "1",
+            "PADDLE_EDL_FS_CACHE": ".test_register_cache",
+            "PADDLE_EDL_SAVE_CHECKPOINT_INTER": "0",
+            "PADDLE_EDL_NODES_RANGE": "1:4",
+            "PADDLE_EDL_NPROC_PERNODE": "1"
+        }
+        os.environ.update(proc_env)
 
-    def _verify_pod(self):
-        pass
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self._old_environ)
+        self._pod_register.stop()
+        self._master_register.stop()
 
-    def _register_master(self):
-        pass
+    def test_register_pod(self):
+        pod = Pod()
+        pod.init_from_env()
 
-    def _verify_master(self):
-        pass
+        job_env = JobEnv(self._args)
+        pod_env = Pod(job_env)
 
-    def test_register(self):
-        self._register_pod()
-        self._verify_pod()
+        self._pod_register = PodRegister(job_env, pod_env)
+        original = pod_env.to_json()
 
-        self._register_master()
-        self._verify_master()
+        servers = self.etcd.get_service("pod")
+        assert len(servers) == 1, "key must not alive when expired."
+        s = servers[0]
+        assert s.info == original
+
+    def test_register_master(self):
+        pod = Pod()
+        pod.init_from_env()
+
+        job_env = JobEnv(self._args)
+        pod_env = Pod(job_env)
+        self._master_register = MasterRegister(job_env, pod)
+
+        original = pod_env.to_json()
+
+        servers = self.etcd.get_service("pod")
+        assert len(servers) == 1, "key must not alive when expired."
+        s = servers[0]
+        assert s.info == original

@@ -17,22 +17,28 @@ from paddle_edl.utils.utils import get_gpus
 
 
 class JobEnv(object):
-    def __init__(self, args):
-        # job_id
-        if args.job_id:
-            self._job_id = args.job_id
-        else:
-            self._job_id = os.getenv("PADDLE_JOB_ID")
-        assert self._job_id, "job_id must has valid value "
+    def _get_ports(self, args):
+        if self._job_env.run_platform == "PADDLE_CLOUD":
+            ports = os.getenv("PADDLE_TRAINER_PORTS", "")
+            self._trainer_ports = ports.split(",")
 
-        # etcd
-        if args.etcd_endpoints:
-            self._etcd_endpoints = args.etcd_endpoints
+            assert len(ports) >= len(self._gpus), \
+                "port num:{} must large than gpus:{}".format(len(self._trainer_ports), len(self._gpus))
+            logger.info("get ports from env:{}".format(self._trainer_ports))
         else:
-            self._etcd_endpoints = os.getenv("PADDLE_ETCD_ENPOINTS")
-        assert self._etcd_endpoints, "etcd_endpoints must has valid value "
+            self._trainer_ports = utils.find_free_ports(len(_gpus))
+            logger.info("get ports from unused:{}".format(self._trainer_ports))
 
+        #self._pod_port = utils.find_free_ports(1)
+        #self._master_port = utils.find_free_ports(1)
+
+    def _get_hdfs(self, args):
         # hdfs
+        if args.hdfs_home:
+            self._hdfs_home = args.hdfs_home
+        else:
+            self._hdfs_home = os.getenv("PADDLE_EDL_HDFS_HOME")
+
         if args.hdfs_name:
             self._hdfs_name = args.hdfs_name
         else:
@@ -57,6 +63,7 @@ class JobEnv(object):
             assert len(self._hdfs_home) > 3 and \
                 len(self._hdfs_checkpoint_path) > 0, "hdfs environ must set"
 
+    def _get_nodes_ranges(self, args):
         # nodes range
         if args.nodes_range:
             self._nodes_range = args.nodes_range
@@ -70,8 +77,9 @@ class JobEnv(object):
         self._min_nodes = a[0]
         self._max_nodes = a[1]
 
+    def _get_gpus(self, args):
         # selected gpus
-        self._selected_gpus = utils.get_gpus(None)
+        self._gpus = utils.get_gpus(None)
 
         # proc per node
         if args.nproc_per_node:
@@ -79,17 +87,41 @@ class JobEnv(object):
         else:
             nproc_per_node = os.getenv("PADDLE_EDL_NPROC_PERNODE")
             if nproc_per_node is None:
-                self.nproc_per_node = len(self._selected_gpus)
+                self.nproc_per_node = len(self._gpus)
             else:
-                self._nproc_per_node = nproc_per_node
+                self._nproc_per_node = int(nproc_per_node)
 
         assert len(
-            self._selected_gpus
+            self._gpus
         ) >= self._nproc_per_node, "gpu's num must larger than procs need to run"
 
+    def __init__(self, args):
+        # run platform
+        self._platform = os.environ["PADDLE_RUNNING_PLATFORM"]
+
+        # job_id
+        if args.job_id:
+            self._job_id = args.job_id
+        else:
+            self._job_id = os.getenv("PADDLE_JOB_ID")
+        assert self._job_id, "job_id must has valid value "
+
+        # etcd
+        if args.etcd_endpoints:
+            self._etcd_endpoints = args.etcd_endpoints
+        else:
+            self._etcd_endpoints = os.getenv("PADDLE_ETCD_ENPOINTS")
+        assert self._etcd_endpoints, "etcd_endpoints must has valid value "
+
+        self._ce_test = int(os.getenv("PADDLE_EDL_ONLY_FOR_CE_TEST", "0"))
+        self._get_hdfs(args)
+        self._get_nodes_ranges(args)
+        self._get_gpus(args)
+        self._get_ports(args)
+
     @property
-    def selected_gpus(self):
-        return self._selected_gpus
+    def gpus(self):
+        return self._gpus
 
     @property
     def nproc_per_node(self):

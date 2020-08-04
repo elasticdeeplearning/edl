@@ -34,7 +34,7 @@ class Pod(object):
     def __init__(self):
         self._id = None
         self._rank = None
-        self._port = None
+        #self._port = None
         self._trainer_ports = None
         self._addr = None
         self._gpus = None
@@ -45,12 +45,11 @@ class Pod(object):
         d = {
             "id": self._id,
             "rank": self._rank,
-            "port": self._port,
+            #"port": self._port,
             "trainer_ports": self._trainer_ports,
             "addr": self._addr,
             "gpus": self._gpus,
             "trainers": self._trainers
-            #"master":self._master
         }
 
         s = ""
@@ -61,11 +60,12 @@ class Pod(object):
         return json.dumps(d)
 
     def init_from_env(self, job_env):
+        self._job_env = job_env
+
         # uuid
         self._id = uuid.uuid1()
-
-        # trainer ports
-        self._get_ports()
+        #self._port = job_env.pod_port
+        self._trainer_ports = job_env.trainer_ports
 
         # gpus
         self._gpus = job_env.selected_gpus
@@ -76,33 +76,27 @@ class Pod(object):
         # init trainers
         self._trainers = []
         n = self.nproc_per_node / len(self._gpus)
+        assert n>=1, \
+            "self.nproc_per_node:{} / len(self._gpus):{} must large than 1".format(self.nproc_per_node,len(self._gpus))
+
         for i in range(job_env.nproc_per_node):
             b = i * n
             e = i * n + n
             if i == job_env.nproc_per_node - 1:
                 e = job_env.nproc_per_node
 
+            endpoint = "{}:{}".format(self._addr, self._trainer_port[i])
+
             t = Trainer()
             t.init_from_pod(
                 self, endpoint=endpoint, rank_in_pod=i, gpus=self._gpus[b:e])
             self._trainers.append(t)
 
-    def _get_ports(self):
-        if self._job_env.run_platform == "PADDLE_CLOUD":
-            ports = os.getenv("PADDLE_TRAINER_PORTS", "")
-            self._trainer_ports = ports.split(",")
-
-            assert len(ports) >= len(self._gpus), \
-                "port num:{} must large than gpus:{}".format(len(self._trainer_ports), len(self._gpus))
-            logger.info("get ports from env:{}".format(self._trainer_ports))
-        else:
-            self._trainer_ports = utils.find_free_ports(len(_selected_gpus))
-            logger.info("get ports from unused:{}".format(self._trainer_ports))
-
     def init_from_pb(self, pod):
         self._id = pod.id
         self._rank = pod.rank
         self._addr = pod.addr
+        #self._port = self._job_env.pod_port
         self._trainer_ports = pod.trainer_ports
         self._gpus = []
         for g in pod.gpus:

@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+export PADDLE_ETCD_ENPOINTS="127.0.0.1:2379"
+export CUDA_VISIBLE_DEVICES=0
+
 name=${TEST_TARGET_NAME}
 TEST_TIMEOUT=${TEST_TIMEOUT}
 
