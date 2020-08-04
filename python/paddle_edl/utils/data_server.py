@@ -26,7 +26,7 @@ import logging
 from threading import Thread, Lock
 from six.moves.queue import Queue
 from .exception import *
-from .dataset import EdlDataSet, TxtDataSet
+from .dataset import DataReader
 import signal
 import threading
 import copy
@@ -42,7 +42,7 @@ class Record(object):
 
 
 class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
-    def __init__(self, master, data_set_reader, file_list=None, capcity=3000):
+    def __init__(self, master, reader_cls, file_list=None, capcity=3000):
         self._master = master
         # master.SubDataSetMeta
         self._sub_data_set = Queue()
@@ -52,9 +52,9 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
         self._data_queue = Queue(capcity)
         self._lock = Lock()
         self._file_list = file_list
-        self._data_set_reader = data_set_reader
+        self._reader_cls = reader_cls
 
-        assert isinstance(data_set_reader, EdlDataSet)
+        assert type(reader_cls) == DataReader
 
         if self._master:
             self._t_get_sub_dataset = Thread(target=self._get_sub_dataset)
@@ -101,7 +101,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                     rec_map[rec.record_no] = one_range.status
 
             for rec_no, data in enumerate(
-                    self._data_set_reader.reader(file_data_set.file_path)):
+                    self._reader_cls(file_data_set.file_path)):
                 if rec_no in rec_map and rec_map[
                         rec_no] == RecordStatus.PROCSSED:
                     continue
@@ -256,17 +256,3 @@ class DataServer(object):
             self._server.stop(timeout)
             return
         self._server.wait_for_termination(timeout)
-
-
-if __name__ == '__main__':
-
-    logger = get_logger(10)
-
-    endpoint = "0.0.0.0:6700"
-    data_server = DataServer()
-    data_server.start(
-        endpoint=endpoint,
-        data_set_reader=TxtDataSet(),
-        file_list="./test_file_list.txt",
-        master=None)
-    data_server.wait(2)

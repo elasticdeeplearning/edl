@@ -37,6 +37,7 @@ class EdlUnkownError(EdlExeception):
     pass
 
 
+"""
 _excpetions = {
     "DuplicateInitDataSetError": EdlDuplicateInitDataSetError,
     "BarrierError": EdlBarrierError,
@@ -49,3 +50,4 @@ def edl_exception(e_type, detail):
 
     e = _excpetions["e_type"](detail)
     raise e
+"""

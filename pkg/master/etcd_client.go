@@ -16,7 +16,7 @@ package master
 
 import (
 	"context"
-	"encoding/json"
+	//"encoding/json"
 	"fmt"
 	"time"
 
@@ -82,111 +82,130 @@ func (e *EtcdClient) detectIsOwner() {
 }
 
 func (e *EtcdClient) recordMeta(addr string) error {
-	m := meta{"INITIAL", addr}
+	/*
+		m := meta{"INITIAL", addr}
 
-	d, _ := json.Marshal(m)
+		d, _ := json.Marshal(m)
 
-	return e.Save(d, metaPath(jobID))
+		return e.Save(d, metaPath(jobID))
+	*/
+	return nil
 }
 
 func (e *EtcdClient) loadState() (*masterState, error) {
-	state, err := e.Load(statePath(jobID))
-	if err != nil {
-		log.Crit("load state info error:", err)
-		return nil, err
-	}
+	/*
+		state, err := e.Load(statePath(jobID))
+		if err != nil {
+			log.Crit("load state info error:", err)
+			return nil, err
+		}
 
-	return state, nil
+		return state, nil
+	*/
+	return nil, nil
 }
 
 func (e *EtcdClient) loadMeta() (*masterMeta, error) {
-	meta, err := e.Load(metaPath(e.jobID))
-	if err != nil {
-		log.Crit("load state info error:", err)
-		return nil, err
-	}
-
-	return meta, nil
-}
-
-func Election(jobID string, endpoints []string, ttlSec int) *EtcdClient {
-	var cli *EtcdClient
-	cli.jobID = jobID
-	var err error
-	for {
-		cli, err = tryToLock(jobID, endpoints, ttlSec)
+	/*
+		meta, err := e.Load(metaPath(e.jobID))
 		if err != nil {
-			log.Debug("Elect failed:", err)
-			time.Sleep(1 * time.Minute)
-			continue
+			log.Crit("load state info error:", err)
+			return nil, err
 		}
 
-		go detectIsOwner(jobID, cli)
-		return cli
-	}
+		return meta, nil
+	*/
+	return nil, nil
+}
+
+// Election gets the master.
+func Election(jobID string, endpoints []string, ttlSec int) *EtcdClient {
+	/*
+		var cli *EtcdClient
+		cli.jobID = jobID
+		var err error
+		for {
+			cli, err = tryToLock(jobID, endpoints, ttlSec)
+			if err != nil {
+				log.Debug("Elect failed:", err)
+				time.Sleep(1 * time.Minute)
+				continue
+			}
+
+			go detectIsOwner(jobID, cli)
+			return cli
+		}
+	*/
+	return nil
 }
 
 func tryToLock(jobID string, endpoints []string, ttlSec int) (*EtcdClient, error) {
-	log.Debug("Connecting to etcd", log.Ctx{"endpoint": endpoints})
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   endpoints,
-		DialTimeout: dialTimeout,
-	})
-	if err != nil {
-		return nil, err
-	}
+	/*
+		log.Debug("Connecting to etcd", log.Ctx{"endpoint": endpoints})
+		cli, err := clientv3.New(clientv3.Config{
+			Endpoints:   endpoints,
+			DialTimeout: dialTimeout,
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	sess, err := concurrency.NewSession(cli, concurrency.WithTTL(ttlSec))
-	if err != nil {
-		return nil, err
-	}
+		sess, err := concurrency.NewSession(cli, concurrency.WithTTL(ttlSec))
+		if err != nil {
+			return nil, err
+		}
 
-	lock := concurrency.NewMutex(sess, lockPath(jobID))
-	// It's fine for the lock to get stuck, in this case we have
-	// multiple master servers running (only configured to have
-	// one master running, but split-brain problem may cause
-	// multiple master servers running), and the cluster management
-	// software will kill one of them.
-	log.Info("Trying to acquire lock.", log.Ctx{"path": lockPath(jobID)})
-	err = lock.Lock(context.TODO())
-	if err != nil {
-		return nil, err
-	}
-	log.Info("Successfully acquired lock at: ", log.Ctx{"path": lockPath(jobID)})
+		lock := concurrency.NewMutex(sess, lockPath(jobID))
+		// It's fine for the lock to get stuck, in this case we have
+		// multiple master servers running (only configured to have
+		// one master running, but split-brain problem may cause
+		// multiple master servers running), and the cluster management
+		// software will kill one of them.
+		log.Info("Trying to acquire lock.", log.Ctx{"path": lockPath(jobID)})
+		err = lock.Lock(context.TODO())
+		if err != nil {
+			return nil, err
+		}
+		log.Info("Successfully acquired lock at: ", log.Ctx{"path": lockPath(jobID)})
 
-	e := &EtcdClient{
-		client: cli,
-		lock:   lock,
-		sess:   sess,
-	}
+		e := &EtcdClient{
+			client: cli,
+			lock:   lock,
+			sess:   sess,
+		}
 
-	//statePath string
-	return e, nil
+		//statePath string
+		return e, nil
+	*/
+	return nil, nil
 }
 
 func (e *EtcdClient) reGetLock(miss bool) {
-	if miss {
-		log.Error("No longer owns the lock, trying to lock again")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	err := e.lock.Lock(ctx)
-	cancel()
-	if err != nil {
-		// We lost the master lock and can not acquire
-		// it back, it means some other master is
-		// already started. We don't want cluster
-		// management system to kill the master server
-		// who is holding the lock and running
-		// correctly. So the most feasible solution is
-		// to kill current master server. The current
-		// state is not saved, but the trainer's RPC
-		// call will fail, so the trainer will retry.
-		log.Crit("Could not acquire the lock at %s: %v. Exiting.", log.Ctx{"path": lockPath(jobID), "error": err})
-		panic("Could not acquire the lock at %s: %v. Exiting.")
-	}
-	if miss {
-		log.Info("Successfully acquired lock at %s.", lockPath(e.jobID))
-	}
+	/*
+		if miss {
+			log.Error("No longer owns the lock, trying to lock again")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := e.lock.Lock(ctx)
+		cancel()
+		if err != nil {
+			// We lost the master lock and can not acquire
+			// it back, it means some other master is
+			// already started. We don't want cluster
+			// management system to kill the master server
+			// who is holding the lock and running
+			// correctly. So the most feasible solution is
+			// to kill current master server. The current
+			// state is not saved, but the trainer's RPC
+			// call will fail, so the trainer will retry.
+			log.Crit("Could not acquire the lock at %s: %v. Exiting.", log.Ctx{"path": lockPath(jobID), "error": err})
+			panic("Could not acquire the lock at %s: %v. Exiting.")
+		}
+		if miss {
+			log.Info("Successfully acquired lock at %s.", lockPath(e.jobID))
+		}
+	*/
+	return
 }
 
 // Save saves the state into the etcd.

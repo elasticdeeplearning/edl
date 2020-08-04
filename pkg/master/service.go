@@ -28,11 +28,11 @@ type taskEntry struct {
 	NumFailure int
 }
 
-type checkPoint() struct{
-	Stage string // master stage
-	Checkpoint string // trainer checkpoint
-	Endpoint string // master endpoint
-	C Cluster // cluster
+type checkPoint struct {
+	Stage      string  // master stage
+	Checkpoint string  // trainer checkpoint
+	Endpoint   string  // master endpoint
+	C          Cluster // cluster
 }
 
 type masterState struct {
@@ -41,8 +41,8 @@ type masterState struct {
 	Done     []taskEntry
 	Failed   []taskEntry
 	CurEpoch int
-	snap Checkpoint // current checkpoint
-	snaps map[string][]checkPoint // stage -> checkPoint
+	snap     checkPoint              // current checkpoint
+	snaps    map[string][]checkPoint // stage -> checkPoint
 }
 
 type launcher struct {
@@ -162,11 +162,13 @@ func (s *Service) recoverState() (bool, error) {
 		log.Error("error close recover file.", log.Ctx{"error": err})
 	}
 
-	s.state = tqs
-	log.Info("Master recovered from snapshot, scheduling pending task timeout check.", s.logCtx())
-	for _, t := range s.state.Pending {
-		time.AfterFunc(s.timeoutDur, s.checkTimeoutFunc(t.Task.Meta.ID, t.Task.Meta.Epoch))
-	}
+	/*
+		s.state = tqs
+		log.Info("Master recovered from snapshot, scheduling pending task timeout check.", s.logCtx())
+		for _, t := range s.state.Pending {
+			time.AfterFunc(s.timeoutDur, s.checkTimeoutFunc(t.Task.Meta.ID, t.Task.Meta.Epoch))
+		}
+	*/
 
 	return true, nil
 }
@@ -262,8 +264,7 @@ func (s *Service) processFailedTask(t taskEntry, epoch int) {
 	return
 }
 
-// processFailedTask retry s.failureMax times for failed task.
-// return true if all task are done or failed.
+// GetID gets the id.
 func (s *Service) GetID(ctx context.Context, in *pb.EmptyRequest) (*pb.Entity, error) {
 	return nil, nil
 }
