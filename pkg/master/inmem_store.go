@@ -25,16 +25,16 @@ type InMemStore struct {
 }
 
 // Save saves the state into the in-memory store.
-func (m *InMemStore) Save(path string, data []byte) error {
+func (m *InMemStore) Save(state []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.buf = data
+	m.buf = state
 	return nil
 }
 
 // Load loads the state from the in-memory store.
-func (m *InMemStore) Load(path string) ([]byte, error) {
+func (m *InMemStore) Load() ([]byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

@@ -2,7 +2,6 @@ package master
 
 import (
 	"fmt"
-
 	pb "github.com/paddlepaddle/edl/pkg/masterpb"
 )
 
@@ -16,19 +15,15 @@ type Error struct {
 }
 
 const (
-	// DuplicateInitDataSetError is used to reported dataset error.
-	DuplicateInitDataSetError ErrorType = "DuplicateInitDataSetError"
-	// BarrierError is used to barrier
-	BarrierError ErrorType = "BarrierError"
+	// ErrorTypeDuplicateInitDataSet is used to reported dataset error.
+	ErrorTypeDuplicateInitDataSet ErrorType = "DuplicateInitDataSet"
 )
 
 // String converts a ErrorType into its corresponding canonical error message.
 func (t ErrorType) String() string {
 	switch t {
-	case DuplicateInitDataSetError:
+	case ErrorTypeDuplicateInitDataSet:
 		return "DataSet must be inited once."
-	case BarrierError:
-		return "Can't barrier now"
 	default:
 		panic(fmt.Sprintf("unrecognized validation error: %q", string(t)))
 	}
@@ -57,5 +52,5 @@ func (v *Error) ToRPCRet() *pb.RPCRet {
 
 // DuplicateInitDataSet make the correspond error.
 func DuplicateInitDataSet(detail string) *Error {
-	return &Error{DuplicateInitDataSetError, detail}
+	return &Error{ErrorTypeDuplicateInitDataSet, detail}
 }

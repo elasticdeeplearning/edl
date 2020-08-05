@@ -16,78 +16,30 @@ package main
 
 import (
 	"fmt"
-	"net"
-	"os"
-	"os/signal"
-	"strings"
-	"time"
-
 	log "github.com/inconshreveable/log15"
 	"github.com/namsral/flag"
 	master "github.com/paddlepaddle/edl/pkg/master"
 	pb "github.com/paddlepaddle/edl/pkg/masterpb"
 	utils "github.com/paddlepaddle/edl/pkg/utils"
 	grpc "google.golang.org/grpc"
+	"net"
+	"os"
+	"os/signal"
+	"strings"
+	"time"
 )
 
-type args struct {
-	port           uint
-	ttlSec         int
-	jobID          string
-	etcd_endpoints []string
-	taskTimeoutDur time.Duration
-	taskTimeoutMax int
-	logLevel       string
-	local_ip       string
-	listen_port    int
-	endpoint       string
-}
-
-func parseArgs() *args {
-	port := flag.Uint("port", 0, "port of the master server.")
+func main() {
+	port := flag.Int("port", 8080, "port of the master server.")
 	ttlSec := flag.Int("ttl", 10, "etcd lease TTL in seconds.")
-	etcd_endpoints := flag.String("endpoints", "http://127.0.0.1:2379", "comma separated etcd endpoints. If empty, fault tolerance will not be enabled.")
-	jobID := flag.String("jobID", "", "jobID of this master")
+	endpoints := flag.String("endpoints", "http://127.0.0.1:2379", "comma separated etcd endpoints. If empty, fault tolerance will not be enabled.")
 	taskTimeoutDur := flag.Duration("task-timout-dur", 20*time.Minute, "task timout duration.")
 	taskTimeoutMax := flag.Int("task-timeout-max", 3, "max timtout count for each task before it being declared failed task.")
 	logLevel := flag.String("log-level", "info",
 		"log level, possible values: debug, info, warn, error, crit")
 	flag.Parse()
 
-	if *jobID == "" {
-		panic("jobID must set")
-	}
-
-	if *etcd_endpoints == "" {
-		log.Crit("-endpoints not set!.")
-		panic("")
-	}
-
-	eps := strings.Split(*etcd_endpoints, ",")
-	ip, err := utils.GetExternalIP()
-	if err != nil {
-		log.Crit("get external ip error", log.Ctx{"error": err})
-		panic(err)
-	}
-
-	a := &args{}
-	a.port = *port
-	a.ttlSec = *ttlSec
-	a.etcd_endpoints = eps
-	a.local_ip = ip
-	a.jobID = *jobID
-	a.taskTimeoutMax = *taskTimeoutMax
-	a.taskTimeoutDur = *taskTimeoutDur
-	a.logLevel = *logLevel
-	a.endpoint = fmt.Sprintf("%s:%d", a.local_ip, a.port)
-
-	return a
-}
-
-func main() {
-	a := parseArgs()
-
-	lvl, err := log.LvlFromString(a.logLevel)
+	lvl, err := log.LvlFromString(*logLevel)
 	if err != nil {
 		panic(err)
 	}
@@ -96,10 +48,23 @@ func main() {
 		log.LvlFilterHandler(lvl, log.CallerStackHandler("%+v", log.StderrHandler)),
 	)
 
+	if *endpoints == "" {
+		log.Crit("-endpoints not set!.")
+		panic("")
+	}
+
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt)
 
-	store := master.Election(a.jobID, a.etcd_endpoints, a.ttlSec)
+	eps := strings.Split(*endpoints, ",")
+	ip, err := utils.GetExternalIP()
+	if err != nil {
+		log.Crit("get external ip error", log.Ctx{"error": err})
+		panic(err)
+	}
+
+	addr := fmt.Sprintf("%s:%d", ip, *port)
+	store, err := master.NewEtcdClient(eps, addr, master.DefaultLockPath, master.DefaultAddrPath, master.DefaultStatePath, *ttlSec)
 	if err != nil {
 		log.Crit("error creating etcd client.", log.Ctx{"error": err})
 		panic(err)
@@ -116,7 +81,7 @@ func main() {
 	// Guaranteed to run even panic happens.
 	defer shutdown()
 
-	s, err := master.NewService(a.jobID, store, a.taskTimeoutDur, a.taskTimeoutMax)
+	s, err := master.NewService(store, *taskTimeoutDur, *taskTimeoutMax)
 	if err != nil {
 		log.Crit("error creating new service.", log.Ctx{"error": err})
 		panic(err)
@@ -124,20 +89,14 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterMasterServer(grpcServer, s)
-
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", a.port))
+	listen, err := net.Listen("tcp", fmt.Sprintf(":%v", *port))
 	if err != nil {
-		log.Crit("could not listen to 0.0.0.0:%v %v", a.port, err)
-		panic(err)
+		log.Crit("could not listen to 0.0.0.0:3000 %v", err)
 	}
-	a.listen_port = listener.Addr().(*net.TCPAddr).Port
-	a.endpoint = fmt.Sprintf("%s:%d", a.local_ip, a.listen_port)
-
-	s.Register(a.endpoint)
 
 	go func() {
 		log.Info("Server starting...")
-		err = grpcServer.Serve(listener)
+		err = grpcServer.Serve(listen)
 		if err != nil {
 			log.Crit("error serving", log.Ctx{"error": err})
 			panic(err)

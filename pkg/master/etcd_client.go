@@ -16,13 +16,10 @@ package master
 
 import (
 	"context"
-	//"encoding/json"
-	"fmt"
-	"time"
-
 	log "github.com/inconshreveable/log15"
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
+	"time"
 )
 
 const (
@@ -30,12 +27,8 @@ const (
 	DefaultLockPath = "/master/lock"
 	// DefaultStatePath is the default etcd key for master state.
 	DefaultStatePath = "/master/state"
-	// DefaultMetaPath is the default etcd key for master address.
-	// {old_stages:[], now_stage:"", endpoint:""}
-	DefaultMetaPath = "/master/meta"
-	// DefaultAdjustPath is the the default etcd key for pod changes.
-	// operation1, operatrion2, ...
-	DefaultAdjustPath = "/master/adjust_operation"
+	// DefaultAddrPath is the default etcd key for master address.
+	DefaultAddrPath = "/master/addr"
 )
 
 const (
@@ -45,146 +38,75 @@ const (
 // EtcdClient is the etcd client that the master uses for fault
 // tolerance and service registry.
 type EtcdClient struct {
-	client *clientv3.Client
-	lock   *concurrency.Mutex
-	sess   *concurrency.Session
-	jobID  string
+	lockPath  string
+	statePath string
+	client    *clientv3.Client
+	lock      *concurrency.Mutex
+	sess      *concurrency.Session
 }
 
-type meta struct {
-	JobStage string `json:"job_stage"`
-	Endpoint string `json:"endpoint"`
-}
-
-func lockPath(jobID string) string {
-	return fmt.Sprintf("/%s%s", jobID, DefaultLockPath)
-}
-
-func metaPath(jobID string) string {
-	return fmt.Sprintf("/%s%s", jobID, DefaultMetaPath)
-}
-
-func statePath(jobID string) string {
-	return fmt.Sprintf("/%s%s", jobID, DefaultStatePath)
-}
-
-func (e *EtcdClient) detectIsOwner() {
-	for {
-		err := e.lock.Lock(context.Background())
-		if err != nil {
-			s := "Master miss lock now, so exit!"
-			log.Info(s)
-			panic(s)
-		}
-
-		time.Sleep(5 * time.Second)
+// NewEtcdClient creates a new EtcdClient.
+func NewEtcdClient(endpoints []string, addr string, lockPath, addrPath, statePath string, ttlSec int) (*EtcdClient, error) {
+	log.Debug("Connecting to etcd", log.Ctx{"endpoint": endpoints})
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   endpoints,
+		DialTimeout: dialTimeout,
+	})
+	if err != nil {
+		return nil, err
 	}
+
+	sess, err := concurrency.NewSession(cli, concurrency.WithTTL(ttlSec))
+	if err != nil {
+		return nil, err
+	}
+
+	lock := concurrency.NewMutex(sess, lockPath)
+	// It's fine for the lock to get stuck, in this case we have
+	// multiple master servers running (only configured to have
+	// one master running, but split-brain problem may cause
+	// multiple master servers running), and the cluster management
+	// software will kill one of them.
+	log.Info("Trying to acquire lock.", log.Ctx{"path": lockPath})
+	err = lock.Lock(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+	log.Info("Successfully acquired lock at: ", log.Ctx{"path": lockPath})
+
+	put := clientv3.OpPut(addrPath, addr)
+	resp, err := cli.Txn(context.Background()).If(lock.IsOwner()).Then(put).Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	if !resp.Succeeded {
+		log.Crit("No longer owns the master lock. Exiting.")
+		panic("No longer owns the master lock. Exiting.")
+	}
+
+	e := &EtcdClient{
+		lockPath:  lockPath,
+		statePath: statePath,
+		client:    cli,
+		lock:      lock,
+		sess:      sess,
+	}
+
+	return e, nil
 }
 
-func (e *EtcdClient) recordMeta(addr string) error {
-	/*
-		m := meta{"INITIAL", addr}
+// Save saves the state into the etcd.
+func (e *EtcdClient) Save(state []byte) error {
+	ctx := context.TODO()
+	put := clientv3.OpPut(e.statePath, string(state))
+	resp, err := e.client.Txn(ctx).If(e.lock.IsOwner()).Then(put).Commit()
+	if err != nil {
+		return err
+	}
 
-		d, _ := json.Marshal(m)
-
-		return e.Save(d, metaPath(jobID))
-	*/
-	return nil
-}
-
-func (e *EtcdClient) loadState() (*masterState, error) {
-	/*
-		state, err := e.Load(statePath(jobID))
-		if err != nil {
-			log.Crit("load state info error:", err)
-			return nil, err
-		}
-
-		return state, nil
-	*/
-	return nil, nil
-}
-
-func (e *EtcdClient) loadMeta() (*masterMeta, error) {
-	/*
-		meta, err := e.Load(metaPath(e.jobID))
-		if err != nil {
-			log.Crit("load state info error:", err)
-			return nil, err
-		}
-
-		return meta, nil
-	*/
-	return nil, nil
-}
-
-// Election gets the master.
-func Election(jobID string, endpoints []string, ttlSec int) *EtcdClient {
-	/*
-		var cli *EtcdClient
-		cli.jobID = jobID
-		var err error
-		for {
-			cli, err = tryToLock(jobID, endpoints, ttlSec)
-			if err != nil {
-				log.Debug("Elect failed:", err)
-				time.Sleep(1 * time.Minute)
-				continue
-			}
-
-			go detectIsOwner(jobID, cli)
-			return cli
-		}
-	*/
-	return nil
-}
-
-func tryToLock(jobID string, endpoints []string, ttlSec int) (*EtcdClient, error) {
-	/*
-		log.Debug("Connecting to etcd", log.Ctx{"endpoint": endpoints})
-		cli, err := clientv3.New(clientv3.Config{
-			Endpoints:   endpoints,
-			DialTimeout: dialTimeout,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		sess, err := concurrency.NewSession(cli, concurrency.WithTTL(ttlSec))
-		if err != nil {
-			return nil, err
-		}
-
-		lock := concurrency.NewMutex(sess, lockPath(jobID))
-		// It's fine for the lock to get stuck, in this case we have
-		// multiple master servers running (only configured to have
-		// one master running, but split-brain problem may cause
-		// multiple master servers running), and the cluster management
-		// software will kill one of them.
-		log.Info("Trying to acquire lock.", log.Ctx{"path": lockPath(jobID)})
-		err = lock.Lock(context.TODO())
-		if err != nil {
-			return nil, err
-		}
-		log.Info("Successfully acquired lock at: ", log.Ctx{"path": lockPath(jobID)})
-
-		e := &EtcdClient{
-			client: cli,
-			lock:   lock,
-			sess:   sess,
-		}
-
-		//statePath string
-		return e, nil
-	*/
-	return nil, nil
-}
-
-func (e *EtcdClient) reGetLock(miss bool) {
-	/*
-		if miss {
-			log.Error("No longer owns the lock, trying to lock again")
-		}
+	if !resp.Succeeded {
+		log.Error("No longer owns the lock, trying to lock again")
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		err := e.lock.Lock(ctx)
 		cancel()
@@ -198,37 +120,20 @@ func (e *EtcdClient) reGetLock(miss bool) {
 			// to kill current master server. The current
 			// state is not saved, but the trainer's RPC
 			// call will fail, so the trainer will retry.
-			log.Crit("Could not acquire the lock at %s: %v. Exiting.", log.Ctx{"path": lockPath(jobID), "error": err})
+			log.Crit("Could not acquire the lock at %s: %v. Exiting.", log.Ctx{"path": e.lockPath, "error": err})
 			panic("Could not acquire the lock at %s: %v. Exiting.")
 		}
-		if miss {
-			log.Info("Successfully acquired lock at %s.", lockPath(e.jobID))
-		}
-	*/
-	return
-}
-
-// Save saves the state into the etcd.
-func (e *EtcdClient) Save(path string, v []byte) error {
-	ctx := context.TODO()
-	put := clientv3.OpPut(path, string(v))
-	resp, err := e.client.Txn(ctx).If(e.lock.IsOwner()).Then(put).Commit()
-	if err != nil {
-		return err
-	}
-
-	if !resp.Succeeded {
-		e.reGetLock(true)
-		return e.Save(path, v)
+		log.Info("Successfully acquired lock at %s.", e.lockPath)
+		return e.Save(state)
 	}
 
 	return nil
 }
 
-// Load load value from etcd by path.
-func (e *EtcdClient) Load(path string) ([]byte, error) {
+// Load loads the state from etcd.
+func (e *EtcdClient) Load() ([]byte, error) {
 	ctx := context.TODO()
-	get := clientv3.OpGet(path)
+	get := clientv3.OpGet(e.statePath)
 
 	resp, err := e.client.Txn(ctx).If(e.lock.IsOwner()).Then(get).Commit()
 	if err != nil {
@@ -236,8 +141,13 @@ func (e *EtcdClient) Load(path string) ([]byte, error) {
 	}
 
 	if !resp.Succeeded {
-		e.reGetLock(true)
-		return e.Load(path)
+		log.Error("No longer owns the lock, trying to lock and load again.")
+		err = e.lock.Lock(context.Background())
+		if err != nil {
+			return nil, err
+		}
+
+		return e.Load()
 	}
 
 	kvs := resp.Responses[0].GetResponseRange().Kvs
@@ -246,8 +156,8 @@ func (e *EtcdClient) Load(path string) ([]byte, error) {
 		return nil, nil
 	}
 
-	v := kvs[0].Value
-	return v, nil
+	state := kvs[0].Value
+	return state, nil
 }
 
 // Shutdown shuts down the etcd client gracefully.
