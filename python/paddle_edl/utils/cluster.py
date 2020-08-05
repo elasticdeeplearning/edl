@@ -28,38 +28,64 @@ import subprocess
 from contextlib import closing
 import socket
 import uuid
+import collections
+from .exceptions import *
+
+
+class PodStatus(Enum):
+    INITIAL = 0
+    RUNNING = 1
+    PENDING = 2
+    COMPLETE = 3
 
 
 class Pod(object):
     def __init__(self):
         self._id = None
         self._rank = None
-        #self._port = None
         self._trainer_ports = None
         self._addr = None
         self._gpus = None
         self._trainers = None
-        #self._master = None  # candidates
+        self._port = None
+        self._status = PODStatus.INITIAL  # status maybe changed
 
     def to_json(self):
         d = {
             "id": self._id,
             "rank": self._rank,
-            #"port": self._port,
+            "port": self._port,
             "trainer_ports": self._trainer_ports,
             "addr": self._addr,
             "gpus": self._gpus,
-            "trainers": self._trainers
         }
 
-        s = ""
-        for t in trainers:
-            s += t.to_json()
-        d["trainers"] = s
+        d["trainers"] = {}
+        for i, t in enumerate(trainers):
+            d["trainers"][i] = t.to_json()
 
         return json.dumps(d)
 
-    def init_from_env(self, job_env):
+    def from_json(self, s):
+        d = json.loads(s)
+
+        self._id = d["id"]
+        self._rank = d["rank"]
+        self._addr = pod.addr
+        self._port = self._job_env.pod_port
+        self._trainer_ports = pod.trainer_ports
+        self._gpus = d["gpus"]
+
+        self.trainers = []
+
+        od = collections.OrderedDict(sorted(d["trainers"].items()))
+        for i, (key, value) in enumerate(od.iteritems()):
+            t = Trainer()
+            t.from_json(value)
+
+            self._trainers.append(t)
+
+    def from_env(self, job_env):
         self._job_env = job_env
 
         # uuid
@@ -92,11 +118,11 @@ class Pod(object):
                 self, endpoint=endpoint, rank_in_pod=i, gpus=self._gpus[b:e])
             self._trainers.append(t)
 
-    def init_from_pb(self, pod):
+    def from_pb(self, pod):
         self._id = pod.id
         self._rank = pod.rank
         self._addr = pod.addr
-        #self._port = self._job_env.pod_port
+        self._port = pod.port
         self._trainer_ports = pod.trainer_ports
         self._gpus = []
         for g in pod.gpus:
@@ -105,24 +131,28 @@ class Pod(object):
         self.trainers = []
         for trainer in pod.trainers:
             t = Trainer()
-            t.init_from_pb(trainer)
+            t.from_pb(trainer)
 
             self.trainers.append(t)
 
     def __str__(self):
-        return "rank:{} id:{} addr:{} port:{} visible_gpu:{}".format(
-            self.rank, self.id, self.addr, self.port, self.gpus)
+        return "rank:{} id:{} addr:{} port:{} gpus:{} status:{} trainers_num:{}".format(
+            self._rank, self._id, self._addr, self._port, self._gpus,
+            self._status, len(self._trainers))
 
     def details(self):
-        return "rank:{} id:{} addr:{} port:{} visible_gpu:{} trainers:{}".format(
-            self.rank, self.id, self.addr, self.port, self.gpus,
-            [str(t) for t in self.trainers])
+        return "rank:{} id:{} addr:{} port:{} visible_gpu:{} steatus:{} trainers:{}".format(
+            self._rank, self._id, self._addr, self._port, self._gpus,
+            self._status, [str(t) for t in self.trainers])
 
     def __eq__(self, pod):
-        if self.rank != pod.rank or \
-                self.id != pod.id or \
-                self.addr != pod.addr or \
-                self.port != pod.port:
+        if self._rank != pod._rank or \
+                self._id != pod._id or \
+                self._trainer_ports != pod._trainer_ports or \
+                self._addr != pod._addr or \
+                self._gpus != pod._gpus or \
+                self._trainers != pod._trainers or \
+                self._port != pod._port:  # not with status
             logger.debug("pod {} != pod".format(self, pod))
             return False
 
@@ -142,18 +172,28 @@ class Pod(object):
     def __ne__(self, pod):
         return not self == pod
 
+    @property
+    def gpus(self):
+        return self._gpus
+
+    @property
+    def status(self):
+        return self._status
+
+    @status.setter
+    def status(self, status):
+        self._status = status
+
+    @propery
     def rank(self):
-        return self.rank
+        return self._rank
 
-    def get_visible_gpus(self):
-        r = ""
-        for g in self.gpus:
-            r += "{},".format(g)
-
-        assert r != "", "this pod {} can't see any gpus".format(self)
-
-        r = r[:-1]
-        return r
+    @rank.setter
+    def rank(self, value):
+        self._rank = value
+        for i, t in enumerate(self._tainers()):
+            self._rank_in_pod = i
+            t._global_rank = self._rank + self._rank_in_pod
 
 
 class Trainer(object):
@@ -173,21 +213,31 @@ class Trainer(object):
             "global_rank": self._global_rank,
         }
 
+        return json.dumps(d)
+
+    def from_json(self, s):
+        d = json.loads(s)
+
+        self._id = d["id"]
+        self._rank_in_pod = d["rank_in_pod"]
+        self._gpus = d["gpus"]
+        self._endpoint = d["endpoint"]
+        self._global_rank = d["global_rank"]
+
     def __str__(self):
-        return "gpu:{} endpoint:{} rank_in_pod:{} global_rank:{}".format(
-            self.gpus, self.endpoint, self.rank_in_pod, self.global_rank)
+        return "id:{} rank_in_pod:{} gpus:{} endpoint:{} global_rank:{}".format(
+            self._ids, self._rank_in_pod, self._gpus, self._endpoint,
+            self._global_rank)
 
     def __eq__(self, t):
-        if len(self.gpus) != len(t.gpus):
+        if self._id != self._id:
             return False
 
-        if self._endpoint != t.endpoint or \
-                self._global_rank != t.global_rank :
+        if self._gpus != t._gpus or \
+            self._endpoint != t._endpoint or \
+            self._rank_in_pod != t._rank_in_pod or \
+            self._global_rank != t._global_rank :
             return False
-
-        for a, b in zip(self.gpus, t.gpus):
-            if a != b:
-                return False
 
         return True
 
@@ -202,14 +252,14 @@ class Trainer(object):
     def rank_in_pod(self):
         return self._global_rank
 
-    def init_from_pod(self, endpoint, rank_in_pod, gpus):
+    def from_pod(self, endpoint, rank_in_pod, gpus):
         self._id = uuid.uuid1()
         self._global_rank = None
         self._rank_in_pod = _rank_in_pod
         self._endpoint = endpoint
         self._gpus = gpus
 
-    def init_from_pb(self, t):
+    def from_pb(self, t):
         self._id = t.id
         self._global_rank = t.global_rank
         self._rank_in_pod = t.rank_in_pod
@@ -219,36 +269,24 @@ class Trainer(object):
             self.gpus.append(g)
 
 
-"""
-class Master(object):
-    def __init__(self):
-        self._pod_id = None
-        self._pod_rank = None
-        self._endpoint = None
-
-    def init_from_etcd(self):
-        pass
-"""
-
-
 class Cluster(object):
     def __init__(self):
-        self.pods = []
+        self._pods = []
         self.job_stage = None
 
     def __str__(self):
-        return "pods:{} job_stage:{}".format([str(pod) for pod in self.pods],
+        return "pods:{} job_stage:{}".format([str(pod) for pod in self._pods],
                                              self.job_stage)
 
     def details(self):
         return "pods:{} job_stage:{}".format(
-            [pod.details() for pod in self.pods], self.job_stage)
+            [pod.details() for pod in self._pods], self.job_stage)
 
     def __eq__(self, cluster):
-        if len(self.pods) != len(cluster.pods):
+        if len(self._pods) != len(cluster.pods):
             return False
 
-        for a, b in zip(self.pods, cluster.pods):
+        for a, b in zip(self._pods, cluster.pods):
             if a != b:
                 return False
 
@@ -261,24 +299,24 @@ class Cluster(object):
         return not self.__eq__(cluster)
 
     def update_pods(cluster):
-        self.pods = copy.copy(cluster.pods)
+        self._pods = copy.copy(cluster.pods)
 
     def trainers_nranks(self):
         return len(self.trainers_endpoints())
 
     def pods_nranks(self):
-        return len(self.pods)
+        return len(self._pods)
 
     def trainers_endpoints(self):
         r = []
-        for pod in self.pods:
+        for pod in self._pods:
             for t in pod.trainers:
                 r.append(t.endpoint)
         return r
 
     def pods_endpoints(self):
         r = []
-        for pod in self.pods:
+        for pod in self._pods:
             ep = "{}:{}".format(pod.addr, pod.port)
             assert pod.port != None and pod.addr != None, "{} not a valid endpoint".format(
                 ep)
@@ -287,23 +325,37 @@ class Cluster(object):
         return r
 
     def get_pod_by_id(self, pod_id):
-        for pod in self.pods:
+        for pod in self._pods:
             if str(pod_id) == str(pod.id):
                 return pod
 
         return None
 
-    def init_from_pb(self, cluster):
+    def from_pb(self, cluster):
         self.job_stage = cluster.job_stage
-        self.pods = []
+        self._pods = []
         for pod in cluster:
             p = Pod()
-            p.init_from_pb(pod)
-            self.pods.append(p)
+            p.from_pb(pod)
+            self._pods.append(p)
 
     def get_pods_endpoints(self):
         eps = []
-        for p in self.pods:
+        for p in self._pods:
             eps.append(p.endpoint)
 
         return eps
+
+    def from_json(self, d):
+        """
+        d = {rank:json, ...}
+        """
+        od = collections.OrderedDict(sorted(d.items()))
+        pods = []
+        for i, (key, value) in enumerate(old.iteritems()):
+            pod = Pod()
+            if i != key:
+                raise EdlRankError("rank:{} is not exists:{}".format(i, d))
+            pods.append(pod.from_json(value))
+
+        self._pods = pods

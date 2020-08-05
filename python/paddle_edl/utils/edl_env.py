@@ -119,6 +119,13 @@ class JobEnv(object):
         self._get_gpus(args)
         self._get_ports(args)
 
+        self._up_limit_nodes = int(
+            os.getenv("PADDLE_EDL_ONLY_FOR_CE_TEST", 1024))
+
+    @property
+    def up_limit_nodes(self):
+        return self._up_limit_nodes
+
     @property
     def gpus(self):
         return self._gpus

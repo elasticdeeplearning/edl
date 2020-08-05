@@ -17,39 +17,75 @@ import time
 from utils import logger
 from paddle_edl.discovery.etcd_client import EtcdClient
 import json
+import collections
 
 
-class Master(object):
-    def __init__(self, endpoint):
-        self.endpoint = endpoint
-
-
-class MasterWatcher(object):
+class Watcher(object):
     def __init__(self, etcd_endpoints, job_id):
         self._etcd = EtcdClient(edl_env.etcd_endpoints, root=job_id)
         self._job_id = job_id
-        self._master = None
+        self._changed = False
 
+        # servers in etcd
+        self._ranks = None  # {rank:pod_json}
+
+        self._cluster = Cluster()
         self._lock = Lock()
-        # wait to get master
-        self._get_master()
 
-        self._t_watcher = Threading(selt._get_master)
+    def watch(self):
+        self._t_watcher = Threading(selt._watcher)
         self._t_watcher.start()
 
-    def _get_master(self):
+    def _watcher(self):
         begin = time.time()
         while True:
-            v, _ = self._etcd.get_key("/{}/master/meta".format(self._job_id))
+            servers = self._etcd._get_server("pod")
+            ranks = {}
             with self._lock:
-                d = json.loads(v)
-                if self._master is None:
-                    self._master = Master()
-                self._master.endpoint = d['endpoint']
-                self._master.job_stage = d['job_stage']
+                for s in servers:
+                    ranks[s.server] = s.info
+
+                if self._ranks is None:
+                    self._ranks = ranks
+                    with self._lock:
+                        self._cluster.from_json(ranks)
+                else:
+                    if self._is_rank_changed(self._ranks, ranks):
+                        with self._lock:
+                            self._changed = True
+                        logger.info(
+                            "train world changed, old  is {} new is {}",
+                            self._ranks, ranks)
+                        break
 
             time.sleep(1)
 
-    def get_master(self):
+    def _is_rank_changed(self, old, new):
+        for k, v in six.iteriterms(old):
+            if v == new[k]:
+                continue
+
+            old_pod = Pod()
+            old_pod.from_json(old[k])
+
+            new_pod = Pod()
+            new_pod.from_json(new[k])
+
+            if new_pod != old_pod:
+                return True
+
+        return False
+
+    @propery
+    def cluster(self):
         with self._lock:
-            return self._master
+            return self._cluster
+
+    @propery
+    def is_changed(self):
+        with self._lock:
+            return self._changed
+
+    def stop(self):
+        self._stop.set()
+        self._t_watcher.join()

@@ -35,3 +35,7 @@ class EdlBarrierError(EdlExeception):
 
 class EdlUnkownError(EdlExeception):
     pass
+
+
+class EdlRankError(EdlExeception):
+    pass

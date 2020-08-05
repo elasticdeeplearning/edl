@@ -11,11 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from threading import Lock, Thread
+import threading
 import time
-from utils import logger
-from paddle_edl.discovery.etcd_client import EtcdClient
 import json
+
+from .utils import logger
+from .cluster import Pod, PodStatus
+from paddle_edl.discovery.etcd_client import EtcdClient
 
 
 class Register(object):
@@ -28,7 +30,7 @@ class Register(object):
         if not self._etcd.set_server_not_exists(service_name, server):
             raise exception.EdlRegisterError()
 
-        self._t_register = Threading(self._refresher)
+        self._t_register = threading.Thread(self._refresher)
 
     def _refresher(self):
         while not self._stop.is_set():
@@ -42,87 +44,73 @@ class Register(object):
 
 class PodRegister(object):
     def __init__(self, job_env, pod):
-        info = self._generate_info(etcd_endpoints, job_env, pod)
+        info = pod.to_json()
 
         sefl._service_name = "pod"
-        self._server = pod._id
-
-        self._register = Register(
-            etcd_endpoints=job_env.etcd_endpoints,
-            job_id=job_env.job_id,
-            service=self._service_name,
-            server=self._server,
-            info=pod.to_json())
-
-    def stop(self):
-        self._register.stop()
-
-    def complete(self):
-        info = self._generate_info(
-            etcd_endpoints, job_id, pod_id, endpoint, gpus, complete=1)
-        self._etcd.set_server_permanent(self._server_name, self._server, info)
-        self.stop()
-
-
-class MasterRegister(object):
-    def __init__(self, job_env, pod):
-        info = self._generate_info(etcd_endpoints, job_env, pod)
-
-        sefl._service_name = "master"
-        self._server = "master"
+        self._rank, self._server = self._register_rank(job_env, pod)
+        self._t_register = threading.Thread(self._refresher)
         self._lock = threading.Lock()
-        self._is_master = False
-        self._info = pod.to_json()
+        self._changed = False
+        self._pod = pod
+        self._job_env = job_env
 
-        self._t_register = Threading(self._refresher)
-        self._t_manager = Threading(self._master_manager)
-        self._proc = None
+    def _register_rank(self, job_env, pod, timeout=300):
+        rank = -1
+        for rank in range(0, job_env.up_limit_nodes):
+            server = "{}".format(rank)
+            valid = True
+            while valid:
+                try:
+                    pod.set_id(rank)
+                    info = pod.to_json()
+                    if not self._etcd.set_server_not_exists(
+                            self._service_name, sever, info=self._info,
+                            timeout=0):
+                        valid = False
+                        continue
+                    else:
+                        logger.info("register rank:{} from etcd".format(rank))
+                        return rank, server
+                except (etcd3.ConnectionTimeoutError,
+                        ConnectionFailedError) as e:  # timeout and other
+                    if time.time() - begin > timeout:
+                        raise EdlRegisterError(
+                            "register {} to etcd:{} timeout:{}".format(
+                                server, job_env.ectd_endpoints, timeout))
+                    time.sleep(1)
+                    continue
+
+        raise EdlRegisterError(
+            "register {} to etcd:{} but can't find valid rank:{}".format(
+                server, job_env.ectd_endpoints, rank))
+
+    @property
+    def rank(self):
+        return self._rank
 
     def _refresher(self):
         while not self._stop.is_set():
             try:
-                if not self._etcd.set_server_not_exists(self._service_name,
-                                                        self._server):
-                    raise exception.EdlRegisterError()
-            except Exception as e:
-                if self._proc is not None:
-                    self._terminate_master()
+                self._etcd.refresh(self._service_name, self._server)
                 time.sleep(1)
-                continue
-
-            while True:
-                try:
-                    self._etcd.refresh(self._service_name, self._server)
-                    if self._proc is None:
-                        self._start_master()
-                    else:
-                        if self._proc.proc.poll() is not None:  # terminate
-                            self._set_master(False)
-                            break
-
-                    time.sleep(1)
-                except Exception as e:
-                    break
-
-    def _set_master(self, is_master):
-        with self._lock:
-            self._is_master = is_master
-
-    def _start_master(self):
-        with self._lock:
-            self._proc = utils.start_master()
-            self._is_master = True
-
-    def _terminate_master(self):
-        with self._lock:
-            utils.termniate_master()
-            self._proc = None
-            self._is_master = False
+            except Exception as e:
+                with self._lock:
+                    self._changed = True
+                break
 
     def stop(self):
         self._stop.set()
         self._t_register.join()
 
     def is_master(self):
+        return self._rank == 0
+
+    def changed(self):
         with self._lock:
-            return self._is_master
+            return self._changed
+
+    def complete(self):
+        pod.status = PodStatus.COMPLETE
+        info = pod.to_json()
+        self._etcd.set_server_permanent(self._server_name, self._server, info)
+        self.stop()
