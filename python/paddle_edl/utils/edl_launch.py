@@ -49,9 +49,10 @@ from contextlib import closing
 import socket
 
 from paddle_edl.utils.utils import *
-from edl_env import JobEnv, PodEnv
-from register import LauncherRegister
-from watcher import MasterWatcher
+from edl_env import JobEnv
+from .cluster import Pod
+from .register import PodRegister
+from .watcher import MasterWatcher
 import paddle_edl.utils.master_client as master_client
 
 

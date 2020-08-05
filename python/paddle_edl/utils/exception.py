@@ -35,19 +35,3 @@ class EdlBarrierError(EdlExeception):
 
 class EdlUnkownError(EdlExeception):
     pass
-
-
-"""
-_excpetions = {
-    "DuplicateInitDataSetError": EdlDuplicateInitDataSetError,
-    "BarrierError": EdlBarrierError,
-}
-
-
-def edl_exception(e_type, detail):
-    if e_type not in _excpetions:
-        return EdlUnkownError(detail)
-
-    e = _excpetions["e_type"](detail)
-    raise e
-"""

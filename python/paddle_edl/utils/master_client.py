@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import master_pb2
-import master_pb2_grpc
-import common_pb2
-import common_pb2_grpc
-from cluster import Cluster
+from . import master_pb2
+from . import master_pb2_grpc
+from . import common_pb2
+from . import common_pb2_grpc
+from .cluster import Cluster
 import grpc
-from exceptions import edl_exception
+from .exception import EdlExeception, EdlBarrierError
 
 
 class Client(object):
@@ -59,10 +59,10 @@ class Client(object):
 
             if error.type == "BarrierError":
                 if time.time() - begin > timeout:
-                    logger.debug("job_id:{} pod_id:{} barrier time out".format(
-                        job_id, pod_id))
-                    raise edl_exception(error.type, error.details)
+                    message = "job_id:{} pod_id:{} barrier time out".format(
+                        job_id, pod_id)
+                    raise EdlBarrierError(message)
                 time.sleep(1)
                 continue
 
-            raise edl_exception(error.type, error.detail)
+            raise EdlExeception(error.detail)
