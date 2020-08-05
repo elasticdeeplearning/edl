@@ -40,21 +40,7 @@ protoc.main((
     '-I.',
     '--python_out=.',
     '--grpc_python_out=.',
-    'data_server.proto', ))
-
-protoc.main((
-    '',
-    '-I.',
-    '--python_out=.',
-    '--grpc_python_out=.',
-    'master.proto', ))
-
-protoc.main((
-    '',
-    '-I.',
-    '--python_out=.',
-    '--grpc_python_out=.',
-    'common.proto', ))
+    'pod_server.proto', ))
 
 proto_include = pkg_resources.resource_filename('grpc_tools', '_proto')
 protoc.main((

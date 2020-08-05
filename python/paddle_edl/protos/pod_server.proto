@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-import "common.proto";
+import "proto";
 option go_package = ".;masterpb";
 package master;
 
@@ -26,22 +26,9 @@ message RPCRet {
 message ShutDownRequest {}
 message EmptyRequest {}
 
-message RecordRange {
-  int64 begin = 1;
-  int64 end = 2;
-}
-
 enum DataStatus {
   DATA_OK = 0;
   NOT_FOUND = 1;
-}
-
-// Chunk is a index(record range) in a file.
-// The range is elastic.
-message Chunk {
-  DataStatus status = 1;
-  // only no
-  common.RecordRange meta = 2;
 }
 
 message Record {
@@ -49,52 +36,26 @@ message Record {
   bytes data = 2;
 }
 
+message DataRequest { int32 batch_size = 1; }
+
 message ChunkData {
-  common.Chunk chunk = 1;
-  repeated Record records = 2;
-}
-
-message File {
   int64 idx_in_list = 1;
   string file_path = 2;
-  common.DataStatus status = 3;
-  repeated ChunkData data = 4;
+  repeated Record records = 3;
 }
 
-message DataResponse { File file = 1; }
-
-message DataRequest {
-  int64 idx_in_list = 1;
-  string file_path = 2;
-  repeated common.Chunk chunks = 3;
+message DataResponse {
+  RPCRet ret = 1;
+  repeated ChunkData batch = 2;
 }
 
-message SubDataSetRequest { string data_server_id = 1; }
-
-message SubDataSetMeta {
-  int64 idx_in_list = 1;
-  string file_path = 2;
-  // only no
-  repeated common.RecordRange filtered_records = 3;
-}
+message SubDataSetRequest {}
 
 message SubDataSetResponse {
-  common.RPCRet ret = 1;
-  repeated SubDataSetMeta metas = 2;
+  RPCRet ret = 1;
+  int64 idx_in_list = 2;
+  string file_path = 3;
 }
-
-enum DataSetType {
-  DATASET_TRAIN = 0;
-  DATASET_INFERENCE = 1;
-  DATASET_OTHER = 2;
-}
-
-message DataSet {
-  DataSetType type = 1;
-  string name = 2;
-  repeated string file_list = 3;
-}
-message NewEpochRequest {}
 
 message BarrierRequest {
   string job_id = 1;
@@ -112,8 +73,8 @@ message CheckpointRequest {
   string model_path = 3;
 }
 
-service Master {
-  rpc Barrier(BarrierRequest) returns (common.ClusterResponse) {}
+service PodServer {
+  rpc Barrier(BarrierRequest) returns (ClusterResponse) {}
 
   // Cluster controller -> master
   // rpc ScaleOut(){}
@@ -122,8 +83,7 @@ service Master {
 
   rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSetResponse) {}
   rpc GetData(DataRequest) returns (DataResponse) {}
-  rpc ClearDataCache(DataRequest) returns (common.RPCRet) {}
 
-  rpc ShutDown(common.ShutDownRequest) returns (common.RPCRet) {}
-  rpc SaveCheckpoint(CheckpointRequest) returns (common.RPCRet) {}
+  rpc ShutDown(ShutDownRequest) returns (RPCRet) {}
+  rpc SaveCheckpoint(CheckpointRequest) returns (RPCRet) {}
 }
