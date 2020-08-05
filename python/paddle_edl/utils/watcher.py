@@ -76,12 +76,10 @@ class Watcher(object):
 
         return False
 
-    @propery
-    def cluster(self):
+    def get_cluster(self):
         with self._lock:
             return self._cluster
 
-    @propery
     def is_changed(self):
         with self._lock:
             return self._changed

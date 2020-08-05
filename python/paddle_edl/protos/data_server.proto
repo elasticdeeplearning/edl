@@ -17,31 +17,6 @@ syntax = "proto3";
 import "common.proto";
 package data_reader;
 
-message Record {
-  int64 record_no = 1;
-  bytes data = 2;
-}
-
-message ChunkData {
-  common.Chunk chunk = 1;
-  repeated Record records = 2;
-}
-
-message File {
-  int64 idx_in_list = 1;
-  string file_path = 2;
-  common.DataStatus status = 3;
-  repeated ChunkData data = 4;
-}
-
-message DataResponse { File file = 1; }
-
-message DataRequest {
-  int64 idx_in_list = 1;
-  string file_path = 2;
-  repeated common.Chunk chunks = 3;
-}
-
 service DataServer {
   // loader -> DataSet
   rpc GetData(DataRequest) returns (DataResponse) {}

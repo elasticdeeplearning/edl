@@ -25,6 +25,7 @@ class Register(object):
         self._service = service
         self._server = server
         self._stop = threading.Event()
+        #don't change this ttl
         self._etcd = EtcdClient(etcd_endpoints, root=job_id, ttl=10)
 
         if not self._etcd.set_server_not_exists(service_name, server):
@@ -45,6 +46,9 @@ class Register(object):
 class PodRegister(object):
     def __init__(self, job_env, pod):
         info = pod.to_json()
+
+        self._stop = threading.Event()
+        self._etcd = EtcdClient(etcd_endpoints, root=job_id, ttl=10)
 
         sefl._service_name = "pod"
         self._rank, self._server = self._register_rank(job_env, pod)
@@ -92,6 +96,7 @@ class PodRegister(object):
         while not self._stop.is_set():
             try:
                 self._etcd.refresh(self._service_name, self._server)
+                # don't change the waited time
                 time.sleep(1)
             except Exception as e:
                 with self._lock:

@@ -14,25 +14,6 @@
 """
 paddle.distributed.launch is a module that spawns multiple distributed 
 process on each training node for gpu training.
-Usage:
-    In both of single node training or multiple node training, this module 
-launch a process on each of the given gpu card.
-    1. for single node training with all visible gpu cards:
-       python -m paddle.distributed.launch \
-         your_training_py (arg1 arg2 and all others)
-    
-    2. for single node training with [0,4) cards
-       python -m paddle_edl.collective.launch --selected_gpus="0,1,2,3" \
-         your_training_py (arg1 arg2 and all others)
-    3. for multiple node training such as two node:192.168.0.16, 192.168.0.17
-        on 192.168.0.16:
-            python -m paddle.collective.launch --cluster_node_ips="192.168.0.16,192.168.0.17" \
-                --node_ip=192.168.0.16 \
-                your_training_py (arg1 arg2 and all others)
-        on 192.168.0.17:
-            python -m paddle.collective.launch --cluster_node_ips="192.168.0.16,192.168.0.17" \
-                --node_ip=192.168.0.17 \
-                your_training_py (arg1 arg2 and all others)
 """
 
 from __future__ import print_function
@@ -52,7 +33,7 @@ from paddle_edl.utils.utils import *
 from edl_env import JobEnv
 from .cluster import Pod
 from .register import PodRegister
-from .watcher import MasterWatcher
+from .watcher import Watcher
 import paddle_edl.utils.master_client as master_client
 
 
@@ -127,84 +108,87 @@ def _parse_args():
     return parser.parse_args()
 
 
-def edl_barrier(master_dog, job_env, pod_env, timeout=15):
-    c = master_client.Client(master_dog.get_master().endpoint)
-    try:
-        pb_cluster = c.barrier(job_env.job_id, pod_env.pod_id, timeout)
-    except Exception as e:
-        if type(e) is exception.PodDroppedError:
-            logger.info("job_id:{} pod_id:{} was dropped".format(job_id,
-                                                                 pod_id))
-            sys.exit(0)
+def edl_barrier(job_env, pod, timeout=60):
+    # regist and get rank
+    register = PodRegister(job_env, pod)
 
-        logger.info("job_id:{} pod_id:{} barrier error:{}".format(
-            job_id, pod_id, e.value))
-        sys.exit(1)
+    # watcher
+    watcher = Watcher(job_env.etcd_endpoints, job_env.job_id)
+    watcher.watch()
 
-    cluster = Cluster()
-    cluster.init_from_pb(pb_cluster)
-
-    pod = cluster.get_pod_by_id(pod_env.pod_id)
-    return cluster, pod
-
-
-# wait until master is set or timeout
-def get_master(master_dog, timeout=300):  #s
+    # cluster must have mnimum pods
+    cluster = None
     start = time.time()
     while True:
-        if master_dog.get_master() is None:
+        cluster = watcher.get_cluster()
+        if len(cluster.pods) < job_env.min_nodes:
             time.sleep(1)
+
+            timeout -= 1
+            if timeout <= 0:
+                logger.warning("can't get enough nodes_num:{}, nodes:{}".
+                               format(len(cluster.pods), cluster))
             continue
 
-    return master_dog.get_master()
+    # all pods barrier on master to avoid pod from last job stage
+    master = cluster.pods[0]
+    endpoint = "{}:{}".format(master.addr, master.port)
+    start = time.time()
+    while True:
+        c = Client(endpoint)
+        try:
+            if not c.Barrier(job_env.job_id, pod.id):
+                continue
+        except Exception as e:
+            time.sleep(1)
+            if time.time() - start > timeout:
+                logger.warning("can't barrier of nodes_num:{} nodes:{}".format(
+                    len(cluster.pods), cluster))
+            continue
+
+    return register, watcher
 
 
 def launch(args):
     job_env = JobEnv(args)
-    pod_env = Pod()
-    pod_env.init_from_env(job_env)
+    pod = Pod()
+    pod.from_env(job_env)
 
-    # pod register
-    pod_register = PodRegister(job_env, pod_env)
+    pod_server = PodServer()
+    # port changed in it.
+    pod_server.start(jobe_env, pod)
+    logger.info("pod server started:{}", pod)
 
-    # try to register master
-    master_register = MasterRegister()
+    register, watcher = edl_barrier(job_env, pod, timeout=600)
 
-    # watch master
-    master_watcher = MasterWatcher(job_env.etcd_endpoints, job_env.job_id)
-    global_master = get_master(master_watcher)
-
-    cluster, pod = edl_barrier(master_watcher, job_env, pod_env, None, 15 * 60)
-    logger.info("get cluster from edl:{}".format(cluster))
-
-    master_client = master_client.Client(master_watcher)
     while True:
-        cluster2, pod = master_client.get_cluster()
+        cluster = watcher.get_cluster()
+        procs = start_local_trainers(
+            cluster,
+            pod,
+            args.training_script,
+            args.training_script_args,
+            log_dir=args.log_dir)
 
-        if cluster2.stage != cluster.stage:
+        if watcher.is_changed():
             logger.info("Cluster changed. New cluster:{}. Old Cluster:{}".
                         format(cluster2, cluster))
 
-            edl_process.terminiate(procs)
+            r.stop()
+            w.stop()
+            terminiate_local_trainers(procs)
+            # wait all pods info displayed from etcd
+            # don't change this time,since the ttl is set to 10s in registers
+            # FIXME(gongwb): any other method?
+            time.sleep(15)
+            continue
 
-            cluster, pod = edl_barrier(
-                job_env, pod_env, local_procs=procs, timeout=15 * 60)
-
-            procs = edl_process.start_local_trainers(
-                cluster,
-                pod,
-                args.training_script,
-                args.training_script_args,
-                log_dir=args.log_dir)
-
-        alive = edl_process.watch_local_trainers(procs,
-                                                 cluster.trainers_nranks())
+        alive = watch_local_trainers(procs, pod.trainers_num())
 
         if not alive:
             logger.info("Local procs complete, POD info:{}".format(pod))
             break
 
-        time.sleep(3)
+        time.sleep(1)
 
-    # normal exit
-    pod_reg.complete()
+    r.complete()

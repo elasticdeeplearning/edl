@@ -18,9 +18,58 @@ import "common.proto";
 option go_package = ".;masterpb";
 package master;
 
-message SubDataSetRequest {
-    string data_server_id = 1;
+message RPCRet {
+  string type = 1;
+  string detail = 2;
 }
+
+message ShutDownRequest {}
+message EmptyRequest {}
+
+message RecordRange {
+  int64 begin = 1;
+  int64 end = 2;
+}
+
+enum DataStatus {
+  DATA_OK = 0;
+  NOT_FOUND = 1;
+}
+
+// Chunk is a index(record range) in a file.
+// The range is elastic.
+message Chunk {
+  DataStatus status = 1;
+  // only no
+  common.RecordRange meta = 2;
+}
+
+message Record {
+  int64 record_no = 1;
+  bytes data = 2;
+}
+
+message ChunkData {
+  common.Chunk chunk = 1;
+  repeated Record records = 2;
+}
+
+message File {
+  int64 idx_in_list = 1;
+  string file_path = 2;
+  common.DataStatus status = 3;
+  repeated ChunkData data = 4;
+}
+
+message DataResponse { File file = 1; }
+
+message DataRequest {
+  int64 idx_in_list = 1;
+  string file_path = 2;
+  repeated common.Chunk chunks = 3;
+}
+
+message SubDataSetRequest { string data_server_id = 1; }
 
 message SubDataSetMeta {
   int64 idx_in_list = 1;
@@ -32,58 +81,6 @@ message SubDataSetMeta {
 message SubDataSetResponse {
   common.RPCRet ret = 1;
   repeated SubDataSetMeta metas = 2;
-}
-
-message Entity{
-    common.RPCRet ret = 1;
-    string id = 2;
-}
-
-message DataServer {
-  string id = 1;
-  string affinity_pod_id = 2;
-  string affinity_rank_in_pod = 3;
-  string endpoint = 4;
-}
-
-/*
-message Pod{
-    string id = 1;
-};
-
-message Trainer {
-  string pod_id = 1;
-  string trainer_id = 2;
-  int32  rank_in_pod = 3;
-  string endpoint = 4;
-}
-*/
-
-message TaskMeta {
-  string task_id = 1;
-  int32  epoch_no = 2;
-  string stage_flag = 3;
-  int32  batch_size = 4;
-}
-
-message DataServerChunk {
-  DataServer data_server = 1;
-  int64 idx_in_list = 2;
-  string file_path = 3;
-  repeated common.Chunk chunks = 4;
-}
-
-message Task {
-  TaskMeta meta = 1;
-  repeated DataServerChunk chunks = 2;
-}
-
-message Tasks { repeated Task tasks = 1; }
-
-message TaskRequest { common.Trainer trainer = 1; }
-message TaskResponse {
-  common.RPCRet ret = 1;
-  repeated Task tasks = 2;
 }
 
 enum DataSetType {
@@ -104,12 +101,18 @@ message BarrierRequest {
   string pod_id = 2;
 }
 
-service Master {
-  rpc GetID(common.EmptyRequest) returns (Entity) {}
+enum BackEndType {
+  ETCD = 0;
+  HDFS = 1;
+}
 
-  // Cluster env
-  // user_client, computor  -> master
-  rpc GetCluster(common.ClusterRequest) returns (common.ClusterResponse) {}
+message CheckpointRequest {
+  BackEndType type = 1;
+  string data_path = 2;
+  string model_path = 3;
+}
+
+service Master {
   rpc Barrier(BarrierRequest) returns (common.ClusterResponse) {}
 
   // Cluster controller -> master
@@ -117,17 +120,10 @@ service Master {
   // rpc ScaleIn(){}
   // rpc Profile(){}
 
-  // Tasks
-  /* user_client -> Master*/
-  rpc AddDataSet(DataSet) returns (common.RPCRet) {}
-  rpc NewEpoch(NewEpochRequest) returns (common.RPCRet) {}
-
-  /* data_server - > master */
   rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSetResponse) {}
-  rpc ReportChunks(DataServerChunk) returns (common.RPCRet) {}
+  rpc GetData(DataRequest) returns (DataResponse) {}
+  rpc ClearDataCache(DataRequest) returns (common.RPCRet) {}
 
-  /* executor -> master */
-  rpc GetTask(TaskRequest) returns (TaskResponse) {}
-  rpc TaskFinished(Tasks) returns (common.RPCRet) {}
-  rpc TaskErrored(Tasks) returns (common.RPCRet) {}
+  rpc ShutDown(common.ShutDownRequest) returns (common.RPCRet) {}
+  rpc SaveCheckpoint(CheckpointRequest) returns (common.RPCRet) {}
 }

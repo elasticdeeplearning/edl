@@ -41,7 +41,7 @@ class PodStatus(Enum):
 
 class Pod(object):
     def __init__(self):
-        self._id = None
+        self._id = None  # id is not rank even they has same value
         self._rank = None
         self._trainer_ports = None
         self._addr = None
@@ -90,7 +90,6 @@ class Pod(object):
 
         # uuid
         self._id = uuid.uuid1()
-        #self._port = job_env.pod_port
         self._trainer_ports = job_env.trainer_ports
 
         # gpus
@@ -114,9 +113,12 @@ class Pod(object):
             endpoint = "{}:{}".format(self._addr, self._trainer_port[i])
 
             t = Trainer()
-            t.init_from_pod(
+            t.from_pod(
                 self, endpoint=endpoint, rank_in_pod=i, gpus=self._gpus[b:e])
             self._trainers.append(t)
+
+    def _start_sever(self):
+        return port
 
     def from_pb(self, pod):
         self._id = pod.id
@@ -184,7 +186,7 @@ class Pod(object):
     def status(self, status):
         self._status = status
 
-    @propery
+    @property
     def rank(self):
         return self._rank
 
@@ -194,6 +196,18 @@ class Pod(object):
         for i, t in enumerate(self._tainers()):
             self._rank_in_pod = i
             t._global_rank = self._rank + self._rank_in_pod
+
+    @property
+    def port(self):
+        return self._port
+
+    @port.setter
+    def port(self, v):
+        self._port = port
+
+    @property
+    def addr(self):
+        return self._addr
 
 
 class Trainer(object):

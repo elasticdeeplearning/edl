@@ -85,6 +85,9 @@ def start_local_trainers(cluster,
 
 
 def watch_local_trainers(procs, nranks):
+    """
+    If proc exit unnormally, this function will raise exception.
+    """
     try:
         error = False
         error_rank = []

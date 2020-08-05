@@ -25,9 +25,6 @@ class Client(object):
     def __init__(self, endpoint):
         self._endpoint = endpoint
 
-    def get_cluster(self, pod_id=None):
-        pass
-
     def _get_conn(self):
         channel = grpc.insecure_channel(self._endpoint)
         stub = data_server_pb2_grpc.DataServerStub(channel)
@@ -37,9 +34,6 @@ class Client(object):
         channel = grpc.insecure_channel(self._endpoint)
         stub = master_pb2_grpc.MasterStub(channel)
         return stub.AddDataSet(dataset)
-
-    def new_epoch(self):
-        pass
 
     def barrier(self, job_id, pod_id, timeout=15):
         """
@@ -55,7 +49,7 @@ class Client(object):
             res = s.Barrier(req)
             error = res.ret
             if error.type == "":
-                return res.cluster
+                return True
 
             if error.type == "BarrierError":
                 if time.time() - begin > timeout:
