@@ -29,9 +29,6 @@ class JobEnv(object):
             self._trainer_ports = utils.find_free_ports(len(_gpus))
             logger.info("get ports from unused:{}".format(self._trainer_ports))
 
-        #self._pod_port = utils.find_free_ports(1)
-        #self._master_port = utils.find_free_ports(1)
-
     def _get_hdfs(self, args):
         # hdfs
         if args.hdfs_home:

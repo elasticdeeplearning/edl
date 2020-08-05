@@ -19,8 +19,11 @@ option go_package = ".;masterpb";
 package server;
 
 message BarrierRequest {
-  string job_id = 1;
-  string pod_id = 2;
+  // barrier on stage
+  string stage = 1;
+  string job_id = 2;
+  string pod_id = 3;
+  string trainer_id = 4;
 }
 
 service PodServer {

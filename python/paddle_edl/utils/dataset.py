@@ -35,12 +35,3 @@ class TxtDataReader(DataReader):
                 if len(line) <= 0:
                     continue
                 yield line
-
-
-class EDLReader(object):
-    def __init__(file_list, reader_cls, num_workers=1):
-        self._file_list = file_list
-
-        # master: self, local_list
-        # master: from trainer_0
-        # master: from etcd

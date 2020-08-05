@@ -32,6 +32,8 @@ class Executor(PaddleExecutor):
 
         super(Executor, self).__init__(place)
 
+        self._processed_data = {}
+
     def run(self,
             program=None,
             feed=None,
@@ -45,8 +47,9 @@ class Executor(PaddleExecutor):
             use_prune=False):
         assert feed != None, "In EDL feed must not be empty"
 
-        self.ask_save_checkpoint()
+        self._ask_if_save_checkpoint()
 
+        # it's a barrier function on multiple trainers.
         super(Executor, self).run(program=program,
                                   feed=feed,
                                   fetch_list=fetch_list,
@@ -61,7 +64,7 @@ class Executor(PaddleExecutor):
         if self._should_save_checkpoint():
             self._save_checkpoint()
 
-    def _ask_save_checkpoint():
+    def _ask_if_save_checkpoint():
         pass
 
     def _save_checkpoint(self):
