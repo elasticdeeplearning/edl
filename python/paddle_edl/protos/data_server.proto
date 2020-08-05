@@ -1,0 +1,77 @@
+// Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless  by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+import "proto";
+option go_package = ".;masterpb";
+package master;
+
+message RPCRet {
+  string type = 1;
+  string detail = 2;
+}
+
+message ShutDownRequest {}
+message EmptyRequest {}
+
+enum DataStatus {
+  DATA_OK = 0;
+  NOT_FOUND = 1;
+}
+
+message Record {
+  int64 record_no = 1;
+  bytes data = 2;
+}
+
+message DataRequest { int32 batch_size = 1; }
+
+message ChunkData {
+  int64 idx_in_list = 1;
+  string file_path = 2;
+  repeated Record records = 3;
+}
+
+message DataResponse {
+  RPCRet ret = 1;
+  repeated ChunkData batch = 2;
+}
+
+message SubDataSetRequest {}
+
+message SubDataSetResponse {
+  RPCRet ret = 1;
+  int64 idx_in_list = 2;
+  string file_path = 3;
+}
+
+enum BackEndType {
+  ETCD = 0;
+  HDFS = 1;
+}
+
+message CheckpointRequest {
+  BackEndType type = 1;
+  string data_path = 2;
+  string model_path = 3;
+}
+
+service PodServer {
+  rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSetResponse) {}
+  rpc GetData(DataRequest) returns (DataResponse) {}
+
+  rpc ShutDown(ShutDownRequest) returns (RPCRet) {}
+  rpc SaveCheckpoint(CheckpointRequest) returns (RPCRet) {}
+}
