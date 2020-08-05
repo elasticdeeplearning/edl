@@ -49,12 +49,13 @@ def start_local_trainers(cluster,
     procs = []
     for idx, t in enumerate(pod.trainers):
         proc_env = {
-            "FLAGS_selected_gpus": "%s" % ",".join([str(g) for g in t.gpus]),
-            "PADDLE_TRAINER_RANK_IN_POD": "%d" % t.rank_in_pod,
             "PADDLE_TRAINER_ID": "%d" % t.rank,  # global rank
+            "PADDLE_TRAINER_RANK_IN_POD": "%d" % t.rank_in_pod,
+            "FLAGS_selected_gpus": "%s" % ",".join([str(g) for g in t.gpus]),
             "PADDLE_CURRENT_ENDPOINT": "%s" % t.endpoint,
             "PADDLE_TRAINERS_NUM": "%d" % cluster.trainers_nranks(),
-            "PADDLE_TRAINER_ENDPOINTS": ",".join(cluster.trainers_endpoints())
+            "PADDLE_TRAINER_ENDPOINTS": ",".join(cluster.trainers_endpoints()),
+            "PADDLE_TRAINER_MASTER": ",".join(cluster.get_master_endpoint)
         }
 
         current_env.update(proc_env)

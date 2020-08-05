@@ -373,3 +373,6 @@ class Cluster(object):
             pods.append(pod.from_json(value))
 
         self._pods = pods
+
+    def get_master_endpoint(self):
+        return "{}:{}".format(self._pods[0].addr, self._pods[0].port)

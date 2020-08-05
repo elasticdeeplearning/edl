@@ -19,18 +19,18 @@ from meta_reader import MetaReader
 
 
 class Executor(PaddleExecutor):
-    def __init__(self, place, master, step_num=10):
+    """
+    Executor wrapper of Paddle' Executor.
+    1. Trainers' leader will tell others to save checkpoint.
+    2. All trainers can load checkpoint from given backend.
+    """
+
+    def __init__(self, place):
         func = PaddleExecutor.__init__
         assert func.__code__.co_varnames == ('self', 'place'), \
             "The executor of paddle is changed and executor of edl hasn't been changed."
 
         super(Executor, self).__init__(place)
-
-        self._step_id = -1l
-        self._step_num = step_num
-
-        self._meta_queue = Queue()
-        self._meta = MetaReader(master=master)
 
     def run(self,
             program=None,
@@ -45,7 +45,7 @@ class Executor(PaddleExecutor):
             use_prune=False):
         assert feed != None, "In EDL feed must not be empty"
 
-        real_feed = feed[1:]
+        self.ask_save_checkpoint()
 
         super(Executor, self).run(program=program,
                                   feed=feed,
@@ -58,14 +58,14 @@ class Executor(PaddleExecutor):
                                   return_merged=return_merged,
                                   use_prune=user_prune)
 
-        self._step_id += 1
-        self._meta_queue.push_back((self._step_id, meta))
-        if self._step_id % self._step_num == 0 and self._step_id > 0:
-            self._report_meta(self)
+        if self._should_save_checkpoint():
+            self._save_checkpoint()
 
-    def _report_meta(self):
-        metas = []
-        while not self._meta_queue.empty():
-            metas.append(self._meta_queue.get()[1])
+    def _ask_save_checkpoint():
+        pass
 
-        self._meta.report(metas)
+    def _save_checkpoint(self):
+        """
+        trainer 0 save model checkpoint and all trainers save data checkpoint
+        """
+        pass
