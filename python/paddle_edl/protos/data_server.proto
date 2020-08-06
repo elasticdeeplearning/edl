@@ -73,5 +73,8 @@ service PodServer {
   rpc GetData(DataRequest) returns (DataResponse) {}
 
   rpc ShutDown(ShutDownRequest) returns (RPCRet) {}
+
+  // two step's to do it.
+  rpc PrePareSaveCheckpoint(CheckpointRequest) returns (RPCRet) {}
   rpc SaveCheckpoint(CheckpointRequest) returns (RPCRet) {}
 }

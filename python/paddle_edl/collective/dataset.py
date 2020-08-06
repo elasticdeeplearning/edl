@@ -17,6 +17,12 @@ import multiprocessing
 
 
 class DataReader():
+    """
+    This the interface user should inherit. It will let's the framework knows the data file it's
+    processing.
+    TxtDataReader is an example.
+    """
+
     def __init__(self, data_file):
         self._data_file = data_file
 

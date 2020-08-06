@@ -33,6 +33,9 @@ class Executor(PaddleExecutor):
         super(Executor, self).__init__(place)
 
         self._processed_data = {}
+        self._name = unique_name.generate("_executor_")
+
+        self._step_inter = None
 
     def run(self,
             program=None,
@@ -45,9 +48,11 @@ class Executor(PaddleExecutor):
             use_program_cache=False,
             return_merged=True,
             use_prune=False):
+        """
+        Feed has not only the data but also the dataloader object and the data's index.
+        So executor can save the data checkpoint.Before run, the part should shoud split from feed.
+        """
         assert feed != None, "In EDL feed must not be empty"
-
-        self._ask_if_save_checkpoint()
 
         # it's a barrier function on multiple trainers.
         super(Executor, self).run(program=program,
@@ -61,14 +66,33 @@ class Executor(PaddleExecutor):
                                   return_merged=return_merged,
                                   use_prune=user_prune)
 
-        if self._should_save_checkpoint():
-            self._save_checkpoint()
+        self._add_processed_data()
+        self._save_checkpoint()
 
-    def _ask_if_save_checkpoint():
+    def _add_processed_data(self):
         pass
 
-    def _save_checkpoint(self):
+    def _prepare_save_checkpoint(self):
         """
-        trainer 0 save model checkpoint and all trainers save data checkpoint
+        Ask all the trainers to prepare save_checkpoint, and make sure it's succeed or exit.
+        """
+        pass
+
+    def _save_data_checkpoint(self):
+        pass
+
+    def _save_model_checkpoint(self):
+        pass
+
+    def _end_save_checkpoint(self):
+        """
+        Wait all the trainers to save_checkpoint, and make sure it's succeed or exit.
+        """
+        pass
+
+    def _save_checkpoint_transaction(self):
+        """
+        trainer 0 save model checkpoint and all trainers save data checkpoint.
+        It's a tranaction.
         """
         pass

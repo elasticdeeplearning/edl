@@ -119,3 +119,12 @@ class PodRegister(object):
         info = pod.to_json()
         self._etcd.set_server_permanent(self._server_name, self._server, info)
         self.stop()
+
+
+class DataServerRegister(Register):
+    def __init__(self, pod_id, trainer_rank, name, port):
+        """
+        /jobid/dataserver_name/nodes/rank:value
+        So the others can find it.
+        """
+        pass

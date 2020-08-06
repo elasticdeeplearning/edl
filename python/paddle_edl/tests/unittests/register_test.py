@@ -71,17 +71,5 @@ class TestRegister(unittest.TestCase):
         s = servers[0]
         assert s.info == original
 
-    def test_register_master(self):
-        pod = Pod()
-        pod.init_from_env()
-
-        job_env = JobEnv(self._args)
-        pod_env = Pod(job_env)
-        self._master_register = MasterRegister(job_env, pod)
-
-        original = pod_env.to_json()
-
-        servers = self.etcd.get_service("pod")
-        assert len(servers) == 1, "key must not alive when expired."
-        s = servers[0]
-        assert s.info == original
+    def tet_register_dataserver(self):
+        pass
