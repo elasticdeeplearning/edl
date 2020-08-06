@@ -14,37 +14,66 @@
 
 syntax = "proto3";
 
-import "common.proto";
-package data_reader;
+option go_package = ".;masterpb";
+package master;
+
+message RPCRet {
+  string type = 1;
+  string detail = 2;
+}
+
+message ShutDownRequest {}
+message EmptyRequest {}
+
+enum DataStatus {
+  DATA_OK = 0;
+  NOT_FOUND = 1;
+}
 
 message Record {
   int64 record_no = 1;
   bytes data = 2;
 }
 
+message DataRequest { int32 batch_size = 1; }
+
 message ChunkData {
-  common.Chunk chunk = 1;
-  repeated Record records = 2;
-}
-
-message File {
   int64 idx_in_list = 1;
   string file_path = 2;
-  common.DataStatus status = 3;
-  repeated ChunkData data = 4;
+  repeated Record records = 3;
 }
 
-message DataResponse { File file = 1; }
-
-message DataRequest {
-  int64 idx_in_list = 1;
-  string file_path = 2;
-  repeated common.Chunk chunks = 3;
+message DataResponse {
+  RPCRet ret = 1;
+  repeated ChunkData batch = 2;
 }
 
-service DataServer {
-  // loader -> DataSet
+message SubDataSetRequest {}
+
+message SubDataSetResponse {
+  RPCRet ret = 1;
+  int64 idx_in_list = 2;
+  string file_path = 3;
+}
+
+enum BackEndType {
+  ETCD = 0;
+  HDFS = 1;
+}
+
+message CheckpointRequest {
+  BackEndType type = 1;
+  string data_path = 2;
+  string model_path = 3;
+}
+
+service PodServer {
+  rpc GetSubDataSet(SubDataSetRequest) returns (SubDataSetResponse) {}
   rpc GetData(DataRequest) returns (DataResponse) {}
-  rpc ClearDataCache(DataRequest) returns (common.RPCRet) {}
-  rpc ShutDown(common.ShutDownRequest) returns (common.RPCRet) {}
+
+  rpc ShutDown(ShutDownRequest) returns (RPCRet) {}
+
+  // two step's to do it.
+  rpc PrePareSaveCheckpoint(CheckpointRequest) returns (RPCRet) {}
+  rpc SaveCheckpoint(CheckpointRequest) returns (RPCRet) {}
 }

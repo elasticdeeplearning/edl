@@ -12,22 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import master_pb2
-from . import master_pb2_grpc
-import grpc
+
+class EdlExeception(Exception):
+    pass
 
 
-class Client(object):
-    def __init__(self, endpoint):
-        self._endpoint = endpoint
+class EdLDuplicateInitDataSetError(EdlExeception):
+    pass
 
-    def get_cluster(self, pod_id=None):
-        pass
 
-    def add_dataset(self, dataset):
-        channel = grpc.insecure_channel(self._endpoint)
-        stub = master_pb2_grpc.MasterStub(channel)
-        return stub.AddDataSet(dataset)
+class EdlDataSetEndError(EdlExeception):
+    pass
 
-    def new_epoch(self):
-        pass
+
+class EdlRegisterError(EdlExeception):
+    pass
+
+
+class EdlBarrierError(EdlExeception):
+    pass
+
+
+class EdlUnkownError(EdlExeception):
+    pass
+
+
+class EdlRankError(EdlExeception):
+    pass

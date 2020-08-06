@@ -202,6 +202,14 @@ class EtcdClient(object):
         return self._etcd.put(key=key, value=info, lease=lease)
 
     @_handle_errors
+    def set_server_permanent(self, service_name, server, info):
+        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        self._etcd.put(key=key, value=info)
+        if key in self._leases:
+            lease = self._leases[key]
+            self._leases.pop(key)
+
+    @_handle_errors
     def _get_server(self, service_name, server):
         # for debug
         key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)

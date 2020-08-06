@@ -14,25 +14,6 @@
 """
 paddle.distributed.launch is a module that spawns multiple distributed 
 process on each training node for gpu training.
-Usage:
-    In both of single node training or multiple node training, this module 
-launch a process on each of the given gpu card.
-    1. for single node training with all visible gpu cards:
-       python -m paddle.distributed.launch \
-         your_training_py (arg1 arg2 and all others)
-    
-    2. for single node training with [0,4) cards
-       python -m paddle.distributed.launch --selected_gpus="0,1,2,3" \
-         your_training_py (arg1 arg2 and all others)
-    3. for multiple node training such as two node:192.168.0.16, 192.168.0.17
-        on 192.168.0.16:
-            python -m paddle.distributed.launch --cluster_node_ips="192.168.0.16,192.168.0.17" \
-                --node_ip=192.168.0.16 \
-                your_training_py (arg1 arg2 and all others)
-        on 192.168.0.17:
-            python -m paddle.distributed.launch --cluster_node_ips="192.168.0.16,192.168.0.17" \
-                --node_ip=192.168.0.17 \
-                your_training_py (arg1 arg2 and all others)
 """
 
 from __future__ import print_function
@@ -48,9 +29,12 @@ import paddle.fluid as fluid
 from contextlib import closing
 import socket
 
-from .utils import *
-from . import edl_utils
-from .http_store import kv_server
+from paddle_edl.utils.utils import *
+from edl_env import JobEnv
+from .cluster import Pod
+from .register import PodRegister
+from .watcher import Watcher
+import paddle_edl.utils.master_client as master_client
 
 
 def _print_arguments(args):
@@ -66,65 +50,28 @@ def _parse_args():
     @retval ArgumentParser
     """
     parser = ArgumentParser(
-        description='''start paddle training using multi-process mode.
-NOTE: your train program ***must*** run as distributed nccl2 mode,
-see: http://www.paddlepaddle.org/documentation/docs/zh/1.6/user_guides/howto/training/cluster_howto.html#permalink-8--nccl2-
-And your train program must read environment variables below in order to let different
-process init properly:
-FLAGS_selected_gpus
-PADDLE_TRAINER_ID
-PADDLE_CURRENT_ENDPOINT
-PADDLE_TRAINERS_NUM
-PADDLE_TRAINER_ENDPOINTS
-POD_IP (current node ip address, not needed for local training)
-''')
+        description='''start paddle training using multi-process mode.''')
 
-    #Optional arguments for the launch helper
-    parser.add_argument(
-        "--cluster_node_ips",
-        type=str,
-        default="127.0.0.1",
-        help="Paddle cluster nodes ips, such as 192.168.0.16,192.168.0.17..")
-    parser.add_argument(
-        "--node_ip",
-        type=str,
-        default="127.0.0.1",
-        help="The current node ip. ")
-    parser.add_argument(
-        "--use_paddlecloud",
-        action='store_true',
-        help="wheter to use paddlecloud platform to run your multi-process job. If false, no need to set this argument."
-    )
-    parser.add_argument(
-        "--started_port",
-        type=int,
-        default=None,
-        help="The trainer's started port on a single node")
+    parser.add_argument("--nodes_range", type=str, default=None, help="")
+
+    parser.add_argument("--nproc_per_node", type=int, default=None, help="")
 
     parser.add_argument(
-        "--print_config",
-        type=bool,
-        default=True,
-        help="Print the config or not")
+        "--etcd_endpoints", type=str, default=None, help="etcd endpoints")
 
     parser.add_argument(
-        "--selected_gpus",
-        type=str,
-        default=None,
-        help="It's for gpu training and the training process will run on the selected_gpus,"
-        "each process is bound to a single GPU. And if it's not set, this module will use all the gpu cards for training."
-    )
+        "--job_id", type=str, default=None, help="The identify id of this job")
 
     parser.add_argument(
         "--log_level",
         type=int,
-        default=20,  # logging.INFO, details are here:https://docs.python.org/3/library/logging.html#levels
+        default=20,
         help="Logging level, default is logging.INFO")
 
     parser.add_argument(
         "--log_dir",
         type=str,
-        default=None,
+        default="./log",
         help="The path for each process's log.If it's not set, the log will printed to default pipe."
     )
 
@@ -161,60 +108,87 @@ POD_IP (current node ip address, not needed for local training)
     return parser.parse_args()
 
 
-def launch(args):
+def edl_barrier(job_env, pod, timeout=60):
+    # regist and get rank
+    register = PodRegister(job_env, pod)
+
+    # watcher
+    watcher = Watcher(job_env.etcd_endpoints, job_env.job_id)
+    watcher.watch()
+
+    # cluster must have mnimum pods
     cluster = None
-    pod = None
-    hdfs = None
+    start = time.time()
+    while True:
+        cluster = watcher.get_cluster()
+        if len(cluster.pods) < job_env.min_nodes:
+            time.sleep(1)
 
-    edl_env = edl_utils.Edlenv()
-    assert edl_env.is_under_edl(), "edl launch must run under edl env"
+            timeout -= 1
+            if timeout <= 0:
+                logger.warning("can't get enough nodes_num:{}, nodes:{}".
+                               format(len(cluster.pods), cluster))
+            continue
 
-    hdfs = edl_utils.get_hdfs_from_args(args)
-    cluster, pod = edl_utils.edl_barrier(edl_env, hdfs, timeout=15 * 60)
-    logger.info("get cluster from edl:{}".format(cluster))
+    # all pods barrier on master to avoid pod from last job stage
+    master = cluster.pods[0]
+    endpoint = "{}:{}".format(master.addr, master.port)
+    start = time.time()
+    while True:
+        c = Client(endpoint)
+        try:
+            if not c.Barrier(job_env.job_id, pod.id):
+                continue
+        except Exception as e:
+            time.sleep(1)
+            if time.time() - start > timeout:
+                logger.warning("can't barrier of nodes_num:{} nodes:{}".format(
+                    len(cluster.pods), cluster))
+            continue
 
-    procs = start_local_trainers(
-        cluster,
-        pod,
-        args.training_script,
-        args.training_script_args,
-        log_dir=args.log_dir)
+    return register, watcher
+
+
+def launch(args):
+    job_env = JobEnv(args)
+    pod = Pod()
+    pod.from_env(job_env)
+
+    pod_server = PodServer()
+    # port changed in it.
+    pod_server.start(jobe_env, pod)
+    logger.info("pod server started:{}", pod)
+
+    register, watcher = edl_barrier(job_env, pod, timeout=600)
 
     while True:
-        cluster2, pod = edl_env.get_cluster(hdfs)
+        cluster = watcher.get_cluster()
+        procs = start_local_trainers(
+            cluster,
+            pod,
+            args.training_script,
+            args.training_script_args,
+            log_dir=args.log_dir)
 
-        if cluster2 != cluster:
+        if watcher.is_changed():
             logger.info("Cluster changed. New cluster:{}. Old Cluster:{}".
                         format(cluster2, cluster))
-            terminate_local_procs(procs)
 
-            cluster, pod = edl_utils.edl_barrier(
-                edl_env, hdfs, timeout=30 * 60)
+            r.stop()
+            w.stop()
+            terminiate_local_trainers(procs)
+            # wait all pods info displayed from etcd
+            # don't change this time,since the ttl is set to 10s in registers
+            # FIXME(gongwb): any other method?
+            time.sleep(15)
+            continue
 
-            procs = start_local_trainers(
-                cluster,
-                pod,
-                args.training_script,
-                args.training_script_args,
-                log_dir=args.log_dir)
-
-        alive = watch_local_trainers(procs, cluster.trainers_nranks())
+        alive = watch_local_trainers(procs, pod.trainers_num())
 
         if not alive:
             logger.info("Local procs complete, POD info:{}".format(pod))
             break
 
-        time.sleep(3)
+        time.sleep(1)
 
-    edl_utils.edl_barrier(edl_env, hdfs)
-
-
-if __name__ == "__main__":
-    args = _parse_args()
-
-    logger = get_logger(args.log_level)
-
-    if args.print_config:
-        _print_arguments(args)
-
-    launch(args)
+    r.complete()

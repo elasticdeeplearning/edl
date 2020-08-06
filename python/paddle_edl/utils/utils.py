@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import master_pb2
+from . import pod_server_pb2
 from . import data_server_pb2
 import logging
 import google.protobuf.text_format as text_format
+import socket
 
 logger = logging.getLogger("root")
 logger.propagate = False
@@ -87,8 +88,72 @@ def chunk_to_string(rs):
     return ret
 
 
+def get_extern_ip():
+    return socket.gethostbyname(socket.gethostname())
+
+
+def get_gpus(selected_gpus):
+    if selected_gpus is None:
+        gpus_num = fluid.core.get_cuda_device_count()
+        selected_gpus = [str(x) for x in range(0, gpus_num)]
+    else:
+        cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES")
+        if cuda_visible_devices is None or cuda_visible_devices == "":
+            selected_gpus = [x.strip() for x in selected_gpus.split(',')]
+        else:
+            # change selected_gpus into relative values
+            # e.g. CUDA_VISIBLE_DEVICES=4,5,6,7; args.selected_gpus=4,5,6,7;
+            # therefore selected_gpus=0,1,2,3
+            cuda_visible_devices_list = cuda_visible_devices.split(',')
+            for x in selected_gpus.split(','):
+                assert x in cuda_visible_devices_list, "Can't find "\
+                "your selected_gpus %s in CUDA_VISIBLE_DEVICES[%s]."\
+                % (x, cuda_visible_devices)
+            selected_gpus = [
+                cuda_visible_devices_list.index(x.strip())
+                for x in selected_gpus.split(',')
+            ]
+
+    return selected_gpus
+
+
 def bytes_to_string(o, codec='utf-8'):
     if not isinstance(o, str):
         return o.decode(codec)
 
     return o
+
+
+def get_host_name_ip():
+    try:
+        host_name = socket.gethostname()
+        host_ip = socket.gethostbyname(host_name)
+        return host_name, host_ip
+    except:
+        return None
+
+
+def find_free_ports(num):
+    def __free_port():
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+            s.bind(('', 0))
+            return s.getsockname()[1]
+
+    port_set = set()
+    step = 0
+    while True:
+        port = __free_port()
+        if port not in port_set:
+            port_set.add(port)
+
+        if len(port_set) >= num:
+            return port_set
+
+        step += 1
+        if step > 100:
+            print(
+                "can't find avilable port and use the specified static port now!"
+            )
+            return None
+
+    return None

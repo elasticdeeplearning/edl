@@ -14,8 +14,6 @@
 
 from __future__ import print_function
 from concurrent import futures
-from . import data_server_pb2
-from . import data_server_pb2_grpc
 from . import common_pb2
 from . import master_pb2
 from . import master_pb2_grpc
@@ -34,72 +32,80 @@ import paddle_edl.utils.utils as utils
 from .utils import logger
 
 
-class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
-    def __init__(self, loader):
-        self._loader = loader
+class PodServerServicer(master_pb2_grpc.MasterServicer):
+    def __init__(self, master, reader_cls, file_list=None, capcity=3000):
+        self._master = master
+        # master.SubDataSetMeta
+        self._sub_data_set = Queue()
+        # {file_key:{rec_no: data}}
+        self._data = {}
+        # to control the cache size.
+        self._data_queue = Queue(capcity)
+        self._lock = Lock()
+        self._file_list = file_list
+        self._reader_cls = reader_cls
 
-    def GetData(self, request, context):
-        """
-        try to get data from loader's queue and return.
-        """
+        assert type(reader_cls) == DataReader
+
+        if self._master:
+            self._t_get_sub_dataset = Thread(target=self._get_sub_dataset)
+            self._t_get_sub_dataset.start()
+        elif self._file_list:
+            logger.info("init from list:{} ".format(self._file_list))
+            arr = utils.get_file_list(self._file_list)
+            for t in arr:
+                logger.debug("readed:{} {}".format(t[0], t[1]))
+                d = master_pb2.SubDataSetMeta()
+                d.file_path = t[0]
+                d.idx_in_list = t[1]
+                self._sub_data_set.put(d)
+        else:
+            assert False, "You must set datasource"
+
+        self._t_read_data = Thread(target=self._read_data)
+        self._t_read_data.start()
+
+    def GetSubDataSet(self, request, context):
         pass
 
-    def PrepareSaveCheckpoint(self, request, context):
-        pass
-
-    def SaveCheckpoint(self, request, context):
+    def Barrier(self, request, context):
         pass
 
     def ShutDown(self, request, context):
-        pass
+        logger.info("Enter into shutdown method")
+        self._sub_data_set.put(None)
+        self._t_read_data.join()
+        return common_pb2.RPCRet()
 
 
-class DataServer(object):
+class PodServer(object):
     def __init__(self):
         self._server = None
         self._port = None
         self_endpoint = None
 
-    def start(self,
-              master,
-              addr,
-              port,
-              data_set_reader,
-              job_env,
-              pod_id,
-              rank_of_pod,
-              cache_capcity=1000,
-              file_list=None,
-              max_workers=100,
-              concurrency=20):
+    def start(self, job_env, pod, concurrency=20):
         server = grpc.server(
             futures.ThreadPoolExecutor(max_workers=max_workers),
             options=[('grpc.max_send_message_length', 1024 * 1024 * 1024),
                      ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
             maximum_concurrent_rpcs=concurrency)
-        data_server_pb2_grpc.add_DataServerServicer_to_server(
-            DataServerServicer(
+        master_pb2_grpc.add_PodServerServicer_to_server(
+            PodServerServicer(
                 master=master,
                 data_set_reader=data_set_reader,
                 capcity=cache_capcity,
                 file_list=file_list),
             server)
 
-        endpoint = "{}:{}".format(addr, port)
-        self._port = server.add_insecure_port('{}'.format(endpoint))
+        self._port = server.add_insecure_port('{}'.format(pod.addr))
         assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(
-            endpoint, self._port)
-        self._endpoint = "{}:{}".format(addr, self._port)
+            pod.addr, self._port)
+        self._endpoint = "{}:{}".format(pod.addr, self._port)
 
         server.start()
         self._server = server
-
-        self._register = DataServerRegister(
-            job_env.etcd_endoints,
-            job_env.job_id,
-            affinity_pod_id=affinity_pod_id,
-            affinity_rank_of_pod=affinity_rank_of_pod,
-            endpoint=self._endpoint)
+        pod.port = self._port
 
     def wait(self, timeout=None):
         if timeout is not None:

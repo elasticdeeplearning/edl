@@ -14,7 +14,7 @@
 
 import unittest
 from paddle_edl.utils.data_server import DataServer
-from paddle_edl.utils.dataset import TxtDataSet
+from paddle_edl.utils.dataset import TxtDataReader
 import paddle_edl.utils.data_server_pb2_grpc as data_server_pb2_grpc
 import paddle_edl.utils.data_server_pb2 as data_server_pb2
 from paddle_edl.utils.utils import *
@@ -38,8 +38,9 @@ class TestDataServer(unittest.TestCase):
         endpoint = "0.0.0.0:{}".format(port)
         data_server = DataServer()
         data_server.start(
-            endpoint=endpoint,
-            data_set_reader=TxtDataSet(),
+            addr="0.0.0.0",
+            port=port,
+            data_set_reader=TxtDataReader,
             file_list="./test_file_list.txt",
             master=None)
         print("start data server:", endpoint)
