@@ -22,6 +22,6 @@ etcd_pid=$!
 run_time=$(( $TEST_TIMEOUT - 10 ))
 echo "run_time: ${run_time}"
 
-timeout -s SIGKILL ${run_time} python register_test.py > ${name}_run.log 2>&1
+#timeout -s SIGKILL ${run_time} python register_test.py > ${name}_run.log 2>&1
 
 kill -9 $etcd_pid

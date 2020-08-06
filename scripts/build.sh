@@ -24,11 +24,11 @@ pushd python/paddle_edl/protos/
 bash generate.sh
 popd
 
+build_dir=build
+rm -rf ${build_dir}
+mkdir -p ${build_dir}/cmd/master/
 # TODO(gongwb): add them on async training
 # go
-#build_dir=build
-#rm -rf ${build_dir}
-#mkdir -p ${build_dir}/cmd/master/
 #go build   -o build/cmd/master/master cmd/master/master.go
 
 #build python

@@ -14,9 +14,13 @@
 
 syntax = "proto3";
 
-import "proto";
 option go_package = ".;masterpb";
 package server;
+
+message RPCRet {
+  string type = 1;
+  string detail = 2;
+}
 
 message BarrierRequest {
   // barrier on stage
@@ -27,7 +31,7 @@ message BarrierRequest {
 }
 
 service PodServer {
-  rpc Barrier(BarrierRequest) returns (ClusterResponse) {}
+  rpc Barrier(BarrierRequest) returns (RPCRet) {}
 
   // Cluster controller -> master
   // rpc ScaleOut(){}

@@ -85,7 +85,33 @@ def start_local_trainers(cluster,
     return procs
 
 
-def watch_local_trainers(procs, nranks):
+def terminate_local_procs(procs):
+    decents = []
+    for child in psutil.Process(os.getpid()).children(recursive=True):
+        decents.append(child)
+
+    for p in procs:
+        p.log_fn.close()
+
+    # try to kill
+    for p in decents:
+        p.send_signal(signal.SIGTERM)
+
+    # wait
+    gone, alive = psutil.wait_procs(decents, timeout=3)
+    for p in alive:
+        p.kill()
+
+    # still alive?
+    gone, alive = psutil.wait_procs(decents, timeout=1)
+    if len(alive) != 0:
+        logger.fatal("can't kill all process and exit")
+        exit(1)
+
+    logger.info("terminate all procs")
+
+
+def watch_local_procs(procs, nranks):
     """
     If proc exit unnormally, this function will raise exception.
     """

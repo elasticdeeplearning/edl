@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import master_pb2
+from . import pod_server_pb2
 from . import data_server_pb2
 import logging
 import google.protobuf.text_format as text_format
