@@ -19,18 +19,23 @@ from meta_reader import MetaReader
 
 
 class Executor(PaddleExecutor):
-    def __init__(self, place, master, step_num=10):
+    """
+    Executor wrapper of Paddle' Executor.
+    1. Trainers' leader will tell others to save checkpoint.
+    2. All trainers can load checkpoint from given backend.
+    """
+
+    def __init__(self, place):
         func = PaddleExecutor.__init__
         assert func.__code__.co_varnames == ('self', 'place'), \
             "The executor of paddle is changed and executor of edl hasn't been changed."
 
         super(Executor, self).__init__(place)
 
-        self._step_id = -1l
-        self._step_num = step_num
+        self._processed_data = {}
+        self._name = unique_name.generate("_executor_")
 
-        self._meta_queue = Queue()
-        self._meta = MetaReader(master=master)
+        self._step_inter = None
 
     def run(self,
             program=None,
@@ -43,10 +48,13 @@ class Executor(PaddleExecutor):
             use_program_cache=False,
             return_merged=True,
             use_prune=False):
+        """
+        Feed has not only the data but also the dataloader object and the data's index.
+        So executor can save the data checkpoint.Before run, the part should shoud split from feed.
+        """
         assert feed != None, "In EDL feed must not be empty"
 
-        real_feed = feed[1:]
-
+        # it's a barrier function on multiple trainers.
         super(Executor, self).run(program=program,
                                   feed=feed,
                                   fetch_list=fetch_list,
@@ -58,14 +66,33 @@ class Executor(PaddleExecutor):
                                   return_merged=return_merged,
                                   use_prune=user_prune)
 
-        self._step_id += 1
-        self._meta_queue.push_back((self._step_id, meta))
-        if self._step_id % self._step_num == 0 and self._step_id > 0:
-            self._report_meta(self)
+        self._add_processed_data()
+        self._save_checkpoint()
 
-    def _report_meta(self):
-        metas = []
-        while not self._meta_queue.empty():
-            metas.append(self._meta_queue.get()[1])
+    def _add_processed_data(self):
+        pass
 
-        self._meta.report(metas)
+    def _prepare_save_checkpoint(self):
+        """
+        Ask all the trainers to prepare save_checkpoint, and make sure it's succeed or exit.
+        """
+        pass
+
+    def _save_data_checkpoint(self):
+        pass
+
+    def _save_model_checkpoint(self):
+        pass
+
+    def _end_save_checkpoint(self):
+        """
+        Wait all the trainers to save_checkpoint, and make sure it's succeed or exit.
+        """
+        pass
+
+    def _save_checkpoint_transaction(self):
+        """
+        trainer 0 save model checkpoint and all trainers save data checkpoint.
+        It's a tranaction.
+        """
+        pass

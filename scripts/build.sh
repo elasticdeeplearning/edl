@@ -24,11 +24,12 @@ pushd python/paddle_edl/protos/
 bash generate.sh
 popd
 
-# go
 build_dir=build
 rm -rf ${build_dir}
 mkdir -p ${build_dir}/cmd/master/
-go build   -o build/cmd/master/master cmd/master/master.go
+# TODO(gongwb): add them on async training
+# go
+#go build   -o build/cmd/master/master cmd/master/master.go
 
 #build python
 pushd ${build_dir}
@@ -38,4 +39,4 @@ ctest -V -R
 popd
 
 #test all go test
-go test --cover ./...
+#go test --cover ./...

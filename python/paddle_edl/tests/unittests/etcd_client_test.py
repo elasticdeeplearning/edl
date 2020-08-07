@@ -100,6 +100,14 @@ class TestEtcd(unittest.TestCase):
             assert len(servers) == 2, "must two servers"
             time.sleep(2)
 
+    def test_permanent(self):
+        self.etcd.set_server_not_exists(
+            "job_permanent", "127.0.0.1:1", "first", ttl=6)
+        self.etcd.set_server_permanent("job_permanent", "127.0.0.1:1", "first")
+        time.sleep(10)
+        servers = self.etcd.get_service("job_permanent")
+        assert len(servers) == 1, "server must exist"
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -25,7 +25,7 @@ function(py_test_modules TARGET_NAME)
         set_property(TEST ${TARGET_NAME} PROPERTY RUN_SERIAL 1)
     endif()
 
-    set_tests_properties(${TARGET_NAME} PROPERTIES TIMEOUT 350)
+    set_tests_properties(${TARGET_NAME} PROPERTIES TIMEOUT 80)
 endfunction()
 
 function(bash_test_modules TARGET_NAME)
@@ -45,14 +45,14 @@ function(bash_test_modules TARGET_NAME)
 
     if(WITH_COVERAGE)
         add_test(NAME ${TARGET_NAME}
-            COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${EDL_BINARY_DIR}/python 
+            COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${EDL_BINARY_DIR}/python
             TEST_TARGET_NAME=${TARGET_NAME} TEST_TIMEOUT=${timeout} ${bash_test_modules_ENVS}
             WITH_COVERAGE=ON COVERAGE_FILE=${EDL_BINARY_DIR}/python-coverage.data
             bash ${CMAKE_CURRENT_BINARY_DIR}/${bash_test_modules_MODULES}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     else()
         add_test(NAME ${TARGET_NAME}
-            COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${EDL_BINARY_DIR}/python 
+            COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${EDL_BINARY_DIR}/python
             TEST_TARGET_NAME=${TARGET_NAME} TEST_TIMEOUT=${timeout} ${bash_test_modules_ENVS}
             bash ${CMAKE_CURRENT_BINARY_DIR}/${bash_test_modules_MODULES}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
@@ -73,7 +73,9 @@ set(dist_ENVS http_proxy="" https_proxy="")
 
 # python unit test
 file(GLOB TEST_OPS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "test_*.py")
+#FIXME
 string(REPLACE ".py" "" TEST_OPS "${TEST_OPS}")
+LIST(REMOVE_ITEM TEST_OPS test_data_server)
 foreach(TEST_OP ${TEST_OPS})
     py_test_modules(${TEST_OP} MODULES ${TEST_OP})
 endforeach(TEST_OP)
@@ -81,6 +83,7 @@ endforeach(TEST_OP)
 # bash unit test
 file(GLOB TEST_OPS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "test_*.sh")
 string(REPLACE ".sh" "" TEST_OPS "${TEST_OPS}")
+LIST(REMOVE_ITEM TEST_OPS test_master)
 foreach(TEST_OP ${TEST_OPS})
     bash_test_modules(${TEST_OP} MODULES "${TEST_OP}.sh")
 endforeach(TEST_OP)
