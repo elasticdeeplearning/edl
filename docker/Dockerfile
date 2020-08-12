@@ -1,5 +1,10 @@
 FROM hub.baidubce.com/paddlepaddle/paddle:<baseimg>
 
+# gcc 5
+RUN ln -sf /usr/bin/gcc-5 /usr/bin/gcc
+# python3 default use python3.6
+RUN ln -sf /usr/local/bin/python3.6 /usr/local/bin/python3
+
 # Install Go
 RUN rm -rf /usr/local/go && wget -qO- https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz | \
     tar -xz -C /usr/local && \
@@ -38,6 +43,7 @@ RUN mkdir -p /tmp/protoc && cd /tmp/protoc && \
     wget -q -O protoc-3.11.4-linux-x86_64.zip  --no-check-certificate  https://paddle-edl.bj.bcebos.com/protoc-3.11.4-linux-x86_64.zip && \
     unzip protoc-3.11.4-linux-x86_64.zip && mv bin/protoc /usr/local/bin
 
+RUN echo "export PATH=$PATH:${GOROOT}/bin:${GOPATH}/bin" >> /root/.bashrc
 RUN echo "go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.io,direct" >> /root/.bashrc
 ENV GO111MODULE=on
 ENV GOPROXY=https://goproxy.io,direct
