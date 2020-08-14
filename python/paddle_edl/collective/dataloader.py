@@ -13,34 +13,54 @@
 # limitations under the License.
 
 import paddle.fluid as fluid
-from fluid.reader import DataLoader
+from fluid.reader import FileSplitter
 from ..utils import data_server
 
 
 class Record(object):
+    def __init__(self, idx, data):
+        # idx in a file
+        self._idx = idx
+        self._data = data
+
+
+class FileMeta(object):
+    def __init__(self, idx, path):
+        self._idx = idx
+        self._path = path
+
+
+class BatchData(object):
+    def __init__(self, data_reader_id, name):
+        self._data_reader_id = data_reader_id
+        self._name = name
+        # FileIdx->Records
+        self._batch = {}
+        self._size = None
+
+
+class DataCheckpoint(object):
     def __init__(self):
-        self.record_no = -1
-        r.data = None
+        # file_dix=>record_idx
+        self._records = {}
+        self._file_idxs = {}
+        self._restored_from = None
+
+    def save_checkpoint(self, path):
+        pass
+
+    def load_checkpoint(self, path):
+        pass
+
+    def is_processed(self, path, file_idx, record_idx):
+        pass
 
 
-class DataLoader(ojbect):
-    def __init__(reader_cls,
-                 file_list,
-                 feed_list=None,
-                 places=None,
-                 return_list=False,
-                 batch_sampler=None,
-                 batch_size=1,
-                 shuffle=False,
-                 drop_last=False,
-                 collate_fn=None,
-                 num_workers=0,
-                 use_buffer_reader=True,
-                 use_shared_memory=True,
-                 timeout=0,
-                 worker_init_fn=None):
+class DataReader(ojbect):
+    def __init__(file_splitter_cls, file_list, batch_size, leader,
+                 checkpoint_path):
         """
-        Reader_cls is the class name of dataset.See example in dataset.py
+        file_splitter_cls is the class name of dataset.See example in dataset.py
         file_list is the input data file list and it should be get by loader.For example, all data
         file is on local or on hdfs.
         This class:
@@ -48,27 +68,33 @@ class DataLoader(ojbect):
         2. parse records from reader_cls' object.
         3. if there's no data local, try to pull data from other dataserver or raise StopIteration.
         """
-        self._name = unique_name.generate("_dataloader_")
+        self._name = unique_name.generate("_datareader_")
 
-        self._loader = DataLoader()
-        self._start_data_server()
-
-        # to control the cache size.
+        #BatchData
         self._data_queue = Queue(capcity)
         self._lock = Lock()
         self._file_list = file_list
-        self._reader_cls = reader_cls
+        self._splitter_cls = file_splitter_cls
+        self._leader = leader
 
-        assert type(reader_cls) == DataReader
+        self._data_checkpoint = DataCheckpoint()
+        self._data_checkpoint.load_checkpoint(checkpoint_path)
+
+        assert type(file_splitter_cls) == FileSplitter
 
         self._t_read_data = Thread(target=self._read_data)
         self._t_read_data.start()
+
+        self._start_data_server()
 
     def _start_data_server(self):
         """
         start and register the data server
         """
-        self._data_server = dataserver.DataServer()
+        self._data_server = data_server.DataServer()
+        pass
+
+    def _shut_down(self):
         pass
 
     def __iter__(self):
@@ -78,15 +104,23 @@ class DataLoader(ojbect):
         pass
 
     def __next__(self):
-        pass
+        if self._reach_end:
+            raise StopIteration
+
+        idx = {}
+        data = []
+        while True:
+            idx, data = self._data_queue.Pop()
+            if idx is None:
+                self._reach_end = True
+                break
+
+        if len(idx) > 0:
+            yield idx, data
+        else:
+            raise StopIteration
 
     def _get_one_data_file(self):
-        pass
-
-    def _get_data(self):
-        """
-        get data from queue
-        """
         pass
 
     def _get_file_key(self, idx, file_path):
@@ -94,34 +128,79 @@ class DataLoader(ojbect):
 
         return key
 
+    def _get_file_idx():
+        """
+        get file idx
+        """
+        while True:
+            file_data_set = self._get_sub_dataset()
+            if file_data_set is None:
+                logger.info("local data process completed.")
+                break
+        pass
+
+    def _set_batch_data(self, meta):
+        """
+        get batch data idx
+        """
+        meta = self._data_client.get_batch_data_meta(self)
+        # reach end
+        if meta is None:
+            self._data_queue.push(None)
+        self._data_queue.push(b)
+
+        if meta.is_local():
+            b = self._cache[meta.name]
+        else:
+            b = self._data_client.get_batch_data(meta)
+        self._data_queue.push(b)
+
+    def _process_one_file(self, idx, path):
+        for rec_no, data in enumerate(self._splitter_cls(path)):
+            if self._data_checkpoint.is_processed(path, idx, rec_no):
+                logger.debug(
+                    "idx:{} file:{} rec_no:{} data_len:{} already processed".
+                    format(idx, path, rec_no, len(data)))
+                continue
+
+            logger.debug("read idx:{} file:{} rec_no:{} data_len:{}".format(
+                idx, path, rec_no, len(data)))
+
+            yield Record(rec_no, data)
+
+    def _new_batch_data(self):
+        pass
+
+    def _process_file_list(self, metas):
+        rec_map = {}
+        b = self._new_batch_data()
+        size = 0
+        for m in metas:
+            for rec in self._process_one_file(m._idx, m._path):
+                if m not in b._batch:
+                    b._batch[m] = []
+                b._batch[m].append(rec)
+                size += 1
+        b._batch._size = size
+        yield b
+
+    def _report_batch_data(self, batch_data):
+        pass
+
     def _read_data(self):
         """
         read data into queue
         """
         while True:
-            file_data_set = self._sub_data_set.get()
-            if file_data_set is None:
-                logger.info("terminated exit!")
-                break
+            file_list = self._data_client._get_file_list()
+            if file_data_set is not None:
+                for batch_data in self._process_file_list(file_list):
+                    self._report_batch_data(batch_data)
+                    meta = self._data_client.get_batch_data_meta(self)
+                    self._set_batch_data(meta)
+                continue
 
-            rec_map = {}
-            for one_range in file_data_set.filtered_records:
-                for rec_no in range(one_range.begin, one_range.end + 1):
-                    rec_map[rec.record_no] = one_range.status
+            break
 
-            for rec_no, data in enumerate(
-                    self._reader_cls(file_data_set.file_path)):
-                if rec_no in rec_map and rec_map[
-                        rec_no] == RecordStatus.PROCSSED:
-                    continue
-
-                logger.debug("read rec_no:{} data_len:{}".format(rec_no,
-                                                                 len(data)))
-
-                self._data_queue.put(1, block=True)
-                key = self._get_file_key(file_data_set.idx_in_list,
-                                         file_data_set.file_path)
-                with self._lock:
-                    if key not in self._data:
-                        self._data[key] = {}
-                    self._data[key][rec_no] = data
+        logger.info("local data process completed.")
+        self._set_batch_data(meta)

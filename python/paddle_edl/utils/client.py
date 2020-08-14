@@ -60,3 +60,14 @@ class Client(object):
                 continue
 
             raise EdlExeception(error.detail)
+
+
+class DataSeverClient(ojbect):
+    def get_file_list(self, leader):
+        pass
+
+    def get_batch_data_meta(self, leader):
+        pass
+
+    def get_batch_data(self, meta):
+        pass

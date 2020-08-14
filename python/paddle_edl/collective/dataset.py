@@ -16,7 +16,7 @@ from six.moves.queue import Queue
 import multiprocessing
 
 
-class DataReader():
+class FileSplitter():
     """
     This the interface user should inherit. It will let's the framework knows the data file it's
     processing.
@@ -27,17 +27,22 @@ class DataReader():
         self._data_file = data_file
 
     def __iter__(self):
+        """
+        yield idx, record data
+        """
         raise NotImplementedError()
 
 
-class TxtDataReader(DataReader):
+class TxtFileSplitter(FileSplitter):
     def __init__(self, data_file):
-        super(self, TxtDataSet).__init__(data_file)
+        super(self, TxtFileSplitter).__init__(data_file)
 
     def __iter__(self):
+        idx = 0
         with open(self._data_file, "rb") as f:
             for line in f:
                 line = line.strip()
                 if len(line) <= 0:
                     continue
-                yield line
+                idx += 1
+                yield idx, line
