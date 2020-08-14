@@ -38,6 +38,21 @@ class BatchData(object):
         self._batch = {}
         self._size = None
 
+    def split_meta_and_data(object):
+        b = BatchData(self.data_reader_id, self._id)
+        b._size = self._size
+
+        a = []
+        for fidx, recs in self._batch:
+            rs = []
+            for rec in recs:
+                r = Record(rec._idx, None)
+                a.append(rec.data)
+                rs.append(r)
+            b._batch[fidx] = rs
+
+        return b, a
+
 
 class DataCheckpoint(object):
     def __init__(self):
@@ -115,17 +130,15 @@ class DataReader(ojbect):
         idx = {}
         data = []
         while True:
-            idx, data = self._data_queue.Pop()
-            if idx is None:
+            b = self._data_queue.Pop()
+            if b is None:
                 break
+            yield b.split_meta_and_data()  # meta, data
 
-        if len(idx) > 0:
-            yield idx, data
-        else:
-            self._t_read_data.join()
-            self._t_read_data = None
-            self._reach_end = True
-            raise StopIteration
+        self._t_read_data.join()
+        self._t_read_data = None
+        self._reach_end = True
+        raise StopIteration
 
     def _set_batch_data(self, meta):
         """
