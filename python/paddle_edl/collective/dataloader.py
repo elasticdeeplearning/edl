@@ -31,9 +31,9 @@ class FileMeta(object):
 
 
 class BatchData(object):
-    def __init__(self, data_reader_id, name):
+    def __init__(self, data_reader_id, b_id):
         self._data_reader_id = data_reader_id
-        self._name = name
+        self._id = b_id
         # FileIdx->Records
         self._batch = {}
         self._size = None
@@ -41,9 +41,9 @@ class BatchData(object):
 
 class DataCheckpoint(object):
     def __init__(self):
-        # file_dix=>record_idx
+        # file_idx=>set(record_idx)
         self._records = {}
-        self._file_idxs = {}
+        #self._file_idxs = {}
         self._restored_from = None
 
     def save_checkpoint(self, path):
@@ -52,7 +52,7 @@ class DataCheckpoint(object):
     def load_checkpoint(self, path):
         pass
 
-    def is_processed(self, path, file_idx, record_idx):
+    def is_processed(self, file_idx, path, record_idx):
         pass
 
 
@@ -79,6 +79,8 @@ class DataReader(ojbect):
 
         self._data_checkpoint = DataCheckpoint()
         self._data_checkpoint.load_checkpoint(checkpoint_path)
+        self._reach_end = False
+        self._cache = {}
 
         assert type(file_splitter_cls) == FileSplitter
 
@@ -101,7 +103,10 @@ class DataReader(ojbect):
         """
         get data from queue
         """
-        pass
+        self._reach_end = False
+        if self._t_read_data is None:
+            self._t_read_data = Thread(target=self._read_data)
+            self._t_read_data.start()
 
     def __next__(self):
         if self._reach_end:
@@ -112,52 +117,35 @@ class DataReader(ojbect):
         while True:
             idx, data = self._data_queue.Pop()
             if idx is None:
-                self._reach_end = True
                 break
 
         if len(idx) > 0:
             yield idx, data
         else:
+            self._t_read_data.join()
+            self._t_read_data = None
+            self._reach_end = True
             raise StopIteration
-
-    def _get_one_data_file(self):
-        pass
-
-    def _get_file_key(self, idx, file_path):
-        return "idx:{}_path:{}".format(idx, file_path)
-
-        return key
-
-    def _get_file_idx():
-        """
-        get file idx
-        """
-        while True:
-            file_data_set = self._get_sub_dataset()
-            if file_data_set is None:
-                logger.info("local data process completed.")
-                break
-        pass
 
     def _set_batch_data(self, meta):
         """
         get batch data idx
         """
-        meta = self._data_client.get_batch_data_meta(self)
         # reach end
         if meta is None:
             self._data_queue.push(None)
         self._data_queue.push(b)
 
         if meta.is_local():
-            b = self._cache[meta.name]
+            b = self._cache[meta._id]
+            self._cache.pop(meta._id)
         else:
             b = self._data_client.get_batch_data(meta)
         self._data_queue.push(b)
 
     def _process_one_file(self, idx, path):
         for rec_no, data in enumerate(self._splitter_cls(path)):
-            if self._data_checkpoint.is_processed(path, idx, rec_no):
+            if self._data_checkpoint.is_processed(idx, path, rec_no):
                 logger.debug(
                     "idx:{} file:{} rec_no:{} data_len:{} already processed".
                     format(idx, path, rec_no, len(data)))
@@ -169,7 +157,9 @@ class DataReader(ojbect):
             yield Record(rec_no, data)
 
     def _new_batch_data(self):
-        pass
+        self._b_id += 1
+        b = BatchData(self._id, self._b_id)
+        return b
 
     def _process_file_list(self, metas):
         rec_map = {}
@@ -181,8 +171,15 @@ class DataReader(ojbect):
                     b._batch[m] = []
                 b._batch[m].append(rec)
                 size += 1
-        b._batch._size = size
-        yield b
+                if size >= self._batch_size:
+                    b._batch._size = size
+                    yield b
+                    size = 0
+                else:
+                    continue
+
+        if size > 0:
+            yield b
 
     def _report_batch_data(self, batch_data):
         pass
@@ -195,12 +192,20 @@ class DataReader(ojbect):
             file_list = self._data_client._get_file_list()
             if file_data_set is not None:
                 for batch_data in self._process_file_list(file_list):
+                    self._cache[batch_data._id] = batch_data
+                    # report first and then get
                     self._report_batch_data(batch_data)
-                    meta = self._data_client.get_batch_data_meta(self)
+                    meta = self._data_client.get_batch_data_meta()
+                    if meta is None:
+                        break
                     self._set_batch_data(meta)
                 continue
 
             break
 
         logger.info("local data process completed.")
-        self._set_batch_data(meta)
+        while True:
+            meta = self._data_client.get_batch_data_meta()
+            if meta is None:
+                break
+            self._set_batch_data(meta)
