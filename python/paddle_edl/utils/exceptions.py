@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from ..utils import data_server_pb2 as pb
 
 
 class EdlException(Exception):
@@ -41,11 +42,14 @@ class EdlInternalError(EdlException):
     pass
 
 
-def raise_exeception(name, detail):
-    thismodule = sys.modules[__name__]
-    cls = getattr(thismodule, name)(detail)
+def deserialize_exception(s):
+    thismodule = sys.modules[s.__name__]
+    cls = getattr(thismodule, name)(s.detail)
     raise cls
 
 
-def get_instance_name(instance):
-    return instance.__class__.__name__
+def serialize_exception(e):
+    s = pb.Status()
+    s.status.type = e.__class__.__name__
+    s.status.detail = str(e)
+    return s

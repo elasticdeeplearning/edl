@@ -35,17 +35,56 @@ from .utils import logger
 
 
 class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
-    def __init__(self, loader):
-        self._loader = loader
+    def __init__(self, file_list, world_rank, self_rank):
+        self._file_list = file_list
+        self._lock = Threading.Lock()
 
-    def GetData(self, request, context):
+        # rank=>file_list
+        self._trainer_file_list = {}
+        self._initital()
+
+        # rank => batch_data_meta
+        self._trainer_batch_data_meta = {}
+
+        self._rank = self_rank
+
+    def _initital(self):
+        for i, f in enumerate(self._file_list):
+            if i not in self._dispatched:
+                self._trainer_file_list[i] = []
+            self._trainer_file_list[i].append(f)
+
+    def _check_leader(self, self_rank):
+        if self._rank != 0:
+            raise EdlNotLeaderError("This server is not Leader")
+
+    def GetBatchData(self, request, context):
         """
         try to get data from loader's queue and return.
         """
         pass
 
-    def PrepareSaveCheckpoint(self, request, context):
+    def GetBatchDataMeta(self, request, context):
         pass
+
+    def GetFileList(self, request, context):
+        res = FileListResponse()
+        try:
+            with self._lock:
+                if i not in self._trainer_file_list[i]:
+                    raise EdlFileListNotFoundError(
+                        "can't get filelist of rank:{} id:{}".format(
+                            request.rank, request.id))
+
+                res.status = pb.Status()
+                res.metas
+                for f in self._trainer_file_list[i]:
+                    meta = pb.Meta()
+                    res.metas.append(meta)
+            return res
+        except Exception as e:
+            res.status = serialize_exception(e)
+            return res
 
     def SaveCheckpoint(self, request, context):
         pass

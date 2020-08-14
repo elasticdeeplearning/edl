@@ -78,9 +78,27 @@ class DataCheckpoint(object):
         return True
 
 
+class FileCache(object):
+    def __init__(self, capcity=100):
+        """
+        capcity: GB
+        """
+        pass
+
+    def download(self, src_path, dst_path):
+        pass
+
+    def _clean_up(self):
+        pass
+
+
 class DataReader(ojbect):
-    def __init__(file_splitter_cls, file_list, batch_size, leader,
-                 checkpoint_path):
+    def __init__(file_splitter_cls,
+                 file_list,
+                 batch_size,
+                 leader,
+                 checkpoint_path,
+                 capcity=100):
         """
         file_splitter_cls is the class name of dataset.See example in dataset.py
         file_list is the input data file list and it should be get by loader.For example, all data
@@ -89,6 +107,8 @@ class DataReader(ojbect):
         1. get data file list from the leader.
         2. parse records from reader_cls' object.
         3. if there's no data local, try to pull data from other dataserver or raise StopIteration.
+
+        capcity: cached batch num
         """
         self._name = unique_name.generate("_datareader_")
 
@@ -103,6 +123,8 @@ class DataReader(ojbect):
         self._data_checkpoint.load_checkpoint(checkpoint_path)
         self._reach_end = False
         self._cache = {}
+        self._file_cache = FileCache()
+        self._b_id = 0
 
         assert type(file_splitter_cls) == FileSplitter
 
@@ -115,7 +137,7 @@ class DataReader(ojbect):
         """
         start and register the data server
         """
-        self._data_server = data_server.DataServer()
+        self._data_server = data_server.DataServer(self._file_list, world_rank)
         pass
 
     def _shut_down(self):
@@ -125,6 +147,7 @@ class DataReader(ojbect):
         """
         get data from queue
         """
+        self._local_file_list = self._data_client._get_file_list()
         self._reach_end = False
         if self._t_read_data is None:
             self._t_read_data = Thread(target=self._read_data)
@@ -132,7 +155,7 @@ class DataReader(ojbect):
 
     def __next__(self):
         while True:
-            b = self._data_queue.Pop()
+            b = self._data_queue.pop()
             if b is None:
                 break
             yield b.split_meta_and_data()  # meta, data
@@ -148,19 +171,20 @@ class DataReader(ojbect):
         """
         # reach end
         if meta is None:
-            self._data_queue.push(None)
+            self._data_queue.put(None)
             return False
 
         if meta.is_local():
             b = self._cache.pop(meta._id)
         else:
             b = self._data_client.get_batch_data(meta)
-        self._data_queue.push(b)
+        self._data_queue.put(b)
         if b is None:
             return False
         return True
 
-    def _process_one_file(self, idx, path):
+    def _process_one_file(self, idx, file_path):
+        path = self._file_cache.download(file_path)
         for rec_no, data in enumerate(self._splitter_cls(path)):
             if self._data_checkpoint.is_processed(idx, path, rec_no):
                 logger.debug(
@@ -198,23 +222,17 @@ class DataReader(ojbect):
         if size > 0:
             yield b
 
-    def _report_batch_data(self, batch_data):
-        pass
-
     def _read_data(self):
         """
         read data into queue
         """
         while True:
-            file_list = self._data_client._get_file_list()
-            if file_data_set is not None:
-                for batch_data in self._process_file_list(file_list):
-                    self._cache[batch_data._id] = batch_data
-                    # report first and then get
-                    self._report_batch_data(batch_data)
-                    meta = self._data_client.get_batch_data_meta()
-                    if not self._set_batch_data(meta):
-                        break
+            for batch_data in self._process_file_list(self._local_file_list):
+                self._cache[batch_data._id] = batch_data
+                # report and then get
+                meta = self._data_client.get_batch_data_meta()
+                if not self._set_batch_data(meta):
+                    break
                 continue
 
             break
