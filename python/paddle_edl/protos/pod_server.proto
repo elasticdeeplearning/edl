@@ -22,6 +22,7 @@ message RPCRet {
   string detail = 2;
 }
 
+/*
 message BarrierRequest {
   // barrier on stage
   string stage = 1;
@@ -29,9 +30,10 @@ message BarrierRequest {
   string pod_id = 3;
   string trainer_id = 4;
 }
+*/
 
 service PodServer {
-  rpc Barrier(BarrierRequest) returns (RPCRet) {}
+  // rpc Barrier(BarrierRequest) returns (RPCRet) {}
 
   // Cluster controller -> master
   // rpc ScaleOut(){}

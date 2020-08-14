@@ -57,18 +57,25 @@ class BatchData(object):
 class DataCheckpoint(object):
     def __init__(self):
         # file_idx=>set(record_idx)
-        self._records = {}
+        self._restored_records = {}
         #self._file_idxs = {}
         self._restored_from = None
 
-    def save_checkpoint(self, path):
+    def save_checkpoint(self, path, batch_datas):
         pass
 
     def load_checkpoint(self, path):
         pass
 
     def is_processed(self, file_idx, path, record_idx):
-        pass
+        if file_idx not in self._restored_records:
+            return False
+
+        rec_idxs = self._restored_records[file_idx]
+        if record_idx not in rec_idxs:
+            return False
+
+        return True
 
 
 class DataReader(ojbect):
@@ -124,11 +131,6 @@ class DataReader(ojbect):
             self._t_read_data.start()
 
     def __next__(self):
-        if self._reach_end:
-            raise StopIteration
-
-        idx = {}
-        data = []
         while True:
             b = self._data_queue.Pop()
             if b is None:
@@ -142,19 +144,21 @@ class DataReader(ojbect):
 
     def _set_batch_data(self, meta):
         """
-        get batch data idx
+        get batch data meta
         """
         # reach end
         if meta is None:
             self._data_queue.push(None)
-        self._data_queue.push(b)
+            return False
 
         if meta.is_local():
-            b = self._cache[meta._id]
-            self._cache.pop(meta._id)
+            b = self._cache.pop(meta._id)
         else:
             b = self._data_client.get_batch_data(meta)
         self._data_queue.push(b)
+        if b is None:
+            return False
+        return True
 
     def _process_one_file(self, idx, path):
         for rec_no, data in enumerate(self._splitter_cls(path)):
@@ -209,9 +213,8 @@ class DataReader(ojbect):
                     # report first and then get
                     self._report_batch_data(batch_data)
                     meta = self._data_client.get_batch_data_meta()
-                    if meta is None:
+                    if not self._set_batch_data(meta):
                         break
-                    self._set_batch_data(meta)
                 continue
 
             break
@@ -219,6 +222,5 @@ class DataReader(ojbect):
         logger.info("local data process completed.")
         while True:
             meta = self._data_client.get_batch_data_meta()
-            if meta is None:
+            if not self._set_batch_data(meta):
                 break
-            self._set_batch_data(meta)

@@ -13,29 +13,39 @@
 # limitations under the License.
 
 
-class EdlExeception(Exception):
+class EdlException(Exception):
     pass
 
 
-class EdLDuplicateInitDataSetError(EdlExeception):
+class EdlStopIteration(EdlException):
     pass
 
 
-class EdlDataSetEndError(EdlExeception):
+class EdlRegisterError(EdlException):
     pass
 
 
-class EdlRegisterError(EdlExeception):
+class EdlBarrierError(EdlException):
     pass
 
 
-class EdlBarrierError(EdlExeception):
+class EdlUnkownError(EdlException):
     pass
 
 
-class EdlUnkownError(EdlExeception):
+class EdlRankError(EdlException):
     pass
 
 
-class EdlRankError(EdlExeception):
+class EdlInternalError(EdlException):
     pass
+
+
+def raise_exeception(name, detail):
+    thismodule = sys.modules[__name__]
+    cls = getattr(thismodule, name)(detail)
+    raise cls
+
+
+def get_instance_name(instance):
+    return instance.__class__.__name__

@@ -12,19 +12,61 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import master_pb2
-from . import master_pb2_grpc
-from . import common_pb2
-from . import common_pb2_grpc
+from . import data_server_pb2 as pb
+from . import data_sever_pb2_grpc as pb_grpc
 from .cluster import Cluster
 import grpc
-from .exception import EdlExeception, EdlBarrierError
+from .exceptions import raise_execption
 
 
 class Client(object):
     def __init__(self, endpoint):
         self._endpoint = endpoint
 
+    def connect(self):
+        self._channel = grpc.insecure_channel(self._endpoint)
+        self._stub = data_server_pb2_grpc.DataServerStub(channel)
+
+    def stop(self):
+        self._channel = None
+        self._stub = None
+
+
+class DataClient(Client):
+    def __init__(self):
+        super(DataClient, self).__init__(endpoint)
+
+    def _request(self, server, req):
+        res = stub.GetFileList(req)
+        if res.status.type != "":
+            raise_exeception(res.status.type, res.status.detail)
+
+        return res
+
+    def get_file_list(self, server, self_id):
+        req = pb.FileListRequest()
+        req.data_reader_id = self_id
+
+        res = request(req)
+        return res.metas
+
+    def get_batch_data_meta(self, server, self_id, batch_id):
+        req = pb.BatchDataMetaRequest()
+        req.data_reader_id = self_id
+        req.batch_id = batch_id
+
+        res = request(server, req)
+        return res.meta
+
+    def get_batch_data(self, server, batch_id):
+        req = pb.BatchDataRequest()
+        req.batch_id = batch_id
+
+        res = request(server, req)
+        return res.batch
+
+
+'''
     def _get_conn(self):
         channel = grpc.insecure_channel(self._endpoint)
         stub = data_server_pb2_grpc.DataServerStub(channel)
@@ -60,14 +102,4 @@ class Client(object):
                 continue
 
             raise EdlExeception(error.detail)
-
-
-class DataSeverClient(ojbect):
-    def get_file_list(self, leader):
-        pass
-
-    def get_batch_data_meta(self, leader):
-        pass
-
-    def get_batch_data(self, meta):
-        pass
+'''
