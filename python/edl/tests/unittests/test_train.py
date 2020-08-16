@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import numpy as np
-from edl.data_reader import DataReader
+from edl.data_reader import DistributedDataReader
 from edl.dataset import TxtFileSplitter, FileMeta
 from paddle.fluid.incubate.fleet.collective import fleet
 import unittest
@@ -24,8 +24,8 @@ main_program = None
 exe = None
 
 
-def on_state_reset():
-    learing_rate = learning_rate * edl.size()
+def adjust():
+    learing_rate = learning_rate * edl.world_rank()
 
 
 class TestDataReader(unittest.TestCase):
@@ -42,10 +42,9 @@ class TestDataReader(unittest.TestCase):
                 self._data[idx].append(
                     record)  #[(path),(rec_no, splitted_fiels)]...
 
-    @edl.run
     def _train(self, state):
         print("learning_rate:", learning_rate)
-        reader = DataReader(
+        reader = DistributedDataReader(
             file_list=file_list,
             file_splitter_cls=TxtFileSplitter,
             splitted_data_field=["line"],
@@ -61,7 +60,7 @@ class TestDataReader(unittest.TestCase):
         fleet.init()
         state = edl.PaddleState(
             exe, start_program, main_program, optimizer, batch=0, epoch=0)
-        state.register_reset_callbacks([on_state_reset])
+        state.register_adjust_function([adjust])
         train(state)
 
 
