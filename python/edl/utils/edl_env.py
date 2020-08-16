@@ -17,7 +17,7 @@ from paddle_edl.utils.utils import get_gpus
 
 
 def get_from_dict_or_env(args, name, key):
-    if name in args:
+    if args and name in args:
         return args[name]
 
     return os.getenv(key, "")
@@ -137,7 +137,25 @@ class TrainerEnv(JobEnv):
     Parse all envs when edl_launch starts a trainer.
     """
 
-    def __init__(self, args):
+    def __init__(self, args=None):
         super(TrainerEnv, self).__init__(args)
 
-        self._rank = os["PADDLE_EDL_"]
+        self._rank = os["PADDLE_TRAINER_ID"]
+        self._rank_in_pod = os["PADDLE_TRAINER_RANK_IN_POD"]
+        self._trainer_endpoints = os["PADDLE_TRAINER_ENDPOINTS"]
+
+    @property
+    def rank(self):
+        return self._rank
+
+    @property
+    def rank_in_pod(self):
+        return self._rank_in_pod
+
+    @property
+    def trainer_endpoints(self):
+        return self._trainer_endpoints
+
+    @property
+    def size(self):
+        return len(self._trainer_endpoints)

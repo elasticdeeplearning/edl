@@ -25,7 +25,7 @@ exe = None
 
 
 def adjust():
-    learing_rate = learning_rate * edl.world_rank()
+    learing_rate = learning_rate * edl.size()
 
 
 class TestDataReader(unittest.TestCase):

@@ -15,6 +15,7 @@
 import paddle.fluid as fluid
 from fluid.reader import FileSplitter
 from ..utils import data_server
+from ..utils.edl_env import TrainerEnv
 import uuid
 
 
@@ -113,15 +114,9 @@ class DistributedDataReader(ojbect):
 
         __next__: return meta, (splitted_data_field data)
         """
-        """
-        self._job_id = os["PADDLE_JOB_ID"]
-        self._etcd_endpoints = os["PADDLE_ETCD_ENDPOINTS"]
-        self._rank = os["PADDLE_EDL_RANK"]
-        """
 
         self._id = uuid.uuid1()
         self._name = unique_name.generate("_datareader_")
-        #self._rank = trainer_rank
 
         #BatchData
         self._data_queue = Queue(capcity)
@@ -137,13 +132,14 @@ class DistributedDataReader(ojbect):
         self._cache = {}
         self._file_cache = FileCache()
         self._b_id = 0
+        self._env = TrainerEnv()
 
         assert type(file_splitter_cls) == FileSplitter
 
         self._register = DataReaderRegister(
             etcd_endoints=self._etcd_endpoints,
             job_id=self._job_id,
-            rank=self._rank,
+            rank=self._env.rank,
             reader=self)
 
         self._t_read_data = Thread(target=self._read_data)
@@ -158,7 +154,8 @@ class DistributedDataReader(ojbect):
         """
         start and register the data server
         """
-        self._data_server = data_server.DataServer(self._file_list, world_rank)
+        self._data_server = data_server.DataServer(self._file_list,
+                                                   self._env.world_rank)
 
     def _shut_down(self):
         self._data_server.wait()
