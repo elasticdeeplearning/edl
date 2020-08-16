@@ -38,7 +38,7 @@ message FileMeta {
 }
 
 message FileListResponse {
-  RPCRet ret = 1;
+  Status ret = 1;
   repeated FileMeta metas = 2;
 }
 
@@ -54,15 +54,10 @@ message BatchDataMetaRequest {
 }
 
 message BatchDataMetaResponse {
-  RPCRet Status status = 1;
+  Status status = 1;
   string data_reader_id = 2;
   string data_reader_endpoint = 3;
   string batch_data_id = 4;
-}
-
-message Record {
-  int64 rec_no = 1;
-  bytes data = 2;
 }
 
 message FileBatchData {
@@ -82,9 +77,9 @@ service PodServer {
   rpc GetFileList(FileListRequest) returns (FileListResponse) {}
   rpc GetBatchDataMeta(BatchDataMetaRequest) returns (BatchDataMetaResponse) {}
   rpc GetBatchData(BatchDataRequest) returns (BatchDataResponse) {}
-  rpc ShutDown(ShutDownRequest) returns (RPCRet) {}
+  rpc ShutDown(ShutDownRequest) returns (Status) {}
 
   // two step's to do it.
-  rpc PrePareSaveCheckpoint(CheckpointRequest) returns (RPCRet) {}
-  rpc SaveCheckpoint(CheckpointRequest) returns (RPCRet) {}
+  rpc PrePareSaveCheckpoint(CheckpointRequest) returns (Status) {}
+  rpc SaveCheckpoint(CheckpointRequest) returns (Status) {}
 }

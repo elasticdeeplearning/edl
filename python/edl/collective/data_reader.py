@@ -95,13 +95,14 @@ class FileCache(object):
 class DataReader(ojbect):
     def __init__(file_splitter_cls,
                  file_list,
+                 feed_list,
                  batch_size,
-                 leader,
-                 checkpoint_path,
+                 trainer_rank,
                  capcity=100):
         """
         file_splitter_cls is the class name of dataset.See example in dataset.py
         file_list is the input data file list and it should be get by loader.For example, all data
+        feed_list: the  file_splitter_cls's result field name by order
         file is on local or on hdfs.
         This class:
         1. get data file list from the leader.
@@ -111,6 +112,7 @@ class DataReader(ojbect):
         capcity: cached batch num
         """
         self._name = unique_name.generate("_datareader_")
+        self._rank = trainer_rank
 
         #BatchData
         self._data_queue = Queue(capcity)
