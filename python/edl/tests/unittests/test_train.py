@@ -15,7 +15,7 @@
 import numpy as np
 from edl.data_reader import DataReader
 from edl.dataset import TxtFileSplitter, FileMeta
-#from paddle.fluid.incubate.fleet.collective import fleet
+from paddle.fluid.incubate.fleet.collective import fleet
 import unittest
 
 learning_rate = 1.0
@@ -55,9 +55,10 @@ class TestDataReader(unittest.TestCase):
         for epoch in range(state.epoch, 5):
             for meta, batch in reader:
                 edl.notify_end_one_batch(meta, state)
-            edl.notify_end_one_epoch(meata, state)
+            edl.notify_end_one_epoch(state)
 
     def test_data_reader(self):
+        fleet.init()
         state = edl.PaddleState(
             exe, start_program, main_program, optimizer, batch=0, epoch=0)
         state.register_reset_callbacks([on_state_reset])

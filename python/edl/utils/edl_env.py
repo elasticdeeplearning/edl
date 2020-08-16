@@ -16,6 +16,13 @@ from paddle_edl.utils.utils import get_extern_ip, logger
 from paddle_edl.utils.utils import get_gpus
 
 
+def get_from_dict_or_env(args, name, key):
+    if name in args:
+        return args[name]
+
+    return os.getenv(key, "")
+
+
 class JobEnv(object):
     def _get_ports(self, args):
         if self._job_env.run_platform == "PADDLE_CLOUD":
@@ -31,33 +38,19 @@ class JobEnv(object):
 
     def _get_hdfs(self, args):
         # hdfs
-        if args.hdfs_home:
-            self._hdfs_home = args.hdfs_home
-        else:
-            self._hdfs_home = os.getenv("PADDLE_EDL_HDFS_HOME", "")
-
-        if args.hdfs_name:
-            self._hdfs_name = args.hdfs_name
-        else:
-            self._hdfs_name = os.getenv("PADDLE_EDL_HDFS_NAME", "")
-
-        if args.hdfs_path:
-            self._hdfs_name = args.hdfs_path
-        else:
-            self._hdfs_path = os.getenv("PADDLE_EDL_HDFS_PATH", "")
-
-        if args.hdfs_ugi:
-            self._hdfs_ugi = args.hdfs_ugi
-        else:
-            self._hdfs_ugi = os.getenv("PADDLE_EDL_HDFS_UGI", "")
+        self._hdfs_home = get_from_dict_or_env(args, "hdfs_home",
+                                               "PADDLE_EDL_HDFS_HOME")
+        self._hdfs_name = get_from_dict_or_env(args, "hdfs_name",
+                                               "PADDLE_EDL_HDFS_NAME")
+        self._hdfs_path = get_from_dict_or_env(args, "hdfs_path",
+                                               "PADDLE_EDL_HDFS_PATH")
+        self._hdfs_ugi = get_from_dict_or_env(args, "hdfs_ugi",
+                                              "PADDLE_EDL_HDFS_UGI")
 
     def _get_nodes_ranges(self, args):
         # nodes range
-        if args.nodes_range:
-            self._nodes_range = args.nodes_range
-        else:
-            self._nodes_range = os.getenv("PADDLE_EDL_NODES_RANGE", "")
-
+        self._nodes_range = get_from_dict_or_env(args, "nodes_range",
+                                                 "PADDLE_EDLNODES_RANAGE")
         assert self._nodes_range is not None, "nodes range must set"
         a = self._nodes_range.split(":")
         assert len(a) == 2, "nodes_range not a valid format:{}".format(
@@ -70,14 +63,12 @@ class JobEnv(object):
         self._gpus = utils.get_gpus(None)
 
         # proc per node
-        if args.nproc_per_node:
-            self._nproc_per_node = args.nproc_per_node
+        self._nodes_range = get_from_dict_or_env(args, "nproc_per_node",
+                                                 "PADDLE_EDL_NPROC_PERNODE")
+        if nproc_per_node is None:
+            self.nproc_per_node = len(self._gpus)
         else:
-            nproc_per_node = os.getenv("PADDLE_EDL_NPROC_PERNODE", "")
-            if nproc_per_node is None:
-                self.nproc_per_node = len(self._gpus)
-            else:
-                self._nproc_per_node = int(nproc_per_node)
+            self._nproc_per_node = int(nproc_per_node)
 
         assert len(
             self._gpus
@@ -88,17 +79,12 @@ class JobEnv(object):
         self._platform = os.get_env("PADDLE_RUNNING_PLATFORM", "")
 
         # job_id
-        if args.job_id:
-            self._job_id = args.job_id
-        else:
-            self._job_id = os.getenv("PADDLE_JOB_ID", "")
+        self._job_id = os.get_env(args, "job_id", "PADDLE_JOB_ID")
         assert self._job_id, "job_id must has valid value "
 
         # etcd
-        if args.etcd_endpoints:
-            self._etcd_endpoints = args.etcd_endpoints
-        else:
-            self._etcd_endpoints = os.getenv("PADDLE_ETCD_ENDPOINTS", "")
+        self._etcd_endpoints = os.get_env(args, "etcd_endpoints",
+                                          "PADDLE_ETCD_ENDPOINTS")
         assert self._etcd_endpoints, "etcd_endpoints must has valid value "
 
         self._ce_test = int(os.getenv("PADDLE_EDL_ONLY_FOR_CE_TEST", "0"))
@@ -146,8 +132,12 @@ class JobEnv(object):
         return self._job_id
 
 
-class TrainerEnv(object):
+class TrainerEnv(JobEnv):
     """
     Parse all envs when edl_launch starts a trainer.
     """
-    pass
+
+    def __init__(self, args):
+        super(TrainerEnv, self).__init__(args)
+
+        self._rank = os["PADDLE_EDL_"]

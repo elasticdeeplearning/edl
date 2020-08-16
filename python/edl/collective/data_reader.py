@@ -113,8 +113,11 @@ class DistributedDataReader(ojbect):
 
         __next__: return meta, (splitted_data_field data)
         """
+        """
         self._job_id = os["PADDLE_JOB_ID"]
         self._etcd_endpoints = os["PADDLE_ETCD_ENDPOINTS"]
+        self._rank = os["PADDLE_EDL_RANK"]
+        """
 
         self._id = uuid.uuid1()
         self._name = unique_name.generate("_datareader_")
@@ -136,6 +139,12 @@ class DistributedDataReader(ojbect):
         self._b_id = 0
 
         assert type(file_splitter_cls) == FileSplitter
+
+        self._register = DataReaderRegister(
+            etcd_endoints=self._etcd_endpoints,
+            job_id=self._job_id,
+            rank=self._rank,
+            reader=self)
 
         self._t_read_data = Thread(target=self._read_data)
         self._t_read_data.start()
