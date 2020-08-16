@@ -98,7 +98,7 @@ class JobEnv(object):
         if args.etcd_endpoints:
             self._etcd_endpoints = args.etcd_endpoints
         else:
-            self._etcd_endpoints = os.getenv("PADDLE_ETCD_ENPOINTS", "")
+            self._etcd_endpoints = os.getenv("PADDLE_ETCD_ENDPOINTS", "")
         assert self._etcd_endpoints, "etcd_endpoints must has valid value "
 
         self._ce_test = int(os.getenv("PADDLE_EDL_ONLY_FOR_CE_TEST", "0"))

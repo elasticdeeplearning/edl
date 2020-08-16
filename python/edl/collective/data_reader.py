@@ -15,6 +15,7 @@
 import paddle.fluid as fluid
 from fluid.reader import FileSplitter
 from ..utils import data_server
+import uuid
 
 
 class Record(object):
@@ -97,7 +98,6 @@ class DistributedDataReader(ojbect):
                  file_splitter_cls,
                  splitted_data_field,
                  batch_size,
-                 trainer_rank,
                  capcity=100):
         """
         file_splitter_cls is the class name of dataset.See example in dataset.py
@@ -113,11 +113,16 @@ class DistributedDataReader(ojbect):
 
         __next__: return meta, (splitted_data_field data)
         """
+        self._job_id = os["PADDLE_JOB_ID"]
+        self._etcd_endpoints = os["PADDLE_ETCD_ENDPOINTS"]
+
+        self._id = uuid.uuid1()
         self._name = unique_name.generate("_datareader_")
-        self._rank = trainer_rank
+        #self._rank = trainer_rank
 
         #BatchData
         self._data_queue = Queue(capcity)
+
         self._lock = Lock()
         self._file_list = file_list
         self._splitter_cls = file_splitter_cls
@@ -251,3 +256,14 @@ class DistributedDataReader(ojbect):
             meta = self._data_client.get_batch_data_meta()
             if not self._set_batch_data(meta):
                 break
+
+    @property
+    def endpoint(self):
+        return "{}:{}".format(utils.get_extern_ip(), self._serer.port)
+
+    def get_id(self):
+        return self._id
+
+    @property
+    def name(self):
+        return self._name

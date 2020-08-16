@@ -121,10 +121,24 @@ class PodRegister(object):
         self.stop()
 
 
-class DataServerRegister(Register):
-    def __init__(self, pod_id, trainer_rank, name, port):
+class DataReaderRegister(Register):
+    def __init__(self, etcd_endoints, job_id, rank, reader):
         """
-        /jobid/dataserver_name/nodes/rank:value
+        /jobid/data_reader/nodes/rank:value
         So the others can find it.
         """
-        pass
+        service = "data_reader"
+        sever = "{}".format(rank)
+        value = {
+            "id": reader.get_id(),
+            "name": reader.name,
+            "endpoint": reader.endpoint,
+            "rank": rank
+        }
+
+        super(DataReaderRegister, self).__init__(
+            etcd_endponts=etcd_endpoints,
+            job_id=job_id,
+            service=service,
+            server=server,
+            value=value)
