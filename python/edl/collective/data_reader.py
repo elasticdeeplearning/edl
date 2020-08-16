@@ -21,7 +21,7 @@ class Record(object):
     def __init__(self, idx, data):
         # idx in a file
         self._idx = idx
-        self._data = data
+        self._data = data  # data is ()
 
 
 class FileMeta(object):
@@ -34,7 +34,7 @@ class BatchData(object):
     def __init__(self, data_reader_id, b_id):
         self._data_reader_id = data_reader_id
         self._id = b_id
-        # FileIdx->Records
+        # FileMeta->Records
         self._batch = {}
         self._size = None
 
@@ -43,13 +43,13 @@ class BatchData(object):
         b._size = self._size
 
         a = []
-        for fidx, recs in self._batch:
+        for fmeta, recs in self._batch:
             rs = []
             for rec in recs:
                 r = Record(rec._idx, None)
                 a.append(rec.data)
                 rs.append(r)
-            b._batch[fidx] = rs
+            b._batch[fmeta] = rs
 
         return b, a
 
@@ -92,17 +92,17 @@ class FileCache(object):
         pass
 
 
-class DataReader(ojbect):
-    def __init__(file_splitter_cls,
-                 file_list,
-                 feed_list,
+class DistributedDataReader(ojbect):
+    def __init__(file_list,
+                 file_splitter_cls,
+                 splitted_data_field,
                  batch_size,
                  trainer_rank,
                  capcity=100):
         """
         file_splitter_cls is the class name of dataset.See example in dataset.py
         file_list is the input data file list and it should be get by loader.For example, all data
-        feed_list: the  file_splitter_cls's result field name by order
+        splitted_data_field: the  file_splitter_cls's result field name by order
         file is on local or on hdfs.
         This class:
         1. get data file list from the leader.
@@ -110,6 +110,8 @@ class DataReader(ojbect):
         3. if there's no data local, try to pull data from other dataserver or raise StopIteration.
 
         capcity: cached batch num
+
+        __next__: return meta, (splitted_data_field data)
         """
         self._name = unique_name.generate("_datareader_")
         self._rank = trainer_rank
@@ -135,14 +137,17 @@ class DataReader(ojbect):
 
         self._start_data_server()
 
+    def get_port(self):
+        return self._data_server.port()
+
     def _start_data_server(self):
         """
         start and register the data server
         """
         self._data_server = data_server.DataServer(self._file_list, world_rank)
-        pass
 
     def _shut_down(self):
+        self._data_server.wait()
         pass
 
     def __iter__(self):
@@ -187,7 +192,9 @@ class DataReader(ojbect):
 
     def _process_one_file(self, idx, file_path):
         path = self._file_cache.download(file_path)
-        for rec_no, data in enumerate(self._splitter_cls(path)):
+        for r in enumerate(self._splitter_cls(path)):
+            rec_no = r[0]
+            data = r[1:]
             if self._data_checkpoint.is_processed(idx, path, rec_no):
                 logger.debug(
                     "idx:{} file:{} rec_no:{} data_len:{} already processed".
@@ -197,7 +204,7 @@ class DataReader(ojbect):
             logger.debug("read idx:{} file:{} rec_no:{} data_len:{}".format(
                 idx, path, rec_no, len(data)))
 
-            yield Record(rec_no, data)
+            yield Record(rec_no, (data))
 
     def _new_batch_data(self):
         self._b_id += 1

@@ -140,8 +140,15 @@ class DataServer(object):
             affinity_rank_of_pod=affinity_rank_of_pod,
             endpoint=self._endpoint)
 
+    @property
+    def port(self):
+        return self._port
+
     def wait(self, timeout=None):
         if timeout is not None:
             self._server.stop(timeout)
             return
         self._server.wait_for_termination(timeout)
+
+    def shutdown(self):
+        pass
