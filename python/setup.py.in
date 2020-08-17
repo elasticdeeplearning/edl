@@ -44,19 +44,19 @@ REQUIRED_PACKAGES = [
     'six >= 1.10.0', 'protobuf >= 3.1.0', "flask", "pathlib2"
 ]
 
-packages=['paddle_edl', 
-          'paddle_edl.collective', 
-          'paddle_edl.discovery',
-          'paddle_edl.distill',
-          'paddle_edl.distill.redis',
+packages=['edl', 
+          'edl.collective', 
+          'edl.discovery',
+          'edl.distill',
+          'edl.distill.redis',
           ]
 
 setup(
-    name='paddle_edl',
+    name='edl',
     version=edl_version.replace('-', ''),
     description=
-    ('Paddle EDL Package'),
-    url='https://github.com/PaddlePaddle/edl',
+    ('EDL Package'),
+    url='https://github.com/elasticdeeplearning/edl',
     author='PaddlePaddle Author',
     author_email='guru4elephant@gmail.com',
     install_requires=REQUIRED_PACKAGES,
@@ -82,4 +82,10 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
     license='Apache 2.0',
-    keywords=('paddle_edl deployment industrial easy-to-use'))
+    keywords=('edl deployment industrial easy-to-use'),
+    entry_points={
+          'console_scripts': [
+              'edlrun = edl.collective.launch:run_commandline'
+          ]
+      }
+)

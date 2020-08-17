@@ -192,3 +192,12 @@ def launch(args):
         time.sleep(1)
 
     r.complete()
+
+
+def run_commandline():
+    args = _parse_args()
+    launch(args)
+
+
+if __name__ == '__main__':
+    run_commandline()

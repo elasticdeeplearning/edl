@@ -2,8 +2,8 @@ file(GLOB_RECURSE EDL_FILES collective/*.py demo/*.py demo/*.sh discovery/*.py d
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in ${CMAKE_CURRENT_BINARY_DIR}/setup.py)
 add_custom_command(
 	OUTPUT ${EDL_BINARY_DIR}/.timestamp
-	COMMAND cp -r ${CMAKE_CURRENT_SOURCE_DIR}/paddle_edl ${EDL_BINARY_DIR}/python/
+	COMMAND cp -r ${CMAKE_CURRENT_SOURCE_DIR}/edl ${EDL_BINARY_DIR}/python/
 	COMMAND python3.6 ./setup.py bdist_wheel --universal
     DEPENDS ${EDL_FILES})
 add_custom_target(edl_python ALL DEPENDS ${EDL_BINARY_DIR}/.timestamp)
-add_subdirectory(paddle_edl/tests/unittests)
+add_subdirectory(edl/tests/unittests)
