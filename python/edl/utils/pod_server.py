@@ -47,13 +47,19 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
         logger.info("get barrier request from {}".format(request))
 
         ids = get_current_pod_ids_from_resource()
+        leader = get_pod_leader()
 
         status = pb2.Status()
         with self._lock:
             try:
-                self._fan_in[request.pod_id] = ""
+                if key not in self._fan_in:
+                    self._fan_in[leader.stage] = {}
+
+                bd = self._fan_in[leader.stage]
+                bd[request.pod_id] = ""
+
                 for k in ids.keys():
-                    if k not in self._fan_in:
+                    if k not in bd:
                         status = serialize_exception(
                             EdlBarrierError("can't find id:{}".format(k)))
                         return status

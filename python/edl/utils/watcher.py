@@ -20,7 +20,7 @@ import json
 import collections
 from .cluster import Cluster
 
-from .constant import *
+from .global_vars import *
 
 
 class Watcher(object):

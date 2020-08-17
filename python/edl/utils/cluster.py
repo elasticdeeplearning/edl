@@ -58,6 +58,7 @@ class Pod(object):
             "trainer_ports": self._trainer_ports,
             "addr": self._addr,
             "gpus": self._gpus,
+            "stage": self._stage,
         }
 
         d["trainers"] = {}
@@ -75,6 +76,7 @@ class Pod(object):
         self._port = self._job_env.pod_port
         self._trainer_ports = pod.trainer_ports
         self._gpus = d["gpus"]
+        self._stage = d["stage"]
 
         self._trainers = []
 
@@ -246,9 +248,13 @@ class Trainer(object):
         self._global_rank = d["global_rank"]
 
     def __str__(self):
-        return "id:{} rank_in_pod:{} gpus:{} endpoint:{} global_rank:{}".format(
+        s = "id:{} rank_in_pod:{} gpus:{} endpoint:{} global_rank:{}".format(
             self._ids, self._rank_in_pod, self._gpus, self._endpoint,
             self._global_rank)
+
+        s += " stage:{}".format(stage)
+
+        return s
 
     def __eq__(self, t):
         if self._id != self._id:

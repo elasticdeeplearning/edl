@@ -20,7 +20,7 @@ from .cluster import Pod, PodStatus
 from ..discovery.etcd_client import EtcdClient
 
 import etcd3
-from .constant import *
+from .global_vars import *
 
 
 class Register(object):
@@ -73,6 +73,12 @@ class PodRegister(object):
             while valid:
                 try:
                     pod._rank = rank
+                    # register the leader stage
+                    if rank == 0:
+                        pod._stage = str(uuid.uuid1())
+                    else:
+                        pod._stage = None
+
                     info = pod.to_json()
                     if not self._etcd.set_server_not_exists(
                             self._service_name, server, info=info, timeout=0):
@@ -94,7 +100,8 @@ class PodRegister(object):
                     logger.warning("register to etcd error:{}".format(e))
                     continue
 
-        pod._rank = -1
+        pod._rank = None
+        pod._stage = None
         raise EdlRegisterError(
             "register {} to etcd:{} but can't find valid rank:{}".format(
                 server, job_env.ectd_endpoints, rank))

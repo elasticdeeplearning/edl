@@ -36,7 +36,7 @@ from ..utils.watcher import Watcher
 from ..utils.pod_server import PodServer
 from ..utils.utils import logger
 from ..utils import utils
-from ..constant import *
+from ..utils.global_vars import *
 
 
 def _print_arguments(args):
@@ -161,7 +161,7 @@ def launch(args):
     pod.from_env(job_env)
 
     # get global etcd and lock
-    get_etcd(job_env.etcd_endpoints)
+    get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
 
     pod_server = PodServer()
     # port changed in it.
