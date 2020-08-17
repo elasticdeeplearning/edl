@@ -17,7 +17,9 @@ import json
 
 from .utils import logger
 from .cluster import Pod, PodStatus
-from edl.discovery.etcd_client import EtcdClient
+from ..discovery.etcd_client import EtcdClient
+
+import etcd3
 
 
 class Register(object):
@@ -26,7 +28,7 @@ class Register(object):
         self._server = server
         self._stop = threading.Event()
         #don't change this ttl
-        self._etcd = EtcdClient(etcd_endpoints, root=job_id, ttl=10)
+        self._etcd = EtcdClient(etcd_endpoints, root=job_id)
 
         if not self._etcd.set_server_not_exists(service_name, server):
             raise exception.EdlRegisterError()
@@ -45,12 +47,10 @@ class Register(object):
 
 class PodRegister(object):
     def __init__(self, job_env, pod):
-        info = pod.to_json()
-
         self._stop = threading.Event()
-        self._etcd = EtcdClient(etcd_endpoints, root=job_id, ttl=10)
+        self._etcd = EtcdClient(job_env.etcd_endpoints, root=job_env.job_id)
 
-        sefl._service_name = "pod"
+        self._service_name = "pod"
         self._rank, self._server = self._register_rank(job_env, pod)
         self._t_register = threading.Thread(self._refresher)
         self._lock = threading.Lock()
@@ -65,18 +65,18 @@ class PodRegister(object):
             valid = True
             while valid:
                 try:
-                    pod.set_id(rank)
+                    pod.rank = rank
                     info = pod.to_json()
                     if not self._etcd.set_server_not_exists(
-                            self._service_name, sever, info=self._info,
-                            timeout=0):
+                            self._service_name, server, info=info, timeout=0):
                         valid = False
                         continue
                     else:
-                        logger.info("register rank:{} from etcd".format(rank))
+                        logger.info("register rank:{} on etcd".format(rank))
                         return rank, server
-                except (etcd3.ConnectionTimeoutError,
-                        ConnectionFailedError) as e:  # timeout and other
+                except (etcd3.exceptions.ConnectionTimeoutError,
+                        etcd3.exceptions.ConnectionFailedError
+                        ) as e:  # timeout and other
                     if time.time() - begin > timeout:
                         raise EdlRegisterError(
                             "register {} to etcd:{} timeout:{}".format(

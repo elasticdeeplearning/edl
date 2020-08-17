@@ -193,7 +193,7 @@ class Pod(object):
     @rank.setter
     def rank(self, value):
         self._rank = value
-        for i, t in enumerate(self._tainers()):
+        for i, t in enumerate(self._trainers):
             self._rank_in_pod = i
             t._global_rank = self._rank + self._rank_in_pod
 
@@ -202,8 +202,8 @@ class Pod(object):
         return self._port
 
     @port.setter
-    def port(self, port):
-        self._port = port
+    def port(self, value):
+        self._port = value
 
     @property
     def addr(self):
