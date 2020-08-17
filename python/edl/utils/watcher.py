@@ -18,11 +18,16 @@ from utils import logger
 from edl.discovery.etcd_client import EtcdClient
 import json
 import collections
+from .cluster import Cluster
+
+from .constant import *
 
 
 class Watcher(object):
     def __init__(self, etcd_endpoints, job_id):
-        self._etcd = EtcdClient(edl_env.etcd_endpoints, root=job_id)
+        self._etcd = EtcdClient(etcd_endpoints, root=job_id)
+        self._etcd.init()
+
         self._job_id = job_id
         self._changed = False
 
@@ -33,13 +38,13 @@ class Watcher(object):
         self._lock = Lock()
 
     def watch(self):
-        self._t_watcher = Threading(selt._watcher)
+        self._t_watcher = Thread(target=self._watcher)
         self._t_watcher.start()
 
     def _watcher(self):
         begin = time.time()
         while True:
-            servers = self._etcd._get_server("pod")
+            servers = self._etcd.get_service(EDL_POD_RANK)
             ranks = {}
             with self._lock:
                 for s in servers:
@@ -87,3 +92,16 @@ class Watcher(object):
     def stop(self):
         self._stop.set()
         self._t_watcher.join()
+
+
+def get_current_pod_ids_from_resource():
+    with g_etcd_lock:
+        pod_resource_servers = etcd.get_service(ETC_POD_RESOURCE)
+
+    p = Pod()
+    ids = set()
+    for m in pod_resource_servers:
+        p.from_json(m.info)
+        ids.add(p.id)
+
+    return ids

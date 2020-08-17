@@ -209,6 +209,13 @@ class Pod(object):
     def addr(self):
         return self._addr
 
+    @property
+    def endpoint(self):
+        return "{}:{}".format(self._addr, self._port)
+
+    def get_id(self):
+        return self._id
+
 
 class Trainer(object):
     def __init__(self):
@@ -320,6 +327,10 @@ class Cluster(object):
 
     def get_pods_nranks(self):
         return len(self._pods)
+
+    @property
+    def pods(self):
+        return self._pods
 
     def get_trainers_endpoints(self):
         r = []

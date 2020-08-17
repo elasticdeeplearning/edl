@@ -20,24 +20,26 @@ from .cluster import Pod, PodStatus
 from ..discovery.etcd_client import EtcdClient
 
 import etcd3
+from .constant import *
 
 
 class Register(object):
-    def __init__(self, etcd_endpoints, job_id, service, server, value):
+    def __init__(self, etcd_endpoints, job_id, service, server, info):
         self._service = service
         self._server = server
         self._stop = threading.Event()
         #don't change this ttl
         self._etcd = EtcdClient(etcd_endpoints, root=job_id)
+        self._etcd.init()
 
-        if not self._etcd.set_server_not_exists(service_name, server):
+        if not self._etcd.set_server_not_exists(service, server, info):
             raise exception.EdlRegisterError()
 
-        self._t_register = threading.Thread(self._refresher)
+        self._t_register = threading.Thread(target=self._refresher)
 
     def _refresher(self):
         while not self._stop.is_set():
-            self._etcd_lock.refresh(service_name, server)
+            self._etcd_lock.refresh(service, server)
             time.sleep(3)
 
     def stop(self):
@@ -49,10 +51,11 @@ class PodRegister(object):
     def __init__(self, job_env, pod):
         self._stop = threading.Event()
         self._etcd = EtcdClient(job_env.etcd_endpoints, root=job_env.job_id)
+        self._etcd.init()
 
-        self._service_name = "pod"
+        self._service_name = ETCD_POD_RANK
         self._rank, self._server = self._register_rank(job_env, pod)
-        self._t_register = threading.Thread(self._refresher)
+        self._t_register = threading.Thread(target=self._refresher)
         self._lock = threading.Lock()
         self._changed = False
         self._pod = pod
@@ -60,20 +63,23 @@ class PodRegister(object):
 
     def _register_rank(self, job_env, pod, timeout=300):
         rank = -1
+        begin = time.time()
         for rank in range(0, job_env.up_limit_nodes):
             server = "{}".format(rank)
             valid = True
             while valid:
                 try:
-                    pod.rank = rank
+                    pod._rank = rank
                     info = pod.to_json()
                     if not self._etcd.set_server_not_exists(
                             self._service_name, server, info=info, timeout=0):
                         valid = False
                         continue
-                    else:
-                        logger.info("register rank:{} on etcd".format(rank))
-                        return rank, server
+
+                    logger.info("register rank:{} on etcd".format(rank))
+                    # set rank
+                    pod.rank = rank
+                    return rank, server
                 except (etcd3.exceptions.ConnectionTimeoutError,
                         etcd3.exceptions.ConnectionFailedError
                         ) as e:  # timeout and other
@@ -82,8 +88,10 @@ class PodRegister(object):
                             "register {} to etcd:{} timeout:{}".format(
                                 server, job_env.ectd_endpoints, timeout))
                     time.sleep(1)
+                    logger.warning("register to etcd error:{}".format(e))
                     continue
 
+        pod._rank = -1
         raise EdlRegisterError(
             "register {} to etcd:{} but can't find valid rank:{}".format(
                 server, job_env.ectd_endpoints, rank))
@@ -107,7 +115,7 @@ class PodRegister(object):
         self._stop.set()
         self._t_register.join()
 
-    def is_master(self):
+    def is_leader(self):
         return self._rank == 0
 
     def changed(self):
@@ -119,6 +127,24 @@ class PodRegister(object):
         info = pod.to_json()
         self._etcd.set_server_permanent(self._server_name, self._server, info)
         self.stop()
+
+
+class PodResourceRegister(Register):
+    def __init__(self, etcd_endpoints, job_id, pod):
+        """
+        /jobid/data_reader/nodes/rank:value
+        So the others can find it.
+        """
+        service = ETCD_POD_RESOURCE
+        server = "{}".format(pod.get_id())
+        value = pod.to_json()
+
+        super(PodResourceRegister, self).__init__(
+            etcd_endpoints=etcd_endpoints,
+            job_id=job_id,
+            service=service,
+            server=server,
+            info=value)
 
 
 class DataReaderRegister(Register):
@@ -137,8 +163,8 @@ class DataReaderRegister(Register):
         }
 
         super(DataReaderRegister, self).__init__(
-            etcd_endponts=etcd_endpoints,
+            etcd_endpoints=etcd_endpoints,
             job_id=job_id,
             service=service,
             server=server,
-            value=value)
+            info=value)

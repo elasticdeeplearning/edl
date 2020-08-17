@@ -22,22 +22,18 @@ message Status {
   string detail = 2;
 }
 
-/*
 message BarrierRequest {
-  // barrier on stage
-  string stage = 1;
-  string job_id = 2;
-  string pod_id = 3;
-  string trainer_id = 4;
+  string job_id = 1;
+  string pod_id = 2;
 }
-*/
 
 message ScaleInRequest { int32 num = 1; }
 
 message ScaleOutRequest {}
 
 service PodServer {
-  // rpc Barrier(BarrierRequest) returns (RPCRet) {}
+  rpc Barrier(BarrierRequest) returns (Status) {}
+
   // Cluster controller -> master
   rpc ScaleOut(ScaleOutRequest) returns (Status) {}
   rpc ScaleIn(ScaleInRequest) returns (Status) {}

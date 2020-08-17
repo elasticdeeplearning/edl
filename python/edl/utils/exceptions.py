@@ -42,7 +42,7 @@ class EdlInternalError(EdlException):
     pass
 
 
-def deserialize_exception(s):
+def deserialize_exception(s, name):
     thismodule = sys.modules[s.__name__]
     cls = getattr(thismodule, name)(s.detail)
     raise cls

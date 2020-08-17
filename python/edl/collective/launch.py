@@ -29,13 +29,14 @@ import paddle.fluid as fluid
 from contextlib import closing
 import socket
 
-from edl.utils.utils import *
 from ..utils.edl_env import JobEnv
 from ..utils.cluster import Pod
-from ..utils.register import PodRegister
+from ..utils.register import PodRegister, PodResourceRegister, ETCD_POD_RANK, ETCD_POD_RESOURCE
 from ..utils.watcher import Watcher
 from ..utils.pod_server import PodServer
+from ..utils.utils import logger
 from ..utils import utils
+from ..constant import *
 
 
 def _print_arguments(args):
@@ -110,15 +111,11 @@ def _parse_args():
 
 
 def _convert_args_to_dict(args):
-    return {
-        "nodes_range": args.nodes_range,
-        "nproc_per_node": args.nproc_per_node,
-        "etcd_endpoints": args.etcd_endpoints,
-        "job_id": args.job_id,
-        "hdfs_name": args.hdfs_name,
-        "hdfs_path": args.hdfs_path,
-        "hdfs_ugi": args.hdfs_ugi,
-    }
+    d = {}
+    for k, v in six.iteritems(vars(args)):
+        if v is not None:
+            d[k] = v
+    return d
 
 
 def edl_barrier(job_env, pod, timeout=60):
@@ -129,26 +126,34 @@ def edl_barrier(job_env, pod, timeout=60):
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id)
     watcher.watch()
 
+    # pod's
+    with g_etcd_lock:
+        pod_resource_servers = g_etcd.get_service(ETC_POD_RESOURCE)
+
     # cluster must have mnimum pods
     cluster = None
     start = time.time()
     while True:
         cluster = watcher.get_cluster()
-        if len(cluster.pods) < job_env.min_nodes:
+        if len(cluster.pods) < job_env.min_nodes or \
+                len(cluster.pods) != len(pod_resource_servers):
             time.sleep(1)
 
             timeout -= 1
             if timeout <= 0:
-                logger.warning("can't get enough nodes_num:{}, nodes:{}".
-                               format(len(cluster.pods), cluster))
+                logger.fatal(
+                    "can't get enough nodes_num:{}, job_env.min_nodes:{} pod_resource_server_num:{} nodes:{}".
+                    format(
+                        len(cluster.pods), job_env.min_nodes,
+                        len(pod_resource_servers), cluster))
+                sys.exit(1)
             continue
 
-    # all pods barrier on master to avoid pod from last job stage
-    master = cluster.pods[0]
-    endpoint = "{}:{}".format(master.addr, master.port)
+    # all pods barrier on leader to avoid pod from last job stage
+    leader = cluster.pods[0]
     start = time.time()
     while True:
-        c = Client(endpoint)
+        c = Client(leader.endpoint)
         try:
             if not c.Barrier(job_env.job_id, pod.id):
                 continue
@@ -169,11 +174,19 @@ def launch(args):
     pod = Pod()
     pod.from_env(job_env)
 
+    # get global etcd and lock
+    get_etcd(job_env.etcd_endpoints)
+
     pod_server = PodServer()
     # port changed in it.
     pod_server.start(job_env, pod)
     logger.info("pod server started:{}".format(pod))
 
+    # register pod resource, they can't be stopped.
+    pod_rr = PodResourceRegister(job_env.etcd_endpoints, job_env.job_id, pod)
+
+    # register rank and watch the rank
+    # if the rank changed, the pods should restart the training proc.
     register, watcher = edl_barrier(job_env, pod, timeout=600)
 
     while True:
@@ -189,8 +202,8 @@ def launch(args):
             logger.info("Cluster changed. New cluster:{}. Old Cluster:{}".
                         format(cluster2, cluster))
 
-            r.stop()
-            w.stop()
+            register.stop()
+            watcher.stop()
             terminiate_local_trainers(procs)
             # wait all pods info displayed from etcd
             # don't change this time,since the ttl is set to 10s in registers
@@ -206,7 +219,7 @@ def launch(args):
 
         time.sleep(1)
 
-    r.complete()
+    register.complete()
 
 
 def run_commandline():

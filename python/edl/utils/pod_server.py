@@ -27,12 +27,16 @@ import copy
 from .utils import logger
 from . import pod_server_pb2_grpc as pb2_grpc
 from . import pod_server_pb2 as pb2
+from .watcher import get_current_pod_ids_from_resource
+from .exceptions import *
 
 
 class PodServerServicer(pb2_grpc.PodServerServicer):
     def __init__(self):
         # to control the cache size.
         self._lock = Lock()
+        self._fan_in = {}
+        self._etcd = None
 
     def ScaleOut(self, request, context):
         pass
@@ -41,7 +45,21 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
         pass
 
     def Barrier(self, request, context):
-        pass
+        ids = get_current_pod_ids_from_resource()
+        status = pb2.Status()
+        with self._lock:
+            try:
+                self._fan_in[request.pod_id] = ""
+                for k in ids.keys():
+                    if k not in self._fan_in:
+                        status = serialize_exception(
+                            EdlBarrierError("can't find id:{}".format(k)))
+                        return status
+            except Exception as e:
+                status = serialize_exception(EdlInternalError(str(e)))
+                return status
+
+        return status
 
     def ShutDown(self, request, context):
         pass
@@ -61,7 +79,7 @@ class PodServer(object):
             maximum_concurrent_rpcs=concurrency)
         pb2_grpc.add_PodServerServicer_to_server(PodServerServicer(), server)
 
-        self._port = server.add_insecure_port('{}'.format(pod.addr))
+        self._port = server.add_insecure_port('{}:0'.format(pod.addr))
         assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(
             pod.addr, self._port)
         self._endpoint = "{}:{}".format(pod.addr, self._port)

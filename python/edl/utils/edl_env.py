@@ -17,6 +17,7 @@ import sys
 
 from . import utils
 from .utils import logger
+import six
 
 
 def get_from_dict_or_env(args, name, key):
@@ -68,7 +69,7 @@ class JobEnv(object):
         # proc per node
         nproc_per_node = get_from_dict_or_env(args, "nproc_per_node",
                                               "PADDLE_EDL_NPROC_PERNODE")
-        if nproc_per_node is None:
+        if nproc_per_node is None or nproc_per_node == "":
             self._nproc_per_node = len(self._gpus)
         else:
             self._nproc_per_node = int(nproc_per_node)
@@ -86,9 +87,10 @@ class JobEnv(object):
         assert self._job_id, "job_id must has valid value "
 
         # etcd
-        self._etcd_endpoints = get_from_dict_or_env(args, "etcd_endpoints",
-                                                    "PADDLE_ETCD_ENDPOINTS")
-        assert self._etcd_endpoints, "etcd_endpoints must has valid value "
+        etcd_endpoints = get_from_dict_or_env(args, "etcd_endpoints",
+                                              "PADDLE_ETCD_ENDPOINTS")
+        assert etcd_endpoints != "", "etcd_endpoints must has valid value "
+        self._etcd_endpoints = etcd_endpoints.split(",")
 
         self._ce_test = int(os.getenv("PADDLE_EDL_ONLY_FOR_CE_TEST", "0"))
         self._get_hdfs(args)
@@ -141,7 +143,7 @@ class JobEnv(object):
     def __str__(self):
         d = vars(self)
         s = ""
-        for k, v in vars(self).iteritems():
+        for k, v in six.iteritems(vars(self)):
             s += "{}:{} ".format(k, v)
         return s
 

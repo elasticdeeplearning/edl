@@ -54,6 +54,7 @@ class EtcdClient(object):
                  endpoints=['127.0.0.1:2379'],
                  passwd=None,
                  root="service"):
+        assert isinstance(endpoints, list), "endpoints must be list"
         self._endpoints = set(endpoints)
         self._passwd = passwd
         self._etcd = None
