@@ -46,6 +46,9 @@ class Register(object):
         self._stop.set()
         self._t_register.join()
 
+    def __exit__(self):
+        self.stop()
+
 
 class PodRegister(object):
     def __init__(self, job_env, pod):
@@ -114,6 +117,9 @@ class PodRegister(object):
     def stop(self):
         self._stop.set()
         self._t_register.join()
+
+    def __exit__(self):
+        self.stop()
 
     def is_leader(self):
         return self._rank == 0

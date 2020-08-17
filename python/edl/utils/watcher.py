@@ -43,7 +43,7 @@ class Watcher(object):
 
     def _watcher(self):
         begin = time.time()
-        while True:
+        while not self._stop.is_set():
             servers = self._etcd.get_service(EDL_POD_RANK)
             ranks = {}
             with self._lock:
@@ -93,15 +93,33 @@ class Watcher(object):
         self._stop.set()
         self._t_watcher.join()
 
+    def __exit__(self):
+        self.stop()
+
 
 def get_current_pod_ids_from_resource():
     with g_etcd_lock:
-        pod_resource_servers = etcd.get_service(ETC_POD_RESOURCE)
+        pod_resource_servers = etcd.get_service(ETCD_POD_RESOURCE)
 
     p = Pod()
     ids = set()
     for m in pod_resource_servers:
         p.from_json(m.info)
         ids.add(p.id)
+
+    return ids
+
+
+def get_pod_leader():
+    try:
+        with g_etcd_lock:
+            value, _ = etcd._get_server(ETCD_POD_RANK, "0")
+
+        leader = Pod()
+        leader.from_json(value)
+        return leader
+    except Exception as e:
+        logger.warning("get pod leader error:{}".format(e))
+        return None
 
     return ids

@@ -118,53 +118,37 @@ def _convert_args_to_dict(args):
     return d
 
 
-def edl_barrier(job_env, pod, timeout=60):
-    # regist and get rank
+def edl_barrier(job_env, pod, timeout):
+    start = time.time()
+
+    # regist and get rank, leader is in it.
     register = PodRegister(job_env, pod)
 
-    # watcher
-    watcher = Watcher(job_env.etcd_endpoints, job_env.job_id)
-    watcher.watch()
-
-    # pod's
-    with g_etcd_lock:
-        pod_resource_servers = g_etcd.get_service(ETC_POD_RESOURCE)
-
-    # cluster must have mnimum pods
-    cluster = None
-    start = time.time()
+    # all pods barrier on leader
     while True:
-        cluster = watcher.get_cluster()
-        if len(cluster.pods) < job_env.min_nodes or \
-                len(cluster.pods) != len(pod_resource_servers):
-            time.sleep(1)
-
-            timeout -= 1
-            if timeout <= 0:
-                logger.fatal(
-                    "can't get enough nodes_num:{}, job_env.min_nodes:{} pod_resource_server_num:{} nodes:{}".
-                    format(
-                        len(cluster.pods), job_env.min_nodes,
-                        len(pod_resource_servers), cluster))
-                sys.exit(1)
-            continue
-
-    # all pods barrier on leader to avoid pod from last job stage
-    leader = cluster.pods[0]
-    start = time.time()
-    while True:
-        c = Client(leader.endpoint)
         try:
+            leader = get_pod_leader()
+            if leader is None:
+                raise EdlBarrierError("can't get pod leader")
+
+            c = Client(leader.endpoint)
             if not c.Barrier(job_env.job_id, pod.id):
                 continue
-        except EdlJobStageError as e:
-            continue
         except Exception as e:
-            time.sleep(1)
-            if time.time() - start > timeout:
-                logger.warning("can't barrier of nodes_num:{} nodes:{}".format(
-                    len(cluster.pods), cluster))
+            logger.warning(
+                "wait to barrier with all, context:job_env{} pod:{}".format(
+                    job_env, pod))
+            time.sleep(3)
             continue
+
+        if time.time() - start > timeout:
+            logger.warning("can't barrier with all, context:job_env{} pod:{}".
+                           format(job_env, pod))
+            return None, None
+
+    # watcher exit when cluster changed
+    watcher = Watcher(job_env.etcd_endpoints, job_env.job_id)
+    watcher.watch()
 
     return register, watcher
 
