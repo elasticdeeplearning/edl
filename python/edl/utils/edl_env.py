@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle_edl.utils.utils import get_extern_ip, logger
-from paddle_edl.utils.utils import get_gpus
+import os
+import sys
+
+from . import utils
+from .utils import logger
 
 
 def get_from_dict_or_env(args, name, key):
@@ -25,7 +28,7 @@ def get_from_dict_or_env(args, name, key):
 
 class JobEnv(object):
     def _get_ports(self, args):
-        if self._job_env.run_platform == "PADDLE_CLOUD":
+        if self._platform == "PADDLE_CLOUD":
             ports = os.getenv("PADDLE_TRAINER_PORTS", "")
             self._trainer_ports = ports.split(",")
 
@@ -33,7 +36,7 @@ class JobEnv(object):
                 "port num:{} must large than gpus:{}".format(len(self._trainer_ports), len(self._gpus))
             logger.info("get ports from env:{}".format(self._trainer_ports))
         else:
-            self._trainer_ports = utils.find_free_ports(len(_gpus))
+            self._trainer_ports = list(utils.find_free_ports(len(self._gpus)))
             logger.info("get ports from unused:{}".format(self._trainer_ports))
 
     def _get_hdfs(self, args):
@@ -63,10 +66,10 @@ class JobEnv(object):
         self._gpus = utils.get_gpus(None)
 
         # proc per node
-        self._nodes_range = get_from_dict_or_env(args, "nproc_per_node",
-                                                 "PADDLE_EDL_NPROC_PERNODE")
+        nproc_per_node = get_from_dict_or_env(args, "nproc_per_node",
+                                              "PADDLE_EDL_NPROC_PERNODE")
         if nproc_per_node is None:
-            self.nproc_per_node = len(self._gpus)
+            self._nproc_per_node = len(self._gpus)
         else:
             self._nproc_per_node = int(nproc_per_node)
 
@@ -76,15 +79,15 @@ class JobEnv(object):
 
     def __init__(self, args):
         # run platform
-        self._platform = os.get_env("PADDLE_RUNNING_PLATFORM", "")
+        self._platform = os.getenv("PADDLE_RUNNING_PLATFORM", "")
 
         # job_id
-        self._job_id = os.get_env(args, "job_id", "PADDLE_JOB_ID")
+        self._job_id = get_from_dict_or_env(args, "job_id", "PADDLE_JOB_ID")
         assert self._job_id, "job_id must has valid value "
 
         # etcd
-        self._etcd_endpoints = os.get_env(args, "etcd_endpoints",
-                                          "PADDLE_ETCD_ENDPOINTS")
+        self._etcd_endpoints = get_from_dict_or_env(args, "etcd_endpoints",
+                                                    "PADDLE_ETCD_ENDPOINTS")
         assert self._etcd_endpoints, "etcd_endpoints must has valid value "
 
         self._ce_test = int(os.getenv("PADDLE_EDL_ONLY_FOR_CE_TEST", "0"))
@@ -131,11 +134,14 @@ class JobEnv(object):
     def job_id(self):
         return self._job_id
 
+    @property
+    def trainer_ports(self):
+        return self._trainer_ports
+
 
 class TrainerEnv(JobEnv):
     """
-    Parse all envs when edl_launch starts a trainer.
-    """
+    Parse all envs when edl_launch starts a trainer.  """
 
     def __init__(self, args=None):
         super(TrainerEnv, self).__init__(args)

@@ -17,7 +17,7 @@ import json
 
 from .utils import logger
 from .cluster import Pod, PodStatus
-from paddle_edl.discovery.etcd_client import EtcdClient
+from edl.discovery.etcd_client import EtcdClient
 
 
 class Register(object):

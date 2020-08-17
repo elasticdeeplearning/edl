@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import pod_server_pb2
-from . import data_server_pb2
+import paddle.fluid as fluid
 import logging
 import google.protobuf.text_format as text_format
 import socket
+from contextlib import closing
+
+from . import pod_server_pb2
+from . import data_server_pb2
 
 logger = logging.getLogger("root")
 logger.propagate = False

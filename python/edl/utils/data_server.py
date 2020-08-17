@@ -30,7 +30,7 @@ from .dataset import DataReader
 import signal
 import threading
 import copy
-import paddle_edl.utils.utils as utils
+import edl.utils.utils as utils
 from .utils import logger
 
 

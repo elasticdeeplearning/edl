@@ -29,12 +29,12 @@ import paddle.fluid as fluid
 from contextlib import closing
 import socket
 
-from paddle_edl.utils.utils import *
-from edl_env import JobEnv
-from .cluster import Pod
-from .register import PodRegister
-from .watcher import Watcher
-import paddle_edl.utils.master_client as master_client
+from edl.utils.utils import *
+from ..utils.edl_env import JobEnv
+from ..utils.cluster import Pod
+from ..utils.register import PodRegister
+from ..utils.watcher import Watcher
+from ..utils.pod_server import PodServer
 
 
 def _print_arguments(args):
@@ -108,6 +108,18 @@ def _parse_args():
     return parser.parse_args()
 
 
+def _convert_args_to_dict(args):
+    return {
+        "nodes_range": args.nodes_range,
+        "nproc_per_node": args.nproc_per_node,
+        "etcd_endpoints": args.etcd_endpoints,
+        "job_id": args.job_id,
+        "hdfs_name": args.hdfs_name,
+        "hdfs_path": args.hdfs_path,
+        "hdfs_ugi": args.hdfs_ugi,
+    }
+
+
 def edl_barrier(job_env, pod, timeout=60):
     # regist and get rank
     register = PodRegister(job_env, pod)
@@ -150,13 +162,14 @@ def edl_barrier(job_env, pod, timeout=60):
 
 
 def launch(args):
-    job_env = JobEnv(args)
+    args_dict = _convert_args_to_dict(args)
+    job_env = JobEnv(args_dict)
     pod = Pod()
     pod.from_env(job_env)
 
     pod_server = PodServer()
     # port changed in it.
-    pod_server.start(jobe_env, pod)
+    pod_server.start(job_env, pod)
     logger.info("pod server started:{}", pod)
 
     register, watcher = edl_barrier(job_env, pod, timeout=600)

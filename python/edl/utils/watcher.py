@@ -15,7 +15,7 @@
 from threading import Lock, Thread
 import time
 from utils import logger
-from paddle_edl.discovery.etcd_client import EtcdClient
+from edl.discovery.etcd_client import EtcdClient
 import json
 import collections
 

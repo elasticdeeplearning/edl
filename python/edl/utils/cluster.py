@@ -18,18 +18,18 @@
 
 import functools
 import logging
-import socket
 import time
 import os
 import signal
 import copy
 import sys
 import subprocess
-from contextlib import closing
-import socket
 import uuid
+import json
 import collections
 from .exceptions import *
+from . import utils
+from enum import Enum
 
 
 class PodStatus(Enum):
@@ -48,7 +48,7 @@ class Pod(object):
         self._gpus = None
         self._trainers = None
         self._port = None
-        self._status = PODStatus.INITIAL  # status maybe changed
+        self._status = PodStatus.INITIAL  # status maybe changed
 
     def to_json(self):
         d = {
@@ -61,7 +61,7 @@ class Pod(object):
         }
 
         d["trainers"] = {}
-        for i, t in enumerate(trainers):
+        for i, t in enumerate(self._trainers):
             d["trainers"][i] = t.to_json()
 
         return json.dumps(d)
@@ -76,7 +76,7 @@ class Pod(object):
         self._trainer_ports = pod.trainer_ports
         self._gpus = d["gpus"]
 
-        self.trainers = []
+        self._trainers = []
 
         od = collections.OrderedDict(sorted(d["trainers"].items()))
         for i, (key, value) in enumerate(od.iteritems()):
@@ -89,20 +89,20 @@ class Pod(object):
         self._job_env = job_env
 
         # uuid
-        self._id = uuid.uuid1()
+        self._id = str(uuid.uuid1())
         self._trainer_ports = job_env.trainer_ports
 
         # gpus
-        self._gpus = job_env.selected_gpus
+        self._gpus = job_env.gpus
 
         # hostname, ip
         _, self._addr = utils.get_host_name_ip()
 
         # init trainers
         self._trainers = []
-        n = self.nproc_per_node / len(self._gpus)
+        n = job_env.nproc_per_node / len(job_env.gpus)
         assert n>=1, \
-            "self.nproc_per_node:{} / len(self._gpus):{} must large than 1".format(self.nproc_per_node,len(self._gpus))
+            "self.nproc_per_node:{} / len(self._gpus):{} must large than 1".format(job_env.nproc_per_node,len(job_env.gpus))
 
         for i in range(job_env.nproc_per_node):
             b = i * n
@@ -110,11 +110,11 @@ class Pod(object):
             if i == job_env.nproc_per_node - 1:
                 e = job_env.nproc_per_node
 
-            endpoint = "{}:{}".format(self._addr, self._trainer_port[i])
+            endpoint = "{}:{}".format(self._addr, job_env.trainer_ports[i])
 
             t = Trainer()
             t.from_pod(
-                self, endpoint=endpoint, rank_in_pod=i, gpus=self._gpus[b:e])
+                endpoint=endpoint, rank_in_pod=i, gpus=job_env.gpus[b:e])
             self._trainers.append(t)
 
     def _start_sever(self):
@@ -130,12 +130,12 @@ class Pod(object):
         for g in pod.gpus:
             self._gpus.append(g)
 
-        self.trainers = []
-        for trainer in pod.trainers:
+        self._trainers = []
+        for trainer in pod._trainers:
             t = Trainer()
             t.from_pb(trainer)
 
-            self.trainers.append(t)
+            self._trainers.append(t)
 
     def __str__(self):
         return "rank:{} id:{} addr:{} port:{} gpus:{} status:{} trainers_num:{}".format(
@@ -158,15 +158,15 @@ class Pod(object):
             logger.debug("pod {} != pod".format(self, pod))
             return False
 
-        if len(self.trainers) != len(pod.trainers):
-            logger.debug("trainers {} != {}".format(self.trainers,
-                                                    pod.trainers))
+        if len(self._trainers) != len(pod._trainers):
+            logger.debug("trainers {} != {}".format(self._trainers,
+                                                    pod._trainers))
             return False
 
-        for i in range(len(self.trainers)):
-            if self.trainers[i] != pod.trainers[i]:
-                logger.debug("trainer {} != {}".format(self.trainers[i],
-                                                       pod.trainers[i]))
+        for i in range(len(self._trainers)):
+            if self._trainers[i] != pod._trainers[i]:
+                logger.debug("trainer {} != {}".format(self._trainers[i],
+                                                       pod._trainers[i]))
                 return False
 
         return True
@@ -202,7 +202,7 @@ class Pod(object):
         return self._port
 
     @port.setter
-    def port(self, v):
+    def port(self, port):
         self._port = port
 
     @property
@@ -267,9 +267,9 @@ class Trainer(object):
         return self._global_rank
 
     def from_pod(self, endpoint, rank_in_pod, gpus):
-        self._id = uuid.uuid1()
+        self._id = str(uuid.uuid1())
         self._global_rank = None
-        self._rank_in_pod = _rank_in_pod
+        self._rank_in_pod = rank_in_pod
         self._endpoint = endpoint
         self._gpus = gpus
 
@@ -315,20 +315,20 @@ class Cluster(object):
     def update_pods(cluster):
         self._pods = copy.copy(cluster.pods)
 
-    def trainers_nranks(self):
-        return len(self.trainers_endpoints())
+    def get_trainers_nranks(self):
+        return len(self.get_trainers_endpoints())
 
-    def pods_nranks(self):
+    def get_pods_nranks(self):
         return len(self._pods)
 
-    def trainers_endpoints(self):
+    def get_trainers_endpoints(self):
         r = []
         for pod in self._pods:
             for t in pod.trainers:
                 r.append(t.endpoint)
         return r
 
-    def pods_endpoints(self):
+    def get_pods_endpoints(self):
         r = []
         for pod in self._pods:
             ep = "{}:{}".format(pod.addr, pod.port)

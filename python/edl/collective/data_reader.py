@@ -115,7 +115,7 @@ class DistributedDataReader(ojbect):
         __next__: return meta, (splitted_data_field data)
         """
 
-        self._id = uuid.uuid1()
+        self._id = str(uuid.uuid1())
         self._name = unique_name.generate("_datareader_")
 
         #BatchData
