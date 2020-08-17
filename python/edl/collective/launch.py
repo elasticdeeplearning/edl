@@ -157,6 +157,8 @@ def edl_barrier(job_env, pod, timeout=60):
         try:
             if not c.Barrier(job_env.job_id, pod.id):
                 continue
+        except EdlJobStageError as e:
+            continue
         except Exception as e:
             time.sleep(1)
             if time.time() - start > timeout:

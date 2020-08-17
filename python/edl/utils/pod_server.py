@@ -36,7 +36,6 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
         # to control the cache size.
         self._lock = Lock()
         self._fan_in = {}
-        self._etcd = None
 
     def ScaleOut(self, request, context):
         pass
@@ -45,7 +44,10 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
         pass
 
     def Barrier(self, request, context):
+        logger.info("get barrier request from {}".format(request))
+
         ids = get_current_pod_ids_from_resource()
+
         status = pb2.Status()
         with self._lock:
             try:
