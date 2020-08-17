@@ -138,6 +138,13 @@ class JobEnv(object):
     def trainer_ports(self):
         return self._trainer_ports
 
+    def __str__(self):
+        d = vars(self)
+        s = ""
+        for k, v in vars(self).iteritems():
+            s += "{}:{} ".format(k, v)
+        return s
+
 
 class TrainerEnv(JobEnv):
     """

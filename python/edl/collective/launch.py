@@ -35,6 +35,7 @@ from ..utils.cluster import Pod
 from ..utils.register import PodRegister
 from ..utils.watcher import Watcher
 from ..utils.pod_server import PodServer
+from ..utils import utils
 
 
 def _print_arguments(args):
@@ -164,13 +165,14 @@ def edl_barrier(job_env, pod, timeout=60):
 def launch(args):
     args_dict = _convert_args_to_dict(args)
     job_env = JobEnv(args_dict)
+    logger.info("get job env:{}".format(str(job_env)))
     pod = Pod()
     pod.from_env(job_env)
 
     pod_server = PodServer()
     # port changed in it.
     pod_server.start(job_env, pod)
-    logger.info("pod server started:{}", pod)
+    logger.info("pod server started:{}".format(pod))
 
     register, watcher = edl_barrier(job_env, pod, timeout=600)
 
@@ -208,6 +210,7 @@ def launch(args):
 
 
 def run_commandline():
+    utils.get_logger(log_level=20)
     args = _parse_args()
     launch(args)
 
