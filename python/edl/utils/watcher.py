@@ -18,9 +18,9 @@ from utils import logger
 from edl.discovery.etcd_client import EtcdClient
 import json
 import collections
-from .cluster import Cluster
+from .cluster import Cluster, Pod
 
-from .global_vars import *
+from .global_vars import get_etcd, ETCD_POD_RANK, ETCD_POD_RESOURCE
 
 
 class Watcher(object):
@@ -98,7 +98,8 @@ class Watcher(object):
 
 
 def get_current_pod_ids_from_resource():
-    with g_etcd_lock:
+    etcd, lock = get_etcd()
+    with lock:
         pod_resource_servers = etcd.get_service(ETCD_POD_RESOURCE)
 
     p = Pod()
@@ -111,8 +112,9 @@ def get_current_pod_ids_from_resource():
 
 
 def get_pod_leader():
-    with g_etcd_lock:
-        value, _ = etcd._get_server(ETCD_POD_RANK, "0")
+    etcd, lock = get_etcd()
+    with lock:
+        value, _, _, _, _, = etcd._get_server(ETCD_POD_RANK, "0")
 
     leader = Pod()
     leader.from_json(value)

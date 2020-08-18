@@ -73,9 +73,9 @@ class Pod(object):
 
         self._id = d["id"]
         self._rank = d["rank"]
-        self._addr = pod.addr
-        self._port = self._job_env.pod_port
-        self._trainer_ports = pod.trainer_ports
+        self._addr = d["addr"]
+        self._port = d["port"]
+        self._trainer_ports = d["trainer_ports"]
         self._gpus = d["gpus"]
         self._stage = d["stage"]
 

@@ -125,24 +125,22 @@ def edl_barrier(job_env, pod, timeout):
     # and leader will change the stage to a unique string
     register = PodRegister(job_env, pod)
 
+    leader = get_pod_leader()
     # all pods barrier on leader
     while True:
         try:
-            leader = get_pod_leader()
-
             c = Client(leader.endpoint)
             c.Barrier(job_env.job_id, pod.id)
             break
         except Exception as e:
             logger.warning(
-                "wait to barrier with all, context:job_env{} pod:{}".format(
-                    job_env, pod))
-            time.sleep(1)
+                "wait to barrier with all error:{} leader:[{}] current pod:[{}]".
+                format(e, leader, pod))
+            time.sleep(3)
 
         if time.time() - start > timeout:
-            message = "can't barrier with all, context:job_env{} pod:{}".format(
-                job_env, pod)
-            logger.warning(message)
+            message = "can't barrier with all, leader:[{}] current pod:{}".format(
+                leader, pod)
             raise EdlBarrierError(message)
 
     # watcher exit when cluster changed
