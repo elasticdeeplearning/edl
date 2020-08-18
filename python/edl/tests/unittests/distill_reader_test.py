@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import numpy as np
-import paddle_edl.distill.distill_reader as distill_reader
+import edl.distill.distill_reader as distill_reader
 import unittest
 
 

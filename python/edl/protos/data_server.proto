@@ -73,7 +73,7 @@ message BatchDataResponse {
   repeated FileBatchData batch = 2;
 }
 
-service PodServer {
+service DataServer {
   rpc GetFileList(FileListRequest) returns (FileListResponse) {}
   rpc GetBatchDataMeta(BatchDataMetaRequest) returns (BatchDataMetaResponse) {}
   rpc GetBatchData(BatchDataRequest) returns (BatchDataResponse) {}

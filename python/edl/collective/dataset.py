@@ -16,7 +16,7 @@ from six.moves.queue import Queue
 import multiprocessing
 
 
-class FileSplitter():
+class FileSplitter(object):
     """
     This the interface user should inherit. It will let's the framework knows the data file it's
     processing.
@@ -35,7 +35,7 @@ class FileSplitter():
 
 class TxtFileSplitter(FileSplitter):
     def __init__(self, data_file):
-        super(self, TxtFileSplitter).__init__(data_file)
+        super(TxtFileSplitter, self).__init__(data_file)
 
     def __iter__(self):
         idx = 0

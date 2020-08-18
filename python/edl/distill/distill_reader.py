@@ -38,9 +38,9 @@ class DynamicServiceDiscover(ServiceDiscover):
 
     def _connect(self):
         if self._type == 'etcd':
-            from paddle_edl.distill.discovery_client import DiscoveryClient
+            from edl.distill.discovery_client import DiscoveryClient
         elif self._type == 'redis':
-            from paddle_edl.distill.redis.client import Client as DiscoveryClient
+            from edl.distill.redis.client import Client as DiscoveryClient
         else:
             assert False, 'BALANCE_TYPE must be etcd or redis'
         client = DiscoveryClient(self._discovery_servers, self._service_name,

@@ -19,9 +19,9 @@ import threading
 import time
 
 from collections import deque
-from paddle_edl.discovery.consistent_hash import ConsistentHash
-from paddle_edl.discovery.etcd_client import EtcdClient
-from paddle_edl.discovery.server_alive import is_server_alive
+from edl.discovery.consistent_hash import ConsistentHash
+from edl.discovery.etcd_client import EtcdClient
+from edl.discovery.server_alive import is_server_alive
 from six.moves import queue
 from weakref import WeakValueDictionary
 

@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import numpy as np
-from edl.data_reader import DistributedDataReader
-from edl.dataset import TxtFileSplitter, FileMeta
+from edl.collective.data_reader import DistributedDataReader, FileMeta
+from edl.collective.dataset import TxtFileSplitter
 from paddle.fluid.incubate.fleet.collective import fleet
 import unittest
 
@@ -45,7 +45,7 @@ class TestDataReader(unittest.TestCase):
     def _train(self, state):
         print("learning_rate:", learning_rate)
         reader = DistributedDataReader(
-            file_list=file_list,
+            file_list=self._file_list,
             file_splitter_cls=TxtFileSplitter,
             splitted_data_field=["line"],
             batch_size=1,

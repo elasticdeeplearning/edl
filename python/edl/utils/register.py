@@ -32,9 +32,13 @@ class Register(object):
         self._etcd = EtcdClient(etcd_endpoints, root=job_id)
         self._etcd.init()
 
-        if not self._etcd.set_server_not_exists(service, server, info):
-            raise exception.EdlRegisterError()
-
+        try:
+            self._etcd.set_server_not_exists(service, server, info, ttl=10)
+        except Exception as e:
+            logger.fatal(
+                "connect to etcd:{} error:{} service:{} server:{} info:{}".
+                format(etcd_endpoints, e, service, server, info))
+            raise e
         self._t_register = threading.Thread(target=self._refresher)
 
     def _refresher(self):

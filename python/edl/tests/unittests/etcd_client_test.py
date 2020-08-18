@@ -13,12 +13,12 @@
 # limitations under the License.
 
 import unittest
-from paddle_edl.discovery.etcd_client import EtcdClient
+from edl.discovery.etcd_client import EtcdClient
 import time
 import threading
 from etcd3.events import PutEvent, DeleteEvent
 
-from paddle_edl.utils.utils import bytes_to_string
+from edl.utils.utils import bytes_to_string
 
 
 class TestEtcd(unittest.TestCase):

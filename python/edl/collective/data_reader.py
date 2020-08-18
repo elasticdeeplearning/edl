@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six.moves.queue import Queue
+from threading import Lock, Thread
 import paddle.fluid as fluid
-from fluid.reader import FileSplitter
+from .dataset import FileSplitter
 from ..utils import data_server
 from ..utils.edl_env import TrainerEnv
+from ..utils import unique_name
+from ..utils.watcher import get_data_reader_leader
 import uuid
 
 
@@ -94,8 +98,9 @@ class FileCache(object):
         pass
 
 
-class DistributedDataReader(ojbect):
-    def __init__(file_list,
+class DistributedDataReader(object):
+    def __init__(self,
+                 file_list,
                  file_splitter_cls,
                  splitted_data_field,
                  batch_size,
@@ -124,7 +129,7 @@ class DistributedDataReader(ojbect):
         self._lock = Lock()
         self._file_list = file_list
         self._splitter_cls = file_splitter_cls
-        self._leader = leader
+        self._leader = get_data_reader_leader()
 
         self._data_checkpoint = DataCheckpoint()
         self._data_checkpoint.load_checkpoint(checkpoint_path)

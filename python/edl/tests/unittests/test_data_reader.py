@@ -13,9 +13,8 @@
 # limitations under the License.
 
 import numpy as np
-from edl.data_reader import DataReader
-from edl.dataset import TxtFileSplitter, FileMeta
-#from paddle.fluid.incubate.fleet.collective import fleet
+from edl.collective.data_reader import DistributedDataReader, FileMeta
+from edl.collective.dataset import TxtFileSplitter
 import unittest
 
 
@@ -25,27 +24,26 @@ class TestDataReader(unittest.TestCase):
         self._data = {}
         for idx, p in enumerate(self._file_list):
             s = TxtFileSplitter(p)
-            m = FileMeta()
+            m = FileMeta(idx, p)
             for r in s:
-                if idx not in d:
+                if idx not in self._data:
                     self._data[idx] = []
+                d = ((p), (r[0], r[1:]))
                 self._data[idx].append(
-                    (p), (r[0], r[1:]))  #[(path),(rec_no, splitted_fiels)]...
+                    d)  #[(path),(rec_no, splitted_fiels)]...
 
     def test_data_reader(self):
-        reader1 = DataReader(
-            file_list=file_list,
+        reader1 = DistributedDataReader(
+            file_list=self._file_list,
             file_splitter_cls=TxtFileSplitter,
             splitted_data_field=["line"],
-            batch_size=1,
-            trainer_rank=0)
+            batch_size=1)
 
-        reader2 = DataReader(
-            file_list=file_list,
+        reader2 = DistributedDataReader(
+            file_list=self._file_list,
             file_splitter_cls=TxtFileSplitter,
             splitted_data_field=["line"],
-            batch_size=1,
-            trainer_rank=1)
+            batch_size=1)
 
         size1 = 0
         for meta, batch in reader1:

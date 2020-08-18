@@ -15,7 +15,7 @@
 import copy
 import unittest
 import six
-from paddle_edl.discovery.consistent_hash import ConsistentHash
+from edl.discovery.consistent_hash import ConsistentHash
 
 
 class TestConsistentHash(unittest.TestCase):

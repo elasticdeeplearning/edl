@@ -13,7 +13,7 @@ nohup python -m paddle_edl.distill.redis.server_register \
   --server 127.0.0.1:3456 &
 register_pid=$!
 
-nohup python -m paddle_edl.distill.redis.balance_server --db_endpoints 127.0.0.1:3456 &
+nohup python -m edl.distill.redis.balance_server --db_endpoints 127.0.0.1:3456 &
 discovery_pid=$!
 # wait balance start
 sleep 10

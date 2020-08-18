@@ -117,3 +117,8 @@ def get_pod_leader():
     leader = Pod()
     leader.from_json(value)
     return leader
+
+
+def get_data_reader_leader():
+    #raise NotImplementedError()
+    pass

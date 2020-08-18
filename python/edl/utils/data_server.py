@@ -14,27 +14,23 @@
 
 from __future__ import print_function
 from concurrent import futures
-from . import data_server_pb2
-from . import data_server_pb2_grpc
-from . import common_pb2
-from . import master_pb2
-from . import master_pb2_grpc
+from . import data_server_pb2 as pb
+from . import data_server_pb2_grpc as pb_grpc
 import grpc
 import sys
 import os
 import logging
 from threading import Thread, Lock
 from six.moves.queue import Queue
-from .exception import *
-from .dataset import DataReader
+from .exceptions import *
 import signal
 import threading
 import copy
-import edl.utils.utils as utils
+from . import utils
 from .utils import logger
 
 
-class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
+class DataServerServicer(pb_grpc.DataServerServicer):
     def __init__(self, file_list, world_rank, self_rank):
         self._file_list = file_list
         self._lock = Threading.Lock()

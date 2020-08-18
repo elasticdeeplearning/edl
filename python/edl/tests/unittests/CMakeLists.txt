@@ -76,6 +76,8 @@ file(GLOB TEST_OPS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "test_*.py")
 #FIXME
 string(REPLACE ".py" "" TEST_OPS "${TEST_OPS}")
 LIST(REMOVE_ITEM TEST_OPS test_data_server)
+LIST(REMOVE_ITEM TEST_OPS test_train)
+LIST(REMOVE_ITEM TEST_OPS test_data_reader)
 foreach(TEST_OP ${TEST_OPS})
     py_test_modules(${TEST_OP} MODULES ${TEST_OP})
 endforeach(TEST_OP)
