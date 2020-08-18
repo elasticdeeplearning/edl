@@ -14,6 +14,7 @@
 import threading
 import time
 import json
+import uuid
 
 from .utils import logger
 from .cluster import Pod, PodStatus
@@ -29,7 +30,7 @@ class Register(object):
         self._server = server
         self._stop = threading.Event()
         #don't change this ttl
-        self._etcd = EtcdClient(etcd_endpoints, root=job_id)
+        self._etcd = EtcdClient(endpoints=etcd_endpoints, root=job_id)
         self._etcd.init()
 
         try:
