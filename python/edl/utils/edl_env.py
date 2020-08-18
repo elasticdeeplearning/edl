@@ -37,8 +37,11 @@ class JobEnv(object):
                 "port num:{} must large than gpus:{}".format(len(self._trainer_ports), len(self._gpus))
             logger.info("get ports from env:{}".format(self._trainer_ports))
         else:
+            assert len(self._gpus) >= 0, "gpus must be visible, now:{}".format(
+                self._gpus)
             self._trainer_ports = list(utils.find_free_ports(len(self._gpus)))
-            logger.info("get ports from unused:{}".format(self._trainer_ports))
+            logger.info("get ports from unused:{} now gpus:{}".format(
+                self._trainer_ports, self._gpus))
 
     def _get_hdfs(self, args):
         # hdfs

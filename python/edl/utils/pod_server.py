@@ -27,7 +27,7 @@ import copy
 from .utils import logger
 from . import pod_server_pb2_grpc as pb2_grpc
 from . import pod_server_pb2 as pb2
-from .watcher import get_current_pod_ids_from_resource
+from .watcher import get_current_pod_ids_from_resource, get_pod_leader
 from .exceptions import *
 
 
@@ -35,7 +35,8 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
     def __init__(self):
         # to control the cache size.
         self._lock = Lock()
-        self._fan_in = {}
+        # stage => set(pod_id)
+        self._barrier_in = {}
 
     def ScaleOut(self, request, context):
         pass
@@ -52,22 +53,25 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
         status = pb2.Status()
         with self._lock:
             try:
-                if key not in self._fan_in:
-                    self._fan_in[leader.stage] = {}
+                key = leader.stage
+                if key not in self._barrier_in:
+                    self._barrier_in[key] = set()
 
-                bd = self._fan_in[leader.stage]
-                bd[request.pod_id] = ""
+                bd = self._barrier_in[leader.stage]
+                bd.add(request.pod_id)
+                logger.info("receive barrier request of pod:{}".format(
+                    request.pod_id))
 
-                for k in ids.keys():
-                    if k not in bd:
-                        status = serialize_exception(
-                            EdlBarrierError("can't find id:{}".format(k)))
-                        return status
+                if ids == bd:
+                    return status
+
+                status = serialize_exception(
+                    EdlBarrierError("barrier's context:{}, now:{}".format(ids,
+                                                                          bd)))
+                return status
             except Exception as e:
                 status = serialize_exception(EdlInternalError(str(e)))
                 return status
-
-        return status
 
     def ShutDown(self, request, context):
         pass

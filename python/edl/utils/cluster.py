@@ -49,6 +49,7 @@ class Pod(object):
         self._trainers = None
         self._port = None
         self._status = PodStatus.INITIAL  # status maybe changed
+        self._stage = None
 
     def to_json(self):
         d = {
@@ -119,8 +120,7 @@ class Pod(object):
                 endpoint=endpoint, rank_in_pod=i, gpus=job_env.gpus[b:e])
             self._trainers.append(t)
 
-    def _start_sever(self):
-        return port
+        # self._stage need not to set when from_env
 
     def from_pb(self, pod):
         self._id = pod.id
@@ -139,13 +139,15 @@ class Pod(object):
 
             self._trainers.append(t)
 
+        self._stage = pod.stage
+
     def __str__(self):
         return "rank:{} id:{} addr:{} port:{} gpus:{} status:{} trainers_num:{}".format(
             self._rank, self._id, self._addr, self._port, self._gpus,
             self._status, len(self._trainers))
 
     def details(self):
-        return "rank:{} id:{} addr:{} port:{} visible_gpu:{} steatus:{} trainers:{}".format(
+        return "rank:{} id:{} addr:{} port:{} visible_gpu:{} status:{} trainers:{}".format(
             self._rank, self._id, self._addr, self._port, self._gpus,
             self._status, [str(t) for t in self.trainers])
 

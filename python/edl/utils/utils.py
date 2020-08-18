@@ -137,6 +137,9 @@ def get_host_name_ip():
 
 
 def find_free_ports(num):
+    if num <= 0:
+        return None
+
     def __free_port():
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
             s.bind(('', 0))

@@ -36,10 +36,10 @@ class Watcher(object):
 
         self._cluster = Cluster()
         self._lock = Lock()
-
-    def watch(self):
         self._t_watcher = Thread(target=self._watcher)
         self._t_watcher.start()
+
+    #def watch(self):
 
     def _watcher(self):
         begin = time.time()
@@ -111,15 +111,9 @@ def get_current_pod_ids_from_resource():
 
 
 def get_pod_leader():
-    try:
-        with g_etcd_lock:
-            value, _ = etcd._get_server(ETCD_POD_RANK, "0")
+    with g_etcd_lock:
+        value, _ = etcd._get_server(ETCD_POD_RANK, "0")
 
-        leader = Pod()
-        leader.from_json(value)
-        return leader
-    except Exception as e:
-        logger.warning("get pod leader error:{}".format(e))
-        return None
-
-    return ids
+    leader = Pod()
+    leader.from_json(value)
+    return leader

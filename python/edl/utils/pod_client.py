@@ -41,14 +41,10 @@ class PodServerClient(client):
         while True:
             res = s.Barrier(req)
             if res.type == "":
-                return True
+                return
 
-            try:
-                deserialize_exception(res.detail)
-            except EdlBarrierError as e:
-                if time.time() - begin > timeout:
-                    message = "job_id:{} pod_id:{} barrier time out".format(
-                        job_id, pod_id)
-                    raise EdlBarrierError(message)
-                time.sleep(1)
-                continue
+            if time.time() - begin > timeout:
+                message = "job_id:{} pod_id:{} barrier time out".format(job_id,
+                                                                        pod_id)
+                raise EdlBarrierError(message)
+            time.sleep(1)

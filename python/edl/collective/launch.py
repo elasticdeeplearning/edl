@@ -32,7 +32,7 @@ import socket
 from ..utils.edl_env import JobEnv
 from ..utils.cluster import Pod
 from ..utils.register import PodRegister, PodResourceRegister, ETCD_POD_RANK, ETCD_POD_RESOURCE
-from ..utils.watcher import Watcher
+from ..utils.watcher import Watcher, get_pod_leader
 from ..utils.pod_server import PodServer
 from ..utils.utils import logger
 from ..utils import utils
@@ -122,34 +122,31 @@ def edl_barrier(job_env, pod, timeout):
     start = time.time()
 
     # regist and get rank, leader is in it.
+    # and leader will change the stage to a unique string
     register = PodRegister(job_env, pod)
 
     # all pods barrier on leader
     while True:
         try:
             leader = get_pod_leader()
-            if leader is None:
-                raise EdlBarrierError("can't get pod leader")
 
             c = Client(leader.endpoint)
-            if not c.Barrier(job_env.job_id, pod.id):
-                continue
+            c.Barrier(job_env.job_id, pod.id)
+            break
         except Exception as e:
             logger.warning(
                 "wait to barrier with all, context:job_env{} pod:{}".format(
                     job_env, pod))
-            time.sleep(3)
-            continue
+            time.sleep(1)
 
         if time.time() - start > timeout:
-            logger.warning("can't barrier with all, context:job_env{} pod:{}".
-                           format(job_env, pod))
-            return None, None
+            message = "can't barrier with all, context:job_env{} pod:{}".format(
+                job_env, pod)
+            logger.warning(message)
+            raise EdlBarrierError(message)
 
     # watcher exit when cluster changed
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id)
-    watcher.watch()
-
     return register, watcher
 
 
@@ -166,7 +163,7 @@ def launch(args):
     pod_server = PodServer()
     # port changed in it.
     pod_server.start(job_env, pod)
-    logger.info("pod server started:{}".format(pod))
+    logger.info("pod server started:[{}]".format(pod))
 
     # register pod resource, they can't be stopped.
     pod_rr = PodResourceRegister(job_env.etcd_endpoints, job_env.job_id, pod)
@@ -191,10 +188,13 @@ def launch(args):
             register.stop()
             watcher.stop()
             terminiate_local_trainers(procs)
-            # wait all pods info displayed from etcd
+            # wait all pods info diappeared from etcd
             # don't change this time,since the ttl is set to 10s in registers
             # FIXME(gongwb): any other method?
             time.sleep(15)
+
+            # barrier again
+            register, watcher = edl_barrier(job_env, pod, timeout=600)
             continue
 
         alive = watch_local_trainers(procs, pod.trainers_num())
