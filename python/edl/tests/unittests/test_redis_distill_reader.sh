@@ -10,10 +10,10 @@ sleep 10
 nohup python -m paddle_edl.distill.redis.server_register \
   --db_endpoints 127.0.0.1:3456 \
   --service_name DistillReaderTest \
-  --server 127.0.0.1:3456 &
+  --server 127.0.0.1:3456  >  test_redist_distill_reader.1.log 2>&1 &
 register_pid=$!
 
-nohup python -m edl.distill.redis.balance_server --db_endpoints 127.0.0.1:3456 &
+nohup python -m edl.distill.redis.balance_server --db_endpoints 127.0.0.1:3456 > test_redist_distill_reader.2.log 2>&1 &
 discovery_pid=$!
 # wait balance start
 sleep 10
