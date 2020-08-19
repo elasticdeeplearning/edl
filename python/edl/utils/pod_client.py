@@ -18,6 +18,7 @@ from . import pod_server_pb2_grpc as pb_grpc
 from .client import Client
 from .cluster import Cluster
 from .exceptions import deserialize_exception, EdlBarrierError
+from .utils import logger
 
 
 class PodServerClient(Client):
@@ -46,6 +47,7 @@ class PodServerClient(Client):
         while True:
             res = s.Barrier(req)
             if res.type == "":
+                logger.info("barrier ok!")
                 return
 
             deserialize_exception(res)

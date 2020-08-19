@@ -22,14 +22,17 @@ from .cluster import Cluster, Pod
 
 from .global_vars import get_etcd, ETCD_POD_RANK, ETCD_POD_RESOURCE
 
+import six
+
 
 class Watcher(object):
-    def __init__(self, etcd_endpoints, job_id):
+    def __init__(self, etcd_endpoints, job_id, current_pod):
         self._etcd = EtcdClient(etcd_endpoints, root=job_id)
         self._etcd.init()
 
         self._job_id = job_id
         self._changed = False
+        self._current_pod = current_pod
 
         # servers in etcd
         self._ranks = None  # {rank:pod_json}
@@ -37,6 +40,18 @@ class Watcher(object):
         self._cluster = Cluster()
         self._lock = Lock()
         self._stop = Event()
+
+        # get the inital cluster
+        """
+        servers = self._etcd.get_service(ETCD_POD_RANK)
+        ranks={}
+        for s in servers:
+            ranks[int(s.server)] = s.info
+        self._cluster.from_json(ranks)
+        logger.info("watch init cluster:{}", self._cluster)
+        """
+
+    def watch(self):
         self._t_watcher = Thread(target=self._watcher)
         self._t_watcher.start()
 
@@ -45,30 +60,43 @@ class Watcher(object):
         while not self._stop.is_set():
             servers = self._etcd.get_service(ETCD_POD_RANK)
             ranks = {}
-            with self._lock:
-                for s in servers:
-                    ranks[s.server] = s.info
+            for s in servers:
+                ranks[int(s.server)] = s.info
 
+            with self._lock:
                 if self._ranks is None:
                     self._ranks = ranks
-                    with self._lock:
-                        self._cluster.from_json(ranks)
-                else:
-                    if self._is_rank_changed(self._ranks, ranks):
-                        with self._lock:
-                            self._changed = True
-                        logger.info(
-                            "train world changed, old  is {} new is {}",
+                    self._cluster.from_json(ranks)
+                    continue
+
+                if not self._is_cluster_changed(self._ranks, ranks):
+                    time.sleep(1)
+                    continue
+
+                self._changed = True
+                logger.info("train world changed, old  is {} new is {}",
                             self._ranks, ranks)
-                        break
 
-            time.sleep(1)
+                new_cluster = Cluster()
+                new_cluster.from_json(ranks)
 
-    def _is_rank_changed(self, old, new):
-        for k, v in six.iteriterms(old):
+                if len(new_cluster.pods) == 0:
+                    time.sleep(1)
+                    continue
+
+                pod = new_cluster.get_pod_by_id(current_pod.get_id())
+                if pod != current_pod:  # current pod rank changed
+                    self._pod_rank_changed = True
+                    break
+
+    def _is_cluster_changed(self, old, new):
+        for k, v in six.iteritems(old):
             if v == new[k]:
                 continue
 
+            if old[k] != new[k]:
+                return True
+            """
             old_pod = Pod()
             old_pod.from_json(old[k])
 
@@ -77,6 +105,7 @@ class Watcher(object):
 
             if new_pod != old_pod:
                 return True
+            """
 
         return False
 
@@ -87,6 +116,10 @@ class Watcher(object):
     def is_changed(self):
         with self._lock:
             return self._changed
+
+    def is_self_rank_changed(self):
+        with self._lock:
+            return self._pod_rank_changed
 
     def stop(self):
         self._stop.set()

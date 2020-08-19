@@ -32,7 +32,7 @@ import traceback
 
 from ..utils.edl_env import JobEnv
 from ..utils.cluster import Pod
-from ..utils.register import PodRegister, PodResourceRegister, ETCD_POD_RANK, ETCD_POD_RESOURCE
+from ..utils.register import PodRankRegister, PodResourceRegister, ETCD_POD_RANK, ETCD_POD_RESOURCE
 from ..utils.watcher import Watcher, get_pod_leader
 from ..utils.pod_server import PodServer
 from ..utils.utils import logger
@@ -123,11 +123,10 @@ def _convert_args_to_dict(args):
 
 
 def edl_barrier(job_env, pod, timeout):
+    """
+    pod under resource barrier togather
+    """
     start = time.time()
-
-    # regist and get rank, leader is in it.
-    # and leader will change the stage to a unique string
-    register = PodRegister(job_env, pod)
 
     leader = get_pod_leader()
     c = PodServerClient(leader.endpoint)
@@ -147,32 +146,43 @@ def edl_barrier(job_env, pod, timeout):
                 leader, pod)
             raise EdlBarrierError(message)
 
-    # watcher exit when cluster changed
-    watcher = Watcher(job_env.etcd_endpoints, job_env.job_id)
-    return register, watcher
-
 
 def launch(args):
     args_dict = _convert_args_to_dict(args)
+
+    # job enviroment.
     job_env = JobEnv(args_dict)
     logger.info("get job env:{}".format(str(job_env)))
-    pod = Pod()
-    pod.from_env(job_env)
 
     # get global etcd and lock
     get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
 
-    pod_server = PodServer()
-    # port changed in it.
+    # local pod, and the pod's id does't change.
+    pod = Pod()
+    pod.from_env(job_env)
+
+    # register pod resource, they can't be stopped.
+    resource_register = PodResourceRegister(job_env.etcd_endpoints,
+                                            job_env.job_id, pod)
+
+    # regist and get rank, leader is in it.
+    # and leader will change the stage to a unique string
+    rank_register = PodRankRegister(job_env, pod)
+
+    # launch pod server
+    pod_server = None
+    pod_server = PodServer(rank_register)
     pod_server.start(job_env, pod)
     logger.info("pod server started:[{}]".format(pod))
 
-    # register pod resource, they can't be stopped.
-    pod_rr = PodResourceRegister(job_env.etcd_endpoints, job_env.job_id, pod)
-
     # register rank and watch the rank
     # if the rank changed, the pods should restart the training proc.
-    register, watcher = edl_barrier(job_env, pod, timeout=600)
+    edl_barrier(job_env, pod, timeout=600)
+
+    #watcher exit when cluster changed
+    watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
+    # watch after barrier
+    watcher.watch()
 
     while True:
         cluster = watcher.get_cluster()
@@ -184,19 +194,28 @@ def launch(args):
             log_dir=args.log_dir)
 
         if watcher.is_changed():
+            watcher.stop()
+            # pod leader need not to change self.
+            if pod.rank != 0 and self.is_self_rank_changed():
+                rank_register.stop()
+                rank_register = PodRankRegister(job_env, pod)
+
             logger.info("Cluster changed. New cluster:{}. Old Cluster:{}".
                         format(cluster2, cluster))
 
-            register.stop()
-            watcher.stop()
             terminate_local_procs(procs)
+
             # wait all pods info diappeared from etcd
             # don't change this time,since the ttl is set to 10s in registers
             # FIXME(gongwb): any other method?
             time.sleep(15)
 
-            # barrier again
-            register, watcher = edl_barrier(job_env, pod, timeout=600)
+            # barrier agagin
+            edl_barrier(job_env, pod, timeout=600)
+
+            # watcher agagin
+            watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
+            watcher.watch()
             continue
 
         alive = watch_local_procs(procs, pod.trainers_num())
@@ -205,6 +224,7 @@ def launch(args):
             logger.info("Local procs complete, POD info:{}".format(pod))
             break
 
+        print("launch 1")
         time.sleep(1)
 
     register.complete()

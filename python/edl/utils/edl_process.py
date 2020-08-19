@@ -24,6 +24,8 @@ import subprocess
 from contextlib import closing
 import socket
 
+from .utils import logger
+
 
 class TrainerProc(object):
     def __init__(self):
@@ -49,21 +51,22 @@ def start_local_trainers(cluster,
     procs = []
     for idx, t in enumerate(pod.trainers):
         proc_env = {
-            "PADDLE_TRAINER_ID": "%d" % t.rank,  # global rank
+            "PADDLE_TRAINER_ID": "%d" % t.global_rank,  # global rank
             "PADDLE_TRAINER_RANK_IN_POD": "%d" % t.rank_in_pod,
             "FLAGS_selected_gpus": "%s" % ",".join([str(g) for g in t.gpus]),
             "PADDLE_CURRENT_ENDPOINT": "%s" % t.endpoint,
-            "PADDLE_TRAINERS_NUM": "%d" % cluster.trainers_nranks(),
-            "PADDLE_TRAINER_ENDPOINTS": ",".join(cluster.trainers_endpoints()),
+            "PADDLE_TRAINERS_NUM": "%d" % cluster.get_trainers_world_size(),
+            "PADDLE_TRAINER_ENDPOINTS":
+            ",".join(cluster.get_trainers_endpoints()),
         }
 
         current_env.update(proc_env)
 
-        logger.debug("trainer proc env:{}".format(current_env))
+        #logger.debug("trainer proc env:{}".format(current_env))
 
         cmd = [sys.executable, "-u", training_script] + training_script_args
 
-        logger.info("start trainer proc:{} env:{}".format(cmd, proc_env))
+        logger.debug("start trainer proc:{} env:{}".format(cmd, proc_env))
 
         fn = None
         if log_dir is not None:
@@ -75,12 +78,13 @@ def start_local_trainers(cluster,
 
         tp = TrainerProc()
         tp.proc = proc
-        tp.rank = t.rank
+        tp.rank = t.global_rank
         tp.log_fn = fn
         tp.cmd = cmd
 
         procs.append(tp)
 
+    logger.info("start trainers:{}".format(cluster.get_trainers_endpoints()))
     return procs
 
 

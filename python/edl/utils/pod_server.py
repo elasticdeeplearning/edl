@@ -33,23 +33,36 @@ from .exceptions import *
 
 
 class PodServerServicer(pb2_grpc.PodServerServicer):
-    def __init__(self):
+    def __init__(self, rank_register):
         # to control the cache size.
         self._lock = Lock()
         # stage => set(pod_id)
         self._barrier_in = {}
+        self._rank_register = rank_register
 
     def ScaleOut(self, request, context):
-        pass
+        status = common_pb.Status()
+        if self._rank_register.rank != 0:
+            status = serialize_exception(
+                EdlLeaderError("this pod is not the leader"))
+            return status
+
+        return status
 
     def ScaleIn(self, request, context):
-        pass
+        status = common_pb.Status()
+        if self._rank_register.rank != 0:
+            status = serialize_exception(
+                EdlLeaderError("this pod is not the leader"))
+            return status
+
+        return status
 
     def Barrier(self, request, context):
         ids = get_current_pod_ids_from_resource()
         leader = get_pod_leader()
         logger.info(
-            "get barrier request from job_id:{} pod_id:{} ids:{} leader:{}".
+            "get barrier request from job_id:{} pod_id:{} ids_set:{} leader:{}".
             format(request.job_id, request.pod_id, ids, leader.get_id()))
 
         status = common_pb.Status()
@@ -61,8 +74,6 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
 
                 bd = self._barrier_in[leader.stage]
                 bd.add(request.pod_id)
-                logger.info("receive barrier request of pod:{}".format(
-                    request.pod_id))
 
                 if ids == bd:
                     return status
@@ -80,10 +91,11 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
 
 
 class PodServer(object):
-    def __init__(self):
+    def __init__(self, rank_register):
         self._server = None
         self._port = None
-        self_endpoint = None
+        self._endpoint = None
+        self._rank_register = rank_register
 
     def start(self, job_env, pod, concurrency=20, max_workers=100):
         server = grpc.server(
@@ -91,7 +103,8 @@ class PodServer(object):
             options=[('grpc.max_send_message_length', 1024 * 1024 * 1024),
                      ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
             maximum_concurrent_rpcs=concurrency)
-        pb2_grpc.add_PodServerServicer_to_server(PodServerServicer(), server)
+        pb2_grpc.add_PodServerServicer_to_server(
+            PodServerServicer(rank_register), server)
 
         self._port = server.add_insecure_port('{}:0'.format(pod.addr))
         assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(

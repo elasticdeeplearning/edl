@@ -221,6 +221,10 @@ class Pod(object):
     def endpoint(self):
         return "{}:{}".format(self._addr, self._port)
 
+    @property
+    def trainers(self):
+        return self._trainers
+
     def get_id(self):
         return self._id
 
@@ -283,7 +287,15 @@ class Trainer(object):
 
     @property
     def rank_in_pod(self):
-        return self._global_rank
+        return self._rank_in_pod
+
+    @property
+    def gpus(self):
+        return self._gpus
+
+    @property
+    def endpoint(self):
+        return self._endpoint
 
     def from_pod(self, endpoint, rank_in_pod, gpus):
         self._id = str(uuid.uuid1())
@@ -334,7 +346,7 @@ class Cluster(object):
     def update_pods(cluster):
         self._pods = copy.copy(cluster.pods)
 
-    def get_trainers_nranks(self):
+    def get_trainers_world_size(self):
         return len(self.get_trainers_endpoints())
 
     def get_pods_nranks(self):
@@ -389,7 +401,7 @@ class Cluster(object):
         """
         od = collections.OrderedDict(sorted(d.items()))
         pods = []
-        for i, (key, value) in enumerate(old.iteritems()):
+        for i, (key, value) in enumerate(od.iteritems()):
             pod = Pod()
             if i != key:
                 raise EdlRankError("rank:{} is not exists:{}".format(i, d))

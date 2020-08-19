@@ -55,7 +55,7 @@ class Register(object):
         self.stop()
 
 
-class PodRegister(object):
+class PodRankRegister(object):
     def __init__(self, job_env, pod):
         self._stop = threading.Event()
         self._etcd = EtcdClient(job_env.etcd_endpoints, root=job_env.job_id)
@@ -65,7 +65,7 @@ class PodRegister(object):
         self._rank, self._server = self._register_rank(job_env, pod)
         self._t_register = threading.Thread(target=self._refresher)
         self._lock = threading.Lock()
-        self._changed = False
+        self._stopped = False
         self._pod = pod
         self._job_env = job_env
 
@@ -119,12 +119,16 @@ class PodRegister(object):
         while not self._stop.is_set():
             try:
                 self._etcd.refresh(self._service_name, self._server)
-                # don't change the waited time
-                time.sleep(1)
             except Exception as e:
-                with self._lock:
-                    self._changed = True
+                # exit when error ocurred
                 break
+
+            # don't change the waited time
+            time.sleep(1)
+
+        with self._lock:
+            self._rank = None
+            self._stopped = True
 
     def stop(self):
         self._stop.set()
@@ -136,15 +140,21 @@ class PodRegister(object):
     def is_leader(self):
         return self._rank == 0
 
+    """
     def changed(self):
         with self._lock:
             return self._changed
+    """
 
     def complete(self):
         pod.status = PodStatus.COMPLETE
         info = pod.to_json()
         self._etcd.set_server_permanent(self._server_name, self._server, info)
         self.stop()
+
+    def is_stoped(self):
+        with self._lock:
+            return self._stopped
 
 
 class PodResourceRegister(Register):
