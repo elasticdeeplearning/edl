@@ -196,9 +196,14 @@ def launch(args):
         if watcher.is_changed():
             watcher.stop()
             # pod leader need not to change self.
-            if pod.rank != 0 and self.is_self_rank_changed():
+            if self.is_self_rank_changed() \
+                    or not rank_register.is_leader() \
+                    or rank_register.is_stoped():
                 rank_register.stop()
                 rank_register = PodRankRegister(job_env, pod)
+
+            if rank_register.is_leader():
+                rank_register.update_stage(pod)
 
             logger.info("Cluster changed. New cluster:{}. Old Cluster:{}".
                         format(cluster2, cluster))
@@ -225,7 +230,7 @@ def launch(args):
             break
 
         print("launch 1")
-        time.sleep(1)
+        time.sleep(3)
 
     register.complete()
 

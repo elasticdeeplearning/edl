@@ -42,7 +42,7 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
 
     def ScaleOut(self, request, context):
         status = common_pb.Status()
-        if self._rank_register.rank != 0:
+        if not self._rank_register.is_leader():
             status = serialize_exception(
                 EdlLeaderError("this pod is not the leader"))
             return status
@@ -51,7 +51,7 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
 
     def ScaleIn(self, request, context):
         status = common_pb.Status()
-        if self._rank_register.rank != 0:
+        if not self._rank_register.is_leader():
             status = serialize_exception(
                 EdlLeaderError("this pod is not the leader"))
             return status

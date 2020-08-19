@@ -130,6 +130,15 @@ class PodRankRegister(object):
             self._rank = None
             self._stopped = True
 
+    def update_stage(self):
+        if not self.is_leader():
+            return
+
+        with self._lock:
+            self._pod._stage = str(uuid.uuid1())
+            info = self._pod.to_json()
+            self._etcd.refresh(self._service_name, self._server, info=info)
+
     def stop(self):
         self._stop.set()
         self._t_register.join()
@@ -138,13 +147,8 @@ class PodRankRegister(object):
         self.stop()
 
     def is_leader(self):
-        return self._rank == 0
-
-    """
-    def changed(self):
         with self._lock:
-            return self._changed
-    """
+            return self._rank == 0
 
     def complete(self):
         pod.status = PodStatus.COMPLETE
