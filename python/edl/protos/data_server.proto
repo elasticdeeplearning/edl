@@ -14,13 +14,10 @@
 
 syntax = "proto3";
 
-option go_package = ".;masterpb";
-package master;
+import "common.proto";
 
-message Status {
-  string type = 1;
-  string detail = 2;
-}
+option go_package = ".;masterpb";
+package data_server;
 
 message ShutDownRequest {}
 message EmptyRequest {}
@@ -38,7 +35,7 @@ message FileMeta {
 }
 
 message FileListResponse {
-  Status ret = 1;
+  common.Status ret = 1;
   repeated FileMeta metas = 2;
 }
 
@@ -54,7 +51,7 @@ message BatchDataMetaRequest {
 }
 
 message BatchDataMetaResponse {
-  Status status = 1;
+  common.Status status = 1;
   string data_reader_id = 2;
   string data_reader_endpoint = 3;
   string batch_data_id = 4;
@@ -69,7 +66,7 @@ message FileBatchData {
 message BatchDataRequest { string batch_id = 1; }
 
 message BatchDataResponse {
-  Status status = 1;
+  common.Status status = 1;
   repeated FileBatchData batch = 2;
 }
 
@@ -77,9 +74,9 @@ service DataServer {
   rpc GetFileList(FileListRequest) returns (FileListResponse) {}
   rpc GetBatchDataMeta(BatchDataMetaRequest) returns (BatchDataMetaResponse) {}
   rpc GetBatchData(BatchDataRequest) returns (BatchDataResponse) {}
-  rpc ShutDown(ShutDownRequest) returns (Status) {}
+  rpc ShutDown(ShutDownRequest) returns (common.Status) {}
 
   // two step's to do it.
-  rpc PrePareSaveCheckpoint(CheckpointRequest) returns (Status) {}
-  rpc SaveCheckpoint(CheckpointRequest) returns (Status) {}
+  rpc PrePareSaveCheckpoint(CheckpointRequest) returns (common.Status) {}
+  rpc SaveCheckpoint(CheckpointRequest) returns (common.Status) {}
 }

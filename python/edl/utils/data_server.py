@@ -14,6 +14,7 @@
 
 from __future__ import print_function
 from concurrent import futures
+from . import common_pb2 as common_pb
 from . import data_server_pb2 as pb
 from . import data_server_pb2_grpc as pb_grpc
 import grpc
@@ -72,7 +73,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
                         "can't get filelist of rank:{} id:{}".format(
                             request.rank, request.id))
 
-                res.status = pb.Status()
+                res.status = common_pb.Status()
                 res.metas
                 for f in self._trainer_file_list[i]:
                     meta = pb.Meta()

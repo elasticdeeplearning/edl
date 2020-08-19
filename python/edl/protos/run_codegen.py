@@ -40,6 +40,13 @@ protoc.main((
     '-I.',
     '--python_out=.',
     '--grpc_python_out=.',
+    'common.proto', ))
+
+protoc.main((
+    '',
+    '-I.',
+    '--python_out=.',
+    '--grpc_python_out=.',
     'pod_server.proto', ))
 
 protoc.main((

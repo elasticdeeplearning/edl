@@ -12,21 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 from . import pod_server_pb2 as pb
 from . import pod_server_pb2_grpc as pb_grpc
 from .client import Client
 from .cluster import Cluster
-from .exceptions import deserialize_exception
+from .exceptions import deserialize_exception, EdlBarrierError
 
 
-class PodServerClient(client):
-    def __init__(self):
-        super(DataClient, self).__init__(endpoint)
+class PodServerClient(Client):
+    def __init__(self, endpoint):
+        super(PodServerClient, self).__init__(endpoint)
 
     def connect(self):
-        super(PodServerClient, self).connect(endpoint)
-        self._stub = pb_grpc.PodServerStub(channel)
-        return self._channel.self._stub
+        super(PodServerClient, self).connect()
+        self._stub = pb_grpc.PodServerStub(self._channel)
+        return self._channel, self._stub
+
+    def shutdown(self):
+        super(PodServerClient, self).shutdown()
+        self._stub = None
 
     def barrier(self, job_id, pod_id, timeout=15):
         """
@@ -43,8 +48,9 @@ class PodServerClient(client):
             if res.type == "":
                 return
 
+            deserialize_exception(res)
             if time.time() - begin > timeout:
                 message = "job_id:{} pod_id:{} barrier time out".format(job_id,
                                                                         pod_id)
-                raise EdlBarrierError(message)
+                deserialize_exception(res)
             time.sleep(1)

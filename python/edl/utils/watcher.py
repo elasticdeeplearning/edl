@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from threading import Lock, Thread
+from threading import Lock, Thread, Event
 import time
 from utils import logger
 from edl.discovery.etcd_client import EtcdClient
@@ -36,15 +36,14 @@ class Watcher(object):
 
         self._cluster = Cluster()
         self._lock = Lock()
+        self._stop = Event()
         self._t_watcher = Thread(target=self._watcher)
         self._t_watcher.start()
-
-    #def watch(self):
 
     def _watcher(self):
         begin = time.time()
         while not self._stop.is_set():
-            servers = self._etcd.get_service(EDL_POD_RANK)
+            servers = self._etcd.get_service(ETCD_POD_RANK)
             ranks = {}
             with self._lock:
                 for s in servers:
@@ -106,7 +105,7 @@ def get_current_pod_ids_from_resource():
     ids = set()
     for m in pod_resource_servers:
         p.from_json(m.info)
-        ids.add(p.id)
+        ids.add(p.get_id())
 
     return ids
 

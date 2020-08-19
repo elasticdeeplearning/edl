@@ -51,6 +51,10 @@ class Pod(object):
         self._status = PodStatus.INITIAL  # status maybe changed
         self._stage = None
 
+    @property
+    def stage(self):
+        return self._stage
+
     def to_json(self):
         d = {
             "id": self._id,
@@ -123,7 +127,7 @@ class Pod(object):
         # self._stage need not to set when from_env
 
     def from_pb(self, pod):
-        self._id = pod.id
+        self._id = pod._id
         self._rank = pod.rank
         self._addr = pod.addr
         self._port = pod.port
@@ -289,7 +293,7 @@ class Trainer(object):
         self._gpus = gpus
 
     def from_pb(self, t):
-        self._id = t.id
+        self._id = t._id
         self._global_rank = t.global_rank
         self._rank_in_pod = t.rank_in_pod
         self._endpoint = t.endpoint
@@ -359,7 +363,7 @@ class Cluster(object):
 
     def get_pod_by_id(self, pod_id):
         for pod in self._pods:
-            if str(pod_id) == str(pod.id):
+            if str(pod_id) == str(pod._id):
                 return pod
 
         return None

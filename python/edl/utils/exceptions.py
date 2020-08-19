@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from ..utils import data_server_pb2 as pb
+
+import sys
+from ..utils import common_pb2 as pb
 
 
 class EdlException(Exception):
@@ -42,14 +44,14 @@ class EdlInternalError(EdlException):
     pass
 
 
-def deserialize_exception(s, name):
-    thismodule = sys.modules[s.__name__]
-    cls = getattr(thismodule, name)(s.detail)
+def deserialize_exception(s):
+    thismodule = sys.modules[__name__]
+    cls = getattr(thismodule, s.type)(s.detail)
     raise cls
 
 
 def serialize_exception(e):
     s = pb.Status()
-    s.status.type = e.__class__.__name__
-    s.status.detail = str(e)
+    s.type = e.__class__.__name__
+    s.detail = str(e)
     return s

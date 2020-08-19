@@ -28,6 +28,7 @@ from argparse import ArgumentParser, REMAINDER
 import paddle.fluid as fluid
 from contextlib import closing
 import socket
+import traceback
 
 from ..utils.edl_env import JobEnv
 from ..utils.cluster import Pod
@@ -37,6 +38,9 @@ from ..utils.pod_server import PodServer
 from ..utils.utils import logger
 from ..utils import utils
 from ..utils.global_vars import *
+from ..utils.pod_client import PodServerClient
+from ..utils.exceptions import *
+from ..utils.edl_process import start_local_trainers, terminate_local_procs, watch_local_procs
 
 
 def _print_arguments(args):
@@ -126,16 +130,16 @@ def edl_barrier(job_env, pod, timeout):
     register = PodRegister(job_env, pod)
 
     leader = get_pod_leader()
+    c = PodServerClient(leader.endpoint)
     # all pods barrier on leader
     while True:
         try:
-            c = Client(leader.endpoint)
-            c.Barrier(job_env.job_id, pod.id)
+            c.barrier(job_env.job_id, pod.get_id())
             break
         except Exception as e:
             logger.warning(
                 "wait to barrier with all error:{} leader:[{}] current pod:[{}]".
-                format(e, leader, pod))
+                format(traceback.format_exc(), leader, pod))
             time.sleep(3)
 
         if time.time() - start > timeout:
@@ -185,7 +189,7 @@ def launch(args):
 
             register.stop()
             watcher.stop()
-            terminiate_local_trainers(procs)
+            terminate_local_procs(procs)
             # wait all pods info diappeared from etcd
             # don't change this time,since the ttl is set to 10s in registers
             # FIXME(gongwb): any other method?
@@ -195,7 +199,7 @@ def launch(args):
             register, watcher = edl_barrier(job_env, pod, timeout=600)
             continue
 
-        alive = watch_local_trainers(procs, pod.trainers_num())
+        alive = watch_local_procs(procs, pod.trainers_num())
 
         if not alive:
             logger.info("Local procs complete, POD info:{}".format(pod))

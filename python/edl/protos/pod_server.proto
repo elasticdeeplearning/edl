@@ -14,13 +14,10 @@
 
 syntax = "proto3";
 
-option go_package = ".;masterpb";
-package server;
+import "common.proto";
 
-message Status {
-  string type = 1;
-  string detail = 2;
-}
+option go_package = ".;masterpb";
+package pod_server;
 
 message BarrierRequest {
   string job_id = 1;
@@ -32,9 +29,9 @@ message ScaleInRequest { int32 num = 1; }
 message ScaleOutRequest {}
 
 service PodServer {
-  rpc Barrier(BarrierRequest) returns (Status) {}
+  rpc Barrier(BarrierRequest) returns (common.Status) {}
 
   // Cluster controller -> master
-  rpc ScaleOut(ScaleOutRequest) returns (Status) {}
-  rpc ScaleIn(ScaleInRequest) returns (Status) {}
+  rpc ScaleOut(ScaleOutRequest) returns (common.Status) {}
+  rpc ScaleIn(ScaleInRequest) returns (common.Status) {}
 }

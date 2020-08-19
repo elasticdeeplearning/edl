@@ -14,7 +14,6 @@
 
 from .cluster import Cluster
 import grpc
-from .exceptions import raise_execption
 
 
 class Client(object):
@@ -26,4 +25,3 @@ class Client(object):
 
     def shutdown(self):
         self._channel = None
-        self._stub = None

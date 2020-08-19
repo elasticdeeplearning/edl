@@ -26,7 +26,8 @@ import threading
 import copy
 from .utils import logger
 from . import pod_server_pb2_grpc as pb2_grpc
-from . import pod_server_pb2 as pb2
+from . import pod_server_pb2 as pb
+from . import common_pb2 as common_pb
 from .watcher import get_current_pod_ids_from_resource, get_pod_leader
 from .exceptions import *
 
@@ -45,12 +46,13 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
         pass
 
     def Barrier(self, request, context):
-        logger.info("get barrier request from {}".format(request))
-
         ids = get_current_pod_ids_from_resource()
         leader = get_pod_leader()
+        logger.info(
+            "get barrier request from job_id:{} pod_id:{} ids:{} leader:{}".
+            format(request.job_id, request.pod_id, ids, leader.get_id()))
 
-        status = pb2.Status()
+        status = common_pb.Status()
         with self._lock:
             try:
                 key = leader.stage
