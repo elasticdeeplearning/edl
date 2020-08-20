@@ -30,6 +30,7 @@ import collections
 from .exceptions import *
 from . import utils
 from enum import Enum
+from .utils import logger
 
 
 class PodStatus(Enum):
@@ -405,7 +406,8 @@ class Cluster(object):
             pod = Pod()
             if i != key:
                 raise EdlRankError("rank:{} is not exists:{}".format(i, d))
-            pods.append(pod.from_json(value))
+            pod.from_json(value)
+            pods.append(pod)
 
         self._pods = pods
 

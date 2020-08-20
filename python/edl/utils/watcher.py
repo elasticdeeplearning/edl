@@ -62,11 +62,14 @@ class Watcher(object):
             ranks = {}
             for s in servers:
                 ranks[int(s.server)] = s.info
+            #logger.info("ranks:{}".format(ranks))
 
+            new_cluster = Cluster()
             with self._lock:
                 if self._ranks is None:
                     self._ranks = ranks
                     self._cluster.from_json(ranks)
+                    #logger.info("clusters:{}".format(self._cluster))
                     continue
 
                 if not self._is_cluster_changed(self._ranks, ranks):
@@ -74,20 +77,19 @@ class Watcher(object):
                     continue
 
                 self._changed = True
-                logger.info("train world changed, old  is {} new is {}",
-                            self._ranks, ranks)
+            logger.info("train world changed, old  is {} new is {}",
+                        self._ranks, ranks)
 
-                new_cluster = Cluster()
-                new_cluster.from_json(ranks)
+            new_cluster.from_json(ranks)
 
-                if len(new_cluster.pods) == 0:
-                    time.sleep(1)
-                    continue
+            if len(new_cluster.pods) == 0:
+                time.sleep(1)
+                continue
 
-                pod = new_cluster.get_pod_by_id(current_pod.get_id())
-                if pod != current_pod:  # current pod rank changed
-                    self._pod_rank_changed = True
-                    break
+            pod = new_cluster.get_pod_by_id(current_pod.get_id())
+            if pod != current_pod:  # current pod rank changed
+                self._pod_rank_changed = True
+                break
 
     def _is_cluster_changed(self, old, new):
         for k, v in six.iteritems(old):

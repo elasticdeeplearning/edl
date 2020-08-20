@@ -161,6 +161,12 @@ def launch(args):
     pod = Pod()
     pod.from_env(job_env)
 
+    # launch pod server
+    pod_server = None
+    pod_server = PodServer(pod.get_id())
+    pod_server.start(job_env, pod)
+    logger.info("pod server started:[{}]".format(pod))
+
     # register pod resource, they can't be stopped.
     resource_register = PodResourceRegister(job_env.etcd_endpoints,
                                             job_env.job_id, pod)
@@ -168,12 +174,6 @@ def launch(args):
     # regist and get rank, leader is in it.
     # and leader will change the stage to a unique string
     rank_register = PodRankRegister(job_env, pod)
-
-    # launch pod server
-    pod_server = None
-    pod_server = PodServer(rank_register)
-    pod_server.start(job_env, pod)
-    logger.info("pod server started:[{}]".format(pod))
 
     # register rank and watch the rank
     # if the rank changed, the pods should restart the training proc.
@@ -186,6 +186,7 @@ def launch(args):
 
     while True:
         cluster = watcher.get_cluster()
+        logger.info("get cluster:{}".format(cluster))
         procs = start_local_trainers(
             cluster,
             pod,

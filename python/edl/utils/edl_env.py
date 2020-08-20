@@ -68,6 +68,7 @@ class JobEnv(object):
     def _get_gpus(self, args):
         # selected gpus
         self._gpus = utils.get_gpus(None)
+        assert self._gpus != None, "can't get gpu info of this machine"
 
         # proc per node
         nproc_per_node = get_from_dict_or_env(args, "nproc_per_node",

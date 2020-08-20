@@ -33,16 +33,17 @@ from .exceptions import *
 
 
 class PodServerServicer(pb2_grpc.PodServerServicer):
-    def __init__(self, rank_register):
+    def __init__(self, pod_id):
         # to control the cache size.
         self._lock = Lock()
         # stage => set(pod_id)
         self._barrier_in = {}
-        self._rank_register = rank_register
+        self._pod_id = pod_id
 
     def ScaleOut(self, request, context):
         status = common_pb.Status()
-        if not self._rank_register.is_leader():
+        pod = get_pod_leader()
+        if pod.get_id != self._pod_id:
             status = serialize_exception(
                 EdlLeaderError("this pod is not the leader"))
             return status
@@ -51,7 +52,8 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
 
     def ScaleIn(self, request, context):
         status = common_pb.Status()
-        if not self._rank_register.is_leader():
+        pod = get_pod_leader()
+        if pod.get_id != self._pod_id:
             status = serialize_exception(
                 EdlLeaderError("this pod is not the leader"))
             return status
@@ -91,11 +93,11 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
 
 
 class PodServer(object):
-    def __init__(self, rank_register):
+    def __init__(self, pod_id):
         self._server = None
         self._port = None
         self._endpoint = None
-        self._rank_register = rank_register
+        self._pod_id = pod_id
 
     def start(self, job_env, pod, concurrency=20, max_workers=100):
         server = grpc.server(
@@ -104,7 +106,7 @@ class PodServer(object):
                      ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
             maximum_concurrent_rpcs=concurrency)
         pb2_grpc.add_PodServerServicer_to_server(
-            PodServerServicer(rank_register), server)
+            PodServerServicer(self._pod_id), server)
 
         self._port = server.add_insecure_port('{}:0'.format(pod.addr))
         assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(

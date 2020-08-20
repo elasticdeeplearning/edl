@@ -33,7 +33,6 @@ def get_global_etcd(etcd_endpoints, job_id):
         g_etcd = EtcdClient(endpoints=etcd_endpoints, root=job_id)
         g_etcd.init()
 
-    print("etcd:", g_etcd, "g_etcd_lock:", g_etcd_lock)
     return g_etcd, g_etcd_lock
 
 
