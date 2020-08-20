@@ -77,8 +77,6 @@ class Watcher(object):
                     continue
 
                 self._changed = True
-            logger.info("train world changed, old  is {} new is {}",
-                        self._ranks, ranks)
 
             new_cluster.from_json(ranks)
 
@@ -93,10 +91,16 @@ class Watcher(object):
 
     def _is_cluster_changed(self, old, new):
         for k, v in six.iteritems(old):
-            if v == new[k]:
-                continue
+            if k not in new:
+                logger.info(
+                    "train world changed, old_cluster k:{} not in new_cluster:{}".
+                    format(k, new))
+                return True
 
             if old[k] != new[k]:
+                logger.info(
+                    "train world changed, old_cluster k:{}=>v:{} != new_cluster k:{}=>v:{}".
+                    format(k, old[k], k, new[k]))
                 return True
             """
             old_pod = Pod()
@@ -143,6 +147,17 @@ def get_current_pod_ids_from_resource():
         ids.add(p.get_id())
 
     return ids
+
+
+def get_cluster():
+    etcd, lock = get_etcd()
+    cluster = Cluster()
+    servers = etcd.get_service(ETCD_POD_RANK)
+    ranks = {}
+    for s in servers:
+        ranks[int(s.server)] = s.info
+    cluster.from_json(ranks)
+    return cluster
 
 
 def get_pod_leader():

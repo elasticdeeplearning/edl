@@ -38,6 +38,7 @@ class PodStatus(Enum):
     RUNNING = 1
     PENDING = 2
     COMPLETE = 3
+    ERROR = 4
 
 
 class Pod(object):
@@ -225,6 +226,10 @@ class Pod(object):
     @property
     def trainers(self):
         return self._trainers
+
+    @property
+    def trainers_num(self):
+        return len(self._trainers)
 
     def get_id(self):
         return self._id

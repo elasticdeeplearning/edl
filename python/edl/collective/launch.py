@@ -31,16 +31,16 @@ import socket
 import traceback
 
 from ..utils.edl_env import JobEnv
-from ..utils.cluster import Pod
+from ..utils.cluster import Pod, PodStatus
 from ..utils.register import PodRankRegister, PodResourceRegister, ETCD_POD_RANK, ETCD_POD_RESOURCE
-from ..utils.watcher import Watcher, get_pod_leader
+from ..utils.watcher import Watcher, get_pod_leader, get_cluster
 from ..utils.pod_server import PodServer
 from ..utils.utils import logger
 from ..utils import utils
 from ..utils.global_vars import *
 from ..utils.pod_client import PodServerClient
 from ..utils.exceptions import *
-from ..utils.edl_process import start_local_trainers, terminate_local_procs, watch_local_procs
+from ..utils.edl_process import start_local_trainers, terminate_local_procs, watch_local_trainers
 
 
 def _print_arguments(args):
@@ -147,6 +147,18 @@ def edl_barrier(job_env, pod, timeout):
             raise EdlBarrierError(message)
 
 
+def check_pods_status():
+    cluster = get_cluster()
+    found = False
+    for pod in cluster.pods:
+        if pod.status == PodStatus.ERROR:
+            found = True
+            logger.warning("train in pod:{} meets error".format(pod))
+
+    if not found:
+        logger.info("Congratulate! This job complete!")
+
+
 def launch(args):
     args_dict = _convert_args_to_dict(args)
 
@@ -184,6 +196,7 @@ def launch(args):
     # watch after barrier
     watcher.watch()
 
+    status = False
     while True:
         cluster = watcher.get_cluster()
         logger.info("get cluster:{}".format(cluster))
@@ -224,16 +237,28 @@ def launch(args):
             watcher.watch()
             continue
 
-        alive = watch_local_procs(procs, pod.trainers_num())
-
-        if not alive:
-            logger.info("Local procs complete, POD info:{}".format(pod))
+        alive, status = watch_local_trainers(procs, pod.trainers_num)
+        if not alive or not status:
             break
 
-        print("launch 1")
         time.sleep(3)
 
-    register.complete()
+    watcher.stop()
+    rank_register.complete(status)
+
+    # try to report the global status
+    try:
+        edl_barrier(job_env, pod, timeout=30)
+        check_pods_status()
+        return
+    except Exception as e:
+        logger.info("barrier error:{}".format(e))
+        pass
+
+    if not status:
+        logger.info("local trainer meets error!")
+        return
+    logger.info("local trainer run ok and exit!")
 
 
 def run_commandline():

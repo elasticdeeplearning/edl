@@ -23,6 +23,7 @@ import sys
 import subprocess
 from contextlib import closing
 import socket
+import psutil
 
 from .utils import logger
 
@@ -114,6 +115,18 @@ def terminate_local_procs(procs):
     logger.info("terminate all procs")
 
 
+def watch_local_trainers(procs, nranks):
+    """
+    return alive_or_not, ok_or_not
+    """
+    try:
+        alive = _watch_local_procs(procs, nranks)
+    except Exception as e:
+        return False, False
+
+    return alive, True
+
+
 def watch_local_procs(procs, nranks):
     """
     If proc exit unnormally, this function will raise exception.
@@ -132,9 +145,7 @@ def watch_local_procs(procs, nranks):
                 error_rank.append(p.rank)
 
         if error:
-            terminate_local_procs(procs)
-            exit(1)
-
+            raise
     except KeyboardInterrupt:
         logger.warning("KeyboardInterrupt, exit")
         terminate_local_procs(procs)

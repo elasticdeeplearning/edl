@@ -252,3 +252,6 @@ class EtcdClient(object):
     @_handle_errors
     def get_key(self, key):
         return self._etcd.get(key)
+
+    def get_full_path(self, service_name, server):
+        return '/{}/{}/nodes/{}'.format(self._root, service_name, server)

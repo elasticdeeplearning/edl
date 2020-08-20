@@ -90,7 +90,9 @@ class PodRankRegister(object):
                         valid = False
                         continue
 
-                    logger.info("register rank:{} on etcd".format(rank))
+                    logger.info("register rank:{} on etcd key:{}".format(
+                        rank,
+                        self._etcd.get_full_path(self._service_name, server)))
                     # set rank
                     pod.rank = rank
                     return rank, server
@@ -137,11 +139,18 @@ class PodRankRegister(object):
         with self._lock:
             self._pod._stage = str(uuid.uuid1())
             info = self._pod.to_json()
-            self._etcd.refresh(self._service_name, self._server, info=info)
+
+        self._etcd.refresh(self._service_name, self._server, info=info)
 
     def stop(self):
         self._stop.set()
-        self._t_register.join()
+
+        if self._t_register.is_alive():
+            self._t_register.join()
+
+        with self._lock:
+            self._stopped = True
+            self._rank = None
 
     def __exit__(self):
         self.stop()
@@ -150,10 +159,15 @@ class PodRankRegister(object):
         with self._lock:
             return self._rank == 0
 
-    def complete(self):
-        pod.status = PodStatus.COMPLETE
-        info = pod.to_json()
-        self._etcd.set_server_permanent(self._server_name, self._server, info)
+    def complete(self, status):
+        with self._lock:
+            if status:
+                self._pod.status = PodStatus.COMPLETE
+            else:
+                self._pod.status = PodStatus.ERROR
+
+        info = self._pod.to_json()
+        self._etcd.set_server_permanent(self._service_name, self._server, info)
         self.stop()
 
     def is_stoped(self):
