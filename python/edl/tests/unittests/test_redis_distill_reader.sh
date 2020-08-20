@@ -7,7 +7,7 @@ redis_pid=$!
 # wait redis start
 sleep 10
 
-nohup python -m paddle_edl.distill.redis.server_register \
+nohup python -m edl.distill.redis.server_register \
   --db_endpoints 127.0.0.1:3456 \
   --service_name DistillReaderTest \
   --server 127.0.0.1:3456  >  test_redist_distill_reader.1.log 2>&1 &
