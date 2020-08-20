@@ -14,14 +14,14 @@ Now EDL is an incubation-stage project of the [LF AI Foundation](https://lfai.fo
 
 <h2 align="center">Installation</h2>
 
-You can install with ```pip install edl```. But we highly **recommend** you use it in our docker:
+EDL package support python2.7/3.6/3.7. You can install with ```pip install paddle_edl```. But we highly **recommend** you use it in our docker:
 
 ```
-docker pull hub.baidubce.com/edl/edl:latest-cuda9.0-cudnn7
-nvidia-docker run -name edl hub.baidubce.com/edl/edl:latest-cuda9.0-cudnn7 /bin/bash
+docker pull hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda9.0-cudnn7
+nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda9.0-cudnn7 /bin/bash
 ```  
 
-<h2 align="center">Latest Release(0.3.0)</h2>
+<h2 align="center">Latest Release(0.3.1)</h2>
 
 - Support elastic training with inference type services during training, such as knowledge distillation 
 - Inference type services are automatically registered through service discovery in EDL
@@ -110,7 +110,7 @@ python -m paddle.distributed.launch --selected_gpus 0 \
 ```
 cd example/demo/collective
 node_ips="127.0.0.1"
-python -u edl.demo.collective.job_server_demo \
+python -u paddle_edl.demo.collective.job_server_demo \
     --node_ips ${node_ips} \
     --pod_num_of_node 8 \
     --time_interval_to_change 900 \
@@ -133,7 +133,7 @@ export PADDLE_RUNING_ENV=PADDLE_EDL
 export PADDLE_JOB_ID="test_job_id_1234"
 export PADDLE_POD_ID="not set"
 
-python -u edl.demo.collective.job_client_demo \
+python -u paddle_edl.demo.collective.job_client_demo \
     --log_level 20 \
     --package_sh ./resnet50/package.sh \
     --pod_path ./resnet50_pod \
