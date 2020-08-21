@@ -69,12 +69,6 @@ class Watcher(object):
                     self._ranks = ranks
                     self._cluster.from_json(ranks)
                     continue
-                """
-                if not self._is_cluster_changed(self._ranks, ranks):
-                    time.sleep(1)
-                    continue
-                self._changed = True
-                """
 
             self._clear_changed()
 
@@ -83,7 +77,6 @@ class Watcher(object):
                 break
 
             if self._is_leader_changed(new_cluster):
-                # leader will not find self changed.
                 break
 
             if self._is_follower_changed(new_cluster):
@@ -114,8 +107,8 @@ class Watcher(object):
         new_leader = new_cluster.pods[0]
         old_leader = self._cluster.pods[0]
 
-        if new_leader.get_id() != old_leader.get_id() or \
-                new_leader.stage != old_leader.stage:
+        # stage need not to be considered
+        if new_leader.get_id() != old_leader.get_id():
             with self._lock:
                 self._leader_changed = True
             return True
@@ -138,16 +131,22 @@ class Watcher(object):
 
         if len(new_cluster.pods) == 0:
             self._changed_follower_pods = self._cluster.pods
+            logger.info("followers changed to:{}".format(
+                [str(x.get_id()) for x in self._changed_follower_pods]))
             return True
 
         filter_ids = set()
         # find the changed pods
         for old_pod in self._cluster.pods:
             new_pod = new_cluster.get_pod_by_id(old_pod.get_id())
-
-            if old_pod.rank != new_pod.rank:
+            if new_pod is None or old_pod.rank != new_pod.rank:
                 with self._lock:
                     self._changed_follower_pods.append(old_pod)
+                if new_pod:
+                    logger.warning("pod:{} rank change from:{} to {}".format(
+                        old_pod.get_id(), old_pod.rank, new_pod.rank))
+                else:
+                    logger.warning("pod:{} disappear".format(old_pod))
             filter_ids.add(old_pod.get_id())
 
         # find the new added pods
@@ -155,13 +154,14 @@ class Watcher(object):
             if pod.get_id() not in filter_ids:
                 with self._lock:
                     self._changed_follower_pods.append(pod)
+                logger.info("and new pod:{}".format(pod))
 
         with self._lock:
             return len(self._changed_follower_pods) != 0
 
     def is_follower_changed(self):
         with self._lock:
-            return self._changed_follower_pods != None
+            return len(self._changed_follower_pods) > 0
 
     def _is_any_pod_failed(self, new_cluster):
         for pod in new_cluster.pods:
@@ -176,24 +176,6 @@ class Watcher(object):
         with self._lock:
             return self._failed_pods
 
-    """
-    def _is_cluster_changed(self, old, new):
-        for k, v in six.iteritems(old):
-            if k not in new:
-                logger.debug(
-                    "train world changed, old_cluster k:{} not in new_cluster:{}".
-                    format(k, new))
-                return True
-
-            if old[k] != new[k]:
-                logger.debug(
-                    "train world changed, old_cluster k:{}=>v:{} != new_cluster k:{}=>v:{}".
-                    format(k, old[k], k, new[k]))
-                return True
-
-        return False
-    """
-
     def get_cluster(self):
         with self._lock:
             return self._cluster
@@ -203,7 +185,7 @@ class Watcher(object):
         if self._t_watcher:
             self._t_watcher.join()
             with self._lock:
-                slf._t_watcher = None
+                self._t_watcher = None
 
     def __exit__(self):
         self.stop()

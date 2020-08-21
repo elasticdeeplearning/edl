@@ -48,8 +48,8 @@ class Register(object):
 
     def _refresher(self):
         while not self._stop.is_set():
-            self._etcd.refresh(service, server)
-            time.sleep(3)
+            self._etcd.refresh(self._service, self._server)
+            time.sleep(2)
 
     def stop(self):
         self._stop.set()

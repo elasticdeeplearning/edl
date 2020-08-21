@@ -149,6 +149,8 @@ def edl_barrier(job_env, pod, timeout):
 
 
 def proc_leader_changed_event(job_env, pod, rank_register, watcher):
+    logger.info("proc_leader_changed_event")
+    # leader will not find self changed.
     if rank_register.is_leader():
         logger.info("leader need not to re-regist")
     else:
@@ -166,6 +168,8 @@ def proc_leader_changed_event(job_env, pod, rank_register, watcher):
 
 
 def proc_follower_changed_event(job_env, pod, rank_register, watcher):
+    logger.info("proc_follower_changed_event")
+    # leader will not find self changed.
     if rank_register.is_leader():
         rank_register.update_stage()
         logger.info("leader need not to re-regist when followers changed")
@@ -249,7 +253,7 @@ def launch(args):
             proc_leader_changed_event(job_env, pod, rank_register, watcher)
             continue
 
-        if watcher.is_follower_changed():
+        elif watcher.is_follower_changed():
             proc_follower_changed_event(job_env, pod, rank_register, watcher)
             continue
 
@@ -262,8 +266,12 @@ def launch(args):
     # inverse order of initialization
     watcher.stop()
     if not local_status:
+        logger.fatal("local trainers meets error and the job will exit!")
         # some trainer failed, it's a user-level failed
         rank_register.complete(False)
+
+    if not other_status:
+        logger.fatal("job meets error and exit!")
 
     if rank_register.is_leader():
         if not local_status or not other_status:

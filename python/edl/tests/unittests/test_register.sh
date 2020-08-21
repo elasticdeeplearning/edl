@@ -43,8 +43,9 @@ pid_01=$!
 
 wait $pid_00 $pid_01
 
+key="/${PADDLE_JOB_ID}/job_flag/nodes/complete"
 value=`etcdctl get ${key}`
-echo $value
+echo "job complete flag:${value}"
 #----
 
 kill -9 $etcd_pid
