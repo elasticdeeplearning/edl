@@ -34,6 +34,8 @@ class TrainerProc(object):
         self.log_fn = None
         self.rank = None
         self.cmd = None
+        self.log_offset = None
+        self.local_rank = None
 
 
 def start_local_trainers(cluster,
@@ -71,6 +73,7 @@ def start_local_trainers(cluster,
 
         fn = None
         if log_dir is not None:
+            logger.info("mkdir {}".format(log_dir))
             os.system("mkdir -p {}".format(log_dir))
             fn = open("%s/workerlog.%d" % (log_dir, idx), "a")
             proc = subprocess.Popen(cmd, env=current_env, stdout=fn, stderr=fn)
@@ -81,11 +84,14 @@ def start_local_trainers(cluster,
         tp.proc = proc
         tp.rank = t.global_rank
         tp.log_fn = fn
+        tp.local_rank = idx
+        tp.log_offset = fn.tell() if fn else None
         tp.cmd = cmd
 
         procs.append(tp)
 
-    logger.info("start trainers:{}".format(cluster.get_trainers_endpoints()))
+    logger.info("all cluster trainers:{}".format(
+        cluster.get_trainers_endpoints()))
     return procs
 
 
@@ -127,6 +133,21 @@ def watch_local_trainers(procs, nranks):
     return alive, True
 
 
+def pull_worker_log(tp):
+    if tp.log_fn:
+        with open(tp.log_fn.name, 'r') as fin:
+            fin.seek(tp.log_offset, 0)
+            for line in fin:
+                try:
+                    sys.stdout.write(line)
+                except UnicodeEncodeError:
+                    sys.stdout.write(
+                        'UnicodeEncodeError occurs at this line. '
+                        'Please refer to the original log file "%s"\n' %
+                        tp.log_fn.name)
+            tp.log_offset = fin.tell()
+
+
 def watch_local_procs(procs, nranks):
     """
     If proc exit unnormally, this function will raise exception.
@@ -138,6 +159,9 @@ def watch_local_procs(procs, nranks):
         alive = False
         for p in procs:
             ret = p.proc.poll()
+            if p.log_fn and p.local_rank == 0:
+                pull_worker_log(p)
+
             if ret is None:
                 alive = True
             elif ret != 0:

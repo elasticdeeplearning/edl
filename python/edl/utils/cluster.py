@@ -410,7 +410,7 @@ class Cluster(object):
         for i, (key, value) in enumerate(od.iteritems()):
             pod = Pod()
             if i != key:
-                raise EdlRankError("rank:{} is not exists:{}".format(i, d))
+                raise EdlRankError("rank:{} is not exists in {}".format(i, d))
             pod.from_json(value)
             pods.append(pod)
 

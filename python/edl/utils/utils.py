@@ -117,6 +117,7 @@ def get_gpus(selected_gpus):
                 for x in selected_gpus.split(',')
             ]
 
+    logger.info("get selected_gpus:{}".format(selected_gpus))
     return selected_gpus
 
 

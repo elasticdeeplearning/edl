@@ -120,7 +120,7 @@ class Watcher(object):
 
         return False
 
-    def is_leader_changed(new_cluster):
+    def is_leader_changed(self):
         with self._lock:
             return self._leader_changed
 

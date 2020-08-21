@@ -130,20 +130,22 @@ def edl_barrier(job_env, pod, timeout):
 
     leader = get_pod_leader()
     c = PodServerClient(leader.endpoint)
+    log_time = time.time()
     # all pods barrier on leader
     while True:
         try:
             c.barrier(job_env.job_id, pod.get_id())
             break
         except Exception as e:
-            logger.warning(
-                "wait to barrier with all error:{} leader:[{}] current pod:[{}]".
-                format(traceback.format_exc(), leader, pod))
+            if time.time() - log_time > 30:
+                logger.info("wait to barrier now!")
+                log_time = time.time()
             time.sleep(3)
 
         if time.time() - start > timeout:
-            message = "can't barrier with all, leader:[{}] current pod:{}".format(
-                leader, pod)
+            logger.warning(
+                "wait to barrier with all error:{} leader:[{}] current pod:[{}]".
+                format(traceback.format_exc(), leader, pod))
             raise EdlBarrierError(message)
 
 
@@ -157,13 +159,15 @@ def proc_leader_changed_event(job_env, pod, rank_register, watcher):
         logger.info("pod re-regist:{}".format(pod))
 
     edl_barrier(job_env, pod, timeout=60)
+    # FIXME(gongwb):wait to info in etcd exit, please don't change the time
+    time.sleep(15)
 
     # watch agagin
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
 
 
 def proc_follower_changed_event(job_env, pod, rank_register, watcher):
-    if register.is_leader():
+    if rank_register.is_leader():
         logger.info("leader need not to re-regist when followers changed")
         return
     else:
@@ -171,6 +175,8 @@ def proc_follower_changed_event(job_env, pod, rank_register, watcher):
         rank_register = PodRankRegister(job_env, pod)
 
     edl_barrier(job_env, pod, timeout=60)
+    # FIXME(gongwb):wait to info in etcd exit, please don't change the time
+    time.sleep(15)
 
     # watch agagin
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
@@ -234,7 +240,7 @@ def launch(args):
             log_dir=args.log_dir)
 
         failed_pods = watcher.get_failed_pods()
-        if failed_pods is not None:
+        if len(failed_pods) != 0:
             other_status = False
             terminate_local_procs(procs)
             logger.info("found pods:{} failed! exit!".format(
