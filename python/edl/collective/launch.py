@@ -147,6 +147,15 @@ def edl_barrier(job_env, pod, timeout):
                 traceback.format_exc(), leader, pod)
             raise EdlBarrierError(message)
 
+    cluster = watcher.get_cluster()
+
+    procs = start_local_trainers(
+        cluster,
+        pod,
+        args.training_script,
+        args.training_script_args,
+        log_dir=args.log_dir)
+
 
 def proc_leader_changed_event(job_env, pod, rank_register, watcher):
     logger.info("proc_leader_changed_event")
@@ -165,6 +174,15 @@ def proc_leader_changed_event(job_env, pod, rank_register, watcher):
 
     # watch agagin
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
+
+    cluster = watcher.get_cluster()
+
+    procs = start_local_trainers(
+        cluster,
+        pod,
+        args.training_script,
+        args.training_script_args,
+        log_dir=args.log_dir)
 
 
 def proc_follower_changed_event(job_env, pod, rank_register, watcher):
@@ -229,6 +247,8 @@ def launch(args):
     # watcher after barrier
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
 
+    cluster = watcher.get_cluster()
+
     procs = start_local_trainers(
         cluster,
         pod,
@@ -239,8 +259,6 @@ def launch(args):
     local_status = True
     other_status = True
     while True:
-        cluster = watcher.get_cluster()
-
         failed_pods = watcher.get_failed_pods()
         if len(failed_pods) != 0:
             other_status = False
@@ -250,11 +268,13 @@ def launch(args):
             break
 
         if watcher.is_leader_changed():
-            proc_leader_changed_event(job_env, pod, rank_register, watcher)
+            proc_leader_changed_event(job_env, pod, rank_register, watcher,
+                                      args)
             continue
 
         elif watcher.is_follower_changed():
-            proc_follower_changed_event(job_env, pod, rank_register, watcher)
+            proc_follower_changed_event(job_env, pod, rank_register, watcher,
+                                        args)
             continue
 
         alive, local_status = watch_local_trainers(procs, pod.trainers_num)
