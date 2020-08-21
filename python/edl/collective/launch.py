@@ -229,17 +229,17 @@ def launch(args):
     # watcher after barrier
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
 
+    procs = start_local_trainers(
+        cluster,
+        pod,
+        args.training_script,
+        args.training_script_args,
+        log_dir=args.log_dir)
+
     local_status = True
     other_status = True
     while True:
         cluster = watcher.get_cluster()
-
-        procs = start_local_trainers(
-            cluster,
-            pod,
-            args.training_script,
-            args.training_script_args,
-            log_dir=args.log_dir)
 
         failed_pods = watcher.get_failed_pods()
         if len(failed_pods) != 0:
