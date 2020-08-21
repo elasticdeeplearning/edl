@@ -253,22 +253,23 @@ def launch(args):
         if not alive or not local_status:
             break
 
-        time.sleep(3)
+        time.sleep(1)
 
     # inverse order of initialization
     watcher.stop()
     if not local_status:
         # some trainer failed, it's a user-level failed
         rank_register.complete(False)
-    resource_register.stop()
 
     if rank_register.is_leader():
         if not status or not other_status:
             set_job_complete_flag(False)
-            return
+        else:
+            set_job_complete_flag(True)
+            logger.info("Congratulate! This job complete!")
 
-    set_job_complete_flag(True)
-    logger.info("Congratulate! This job complete!")
+    rank_register.stop()
+    resource_register.stop()
 
 
 def run_commandline():

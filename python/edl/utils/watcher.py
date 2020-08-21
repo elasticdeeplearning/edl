@@ -138,13 +138,21 @@ class Watcher(object):
             self._changed_follower_pods = self._cluster.pods
             return True
 
-        for i in range(1, len(self._cluster.pods)):
-            old_pod = self._cluster.pods[i]
+        filer_ids = set()
+        # find the changed pods
+        for old_pod in self._cluster.pods:
             new_pod = new_cluster.get_pod_by_id(old_pod.get_id())
 
             if old_pod.rank != new_pod.rank:
                 with self._lock:
                     self._changed_follower_pods.append(old_pod)
+            filer_ids.add(old_pod.get_id())
+
+        # find the new added pods
+        for pod in new_cluster.pods:
+            if pod.get_id not in filer_ids:
+                with self._lock:
+                    self._changed_follower_pods.append(pod)
 
         with self._lock:
             return len(self._changed_follower_pods) != 0
