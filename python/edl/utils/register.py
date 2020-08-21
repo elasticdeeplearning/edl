@@ -35,6 +35,8 @@ class Register(object):
 
         try:
             self._etcd.set_server_not_exists(service, server, info, ttl=10)
+            logger.info("register pod:{} in resource:{}".format(
+                info, self._etcd.get_full_path(service, server)))
         except Exception as e:
             logger.fatal(
                 "connect to etcd:{} error:{} service:{} server:{} info:{}".
@@ -145,17 +147,20 @@ class PodRankRegister(object):
             self._pod._stage = str(uuid.uuid1())
             info = self._pod.to_json()
 
-        self._etcd.refresh(self._service_name, self._server, info=info)
+        self._etcd.refresh(self._service_name, self._server, info=info, ttl=10)
 
     def stop(self):
         self._stop.set()
 
-        if self._t_register.is_alive():
+        if self._t_register:
             self._t_register.join()
 
         with self._lock:
             self._stopped = True
             self._rank = None
+            self._t_register = None
+
+        logger.info("pod_register stopped")
 
     def __exit__(self):
         self.stop()

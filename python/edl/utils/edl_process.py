@@ -73,7 +73,7 @@ def start_local_trainers(cluster,
 
         fn = None
         if log_dir is not None:
-            logger.info("mkdir {}".format(log_dir))
+            logger.debug("mkdir {}".format(log_dir))
             os.system("mkdir -p {}".format(log_dir))
             fn = open("%s/workerlog.%d" % (log_dir, idx), "a")
             proc = subprocess.Popen(cmd, env=current_env, stdout=fn, stderr=fn)

@@ -143,24 +143,23 @@ def edl_barrier(job_env, pod, timeout):
             time.sleep(3)
 
         if time.time() - start > timeout:
-            logger.warning(
-                "wait to barrier with all error:{} leader:[{}] current pod:[{}]".
-                format(traceback.format_exc(), leader, pod))
+            message = "wait to barrier with all error:{} leader:[{}] current pod:[{}]".format(
+                traceback.format_exc(), leader, pod)
             raise EdlBarrierError(message)
 
 
 def proc_leader_changed_event(job_env, pod, rank_register, watcher):
-    if register.is_leader():
+    if rank_register.is_leader():
         logger.info("leader need not to re-regist")
-        return
     else:
         rank_register.stop()
+        # FIXME(gongwb):wait to info in etcd exit, please don't change the time
+        time.sleep(15)
+
         rank_register = PodRankRegister(job_env, pod)
         logger.info("pod re-regist:{}".format(pod))
 
     edl_barrier(job_env, pod, timeout=60)
-    # FIXME(gongwb):wait to info in etcd exit, please don't change the time
-    time.sleep(15)
 
     # watch agagin
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
@@ -168,15 +167,17 @@ def proc_leader_changed_event(job_env, pod, rank_register, watcher):
 
 def proc_follower_changed_event(job_env, pod, rank_register, watcher):
     if rank_register.is_leader():
+        rank_register.update_stage()
         logger.info("leader need not to re-regist when followers changed")
-        return
     else:
         rank_register.stop()
+        # FIXME(gongwb):wait to info in etcd exit, please don't change the time
+        time.sleep(15)
+
         rank_register = PodRankRegister(job_env, pod)
+        logger.info("pod re-regist:{}".format(pod))
 
     edl_barrier(job_env, pod, timeout=60)
-    # FIXME(gongwb):wait to info in etcd exit, please don't change the time
-    time.sleep(15)
 
     # watch agagin
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
@@ -198,9 +199,6 @@ def launch(args):
             logger.info("job:{} has completed! Need't to try!".format(
                 job_env.job_id))
             sys.exit(0)
-
-        logger.info("job:{} has failed! Can't try!".format(job_env.job_id))
-        sys.exit(1)
 
     # local pod, and the pod's id does't change.
     pod = Pod()
@@ -269,7 +267,9 @@ def launch(args):
 
     if rank_register.is_leader():
         if not local_status or not other_status:
-            set_job_complete_flag(False)
+            # don't set this bacause this job may be retry by scheduler or user
+            #set_job_complete_flag(False)
+            pass
         else:
             set_job_complete_flag(True)
             logger.info("Congratulate! This job complete!")

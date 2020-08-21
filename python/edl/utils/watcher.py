@@ -18,7 +18,7 @@ from utils import logger
 from edl.discovery.etcd_client import EtcdClient
 import json
 import collections
-from .cluster import Cluster, Pod
+from .cluster import Cluster, Pod, JobStatus
 
 from .global_vars import get_global_etcd, ETCD_POD_RANK, ETCD_POD_RESOURCE
 
@@ -31,7 +31,7 @@ class Watcher(object):
         self._etcd.init()
 
         self._job_id = job_id
-        self._changed = False
+        #self._changed = False
         self._current_pod = current_pod
 
         # servers in etcd
@@ -69,12 +69,12 @@ class Watcher(object):
                     self._ranks = ranks
                     self._cluster.from_json(ranks)
                     continue
-
+                """
                 if not self._is_cluster_changed(self._ranks, ranks):
                     time.sleep(1)
                     continue
-
                 self._changed = True
+                """
 
             self._clear_changed()
 
@@ -88,6 +88,8 @@ class Watcher(object):
 
             if self._is_follower_changed(new_cluster):
                 break
+
+            self._cluster = new_cluster
 
     def _clear_changed(self):
         with self._lock:
@@ -113,7 +115,7 @@ class Watcher(object):
         old_leader = self._cluster.pods[0]
 
         if new_leader.get_id() != old_leader.get_id() or \
-                new_leader.stage != old_leader.stage():
+                new_leader.stage != old_leader.stage:
             with self._lock:
                 self._leader_changed = True
             return True
@@ -124,7 +126,7 @@ class Watcher(object):
         with self._lock:
             return self._leader_changed
 
-    def _is_follower_changed(self, old, new):
+    def _is_follower_changed(self, new_cluster):
         """
         1. some pod disappear
         2. some pod add to cluster
@@ -163,7 +165,7 @@ class Watcher(object):
 
     def _is_any_pod_failed(self, new_cluster):
         for pod in new_cluster.pods:
-            if pod.status == PodStatus.ERROR:
+            if pod.status == JobStatus.ERROR:
                 with self._lock:
                     self._failed_pods.append(pod)
 
@@ -174,21 +176,23 @@ class Watcher(object):
         with self._lock:
             return self._failed_pods
 
+    """
     def _is_cluster_changed(self, old, new):
         for k, v in six.iteritems(old):
             if k not in new:
-                logger.info(
+                logger.debug(
                     "train world changed, old_cluster k:{} not in new_cluster:{}".
                     format(k, new))
                 return True
 
             if old[k] != new[k]:
-                logger.info(
+                logger.debug(
                     "train world changed, old_cluster k:{}=>v:{} != new_cluster k:{}=>v:{}".
                     format(k, old[k], k, new[k]))
                 return True
 
         return False
+    """
 
     def get_cluster(self):
         with self._lock:
@@ -196,7 +200,10 @@ class Watcher(object):
 
     def stop(self):
         self._stop.set()
-        self._t_watcher.join()
+        if self._t_watcher:
+            self._t_watcher.join()
+            with self._lock:
+                slf._t_watcher = None
 
     def __exit__(self):
         self.stop()
