@@ -279,7 +279,7 @@ def launch(args):
 
 
 def run_commandline():
-    utils.get_logger(log_level=20)
+    utils.get_logger(log_level=10)
     args = _parse_args()
     launch(args)
 

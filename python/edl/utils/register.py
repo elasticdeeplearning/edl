@@ -42,11 +42,13 @@ class Register(object):
                 "connect to etcd:{} error:{} service:{} server:{} info:{}".
                 format(etcd_endpoints, e, service, server, info))
             raise e
+
         self._t_register = threading.Thread(target=self._refresher)
+        self._t_register.start()
 
     def _refresher(self):
         while not self._stop.is_set():
-            self._etcd_lock.refresh(service, server)
+            self._etcd.refresh(service, server)
             time.sleep(3)
 
     def stop(self):
@@ -66,7 +68,10 @@ class PodRankRegister(object):
 
         self._service_name = ETCD_POD_RANK
         self._rank, self._server = self._register_rank(job_env, pod)
+
         self._t_register = threading.Thread(target=self._refresher)
+        self._t_register.start()
+
         self._lock = threading.Lock()
         self._stopped = False
         self._pod = pod

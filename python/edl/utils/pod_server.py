@@ -63,7 +63,7 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
     def Barrier(self, request, context):
         ids = get_current_pod_ids_from_resource()
         leader = get_pod_leader()
-        logger.info(
+        logger.debug(
             "get barrier request from job_id:{} pod_id:{} ids_set:{} leader:{}".
             format(request.job_id, request.pod_id, ids, leader.get_id()))
 
