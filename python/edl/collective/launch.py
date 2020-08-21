@@ -32,7 +32,7 @@ import traceback
 
 from ..utils.edl_env import JobEnv
 from ..utils.cluster import Pod, JobStatus
-from ..utils.register import PodRankRegister, PodResourceRegister, ETCD_POD_RANK, ETCD_POD_RESOURCE
+from ..utils.register import PodRankRegister, PodResourceRegister, get_job_complete_flag, set_job_complete_flag
 from ..utils.watcher import Watcher, get_pod_leader, get_cluster
 from ..utils.pod_server import PodServer
 from ..utils.utils import logger
@@ -158,7 +158,7 @@ def proc_leader_changed_event(job_env, pod, rank_register, watcher):
 
     edl_barrier(job_env, pod, timeout=60)
 
-    # watcher agagin
+    # watch agagin
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
 
 
@@ -172,7 +172,7 @@ def proc_follower_changed_event(job_env, pod, rank_register, watcher):
 
     edl_barrier(job_env, pod, timeout=60)
 
-    # watcher agagin
+    # watch agagin
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
 
 
@@ -238,7 +238,7 @@ def launch(args):
             other_status = False
             terminate_local_procs(procs)
             logger.info("found pods:{} failed! exit!".format(
-                [str(x) for x in pods]))
+                [str(x) for x in failed_pods]))
             break
 
         if watcher.is_leader_changed():
@@ -262,7 +262,7 @@ def launch(args):
         rank_register.complete(False)
 
     if rank_register.is_leader():
-        if not status or not other_status:
+        if not local_status or not other_status:
             set_job_complete_flag(False)
         else:
             set_job_complete_flag(True)

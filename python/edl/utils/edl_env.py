@@ -49,8 +49,8 @@ class JobEnv(object):
                                                "PADDLE_EDL_HDFS_HOME")
         self._hdfs_name = get_from_dict_or_env(args, "hdfs_name",
                                                "PADDLE_EDL_HDFS_NAME")
-        self._hdfs_path = get_from_dict_or_env(args, "hdfs_path",
-                                               "PADDLE_EDL_HDFS_PATH")
+        self._hdfs_path = get_from_dict_or_env(
+            args, "hdfs_path", "PADDLE_EDL_HDFS_CHECKPOINT_PATH")
         self._hdfs_ugi = get_from_dict_or_env(args, "hdfs_ugi",
                                               "PADDLE_EDL_HDFS_UGI")
 
@@ -105,20 +105,15 @@ class JobEnv(object):
         self._up_limit_nodes = int(
             os.getenv("PADDLE_EDL_UP_LIMIT_NODES", 1024))
 
-        if self._etcd_endpoints != "" and self._hdfs_home == "":
-            self._backend_type = "etcd"
+        # assert hdfs value
+        if not self._ce_test:
+            assert len(self._hdfs_home) > 3 and \
+                len(self._hdfs_name) > 6 and \
+                len(self._hdfs_ugi) > 3 and \
+                len(self._hdfs_path) > 0, "hdfs environ must set"
         else:
-            self._backend_type = "hdfs"
-
-            # assert hdfs value
-            if not self._ce_test:
-                assert len(self._hdfs_home) > 3 and \
-                    len(self._hdfs_name) > 6 and \
-                    len(self._hdfs_ugi) > 3 and \
-                    len(self._hdfs_checkpoint_path) > 0, "hdfs environ must set"
-            else:
-                assert len(self._hdfs_home) > 3 and \
-                    len(self._hdfs_checkpoint_path) > 0, "hdfs environ must set"
+            assert len(self._hdfs_home) > 3 and \
+                len(self._hdfs_path) > 0, "hdfs environ must set"
 
     @property
     def up_limit_nodes(self):

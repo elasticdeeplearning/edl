@@ -29,11 +29,11 @@ import json
 import collections
 from .exceptions import *
 from . import utils
-from enum import Enum
+from enum import IntEnum
 from .utils import logger
 
 
-class JobStatus(Enum):
+class JobStatus(IntEnum):
     INITIAL = 0
     RUNNING = 1
     PENDING = 2

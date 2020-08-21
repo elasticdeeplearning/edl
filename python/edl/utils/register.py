@@ -49,7 +49,8 @@ class Register(object):
 
     def stop(self):
         self._stop.set()
-        self._t_register.join()
+        if self._t_register.is_alive():
+            self._t_register.join()
 
     def __exit__(self):
         self.stop()
@@ -226,19 +227,19 @@ def set_job_complete_flag(flag):
     else:
         status = JobStatus.ERROR
 
-    etcd, lock = get_etcd()
+    etcd, lock = get_global_etcd()
     service = ETCD_POD_COMPLETE_FLAG
     server = "complete"
-    info = json.dumps({"flag": status})
-    with self._lock:
-        self._etcd.set_server_permanent(service, server, info, ttl=10)
+    info = json.dumps({"flag": int(status)})
+    with lock:
+        etcd.set_server_permanent(service, server, info)
 
 
 def get_job_complete_flag():
     etcd, lock = get_global_etcd()
     service = ETCD_POD_COMPLETE_FLAG
-    with self._lock:
-        servers = self._etcd.get_service(service)
+    with lock:
+        servers = etcd.get_service(service)
 
     assert len(servers) <= 1
     if len(servers) < 1:
@@ -246,9 +247,9 @@ def get_job_complete_flag():
 
     s = servers[0]
     d = json.loads(s.info)
-    if d["flag"] == JobStatus.ERROR:
+    if d["flag"] == int(JobStatus.ERROR):
         return False
-    elif d["flag"] == JobStatus.COMPLETE:
+    elif d["flag"] == int(JobStatus.COMPLETE):
         return True
     else:
         assert False, "can't reach here!"

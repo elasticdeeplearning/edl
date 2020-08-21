@@ -20,7 +20,7 @@ import json
 import collections
 from .cluster import Cluster, Pod
 
-from .global_vars import get_etcd, ETCD_POD_RANK, ETCD_POD_RESOURCE
+from .global_vars import get_global_etcd, ETCD_POD_RANK, ETCD_POD_RESOURCE
 
 import six
 
@@ -50,7 +50,7 @@ class Watcher(object):
         for s in servers:
             ranks[int(s.server)] = s.info
         self._cluster.from_json(ranks)
-        logger.info("watcher gets the init cluster:{}", self._cluster)
+        logger.info("watcher gets the init cluster:{}".format(self._cluster))
 
         self._t_watcher = Thread(target=self._watcher)
         self._t_watcher.start()
@@ -138,7 +138,7 @@ class Watcher(object):
             self._changed_follower_pods = self._cluster.pods
             return True
 
-        filer_ids = set()
+        filter_ids = set()
         # find the changed pods
         for old_pod in self._cluster.pods:
             new_pod = new_cluster.get_pod_by_id(old_pod.get_id())
@@ -146,11 +146,11 @@ class Watcher(object):
             if old_pod.rank != new_pod.rank:
                 with self._lock:
                     self._changed_follower_pods.append(old_pod)
-            filer_ids.add(old_pod.get_id())
+            filter_ids.add(old_pod.get_id())
 
         # find the new added pods
         for pod in new_cluster.pods:
-            if pod.get_id not in filer_ids:
+            if pod.get_id() not in filter_ids:
                 with self._lock:
                     self._changed_follower_pods.append(pod)
 
@@ -203,7 +203,7 @@ class Watcher(object):
 
 
 def get_current_pod_ids_from_resource():
-    etcd, lock = get_etcd()
+    etcd, lock = get_global_etcd()
     with lock:
         pod_resource_servers = etcd.get_service(ETCD_POD_RESOURCE)
 
@@ -217,7 +217,7 @@ def get_current_pod_ids_from_resource():
 
 
 def get_cluster():
-    etcd, lock = get_etcd()
+    etcd, lock = get_global_etcd()
     cluster = Cluster()
     servers = etcd.get_service(ETCD_POD_RANK)
     ranks = {}
@@ -228,7 +228,7 @@ def get_cluster():
 
 
 def get_pod_leader():
-    etcd, lock = get_etcd()
+    etcd, lock = get_global_etcd()
     with lock:
         value, _, _, _, _, = etcd._get_server(ETCD_POD_RANK, "0")
 
