@@ -14,14 +14,14 @@ Now EDL is an incubation-stage project of the [LF AI Foundation](https://lfai.fo
 
 <h2 align="center">Installation</h2>
 
-You can install with ```pip install paddle_edl```. But we highly **recommend** you use it in our docker:
+EDL package support python2.7/3.6/3.7. You can install with ```pip install paddle_edl```. But we highly **recommend** you use it in our docker:
 
 ```
 docker pull hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda9.0-cudnn7
 nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda9.0-cudnn7 /bin/bash
 ```  
 
-<h2 align="center">Latest Release(0.3.0)</h2>
+<h2 align="center">Latest Release(0.3.1)</h2>
 
 - Support elastic training with inference type services during training, such as knowledge distillation 
 - Inference type services are automatically registered through service discovery in EDL

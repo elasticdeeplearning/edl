@@ -1,0 +1,82 @@
+// Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless  by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+import "common.proto";
+
+option go_package = ".;masterpb";
+package data_server;
+
+message ShutDownRequest {}
+message EmptyRequest {}
+
+message Record {
+  int64 record_no = 1;
+  bytes data = 2;
+}
+
+message FileListRequest { string data_reader_id = 1; }
+
+message FileMeta {
+  int64 idx = 1;
+  string path = 2;
+}
+
+message FileListResponse {
+  common.Status ret = 1;
+  repeated FileMeta metas = 2;
+}
+
+message CheckpointRequest {
+  string data_path = 1;
+  string model_path = 2;
+}
+
+message BatchDataMetaRequest {
+  string data_reader_id = 1;
+  // if batch_id == "" means there's no data local
+  string batch_id = 2;
+}
+
+message BatchDataMetaResponse {
+  common.Status status = 1;
+  string data_reader_id = 2;
+  string data_reader_endpoint = 3;
+  string batch_data_id = 4;
+}
+
+message FileBatchData {
+  int64 idx = 1;
+  string path = 2;
+  repeated Record records = 3;
+}
+
+message BatchDataRequest { string batch_id = 1; }
+
+message BatchDataResponse {
+  common.Status status = 1;
+  repeated FileBatchData batch = 2;
+}
+
+service DataServer {
+  rpc GetFileList(FileListRequest) returns (FileListResponse) {}
+  rpc GetBatchDataMeta(BatchDataMetaRequest) returns (BatchDataMetaResponse) {}
+  rpc GetBatchData(BatchDataRequest) returns (BatchDataResponse) {}
+  rpc ShutDown(ShutDownRequest) returns (common.Status) {}
+
+  // two step's to do it.
+  rpc PrePareSaveCheckpoint(CheckpointRequest) returns (common.Status) {}
+  rpc SaveCheckpoint(CheckpointRequest) returns (common.Status) {}
+}

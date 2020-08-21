@@ -20,7 +20,7 @@ if [[ ${version_str} != "Python ${py_verion}"* ]]; then
 fi
 
 
-pushd python/paddle_edl/protos/
+pushd python/edl/protos/
 bash generate.sh
 popd
 
