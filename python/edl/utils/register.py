@@ -17,7 +17,7 @@ import json
 import uuid
 
 from .utils import logger
-from .cluster import Pod, PodStatus
+from .cluster import Pod, JobStatus
 from ..discovery.etcd_client import EtcdClient
 
 import etcd3
@@ -86,7 +86,11 @@ class PodRankRegister(object):
 
                     info = pod.to_json()
                     if not self._etcd.set_server_not_exists(
-                            self._service_name, server, info=info, timeout=0):
+                            self._service_name,
+                            server,
+                            info=info,
+                            timeout=0,
+                            ttl=10):
                         valid = False
                         continue
 
@@ -162,9 +166,9 @@ class PodRankRegister(object):
     def complete(self, status):
         with self._lock:
             if status:
-                self._pod.status = PodStatus.COMPLETE
+                self._pod.status = JobStatus.COMPLETE
             else:
-                self._pod.status = PodStatus.ERROR
+                self._pod.status = JobStatus.ERROR
 
         info = self._pod.to_json()
         self._etcd.set_server_permanent(self._service_name, self._server, info)
@@ -214,3 +218,37 @@ class DataReaderRegister(Register):
             service=service,
             server=server,
             info=value)
+
+
+def set_job_complete_flag(flag):
+    if flag:
+        status = JobStatus.COMPLETE
+    else:
+        status = JobStatus.ERROR
+
+    etcd, lock = get_etcd()
+    service = ETCD_POD_COMPLETE_FLAG
+    server = "complete"
+    info = json.dumps({"flag": status})
+    with self._lock:
+        self._etcd.set_server_permanent(service, server, info, ttl=10)
+
+
+def get_job_complete_flag():
+    etcd, lock = get_global_etcd()
+    service = ETCD_POD_COMPLETE_FLAG
+    with self._lock:
+        servers = self._etcd.get_service(service)
+
+    assert len(servers) <= 1
+    if len(servers) < 1:
+        return None
+
+    s = servers[0]
+    d = json.loads(s.info)
+    if d["flag"] == JobStatus.ERROR:
+        return False
+    elif d["flag"] == JobStatus.COMPLETE:
+        return True
+    else:
+        assert False, "can't reach here!"

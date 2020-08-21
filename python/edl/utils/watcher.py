@@ -41,17 +41,17 @@ class Watcher(object):
         self._lock = Lock()
         self._stop = Event()
 
-        # get the inital cluster
-        """
+        self._leader_changed = False
+        self._failed_pods = []
+        self._changed_follower_pods = []
+
         servers = self._etcd.get_service(ETCD_POD_RANK)
-        ranks={}
+        ranks = {}
         for s in servers:
             ranks[int(s.server)] = s.info
         self._cluster.from_json(ranks)
-        logger.info("watch init cluster:{}", self._cluster)
-        """
+        logger.info("watcher gets the init cluster:{}", self._cluster)
 
-    def watch(self):
         self._t_watcher = Thread(target=self._watcher)
         self._t_watcher.start()
 
@@ -62,14 +62,12 @@ class Watcher(object):
             ranks = {}
             for s in servers:
                 ranks[int(s.server)] = s.info
-            #logger.info("ranks:{}".format(ranks))
 
             new_cluster = Cluster()
             with self._lock:
                 if self._ranks is None:
                     self._ranks = ranks
                     self._cluster.from_json(ranks)
-                    #logger.info("clusters:{}".format(self._cluster))
                     continue
 
                 if not self._is_cluster_changed(self._ranks, ranks):
@@ -78,16 +76,95 @@ class Watcher(object):
 
                 self._changed = True
 
+            self._clear_changed()
+
             new_cluster.from_json(ranks)
-
-            if len(new_cluster.pods) == 0:
-                time.sleep(1)
-                continue
-
-            pod = new_cluster.get_pod_by_id(current_pod.get_id())
-            if pod != current_pod:  # current pod rank changed
-                self._pod_rank_changed = True
+            if self._is_any_pod_failed(new_cluster):
                 break
+
+            if self._is_leader_changed(new_cluster):
+                # leader will not find self changed.
+                break
+
+            if self._is_follower_changed(new_cluster):
+                break
+
+    def _clear_changed(self):
+        with self._lock:
+            self._job_stage_changed = False
+            self._failed_pods = []
+            self._changed_follower_pods = []
+
+    def _is_leader_changed(self, new_cluster):
+        """
+        1. leader pod id changed
+        2. leader stage changed 
+        """
+        if len(self._cluster.pods) == 0:
+            assert False, "internal error, can't reach here"
+            return False
+
+        if len(new_cluster.pods) == 0:
+            with self._lock:
+                self._leader_changed = True
+            return True
+
+        new_leader = new_cluster.pods[0]
+        old_leader = self._cluster.pods[0]
+
+        if new_leader.get_id() != old_leader.get_id() or \
+                new_leader.stage != old_leader.stage():
+            with self._lock:
+                self._leader_changed = True
+            return True
+
+        return False
+
+    def is_leader_changed(new_cluster):
+        with self._lock:
+            return self._leader_changed
+
+    def _is_follower_changed(self, old, new):
+        """
+        1. some pod disappear
+        2. some pod add to cluster
+        3. rank of pod changed
+        """
+        if len(self._cluster.pods) == 0:
+            assert False, "internal error, can't reach here"
+            return False
+
+        if len(new_cluster.pods) == 0:
+            self._changed_follower_pods = self._cluster.pods
+            return True
+
+        for i in range(1, len(self._cluster.pods)):
+            old_pod = self._cluster.pods[i]
+            new_pod = new_cluster.get_pod_by_id(old_pod.get_id())
+
+            if old_pod.rank != new_pod.rank:
+                with self._lock:
+                    self._changed_follower_pods.append(old_pod)
+
+        with self._lock:
+            return len(self._changed_follower_pods) != 0
+
+    def is_follower_changed(self):
+        with self._lock:
+            return self._changed_follower_pods != None
+
+    def _is_any_pod_failed(self, new_cluster):
+        for pod in new_cluster.pods:
+            if pod.status == PodStatus.ERROR:
+                with self._lock:
+                    self._failed_pods.append(pod)
+
+        with self._lock:
+            return len(self._failed_pods) != 0
+
+    def get_failed_pods(self):
+        with self._lock:
+            return self._failed_pods
 
     def _is_cluster_changed(self, old, new):
         for k, v in six.iteritems(old):
@@ -102,30 +179,12 @@ class Watcher(object):
                     "train world changed, old_cluster k:{}=>v:{} != new_cluster k:{}=>v:{}".
                     format(k, old[k], k, new[k]))
                 return True
-            """
-            old_pod = Pod()
-            old_pod.from_json(old[k])
-
-            new_pod = Pod()
-            new_pod.from_json(new[k])
-
-            if new_pod != old_pod:
-                return True
-            """
 
         return False
 
     def get_cluster(self):
         with self._lock:
             return self._cluster
-
-    def is_changed(self):
-        with self._lock:
-            return self._changed
-
-    def is_self_rank_changed(self):
-        with self._lock:
-            return self._pod_rank_changed
 
     def stop(self):
         self._stop.set()

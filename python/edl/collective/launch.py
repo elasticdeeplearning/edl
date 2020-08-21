@@ -31,7 +31,7 @@ import socket
 import traceback
 
 from ..utils.edl_env import JobEnv
-from ..utils.cluster import Pod, PodStatus
+from ..utils.cluster import Pod, JobStatus
 from ..utils.register import PodRankRegister, PodResourceRegister, ETCD_POD_RANK, ETCD_POD_RESOURCE
 from ..utils.watcher import Watcher, get_pod_leader, get_cluster
 from ..utils.pod_server import PodServer
@@ -147,16 +147,33 @@ def edl_barrier(job_env, pod, timeout):
             raise EdlBarrierError(message)
 
 
-def check_pods_status():
-    cluster = get_cluster()
-    found = False
-    for pod in cluster.pods:
-        if pod.status == PodStatus.ERROR:
-            found = True
-            logger.warning("train in pod:{} meets error".format(pod))
+def proc_leader_changed_event(job_env, pod, rank_register, watcher):
+    if register.is_leader():
+        logger.info("leader need not to re-regist")
+        return
+    else:
+        rank_register.stop()
+        rank_register = PodRankRegister(job_env, pod)
+        logger.info("pod re-regist:{}".format(pod))
 
-    if not found:
-        logger.info("Congratulate! This job complete!")
+    edl_barrier(job_env, pod, timeout=60)
+
+    # watcher agagin
+    watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
+
+
+def proc_follower_changed_event(job_env, pod, rank_register, watcher):
+    if register.is_leader():
+        logger.info("leader need not to re-regist when followers changed")
+        return
+    else:
+        rank_register.stop()
+        rank_register = PodRankRegister(job_env, pod)
+
+    edl_barrier(job_env, pod, timeout=60)
+
+    # watcher agagin
+    watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
 
 
 def launch(args):
@@ -168,6 +185,16 @@ def launch(args):
 
     # get global etcd and lock
     get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
+
+    flag = get_job_complete_flag()
+    if flag is not None:
+        if flag:
+            logger.info("job:{} has completed! Need't to try!".format(
+                job_env.job_id))
+            sys.exit(0)
+
+        logger.info("job:{} has failed! Can't try!".format(job_env.job_id))
+        sys.exit(1)
 
     # local pod, and the pod's id does't change.
     pod = Pod()
@@ -191,15 +218,14 @@ def launch(args):
     # if the rank changed, the pods should restart the training proc.
     edl_barrier(job_env, pod, timeout=600)
 
-    #watcher exit when cluster changed
+    # watcher after barrier
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
-    # watch after barrier
-    watcher.watch()
 
-    status = False
+    local_status = True
+    other_status = True
     while True:
         cluster = watcher.get_cluster()
-        logger.info("get cluster:{}".format(cluster))
+
         procs = start_local_trainers(
             cluster,
             pod,
@@ -207,58 +233,42 @@ def launch(args):
             args.training_script_args,
             log_dir=args.log_dir)
 
-        if watcher.is_changed():
-            watcher.stop()
-            # pod leader need not to change self.
-            if self.is_self_rank_changed() \
-                    or not rank_register.is_leader() \
-                    or rank_register.is_stoped():
-                rank_register.stop()
-                rank_register = PodRankRegister(job_env, pod)
-
-            if rank_register.is_leader():
-                rank_register.update_stage(pod)
-
-            logger.info("Cluster changed. New cluster:{}. Old Cluster:{}".
-                        format(cluster2, cluster))
-
+        failed_pods = watcher.get_failed_pods()
+        if failed_pods is not None:
+            other_status = False
             terminate_local_procs(procs)
+            logger.info("found pods:{} failed! exit!".format(
+                [str(x) for x in pods]))
+            break
 
-            # wait all pods info diappeared from etcd
-            # don't change this time,since the ttl is set to 10s in registers
-            # FIXME(gongwb): any other method?
-            time.sleep(15)
-
-            # barrier agagin
-            edl_barrier(job_env, pod, timeout=600)
-
-            # watcher agagin
-            watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
-            watcher.watch()
+        if watcher.is_leader_changed():
+            proc_leader_changed_event(job_env, pod, rank_register, watcher)
             continue
 
-        alive, status = watch_local_trainers(procs, pod.trainers_num)
-        if not alive or not status:
+        if watcher.is_follower_changed():
+            proc_follower_changed_event(job_env, pod, rank_register, watcher)
+            continue
+
+        alive, local_status = watch_local_trainers(procs, pod.trainers_num)
+        if not alive or not local_status:
             break
 
         time.sleep(3)
 
+    # inverse order of initialization
     watcher.stop()
-    rank_register.complete(status)
+    if not local_status:
+        # some trainer failed, it's a user-level failed
+        rank_register.complete(False)
+    resource_register.stop()
 
-    # try to report the global status
-    try:
-        edl_barrier(job_env, pod, timeout=30)
-        check_pods_status()
-        return
-    except Exception as e:
-        logger.info("barrier error:{}".format(e))
-        pass
+    if rank_register.is_leader():
+        if not status or not other_status:
+            set_job_complete_flag(False)
+            return
 
-    if not status:
-        logger.info("local trainer meets error!")
-        return
-    logger.info("local trainer run ok and exit!")
+    set_job_complete_flag(True)
+    logger.info("Congratulate! This job complete!")
 
 
 def run_commandline():

@@ -17,6 +17,7 @@ from ..discovery.etcd_client import EtcdClient
 
 ETCD_POD_RESOURCE = "pod_resource"
 ETCD_POD_RANK = "pod_rank"
+ETCD_POD_COMPLETE_FLAG = "job_complete_flag"
 
 g_etcd = None
 g_etcd_lock = None
@@ -33,8 +34,4 @@ def get_global_etcd(etcd_endpoints, job_id):
         g_etcd = EtcdClient(endpoints=etcd_endpoints, root=job_id)
         g_etcd.init()
 
-    return g_etcd, g_etcd_lock
-
-
-def get_etcd():
     return g_etcd, g_etcd_lock

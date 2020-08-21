@@ -33,7 +33,7 @@ from enum import Enum
 from .utils import logger
 
 
-class PodStatus(Enum):
+class JobStatus(Enum):
     INITIAL = 0
     RUNNING = 1
     PENDING = 2
@@ -50,7 +50,7 @@ class Pod(object):
         self._gpus = None
         self._trainers = None
         self._port = None
-        self._status = PodStatus.INITIAL  # status maybe changed
+        self._status = JobStatus.INITIAL  # status maybe changed
         self._stage = None
 
     @property
