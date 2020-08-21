@@ -121,18 +121,6 @@ def terminate_local_procs(procs):
     logger.info("terminate all procs")
 
 
-def watch_local_trainers(procs, nranks):
-    """
-    return alive_or_not, ok_or_not
-    """
-    try:
-        alive = _watch_local_procs(procs, nranks)
-    except Exception as e:
-        return False, False
-
-    return alive, True
-
-
 def pull_worker_log(tp):
     if tp.log_fn:
         with open(tp.log_fn.name, 'r') as fin:
@@ -188,3 +176,16 @@ def watch_local_procs(procs, nranks):
         raise
 
     return alive
+
+
+def watch_local_trainers(procs, nranks):
+    """
+    return alive_or_not, ok_or_not
+    """
+    try:
+        alive = watch_local_procs(procs, nranks)
+    except Exception as e:
+        logger.warning("watch local trainers:{}".format(e))
+        return False, False
+
+    return alive, True

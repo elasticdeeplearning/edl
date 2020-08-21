@@ -82,7 +82,8 @@ class Watcher(object):
             if self._is_follower_changed(new_cluster):
                 break
 
-            self._cluster = new_cluster
+            with self._lock:
+                self._cluster = new_cluster
 
     def _clear_changed(self):
         with self._lock:
@@ -142,11 +143,13 @@ class Watcher(object):
             if new_pod is None or old_pod.rank != new_pod.rank:
                 with self._lock:
                     self._changed_follower_pods.append(old_pod)
+
                 if new_pod:
                     logger.warning("pod:{} rank change from:{} to {}".format(
                         old_pod.get_id(), old_pod.rank, new_pod.rank))
                 else:
                     logger.warning("pod:{} disappear".format(old_pod))
+
             filter_ids.add(old_pod.get_id())
 
         # find the new added pods
@@ -186,6 +189,7 @@ class Watcher(object):
             self._t_watcher.join()
             with self._lock:
                 self._t_watcher = None
+        logger.debug("watcher stopped")
 
     def __exit__(self):
         self.stop()
