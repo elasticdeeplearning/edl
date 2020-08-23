@@ -180,7 +180,7 @@ def _on_world_changed(job_env, pod, rank_register, watcher):
         rank_register = PodRankRegister(job_env, pod)
         logger.info("pod re-regist:{}".format(pod))
 
-    clsuter = edl_barrier(job_env, pod, timeout=60)
+    cluster = edl_barrier(job_env, pod, timeout=60)
 
     # watch agagin
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod, cluster)
@@ -199,7 +199,8 @@ def on_world_changed(job_env, pod, rank_register, watcher, timeout=600):
             if time.time() - start >= timeout:
                 raise e
 
-            logger.debug("on_world_changed meets error:{}".format(e))
+            logger.debug("on_world_changed meets {}".format(
+                traceback.format_exc()))
             time.sleep(3)
             continue
 

@@ -53,7 +53,7 @@ class Watcher(object):
         self._new_cluster = copy.copy(self._cluster)
         """
 
-        self._cluster = self._cluster
+        self._cluster = cluster
         self._new_cluster = copy.copy(self._cluster)
         self._changed = False
         logger.info("watcher gets the init cluster:{}".format(self._cluster))
