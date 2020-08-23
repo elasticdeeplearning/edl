@@ -150,7 +150,7 @@ def edl_barrier(job_env, pod, timeout):
             raise EdlBarrierError(message)
 
 
-def on_world_changed(job_env, pod, rank_register, watcher):
+def _on_world_changed(job_env, pod, rank_register, watcher):
     """
     return if job failed.
     """
@@ -166,7 +166,7 @@ def on_world_changed(job_env, pod, rank_register, watcher):
                 is smaller than need:{}, job exit!"
                      .format(resource_ids,
                              len(resource_ids), job_env.min_nodes))
-        return False
+        return None, False
 
     # leader need't to regist
     if rank_register.is_leader():
@@ -174,16 +174,34 @@ def on_world_changed(job_env, pod, rank_register, watcher):
     else:
         rank_register.stop()
         # wait followers release their registers
-        db.wait_following_ranks()
+        db.wait_following_ranks(timeout=20)
 
         # re-regist to reserver dense rank order
         rank_register = PodRankRegister(job_env, pod)
         logger.info("pod re-regist:{}".format(pod))
 
-    edl_barrier(job_env, pod, timeout=60)
+    clsuter = edl_barrier(job_env, pod, timeout=60)
 
     # watch agagin
-    watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
+    watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod, cluster)
+
+    return cluster, True
+
+
+def on_world_changed(job_env, pod, rank_register, watcher, timeout=600):
+    start = time.time()
+    while True:
+        try:
+            return _on_world_changed(job_env, pod, rank_register, watcher)
+        except Exception as e:
+            watcher.stop()
+
+            if time.time() - start >= timeout:
+                raise e
+
+            logger.debug("on_world_changed meets error:{}".format(e))
+            time.sleep(3)
+            continue
 
 
 def launch(args):
@@ -223,12 +241,12 @@ def launch(args):
 
     # register rank and watch the rank
     # if the rank changed, the pods should restart the training proc.
-    edl_barrier(job_env, pod, timeout=600)
+    cluster = edl_barrier(job_env, pod, timeout=600)
 
     # watcher after barrier
-    watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
+    watcher = Watcher(
+        job_env.etcd_endpoints, job_env.job_id, pod, cluster=cluster)
 
-    cluster = watcher.get_cluster()
     procs = start_local_trainers(
         cluster,
         pod,
@@ -249,11 +267,11 @@ def launch(args):
             # terminate and restart again
             terminate_local_procs(procs)
 
-            job_status = on_world_changed(job_env, pod, rank_register, watcher)
+            cluster, job_status = on_world_changed(job_env, pod, rank_register,
+                                                   watcher)
             if not job_status:
                 break
 
-            cluster = watcher.get_cluster()
             procs = start_local_trainers(
                 cluster,
                 pod,

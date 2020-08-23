@@ -197,6 +197,10 @@ class PodResourceRegister(Register):
             server=server,
             info=value)
 
+    def stop(self):
+        super(PodResourceRegister, self).stop()
+        logger.info("pod resource register stopped!")
+
 
 class DataReaderRegister(Register):
     def __init__(self, etcd_endoints, job_id, rank, reader):

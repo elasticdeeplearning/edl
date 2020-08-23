@@ -62,8 +62,8 @@ class JobEnv(object):
         a = self._nodes_range.split(":")
         assert len(a) == 2, "nodes_range not a valid format:{}".format(
             self._nodes_range)
-        self._min_nodes = a[0]
-        self._max_nodes = a[1]
+        self._min_nodes = int(a[0])
+        self._max_nodes = int(a[1])
 
     def _get_gpus(self, args):
         # selected gpus

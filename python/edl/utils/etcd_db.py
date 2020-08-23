@@ -57,20 +57,26 @@ class EtcdDB(object):
                 success[server.server] = ""
 
         return succeed, failed
-
+    """
 
     @staticmethod
-    def wait_following_ranks(time_out=60):
+    def wait_following_ranks(timeout=60):
+        """
+        Note: some pod may regist to ranks when other waiting already.
+        """
         etcd, lock = get_global_etcd()
         service = ETCD_POD_RANK
+        start = time.time()
 
         while True:
             with lock:
                 servers = etcd.get_service(service)
 
-            if time.time() - start >= time_out:
-                logger.fatal("the pods did't release their register")
-                return False
+            if time.time() - start >= timeout:
+                cluster = self.get_cluster()
+                raise EdlWaitFollowersReleaseError(
+                    "the pods did't release their register:{}".format(
+                        cluster.get_pods_ids()))
 
             if len(servers) > 1:
                 time.sleep(2)
@@ -80,13 +86,12 @@ class EtcdDB(object):
                 return True
 
             pod = Pod()
-            pod.from_json(server[0].info)
+            pod.from_json(servers[0].info)
 
             if pod.rank != 0:
                 continue
 
             return True
-    """
 
     @staticmethod
     def set_job_complete_flag(flag):

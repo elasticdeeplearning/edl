@@ -27,7 +27,7 @@ import six
 
 
 class Watcher(object):
-    def __init__(self, etcd_endpoints, job_id, current_pod):
+    def __init__(self, etcd_endpoints, job_id, current_pod, cluster):
         self._etcd = EtcdClient(etcd_endpoints, root=job_id)
         self._etcd.init()
 
@@ -41,7 +41,7 @@ class Watcher(object):
         self._new_cluster = Cluster()
         self._lock = Lock()
         self._stop = Event()
-
+        """
         # running pods
         servers = self._etcd.get_service(ETCD_POD_RANK)
         #self._ranks = {}
@@ -49,6 +49,10 @@ class Watcher(object):
         for s in servers:
             ranks[int(s.server)] = s.info
         self._cluster.from_json(ranks)
+        self._new_cluster = copy.copy(self._cluster)
+        """
+
+        self._cluster = self._cluster
         self._new_cluster = copy.copy(self._cluster)
         self._changed = False
         logger.info("watcher gets the init cluster:{}".format(self._cluster))
