@@ -48,4 +48,6 @@ value=`etcdctl get ${key}`
 echo "job complete flag:${value}"
 #----
 
+set +e
 kill -9 $etcd_pid
+echo $etcd_pid
