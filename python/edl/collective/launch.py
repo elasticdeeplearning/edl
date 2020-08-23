@@ -295,8 +295,7 @@ def launch(args):
 
     if rank_register.is_leader():
         if not local_status or not other_status:
-            # don't set this bacause this job may be retry by scheduler or user
-            #set_job_complete_flag(False)
+            set_job_complete_flag(False)
             pass
         else:
             set_job_complete_flag(True)

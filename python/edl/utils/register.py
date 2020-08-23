@@ -231,6 +231,38 @@ class DataReaderRegister(Register):
             info=value)
 
 
+def set_pod_status(flag, pod_id):
+    if flag:
+        status = JobStatus.COMPLETE
+    else:
+        status = JobStatus.ERROR
+
+    etcd, lock = get_global_etcd()
+    service = ETCD_POD_STATUS
+    server = pod_id
+    info = json.dumps({"flag": int(status)})
+    with lock:
+        etcd.set_server_permanent(service, server, info)
+
+
+def get_pod_status():
+    etcd, lock = get_global_etcd()
+    service = ETCD_POD_COMPLETE_FLAG
+    with lock:
+        servers = etcd.get_service(service)
+
+    succeed = {}
+    failed = {}
+    for server in servers:
+        d = json.loads(server.info)
+        if d["flag"] == int(JobStatus.ERROR):
+            failed[server.server] = ""
+        elif d["flag"] == int(JobStatus.COMPLETE):
+            success[server.server] = ""
+
+    return succeed, failed
+
+
 def set_job_complete_flag(flag):
     if flag:
         status = JobStatus.COMPLETE
@@ -238,7 +270,7 @@ def set_job_complete_flag(flag):
         status = JobStatus.ERROR
 
     etcd, lock = get_global_etcd()
-    service = ETCD_POD_COMPLETE_FLAG
+    service = ETCD_JOB_FLAG
     server = "complete"
     info = json.dumps({"flag": int(status)})
     with lock:
