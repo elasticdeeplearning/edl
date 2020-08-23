@@ -313,3 +313,13 @@ def wait_following_ranks(time_out=60):
             continue
 
         return True
+
+
+def if_job_failed(job_env, cluster):
+    """
+    """
+    succeed_pods, failed_pods = get_pods_complete_flag()
+    if len(failed_pods) > 4:
+        logger.info("found pods:{} failed! exit!".format(
+            [str(x) for x in failed_pods]))
+        return False

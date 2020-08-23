@@ -386,6 +386,13 @@ class Cluster(object):
 
         return None
 
+    def get_pods_ids(self):
+        ids = []
+        for pod in self._pods:
+            ids.append(pod._id)
+
+        return ids
+
     def from_pb(self, cluster):
         self.job_stage = cluster.job_stage
         self._pods = []

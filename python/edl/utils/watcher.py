@@ -18,6 +18,7 @@ from utils import logger
 from edl.discovery.etcd_client import EtcdClient
 import json
 import collections
+import copy
 from .cluster import Cluster, Pod, JobStatus
 
 from .global_vars import get_global_etcd, ETCD_POD_RANK, ETCD_POD_RESOURCE
@@ -34,7 +35,7 @@ class Watcher(object):
         self._current_pod = current_pod
 
         # servers in etcd
-        self._ranks = None  # {rank:pod_json}
+        #self._ranks = None  # {rank:pod_json}
 
         self._cluster = Cluster()
         self._new_cluster = Cluster()
@@ -43,9 +44,10 @@ class Watcher(object):
 
         # running pods
         servers = self._etcd.get_service(ETCD_POD_RANK)
-        self._ranks = {}
+        #self._ranks = {}
+        ranks = {}
         for s in servers:
-            self._ranks[int(s.server)] = s.info
+            ranks[int(s.server)] = s.info
         self._cluster.from_json(ranks)
         self._new_cluster = copy.copy(self._cluster)
         self._changed = False
@@ -63,8 +65,8 @@ class Watcher(object):
                 ranks[int(s.server)] = s.info
 
             with self._lock:
-                if self._ranks is None:
-                    self._ranks = ranks
+                if ranks is None:
+                    #self._ranks = ranks
                     self._cluster.from_json(ranks)
                     self._new_cluster = copy.copy(self._cluster)
                     continue
@@ -74,9 +76,7 @@ class Watcher(object):
             with self._lock:
                 self._new_cluster.from_json(ranks)
 
-            if self.is_world_changed(self._new_cluster):
-                with self._lock:
-                    self._changed = True
+            if self._is_world_changed(self._new_cluster):
                 break
 
             with self._lock:
@@ -99,6 +99,10 @@ class Watcher(object):
             new = self._new_cluster.get_pods_ids()
 
         if old != new:
+            with self._lock:
+                self._changed = True
+            logger.info("cluster change from pods:{} to pods:{}".format(old,
+                                                                        new))
             return True
 
         return False

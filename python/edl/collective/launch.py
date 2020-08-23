@@ -192,14 +192,6 @@ def on_world_changed(job_env, pod, rank_register, watcher):
     # watch agagin
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
 
-    cluster = watcher.get_cluster()
-    procs = start_local_trainers(
-        cluster,
-        pod,
-        args.training_script,
-        args.training_script_args,
-        log_dir=args.log_dir)
-
 
 def launch(args):
     args_dict = _convert_args_to_dict(args)
@@ -244,7 +236,6 @@ def launch(args):
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
 
     cluster = watcher.get_cluster()
-
     procs = start_local_trainers(
         cluster,
         pod,
@@ -264,7 +255,16 @@ def launch(args):
         if watcher.changed:
             job_status = on_world_changed(job_env, pod, rank_register, watcher,
                                           args)
-            continue
+            if not job_status:
+                break
+
+            cluster = watcher.get_cluster()
+            procs = start_local_trainers(
+                cluster,
+                pod,
+                args.training_script,
+                args.training_script_args,
+                log_dir=args.log_dir)
 
         time.sleep(2)
 
@@ -277,7 +277,7 @@ def launch(args):
 
     if rank_register.is_leader():
         # wait all followers exit.
-        wait_followers_ranks()
+        wait_following_ranks()
         succeed, failed = get_job_complete_flag()
         if len(failed) > 4:
             set_job_complete_flag(False)
