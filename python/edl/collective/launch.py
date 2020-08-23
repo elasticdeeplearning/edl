@@ -197,7 +197,9 @@ def on_world_changed(job_env, pod, rank_register, watcher, timeout=600):
             watcher.stop()
 
             if time.time() - start >= timeout:
-                raise e
+                logger.Fatal("on_world_changed meets {}".format(
+                    traceback.format_exc()))
+                return None, False
 
             logger.debug("on_world_changed meets {}".format(
                 traceback.format_exc()))
