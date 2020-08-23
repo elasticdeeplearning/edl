@@ -174,28 +174,18 @@ class PodRankRegister(object):
         with self._lock:
             return self._rank == 0
 
-    def complete(self, status):
-        with self._lock:
-            if status:
-                self._pod.status = JobStatus.COMPLETE
-            else:
-                self._pod.status = JobStatus.ERROR
-
-        info = self._pod.to_json()
-        self._etcd.set_server_permanent(self._service_name, self._server, info)
-        self.stop()
-
     def is_stoped(self):
         with self._lock:
             return self._stopped
 
 
 class PodResourceRegister(Register):
+    """
+    Registe pod resource under  /jobid/data_reader/nodes/resource
+    If it stop, it means the pods disappear.
+    """
+
     def __init__(self, etcd_endpoints, job_id, pod):
-        """
-        /jobid/data_reader/nodes/rank:value
-        So the others can find it.
-        """
         service = ETCD_POD_RESOURCE
         server = "{}".format(pod.get_id())
         value = pod.to_json()
@@ -231,7 +221,7 @@ class DataReaderRegister(Register):
             info=value)
 
 
-def set_pod_status(flag, pod_id):
+def set_pod_complete_flag(flag, pod):
     if flag:
         status = JobStatus.COMPLETE
     else:
@@ -239,15 +229,15 @@ def set_pod_status(flag, pod_id):
 
     etcd, lock = get_global_etcd()
     service = ETCD_POD_STATUS
-    server = pod_id
-    info = json.dumps({"flag": int(status)})
+    server = pod.get_id()
+    info = json.dumps({"flag": int(status), "pod": pod.to_json()})
     with lock:
         etcd.set_server_permanent(service, server, info)
 
 
-def get_pod_status():
+def get_pods_complete_flag():
     etcd, lock = get_global_etcd()
-    service = ETCD_POD_COMPLETE_FLAG
+    service = ETCD_POD_STATUS
     with lock:
         servers = etcd.get_service(service)
 
@@ -270,7 +260,7 @@ def set_job_complete_flag(flag):
         status = JobStatus.ERROR
 
     etcd, lock = get_global_etcd()
-    service = ETCD_JOB_FLAG
+    service = ETCD_JOB_STATUS
     server = "complete"
     info = json.dumps({"flag": int(status)})
     with lock:
@@ -279,7 +269,7 @@ def set_job_complete_flag(flag):
 
 def get_job_complete_flag():
     etcd, lock = get_global_etcd()
-    service = ETCD_POD_COMPLETE_FLAG
+    service = ETCD_JOB_STATUS
     with lock:
         servers = etcd.get_service(service)
 
@@ -295,3 +285,31 @@ def get_job_complete_flag():
         return True
     else:
         assert False, "can't reach here!"
+
+
+def wait_following_ranks(time_out=60):
+    etcd, lock = get_global_etcd()
+    service = ETCD_POD_RANK
+
+    while True:
+        with lock:
+            servers = etcd.get_service(service)
+
+        if time.time() - start >= time_out:
+            logger.fatal("the pods did't release their register")
+            return False
+
+        if len(servers) > 1:
+            time.sleep(2)
+            continue
+
+        if len(servers) < 1:
+            return True
+
+        pod = Pod()
+        pod.from_json(server[0].info)
+
+        if pod.rank != 0:
+            continue
+
+        return True

@@ -32,7 +32,7 @@ import traceback
 
 from ..utils.edl_env import JobEnv
 from ..utils.cluster import Pod, JobStatus
-from ..utils.register import PodRankRegister, PodResourceRegister, get_job_complete_flag, set_job_complete_flag
+from ..utils.register import PodRankRegister, PodResourceRegister, get_job_complete_flag, set_job_complete_flag, set_pod_status, wait_following_ranks
 from ..utils.watcher import Watcher, get_pod_leader, get_cluster
 from ..utils.pod_server import PodServer
 from ..utils.utils import logger
@@ -157,16 +157,33 @@ def edl_barrier(job_env, pod, timeout):
         log_dir=args.log_dir)
 
 
-def proc_leader_changed_event(job_env, pod, rank_register, watcher):
-    logger.info("proc_leader_changed_event")
+def on_world_changed(job_env, pod, rank_register, watcher):
+    """
+    return if job failed.
+    """
+    logger.info("on_world_changed")
+
+    # all pods stop watch
+    watcher.stop()
+
+    # terminate and restart again
+    terminate_local_procs()
+
+    succeed_pods, failed_pods = get_pods_complete_flag()
+    if len(failed_pods) > 4:
+        logger.info("found pods:{} failed! exit!".format(
+            [str(x) for x in failed_pods]))
+        return False
+
     # leader will not find self changed.
     if rank_register.is_leader():
         logger.info("leader need not to re-regist")
     else:
         rank_register.stop()
-        # FIXME(gongwb):wait to info in etcd exit, please don't change the time
-        time.sleep(15)
+        # wait followers release their registers
+        wait_following_ranks()
 
+        # re-regist to reserver dense rank order
         rank_register = PodRankRegister(job_env, pod)
         logger.info("pod re-regist:{}".format(pod))
 
@@ -176,33 +193,12 @@ def proc_leader_changed_event(job_env, pod, rank_register, watcher):
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
 
     cluster = watcher.get_cluster()
-
     procs = start_local_trainers(
         cluster,
         pod,
         args.training_script,
         args.training_script_args,
         log_dir=args.log_dir)
-
-
-def proc_follower_changed_event(job_env, pod, rank_register, watcher):
-    logger.info("proc_follower_changed_event")
-    # leader will not find self changed.
-    if rank_register.is_leader():
-        rank_register.update_stage()
-        logger.info("leader need not to re-regist when followers changed")
-    else:
-        rank_register.stop()
-        # FIXME(gongwb):wait to info in etcd exit, please don't change the time
-        time.sleep(15)
-
-        rank_register = PodRankRegister(job_env, pod)
-        logger.info("pod re-regist:{}".format(pod))
-
-    edl_barrier(job_env, pod, timeout=60)
-
-    # watch agagin
-    watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod)
 
 
 def launch(args):
@@ -218,9 +214,9 @@ def launch(args):
     flag = get_job_complete_flag()
     if flag is not None:
         if flag:
-            logger.info("job:{} has completed! Need't to try!".format(
-                job_env.job_id))
-            sys.exit(0)
+            logger.info("job:{} has completed {}! Can't try!".format(
+                job_env.job_id, flag))
+            sys.exit(1)
 
     # local pod, and the pod's id does't change.
     pod = Pod()
@@ -257,46 +253,35 @@ def launch(args):
         log_dir=args.log_dir)
 
     local_status = True
-    other_status = True
+    job_status = True
     while True:
-        failed_pods = watcher.get_failed_pods()
-        if len(failed_pods) != 0:
-            other_status = False
-            terminate_local_procs(procs)
-            logger.info("found pods:{} failed! exit!".format(
-                [str(x) for x in failed_pods]))
-            break
-
-        if watcher.is_leader_changed():
-            proc_leader_changed_event(job_env, pod, rank_register, watcher,
-                                      args)
-            continue
-
-        elif watcher.is_follower_changed():
-            proc_follower_changed_event(job_env, pod, rank_register, watcher,
-                                        args)
-            continue
-
+        # check local status first
         alive, local_status = watch_local_trainers(procs, pod.trainers_num)
         if not alive or not local_status:
             break
 
-        time.sleep(1)
+        # check job status second
+        if watcher.changed:
+            job_status = on_world_changed(job_env, pod, rank_register, watcher,
+                                          args)
+            continue
+
+        time.sleep(2)
 
     # inverse order of initialization
     watcher.stop()
     if not local_status:
         logger.fatal("local trainers meets error and the job will exit!")
         # some trainer failed, it's a user-level failed
-        rank_register.complete(False)
-
-    if not other_status:
-        logger.fatal("job meets error and exit!")
+        set_pod_status(False)
 
     if rank_register.is_leader():
-        if not local_status or not other_status:
+        # wait all followers exit.
+        wait_followers_ranks()
+        succeed, failed = get_job_complete_flag()
+        if len(failed) > 4:
             set_job_complete_flag(False)
-            pass
+            logger.fatal("job meets error and exit!")
         else:
             set_job_complete_flag(True)
             logger.info("Congratulate! This job complete!")

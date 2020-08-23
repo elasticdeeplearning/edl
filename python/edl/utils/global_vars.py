@@ -17,8 +17,8 @@ from ..discovery.etcd_client import EtcdClient
 
 ETCD_POD_RESOURCE = "pod_resource"
 ETCD_POD_RANK = "pod_rank"
-ETCD_POD_STATUS = "pod_flag"
-ETCD_JOB_FLAG = "job_flag"
+ETCD_POD_STATUS = "pod_status"
+ETCD_JOB_STATUS = "job_status"
 
 g_etcd = None
 g_etcd_lock = None
