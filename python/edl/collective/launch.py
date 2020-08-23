@@ -189,6 +189,9 @@ def _on_world_changed(job_env, pod, rank_register, watcher):
 
 
 def on_world_changed(job_env, pod, rank_register, watcher, timeout=600):
+    """
+    return cluster, job_status
+    """
     start = time.time()
     while True:
         try:
