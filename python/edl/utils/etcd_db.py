@@ -129,7 +129,7 @@ class EtcdDB(object):
             assert False, "can't reach here!"
 
     @staticmethod
-    def get_resource_pod_ids():
+    def get_resource_pod_ids_set():
         etcd, lock = get_global_etcd()
         with lock:
             pod_resource_servers = etcd.get_service(ETCD_POD_RESOURCE)

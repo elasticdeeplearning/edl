@@ -62,7 +62,7 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         return status
 
     def Barrier(self, request, context):
-        ids = db.get_resource_pod_ids()
+        ids = db.get_resource_pod_ids_set()
         leader = db.get_pod_leader()
         logger.debug(
             "get barrier request from job_id:{} pod_id:{} ids_set:{} leader:{}".
@@ -89,9 +89,9 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
 
                 if ids == bd:
                     cluster = db.get_rank_cluster()
-                    if cluster.get_pods_ids() != ids:
+                    if cluster.get_pods_ids_set() != ids:
                         message = "barrier's context:{}, rank cluster now:{}".format(
-                            ids, cluster.get_pods_ids())
+                            ids, cluster.get_pods_ids_set())
                         serialize_exception(res, EdlBarrierError(message))
                         return res
 

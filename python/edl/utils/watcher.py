@@ -88,6 +88,7 @@ class Watcher(object):
 
             time.sleep(2)
 
+    @property
     def changed(self):
         with self._lock:
             return self._changed
@@ -98,14 +99,14 @@ class Watcher(object):
         """
 
         with self._lock:
-            old = self._cluster.get_pods_ids()
-            new = self._new_cluster.get_pods_ids()
+            old = self._cluster.get_pods_ids_list()
+            new = self._new_cluster.get_pods_ids_list()
 
         if old != new:
+            logger.debug("_is_world_changed find changed")
             with self._lock:
                 self._changed = True
-            logger.info("cluster change from pods:{} to pods:{}".format(old,
-                                                                        new))
+                old.changed_pods(new)
             return True
 
         return False

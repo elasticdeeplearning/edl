@@ -102,12 +102,37 @@ class Cluster(object):
 
         return None
 
-    def get_pods_ids(self):
+    def get_pods_ids_list(self):
+        ids = []
+        for pod in self._pods:
+            ids.append(pod._id)
+
+        return ids
+
+    def get_pods_ids_set(self):
         ids = set()
         for pod in self._pods:
             ids.add(pod._id)
 
         return ids
+
+    def changed_pods(self, new_cluster, print_detail=True):
+        disappeared = []
+        rank_changed = {}
+        for old_pod in self._pods:
+            new_pod = new_cluster.get_pod_by_id(self, old_pod._id)
+            if new_pod is None:
+                disappeared.append(old_pod)
+                if print_detail:
+                    logger.info("disappeared pods:{}".format(old_pod))
+
+            if old_pod.rank != new_pod.rank:
+                rank_changed[old_pod] = copy.copy(new_pod)
+                if print_detail:
+                    logger.info("pods change from {} to {}".format(old_pod,
+                                                                   new_pod))
+
+        return disappeared, rank_changed
 
     def from_pb(self, cluster):
         self.job_stage = cluster.job_stage

@@ -160,7 +160,7 @@ def _on_world_changed(job_env, pod, rank_register, watcher):
     watcher.stop()
 
     # is resource enough?
-    resource_ids = db.get_resource_pod_ids()
+    resource_ids = db.get_resource_pod_ids_set()
     if len(resource_ids) < job_env.min_nodes:
         logger.fatal("now pods resource:{} length:{}\
                 is smaller than need:{}, job exit!"
