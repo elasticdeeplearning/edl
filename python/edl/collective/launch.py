@@ -32,7 +32,8 @@ import traceback
 
 from ..utils.edl_env import JobEnv
 from ..utils.cluster import Pod, JobStatus
-from ..utils.register import PodRankRegister, PodResourceRegister, get_job_complete_flag, set_job_complete_flag, set_pod_status, wait_following_ranks
+from ..utils.register import PodRankRegister, PodResourceRegister
+from ..utils.edl_db import EtcdDB as db
 from ..utils.watcher import Watcher, get_pod_leader, get_cluster
 from ..utils.pod_server import PodServer
 from ..utils.utils import logger
@@ -169,19 +170,21 @@ def on_world_changed(job_env, pod, rank_register, watcher):
     # terminate and restart again
     terminate_local_procs()
 
-    succeed_pods, failed_pods = get_pods_complete_flag()
-    if len(failed_pods) > 4:
-        logger.info("found pods:{} failed! exit!".format(
-            [str(x) for x in failed_pods]))
+    # is resource enough?
+    resource_ids = db.get_pods_ids_from_resource()
+    if len(resource_ids) < job_env.min_nodes:
+        logger.info("now pods resource:{}\
+                is smaller than need:{}, job exit!"
+                    .format(resource_ids, job_env.min_nodes))
         return False
 
-    # leader will not find self changed.
+    # leader need't to regist
     if rank_register.is_leader():
         logger.info("leader need not to re-regist")
     else:
         rank_register.stop()
         # wait followers release their registers
-        wait_following_ranks()
+        db.wait_following_ranks()
 
         # re-regist to reserver dense rank order
         rank_register = PodRankRegister(job_env, pod)
@@ -268,24 +271,19 @@ def launch(args):
 
         time.sleep(2)
 
-    # inverse order of initialization
-    watcher.stop()
+    # set pod's status
     if not local_status:
-        logger.fatal("local trainers meets error and the job will exit!")
-        # some trainer failed, it's a user-level failed
-        set_pod_status(False)
+        logger.fatal("local trainers meets error!")
+    else:
+        logger.info("local trainers succeeded!")
 
     if rank_register.is_leader():
-        # wait all followers exit.
-        wait_following_ranks()
-        succeed, failed = get_job_complete_flag()
-        if len(failed) > 4:
-            set_job_complete_flag(False)
-            logger.fatal("job meets error and exit!")
-        else:
-            set_job_complete_flag(True)
+        if local_status and job_status:
+            db.set_job_complete_flag(True)
             logger.info("Congratulate! This job complete!")
 
+    # release resource in inverse order
+    watcher.stop()
     rank_register.stop()
     resource_register.stop()
 

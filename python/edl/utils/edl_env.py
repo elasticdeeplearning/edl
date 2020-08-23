@@ -139,6 +139,14 @@ class JobEnv(object):
     def trainer_ports(self):
         return self._trainer_ports
 
+    @property
+    def min_nodes(self):
+        return self._min_nodes
+
+    @propery
+    def max_nodes(self):
+        return self._max_nodes
+
     def __str__(self):
         d = vars(self)
         s = ""

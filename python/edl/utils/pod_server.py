@@ -30,6 +30,7 @@ from . import pod_server_pb2 as pb
 from . import common_pb2 as common_pb
 from .watcher import get_current_pod_ids_from_resource, get_pod_leader
 from .exceptions import *
+from .edl_db import EtcdDb as db
 
 
 class PodServerServicer(pb2_grpc.PodServerServicer):
@@ -61,8 +62,8 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
         return status
 
     def Barrier(self, request, context):
-        ids = get_current_pod_ids_from_resource()
-        leader = get_pod_leader()
+        ids = db.get_pod_ids_from_resource()
+        leader = db.get_pod_leader()
         logger.debug(
             "get barrier request from job_id:{} pod_id:{} ids_set:{} leader:{}".
             format(request.job_id, request.pod_id, ids, leader.get_id()))
@@ -71,6 +72,13 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
         with self._lock:
             try:
                 key = leader.stage
+                if request.stage != leader.stage:
+                    e = EdlBarrierError("stage error request stage:{},\
+                                        leader_stage:{}"
+                                        .format(request.stage, leader.stage))
+                    status = serialize_exception(e)
+                    return status
+
                 if key not in self._barrier_in:
                     self._barrier_in[key] = set()
 
