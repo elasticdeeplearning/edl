@@ -19,7 +19,8 @@ from edl.discovery.etcd_client import EtcdClient
 import json
 import collections
 import copy
-from .cluster import Cluster, Pod, JobStatus
+from .cluster import Cluster
+from .pod import Pod, JobStatus
 
 from .global_vars import get_global_etcd, ETCD_POD_RANK, ETCD_POD_RESOURCE
 
@@ -71,12 +72,12 @@ class Watcher(object):
             with self._lock:
                 if ranks is None:
                     #self._ranks = ranks
-                    self._cluster.from_json(ranks)
+                    self._cluster.from_rank_dict(ranks)
                     self._new_cluster = copy.copy(self._cluster)
                     continue
 
             with self._lock:
-                self._new_cluster.from_json(ranks)
+                self._new_cluster.from_rank_dict(ranks)
 
             if self._is_world_changed():
                 break

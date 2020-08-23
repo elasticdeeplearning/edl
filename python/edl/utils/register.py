@@ -17,7 +17,7 @@ import json
 import uuid
 
 from .utils import logger
-from .cluster import Pod, JobStatus
+from .pod import Pod, JobStatus
 from ..discovery.etcd_client import EtcdClient
 
 import etcd3
@@ -144,6 +144,7 @@ class PodRankRegister(object):
             self._rank = None
             self._stopped = True
 
+    """
     def update_stage(self):
         if not self.is_leader():
             return
@@ -153,6 +154,7 @@ class PodRankRegister(object):
             info = self._pod.to_json()
 
         self._etcd.refresh(self._service_name, self._server, info=info, ttl=10)
+    """
 
     def stop(self):
         self._stop.set()

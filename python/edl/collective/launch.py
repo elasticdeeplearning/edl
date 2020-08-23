@@ -31,7 +31,7 @@ import socket
 import traceback
 
 from ..utils.edl_env import JobEnv
-from ..utils.cluster import Pod, JobStatus
+from ..utils.pod import Pod, JobStatus
 from ..utils.register import PodRankRegister, PodResourceRegister
 from ..utils.etcd_db import EtcdDB as db
 from ..utils.watcher import Watcher
@@ -135,13 +135,13 @@ def edl_barrier(job_env, pod, timeout):
     # all pods barrier on leader
     while True:
         try:
-            c.barrier(job_env.job_id, pod.get_id())
-            break
+            return c.barrier(job_env.job_id, pod.get_id())
         except Exception as e:
             if time.time() - log_time > 30:
                 logger.info("wait to barrier now!")
                 log_time = time.time()
-            logger.debug("barrier error:{}".format(e))
+            logger.debug("barrier error:{} {}".format(e,
+                                                      traceback.format_exc()))
             time.sleep(3)
 
         if time.time() - start > timeout:

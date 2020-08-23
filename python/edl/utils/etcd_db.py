@@ -17,8 +17,9 @@ import json
 import uuid
 
 from .utils import logger
-from .cluster import Pod, JobStatus
+from .pod import Pod, JobStatus
 from ..discovery.etcd_client import EtcdClient
+from .cluster import Cluster
 
 import etcd3
 from .global_vars import *
@@ -73,7 +74,7 @@ class EtcdDB(object):
                 servers = etcd.get_service(service)
 
             if time.time() - start >= timeout:
-                cluster = self.get_cluster()
+                cluster = self.get_rank_cluster()
                 raise EdlWaitFollowersReleaseError(
                     "the pods did't release their register:{}".format(
                         cluster.get_pods_ids()))
@@ -149,7 +150,7 @@ class EtcdDB(object):
         ranks = {}
         for s in servers:
             ranks[int(s.server)] = s.info
-        cluster.from_json(ranks)
+        cluster.from_rank_dict(ranks)
         return cluster
 
     @staticmethod
