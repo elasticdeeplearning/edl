@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from edl.discovery.etcd_client import EtcdClient
-from edl.utils.global_vars import get_global_etcd, ETCD_POD_RANK, ETCD_POD_COMPLETE_FLAG, ETCD_POD_RESOURCE
+from edl.utils.global_vars import get_global_etcd, ETCD_POD_RANK, ETCD_POD_STATUS, ETCD_POD_RESOURCE
 import os
 
 job_id = os.environ["PADDLE_JOB_ID"]
@@ -21,5 +21,5 @@ etcd_endpoints = os.environ["PADDLE_ETCD_ENDPOINTS"]
 
 etcd, _ = get_global_etcd([etcd_endpoints], job_id)
 etcd.remove_service(ETCD_POD_RANK)
-etcd.remove_service(ETCD_POD_COMPLETE_FLAG)
+etcd.remove_service(ETCD_POD_STATUS)
 etcd.remove_service(ETCD_POD_RESOURCE)

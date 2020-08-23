@@ -24,7 +24,7 @@ import etcd3
 from .global_vars import *
 
 
-class EtcdDB(self):
+class EtcdDB(object):
     """
     @staticmethod
     def set_pod_complete_flag(flag, pod):
@@ -58,39 +58,6 @@ class EtcdDB(self):
 
         return succeed, failed
 
-    @static_method
-    def set_job_complete_flag(flag):
-        if flag:
-            status = JobStatus.COMPLETE
-        else:
-            status = JobStatus.ERROR
-
-        etcd, lock = get_global_etcd()
-        service = ETCD_JOB_STATUS
-        server = "complete"
-        info = json.dumps({"flag": int(status)})
-        with lock:
-            etcd.set_server_permanent(service, server, info)
-
-    @static_method
-    def get_job_complete_flag():
-        etcd, lock = get_global_etcd()
-        service = ETCD_JOB_STATUS
-        with lock:
-            servers = etcd.get_service(service)
-
-        assert len(servers) <= 1
-        if len(servers) < 1:
-            return None
-
-        s = servers[0]
-        d = json.loads(s.info)
-        if d["flag"] == int(JobStatus.ERROR):
-            return False
-        elif d["flag"] == int(JobStatus.COMPLETE):
-            return True
-        else:
-            assert False, "can't reach here!"
 
     @staticmethod
     def wait_following_ranks(time_out=60):
@@ -120,6 +87,40 @@ class EtcdDB(self):
 
             return True
     """
+
+    @staticmethod
+    def set_job_complete_flag(flag):
+        if flag:
+            status = JobStatus.COMPLETE
+        else:
+            status = JobStatus.ERROR
+
+        etcd, lock = get_global_etcd()
+        service = ETCD_JOB_STATUS
+        server = "complete"
+        info = json.dumps({"flag": int(status)})
+        with lock:
+            etcd.set_server_permanent(service, server, info)
+
+    @staticmethod
+    def get_job_complete_flag():
+        etcd, lock = get_global_etcd()
+        service = ETCD_JOB_STATUS
+        with lock:
+            servers = etcd.get_service(service)
+
+        assert len(servers) <= 1
+        if len(servers) < 1:
+            return None
+
+        s = servers[0]
+        d = json.loads(s.info)
+        if d["flag"] == int(JobStatus.ERROR):
+            return False
+        elif d["flag"] == int(JobStatus.COMPLETE):
+            return True
+        else:
+            assert False, "can't reach here!"
 
     @staticmethod
     def get_resource_pod_ids():

@@ -19,6 +19,7 @@ from .client import Client
 from .cluster import Cluster
 from .exceptions import deserialize_exception, EdlBarrierError
 from .utils import logger
+from .etcd_db import EtcdDB as db
 
 
 class PodServerClient(Client):
@@ -41,6 +42,8 @@ class PodServerClient(Client):
         req = pb.BarrierRequest()
         req.job_id = job_id
         req.pod_id = pod_id
+        leader = db.get_pod_leader()
+        req.stage = leader.stage
 
         c, s = self.connect()
         begin = time.time()

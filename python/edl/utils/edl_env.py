@@ -143,7 +143,7 @@ class JobEnv(object):
     def min_nodes(self):
         return self._min_nodes
 
-    @propery
+    @property
     def max_nodes(self):
         return self._max_nodes
 

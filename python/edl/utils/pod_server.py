@@ -28,9 +28,8 @@ from .utils import logger
 from . import pod_server_pb2_grpc as pb2_grpc
 from . import pod_server_pb2 as pb
 from . import common_pb2 as common_pb
-from .watcher import get_current_pod_ids_from_resource, get_pod_leader
+from .etcd_db import EtcdDB as db
 from .exceptions import *
-from .edl_db import EtcdDb as db
 
 
 class PodServerServicer(pb2_grpc.PodServerServicer):
@@ -43,7 +42,7 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
 
     def ScaleOut(self, request, context):
         status = common_pb.Status()
-        pod = get_pod_leader()
+        pod = db.get_pod_leader()
         if pod.get_id != self._pod_id:
             status = serialize_exception(
                 EdlLeaderError("this pod is not the leader"))
@@ -53,7 +52,7 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
 
     def ScaleIn(self, request, context):
         status = common_pb.Status()
-        pod = get_pod_leader()
+        pod = db.get_pod_leader()
         if pod.get_id != self._pod_id:
             status = serialize_exception(
                 EdlLeaderError("this pod is not the leader"))
@@ -62,7 +61,7 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
         return status
 
     def Barrier(self, request, context):
-        ids = db.get_pod_ids_from_resource()
+        ids = db.get_resource_pod_ids()
         leader = db.get_pod_leader()
         logger.debug(
             "get barrier request from job_id:{} pod_id:{} ids_set:{} leader:{}".

@@ -22,6 +22,7 @@ package pod_server;
 message BarrierRequest {
   string job_id = 1;
   string pod_id = 2;
+  string stage = 3;
 }
 
 message ScaleInRequest { int32 num = 1; }

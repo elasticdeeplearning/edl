@@ -33,8 +33,8 @@ import traceback
 from ..utils.edl_env import JobEnv
 from ..utils.cluster import Pod, JobStatus
 from ..utils.register import PodRankRegister, PodResourceRegister
-from ..utils.edl_db import EtcdDB as db
-from ..utils.watcher import Watcher, get_pod_leader, get_cluster
+from ..utils.etcd_db import EtcdDB as db
+from ..utils.watcher import Watcher
 from ..utils.pod_server import PodServer
 from ..utils.utils import logger
 from ..utils import utils
@@ -129,7 +129,7 @@ def edl_barrier(job_env, pod, timeout):
     """
     start = time.time()
 
-    leader = get_pod_leader()
+    leader = db.get_pod_leader()
     c = PodServerClient(leader.endpoint)
     log_time = time.time()
     # all pods barrier on leader
@@ -141,21 +141,13 @@ def edl_barrier(job_env, pod, timeout):
             if time.time() - log_time > 30:
                 logger.info("wait to barrier now!")
                 log_time = time.time()
+            logger.debug("barrier error:{}".format(e))
             time.sleep(3)
 
         if time.time() - start > timeout:
             message = "wait to barrier with all error:{} leader:[{}] current pod:[{}]".format(
                 traceback.format_exc(), leader, pod)
             raise EdlBarrierError(message)
-
-    cluster = watcher.get_cluster()
-
-    procs = start_local_trainers(
-        cluster,
-        pod,
-        args.training_script,
-        args.training_script_args,
-        log_dir=args.log_dir)
 
 
 def on_world_changed(job_env, pod, rank_register, watcher):
@@ -167,15 +159,13 @@ def on_world_changed(job_env, pod, rank_register, watcher):
     # all pods stop watch
     watcher.stop()
 
-    # terminate and restart again
-    terminate_local_procs()
-
     # is resource enough?
-    resource_ids = db.get_pods_ids_from_resource()
+    resource_ids = db.get_resource_pod_ids()
     if len(resource_ids) < job_env.min_nodes:
-        logger.info("now pods resource:{}\
+        logger.fatal("now pods resource:{} length:{}\
                 is smaller than need:{}, job exit!"
-                    .format(resource_ids, job_env.min_nodes))
+                     .format(resource_ids,
+                             len(resource_ids), job_env.min_nodes))
         return False
 
     # leader need't to regist
@@ -206,7 +196,7 @@ def launch(args):
     # get global etcd and lock
     get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
 
-    flag = get_job_complete_flag()
+    flag = db.get_job_complete_flag()
     if flag is not None:
         if flag:
             logger.info("job:{} has completed {}! Can't try!".format(
@@ -256,8 +246,10 @@ def launch(args):
 
         # check job status second
         if watcher.changed:
-            job_status = on_world_changed(job_env, pod, rank_register, watcher,
-                                          args)
+            # terminate and restart again
+            terminate_local_procs(procs)
+
+            job_status = on_world_changed(job_env, pod, rank_register, watcher)
             if not job_status:
                 break
 

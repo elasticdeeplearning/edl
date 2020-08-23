@@ -71,12 +71,10 @@ class Watcher(object):
                     self._new_cluster = copy.copy(self._cluster)
                     continue
 
-            self._clear_changed()
-
             with self._lock:
                 self._new_cluster.from_json(ranks)
 
-            if self._is_world_changed(self._new_cluster):
+            if self._is_world_changed():
                 break
 
             with self._lock:
@@ -94,8 +92,8 @@ class Watcher(object):
         list[Rank ordered pod_id] changed
         """
 
-        old = self._cluster.get_pods_ids()
         with self._lock:
+            old = self._cluster.get_pods_ids()
             new = self._new_cluster.get_pods_ids()
 
         if old != new:
@@ -109,7 +107,11 @@ class Watcher(object):
 
     def get_cluster(self):
         with self._lock:
-            return self._cluster, self._new_cluster
+            return self._cluster
+
+    def get_new_cluster(self):
+        with self._lock:
+            return self._new_cluster
 
     def stop(self):
         self._stop.set()
