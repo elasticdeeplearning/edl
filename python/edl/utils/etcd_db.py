@@ -53,14 +53,14 @@ class EtcdDB(object):
         with lock:
             servers = etcd.get_service(service)
 
-        succeed = {}
-        failed = {}
+        succeed = set()
+        failed = set()
         for server in servers:
             d = json.loads(server.info)
             if d["flag"] == int(JobStatus.ERROR):
-                failed[server.server] = ""
+                failed.add(server.server)
             elif d["flag"] == int(JobStatus.COMPLETE):
-                success[server.server] = ""
+                succeed.add(server.server)
 
         return succeed, failed
 
@@ -176,10 +176,10 @@ class EtcdDB(object):
         """
         return succeeded and failed pods in old_cluster
         """
-        succeed, failed = self.get_pods_complete_flag()
-        resource = self.get_resource_pod_ids_set()
+        succeed, failed = EtcdDB.get_pods_complete_flag()
+        resource = EtcdDB.get_resource_pod_ids_set()
         init = cluster.get_pods_ids_set()
-        now = self.get_rank_cluster().get_pods_ids_set()
+        now = EtcdDB.get_rank_cluster().get_pods_ids_set()
 
         added = now - init
         diff = init.symmetric_difference(now)
