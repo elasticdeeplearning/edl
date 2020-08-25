@@ -169,6 +169,8 @@ def on_rank_pods_changed(job_env,
     while True:
         try:
             succeed, failed, added = db.get_diff_pods_flag(cluster)
+            logger.info("succeed:{} failed:{} added:{}".format(succeed, failed,
+                                                               added))
             # FIXME(gongwb): control which pods can register on rank.
             if len(failed) == 0 and len(added) == 0:
                 return None, True
