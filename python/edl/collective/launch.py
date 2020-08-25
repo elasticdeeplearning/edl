@@ -209,14 +209,14 @@ def on_rank_pods_changed(job_env,
     return None, False
 
 
-def set_pod_complete_flag(local_status):
+def set_pod_complete_flag(pod, local_status):
     # set pod's status
     if not local_status:
         db.set_pod_complete_flag(False)
         logger.fatal("local trainers meets error!")
         return
 
-    db.set_pod_complete_flag(True)
+    db.set_pod_complete_flag(True, pod.get_id())
     logger.info("local trainers succeeded!")
 
 
@@ -326,7 +326,7 @@ def launch(args):
     # release resource in inverse order
     watcher.stop()
 
-    set_pod_complete_flag(local_status)
+    set_pod_complete_flag(pod, local_status)
     set_job_complete_flag(rank_register, local_status, job_status)
 
     rank_register.stop()
