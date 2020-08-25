@@ -150,12 +150,6 @@ def edl_barrier(job_env, pod, timeout):
         time.sleep(3)
 
 
-def _on_rank_pods_changed(job_env, pod, rank_register, watcher):
-    logger.info("on_rank_pods_changed")
-
-    return cluster
-
-
 def on_rank_pods_changed(job_env,
                          cluster,
                          pod,
