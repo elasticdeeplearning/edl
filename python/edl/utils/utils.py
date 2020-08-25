@@ -163,4 +163,4 @@ def find_free_ports(num):
             )
             return None
 
-    return None
+    return port_set

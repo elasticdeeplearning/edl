@@ -170,3 +170,20 @@ class EtcdDB(object):
     @staticmethod
     def get_data_reader_leader():
         raise NotImplementedError()
+
+    @staticmethod
+    def get_diff_pods_flag(cluster):
+        """
+        return succeeded and failed pods in old_cluster
+        """
+        succeed, failed = self.get_pods_complete_flag()
+        resource = self.get_resource_pod_ids_set()
+        init = cluster.get_pods_ids_set()
+        now = self.get_rank_cluster().get_pods_ids_set()
+
+        added = now - init
+        diff = init.symmetric_difference(now)
+        diff_succeed = diff & succeed
+        diff_failed = diff & failed
+
+        return diff_succeed, diff_failed, added
