@@ -26,9 +26,11 @@ from .global_vars import *
 
 
 class EtcdDB(object):
-    """
     @staticmethod
     def set_pod_complete_flag(flag, pod):
+        """
+        Set job flags: COMPLETE or ERROR
+        """
         if flag:
             status = JobStatus.COMPLETE
         else:
@@ -37,12 +39,15 @@ class EtcdDB(object):
         etcd, lock = get_global_etcd()
         service = ETCD_POD_STATUS
         server = pod.get_id()
-        info = json.dumps({"flag": int(status), "pod": pod.to_json()})
+        info = json.dumps({"flag": int(status)})
         with lock:
             etcd.set_server_permanent(service, server, info)
 
     @staticmethod
     def get_pods_complete_flag():
+        """
+        Get succeed pods and failed pods
+        """
         etcd, lock = get_global_etcd()
         service = ETCD_POD_STATUS
         with lock:
@@ -58,7 +63,6 @@ class EtcdDB(object):
                 success[server.server] = ""
 
         return succeed, failed
-    """
 
     @staticmethod
     def wait_following_ranks(timeout=60):

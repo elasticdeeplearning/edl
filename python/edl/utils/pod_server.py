@@ -34,12 +34,15 @@ from .exceptions import *
 
 
 class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
-    def __init__(self, pod_id):
+    def __init__(self, job_env, pod_id):
         # to control the cache size.
         self._lock = Lock()
+
         # stage => set(pod_id)
         self._barrier_in = {}
+
         self._pod_id = pod_id
+        self._job_env = job_env
 
     def ScaleOut(self, request, context):
         status = common_pb.Status()
@@ -62,6 +65,12 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         return status
 
     def Barrier(self, request, context):
+        """
+        1. pods barrier on the leader's current stage
+        1.1 leader's stage changed on leader changed
+        2. pods num must large then the job_env.min_nodes
+        3. pods num must equal the pods registed under resource.
+        """
         ids = db.get_resource_pod_ids_set()
         leader = db.get_pod_leader()
         logger.debug(
@@ -72,14 +81,6 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         with self._lock:
             try:
                 key = leader.stage
-                """
-                if request.stage != leader.stage:
-                    e = EdlBarrierError("stage error request stage:{},\
-                                        leader_stage:{}"
-                                        .format(request.stage, leader.stage))
-                    status = serialize_exception(e)
-                    return status
-                """
 
                 if key not in self._barrier_in:
                     self._barrier_in[key] = set()
@@ -89,9 +90,17 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
 
                 if ids == bd:
                     cluster = db.get_rank_cluster()
-                    if cluster.get_pods_ids_set() != ids:
+                    rank_ids = cluster.get_pods_ids_set()
+                    if rank_ids != ids:
                         message = "barrier's context:{}, rank cluster now:{}".format(
                             ids, cluster.get_pods_ids_set())
+                        serialize_exception(res, EdlBarrierError(message))
+                        return res
+
+                    if len(rank_ids) < self._job_env.min_nodes:
+                        message = "barrier's rank cluster now:{} is not enough of job's min nodes:{}".format(
+                            cluster.get_pods_ids_set(),
+                            self._job_env.min_nodes())
                         serialize_exception(res, EdlBarrierError(message))
                         return res
 
@@ -114,11 +123,12 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
 
 
 class PodServer(object):
-    def __init__(self, pod_id):
+    def __init__(self, job_env, pod_id):
         self._server = None
         self._port = None
         self._endpoint = None
         self._pod_id = pod_id
+        self._job_env = job_env
 
     def start(self, job_env, pod, concurrency=20, max_workers=100):
         server = grpc.server(
@@ -127,7 +137,7 @@ class PodServer(object):
                      ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
             maximum_concurrent_rpcs=concurrency)
         pod_server_pb_grpc.add_PodServerServicer_to_server(
-            PodServerServicer(self._pod_id), server)
+            PodServerServicer(self._job_env, self._pod_id), server)
 
         self._port = server.add_insecure_port('{}:0'.format(pod.addr))
         assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(

@@ -35,25 +35,11 @@ class Watcher(object):
         self._job_id = job_id
         self._current_pod = current_pod
 
-        # servers in etcd
-        #self._ranks = None  # {rank:pod_json}
-
-        self._cluster = Cluster()
         self._new_cluster = Cluster()
         self._lock = Lock()
         self._stop = Event()
-        """
-        # running pods
-        servers = self._etcd.get_service(ETCD_POD_RANK)
-        #self._ranks = {}
-        ranks = {}
-        for s in servers:
-            ranks[int(s.server)] = s.info
-        self._cluster.from_json(ranks)
-        self._new_cluster = copy.copy(self._cluster)
-        """
 
-        self._cluster = cluster
+        self._cluster = copy.copy(cluster)
         self._new_cluster = copy.copy(self._cluster)
         self._changed = False
         logger.info("watcher gets the init cluster:{}".format(self._cluster))

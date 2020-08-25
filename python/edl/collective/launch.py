@@ -125,14 +125,13 @@ def _convert_args_to_dict(args):
 
 def edl_barrier(job_env, pod, timeout):
     """
-    pod under resource barrier togather
+    Pod under resource barrier togather and return the cluster.
     """
     start = time.time()
 
     leader = db.get_pod_leader()
     c = PodServerClient(leader.endpoint)
     log_time = time.time()
-    # all pods barrier on leader
     while True:
         try:
             return c.barrier(job_env.job_id, pod.get_id())
@@ -142,31 +141,20 @@ def edl_barrier(job_env, pod, timeout):
                 log_time = time.time()
             logger.debug("barrier error:{} {}".format(e,
                                                       traceback.format_exc()))
-            time.sleep(3)
 
         if time.time() - start > timeout:
             message = "wait to barrier with all error:{} leader:[{}] current pod:[{}]".format(
                 traceback.format_exc(), leader, pod)
             raise EdlBarrierError(message)
 
+        time.sleep(3)
 
-def _on_world_changed(job_env, pod, rank_register, watcher):
-    """
-    return if job failed.
-    """
-    logger.info("on_world_changed")
+
+def _on_rank_pods_changed(job_env, pod, rank_register, watcher):
+    logger.info("on_rank_pods_changed")
 
     # all pods stop watch
     watcher.stop()
-
-    # is resource enough?
-    resource_ids = db.get_resource_pod_ids_set()
-    if len(resource_ids) < job_env.min_nodes:
-        logger.fatal("now pods resource:{} length:{}\
-                is smaller than need:{}, job exit!"
-                     .format(resource_ids,
-                             len(resource_ids), job_env.min_nodes))
-        return None, False
 
     # leader need't to regist
     if rank_register.is_leader():
@@ -185,20 +173,26 @@ def _on_world_changed(job_env, pod, rank_register, watcher):
     # watch agagin
     watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod, cluster)
 
-    return cluster, True
+    return cluster
 
 
-def on_world_changed(job_env, pod, rank_register, watcher, timeout=600):
+def on_rank_pods_changed(job_env,
+                         cluster,
+                         pod,
+                         rank_register,
+                         watcher,
+                         timeout=600):
     """
-    return cluster, job_status
+    return new_cluster, job_status
     """
     start = time.time()
     while True:
         try:
-            return _on_world_changed(job_env, pod, rank_register, watcher)
+            succeed, failed = db.get_pods_complete_flag()
+            resource = db.get_resource_pod_ids_set()
+            old = cluster.get_pods_ids_set()
+            return _on_rank_pods_changed(job_env, pod, rank_register, watcher)
         except Exception as e:
-            watcher.stop()
-
             if time.time() - start >= timeout:
                 logger.Fatal("on_world_changed meets {}".format(
                     traceback.format_exc()))
@@ -208,6 +202,38 @@ def on_world_changed(job_env, pod, rank_register, watcher, timeout=600):
                 traceback.format_exc()))
             time.sleep(3)
             continue
+
+
+def set_pod_complete_flag(local_status):
+    # set pod's status
+    if not local_status:
+        db.set_pod_complete_flag(False)
+        logger.fatal("local trainers meets error!")
+        return
+
+    db.set_pod_complete_flag(True)
+    logger.info("local trainers succeeded!")
+
+
+def set_job_complete_flag(rank_register, local_status, job_status, timeout=60):
+    start = time.time()
+
+    while True:
+        if rank_register.is_leader():
+            return
+
+        try:
+            # wait all followers exit
+            db.wait_following_ranks(timeout=10)
+
+            if local_status and job_status:
+                db.set_job_complete_flag(True)
+                logger.info("Congratulate! This job complete!")
+        except:
+            if time.time() - start >= timeout:
+                return
+
+        time.sleep(3)
 
 
 def launch(args):
@@ -233,7 +259,7 @@ def launch(args):
 
     # launch pod server
     pod_server = None
-    pod_server = PodServer(pod.get_id())
+    pod_server = PodServer(job_env, pod.get_id())
     pod_server.start(job_env, pod)
     logger.info("pod server started:[{}]".format(pod))
 
@@ -270,11 +296,15 @@ def launch(args):
 
         # check job status second
         if watcher.changed:
+            cluster, job_status = on_rank_pods_changed(job_env, cluster, pod,
+                                                       rank_register, watcher)
+            if not is_cluster_changed:
+                time.sleep(2)
+                continue
+
             # terminate and restart again
             terminate_local_procs(procs)
 
-            cluster, job_status = on_world_changed(job_env, pod, rank_register,
-                                                   watcher)
             if not job_status:
                 break
 
@@ -287,19 +317,12 @@ def launch(args):
 
         time.sleep(2)
 
-    # set pod's status
-    if not local_status:
-        logger.fatal("local trainers meets error!")
-    else:
-        logger.info("local trainers succeeded!")
-
-    if rank_register.is_leader():
-        if local_status and job_status:
-            db.set_job_complete_flag(True)
-            logger.info("Congratulate! This job complete!")
-
     # release resource in inverse order
     watcher.stop()
+
+    set_pod_complete_flag(local_status)
+    set_job_complete_flag(rank_register, local_status, job_status)
+
     rank_register.stop()
     resource_register.stop()
 
