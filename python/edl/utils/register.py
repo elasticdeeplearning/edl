@@ -29,6 +29,7 @@ class Register(object):
         self._service = service
         self._server = server
         self._stop = threading.Event()
+        self._stopped = False
         #don't change this ttl
         self._etcd = EtcdClient(endpoints=etcd_endpoints, root=job_id)
         self._etcd.init()
@@ -48,13 +49,27 @@ class Register(object):
 
     def _refresher(self):
         while not self._stop.is_set():
-            self._etcd.refresh(self._service, self._server)
-            time.sleep(2)
+            try:
+                self._etcd.refresh(self._service, self._server)
+                time.sleep(2)
+            except Exception as e:
+                logger.fatal("register meet error and exit! error:".format(e))
+                self._stopped = True
+                break
 
     def stop(self):
         self._stop.set()
         if self._t_register.is_alive():
             self._t_register.join()
+            with self._lock:
+                self._t_register = None
+
+        with self._lock:
+            self._stopped = True
+
+    def is_stopped(self):
+        with self._lock:
+            return self._stopped
 
     def __exit__(self):
         self.stop()
@@ -62,20 +77,27 @@ class Register(object):
 
 class PodRankRegister(object):
     def __init__(self, job_env, pod):
+        self._job_env = job_env
+        self._pod = pod
+
         self._stop = threading.Event()
-        self._etcd = EtcdClient(job_env.etcd_endpoints, root=job_env.job_id)
+        self._service_name = ETCD_POD_RANK
+        self._lock = threading.Lock()
+
+        self._etcd = None
+        self._rank = None
+        self._server = None
+        self._t_register = None
+
+    def start(self):
+        self._etcd = EtcdClient(
+            self._ob_env.etcd_endpoints, root=self._job_env.job_id)
         self._etcd.init()
 
-        self._service_name = ETCD_POD_RANK
         self._rank, self._server = self._register_rank(job_env, pod)
 
         self._t_register = threading.Thread(target=self._refresher)
         self._t_register.start()
-
-        self._lock = threading.Lock()
-        self._stopped = False
-        self._pod = pod
-        self._job_env = job_env
 
     def _register_rank(self, job_env, pod, timeout=300):
         rank = -1
@@ -142,18 +164,18 @@ class PodRankRegister(object):
 
         with self._lock:
             self._rank = None
-            self._stopped = True
 
     def stop(self):
-        self._stop.set()
-
-        if self._t_register:
-            self._t_register.join()
-
         with self._lock:
-            self._stopped = True
-            self._rank = None
-            self._t_register = None
+            if self._t_register and self._t_register.is_alive():
+                return False
+
+        self._stop.set()
+        with self._lock:
+            if self._t_register:
+                self._t_register.join()
+                self._t_register = None
+                self._rank = None
 
         logger.info("pod_register stopped")
 
@@ -164,9 +186,9 @@ class PodRankRegister(object):
         with self._lock:
             return self._rank == 0
 
-    def is_stoped(self):
+    def is_stopped(self):
         with self._lock:
-            return self._stopped
+            return self._t_register == None
 
 
 class PodResourceRegister(Register):
@@ -175,14 +197,14 @@ class PodResourceRegister(Register):
     If it stop, it means the pods disappear.
     """
 
-    def __init__(self, etcd_endpoints, job_id, pod):
+    def __init__(self, job_env, pod):
         service = ETCD_POD_RESOURCE
         server = "{}".format(pod.get_id())
         value = pod.to_json()
 
         super(PodResourceRegister, self).__init__(
-            etcd_endpoints=etcd_endpoints,
-            job_id=job_id,
+            etcd_endpoints=job_env.etcd_endpoints,
+            job_id=job_env.job_id,
             service=service,
             server=server,
             info=value)

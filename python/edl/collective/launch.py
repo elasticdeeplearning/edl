@@ -237,6 +237,13 @@ def set_job_complete_flag(rank_register, local_status, job_status, timeout=60):
         time.sleep(3)
 
 
+def watch_registers(rank_register, resource_register):
+    if rank_register.is_stoped() or resource_register.is_stoped():
+        return False
+
+    return True
+
+
 def launch(args):
     args_dict = _convert_args_to_dict(args)
 
@@ -289,10 +296,15 @@ def launch(args):
 
     local_status = True
     job_status = True
+    register_status = True
     while True:
         # check local status first
         alive, local_status = watch_local_trainers(procs, pod.trainers_num)
         if not alive or not local_status:
+            break
+
+        if not watch_registers(rank_register, resource_register):
+            register_status = False
             break
 
         # check job status second
@@ -322,8 +334,12 @@ def launch(args):
     # release resource in inverse order
     watcher.stop()
 
-    set_pod_complete_flag(pod, local_status)
-    set_job_complete_flag(rank_register, local_status, job_status)
+    # disappeared
+    if not register_status:
+        logger.fatal("register meets error and local exit!")
+    else:
+        set_pod_complete_flag(pod, local_status)
+        set_job_complete_flag(rank_register, local_status, job_status)
 
     rank_register.stop()
     resource_register.stop()

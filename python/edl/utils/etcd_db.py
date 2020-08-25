@@ -176,14 +176,15 @@ class EtcdDB(object):
         """
         return succeeded and failed pods in old_cluster
         """
-        succeed, failed = EtcdDB.get_pods_complete_flag()
+        all_succeed, all_failed = EtcdDB.get_pods_complete_flag()
         resource = EtcdDB.get_resource_pod_ids_set()
         init = cluster.get_pods_ids_set()
         now = EtcdDB.get_rank_cluster().get_pods_ids_set()
 
         added = now - init
-        diff = init.symmetric_difference(now)
-        diff_succeed = diff & succeed
-        diff_failed = diff & failed
+        #diff = init.symmetric_difference(now)
+        succeeded = init & all_succeed
+        #disappeared = init - now - (diff & failed) - succeeded
+        failed = init - now - succeeded
 
-        return diff_succeed, diff_failed, added
+        return succeeded, failed, added
