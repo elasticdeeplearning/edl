@@ -32,7 +32,7 @@ def get_global_etcd(etcd_endpoints=None, job_id=None):
         g_etcd_lock = threading.Lock()
 
     if g_etcd is None:
-        g_etcd = EtcdClient(endpoints=etcd_endpoints, root=job_id)
+        g_etcd = EtcdClient(endpoints=etcd_endpoints, root=job_id, timeout=6)
         g_etcd.init()
 
     return g_etcd, g_etcd_lock

@@ -31,7 +31,8 @@ class Register(object):
         self._stop = threading.Event()
         self._stopped = False
         #don't change this ttl
-        self._etcd = EtcdClient(endpoints=etcd_endpoints, root=job_id)
+        self._etcd = EtcdClient(
+            endpoints=etcd_endpoints, root=job_id, timeout=6)
         self._etcd.init()
 
         try:
@@ -91,7 +92,7 @@ class PodRankRegister(object):
 
     def start(self):
         self._etcd = EtcdClient(
-            self._ob_env.etcd_endpoints, root=self._job_env.job_id)
+            self._ob_env.etcd_endpoints, root=self._job_env.job_id, timeout=6)
         self._etcd.init()
 
         self._rank, self._server = self._register_rank(job_env, pod)

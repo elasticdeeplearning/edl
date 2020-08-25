@@ -28,21 +28,25 @@ import six
 
 
 class Watcher(object):
-    def __init__(self, etcd_endpoints, job_id, current_pod, cluster):
-        self._etcd = EtcdClient(etcd_endpoints, root=job_id)
-        self._etcd.init()
+    def __init__(self, job_env, cluster, pod):
+        self._etcd = None
 
-        self._job_id = job_id
-        self._current_pod = current_pod
+        self._job_id = job_env.job_id
+        self._current_pod = pod
+        self._cluster = copy.copy(cluster)
+        logger.info("watcher gets the init cluster:{}".format(self._cluster))
+        self._new_cluster = copy.copy(self._cluster)
+        self._changed = False
 
         self._new_cluster = Cluster()
         self._lock = Lock()
         self._stop = Event()
 
-        self._cluster = copy.copy(cluster)
-        self._new_cluster = copy.copy(self._cluster)
-        self._changed = False
-        logger.info("watcher gets the init cluster:{}".format(self._cluster))
+        self._t_watcher = None
+
+    def start(self):
+        self._etcd = EtcdClient(etcd_endpoints, root=job_id)
+        self._etcd.init()
 
         self._t_watcher = Thread(target=self._watcher)
         self._t_watcher.start()
@@ -107,11 +111,15 @@ class Watcher(object):
 
     def stop(self):
         self._stop.set()
-        if self._t_watcher:
-            self._t_watcher.join()
-            with self._lock:
+        with self._lock:
+            if self._t_watcher:
+                self._t_watcher.join()
                 self._t_watcher = None
         logger.debug("watcher stopped")
+
+    def is_stopped(self):
+        with self._lock:
+            return self._t_watcher == None
 
     def __exit__(self):
         self.stop()

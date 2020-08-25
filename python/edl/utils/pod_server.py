@@ -64,6 +64,17 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
 
         return status
 
+    def IsWorldChanged(self, request, context):
+        """
+        1. failed/disappeared
+        2. new added?
+        """
+        pass
+
+    def GetDiffPods(self, request, context):
+        # return succeed, failed, added, inited
+        pass
+
     def Barrier(self, request, context):
         """
         1. pods barrier on the leader's current stage
@@ -78,45 +89,44 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
             format(request.job_id, request.pod_id, ids, leader.get_id()))
 
         res = pod_server_pb.BarrierResponse()
-        with self._lock:
-            try:
-                key = leader.stage
+        try:
+            key = leader.stage
 
+            with self._lock:
                 if key not in self._barrier_in:
                     self._barrier_in[key] = set()
 
                 bd = self._barrier_in[leader.stage]
                 bd.add(request.pod_id)
 
-                if ids == bd:
-                    cluster = db.get_rank_cluster()
-                    rank_ids = cluster.get_pods_ids_set()
-                    if rank_ids != ids:
-                        message = "barrier's context:{}, rank cluster now:{}".format(
-                            ids, cluster.get_pods_ids_set())
-                        serialize_exception(res, EdlBarrierError(message))
-                        return res
-
-                    if len(rank_ids) < self._job_env.min_nodes:
-                        message = "barrier's rank cluster now:{} is not enough of job's min nodes:{}".format(
-                            cluster.get_pods_ids_set(),
-                            self._job_env.min_nodes())
-                        serialize_exception(res, EdlBarrierError(message))
-                        return res
-
-                    cluster.to_pb_response(res)
+            if ids == bd:
+                cluster = db.get_rank_cluster()
+                rank_ids = cluster.get_pods_ids_set()
+                if rank_ids != ids:
+                    message = "barrier's context:{}, rank cluster now:{}".format(
+                        ids, cluster.get_pods_ids_set())
+                    serialize_exception(res, EdlBarrierError(message))
                     return res
 
-                serialize_exception(
-                    res,
-                    EdlBarrierError("barrier's context:{}, now:{}".format(ids,
-                                                                          bd)))
+                if len(rank_ids) < self._job_env.min_nodes:
+                    message = "barrier's rank cluster now:{} is not enough of job's min nodes:{}".format(
+                        cluster.get_pods_ids_set(), self._job_env.min_nodes())
+                    serialize_exception(res, EdlBarrierError(message))
+                    return res
+
+                cluster.to_pb_response(res)
                 return res
-            except Exception as e:
-                logger.debug("internal error:{} {}".format(
-                    e, traceback.format_exc()))
-                serialize_exception(res, EdlInternalError(str(e)))
-                return res
+
+            serialize_exception(
+                res,
+                EdlBarrierError("barrier's context:{}, now:{}".format(ids,
+                                                                      bd)))
+            return res
+        except Exception as e:
+            logger.debug("internal error:{} {}".format(e,
+                                                       traceback.format_exc()))
+            serialize_exception(res, EdlInternalError(str(e)))
+            return res
 
     def ShutDown(self, request, context):
         pass

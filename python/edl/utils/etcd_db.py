@@ -27,24 +27,16 @@ from .global_vars import *
 
 class EtcdDB(object):
     @staticmethod
-    def set_pod_complete_flag(flag, pod_id):
-        """
-        Set job flags: COMPLETE or ERROR
-        """
-        if flag:
-            status = JobStatus.COMPLETE
-        else:
-            status = JobStatus.ERROR
-
+    def set_pod_status(pod_id, status):
         etcd, lock = get_global_etcd()
         service = ETCD_POD_STATUS
         server = pod_id
-        info = json.dumps({"flag": int(status)})
+        info = json.dumps({"status": int(status)})
         with lock:
             etcd.set_server_permanent(service, server, info)
 
     @staticmethod
-    def get_pods_complete_flag():
+    def get_pods_status():
         """
         Get succeed pods and failed pods
         """
@@ -55,14 +47,17 @@ class EtcdDB(object):
 
         succeed = set()
         failed = set()
+        inited = set()
         for server in servers:
             d = json.loads(server.info)
-            if d["flag"] == int(JobStatus.ERROR):
+            if d["status"] == int(JobStatus.ERROR):
                 failed.add(server.server)
-            elif d["flag"] == int(JobStatus.COMPLETE):
+            elif d["status"] == int(JobStatus.COMPLETE):
                 succeed.add(server.server)
+            elif d["status"] == int(JobStatus.INITIAL):
+                inited.add(server.server)
 
-        return succeed, failed
+        return inited, succeed, failed
 
     @staticmethod
     def wait_following_ranks(timeout=60):
@@ -99,21 +94,16 @@ class EtcdDB(object):
             return True
 
     @staticmethod
-    def set_job_complete_flag(flag):
-        if flag:
-            status = JobStatus.COMPLETE
-        else:
-            status = JobStatus.ERROR
-
+    def set_job_status(status):
         etcd, lock = get_global_etcd()
         service = ETCD_JOB_STATUS
-        server = "complete"
-        info = json.dumps({"flag": int(status)})
+        server = "status"
+        info = json.dumps({"status": int(status)})
         with lock:
             etcd.set_server_permanent(service, server, info)
 
     @staticmethod
-    def get_job_complete_flag():
+    def get_job_status():
         etcd, lock = get_global_etcd()
         service = ETCD_JOB_STATUS
         with lock:
@@ -125,15 +115,15 @@ class EtcdDB(object):
 
         s = servers[0]
         d = json.loads(s.info)
-        if d["flag"] == int(JobStatus.ERROR):
+        if d["status"] == int(JobStatus.ERROR):
             return False
-        elif d["flag"] == int(JobStatus.COMPLETE):
+        elif d["status"] == int(JobStatus.COMPLETE):
             return True
         else:
             assert False, "can't reach here!"
 
     @staticmethod
-    def get_resource_pod_ids_set():
+    def get_resource_pods_ids_set():
         etcd, lock = get_global_etcd()
         with lock:
             pod_resource_servers = etcd.get_service(ETCD_POD_RESOURCE)
@@ -145,6 +135,10 @@ class EtcdDB(object):
             ids.add(p.get_id())
 
         return ids
+
+    @staticmethod
+    def get_rank_pods_ids_set():
+        return get_rank_cluster().get_pods_ids_set()
 
     @staticmethod
     def get_rank_cluster():
@@ -172,19 +166,19 @@ class EtcdDB(object):
         raise NotImplementedError()
 
     @staticmethod
-    def get_diff_pods_flag(cluster):
+    def get_diff_pods(cluster):
         """
         return succeeded and failed pods in old_cluster
         """
-        all_succeed, all_failed = EtcdDB.get_pods_complete_flag()
-        resource = EtcdDB.get_resource_pod_ids_set()
-        init = cluster.get_pods_ids_set()
-        now = EtcdDB.get_rank_cluster().get_pods_ids_set()
+        all_succeed, all_failed, all_inited = EtcdDB.get_pods_status()
 
-        added = now - init
+        now = EtcdDB.get_resource_pods_ids_set()
+        last = cluster.get_pods_ids_set()
+
+        added = now - last
         #diff = init.symmetric_difference(now)
-        succeeded = init & all_succeed
-        #disappeared = init - now - (diff & failed) - succeeded
-        failed = init - now - succeeded
+        succeed = last & all_succeed
+        failed = last - now - succeeded
+        inited = now & all_inited
 
-        return succeeded, failed, added
+        return (succeed, failed, added, inited)

@@ -123,18 +123,20 @@ def _convert_args_to_dict(args):
     return d
 
 
-def edl_barrier(job_env, pod, timeout):
+def edl_barrier(job_env, pod, rank_register, timeout):
     """
     Pod under resource barrier togather and return the cluster.
     """
     start = time.time()
 
-    leader = db.get_pod_leader()
-    c = PodServerClient(leader.endpoint)
     log_time = time.time()
     while True:
         try:
-            return c.barrier(job_env.job_id, pod.get_id())
+            leader = db.get_pod_leader()
+            c = PodServerClient(leader.endpoint)
+
+            cluster = c.barrier(job_env.job_id, pod.get_id())
+            rank_register.update_pod_stage(pod)
         except Exception as e:
             if time.time() - log_time > 30:
                 logger.info("wait to barrier now!")
@@ -162,10 +164,13 @@ def on_rank_pods_changed(job_env,
     start = time.time()
     while True:
         try:
-            succeed, failed, added = db.get_diff_pods_flag(cluster)
+            leader = db.get_pod_leader()
+            c = PodServerClient(leader.endpoint)
+
+            # barrier and get the changed pods.
+            succeed, failed, added, inited = c.get_diff_pods(cluster)
             logger.info("succeed:{} failed:{} added:{}".format(succeed, failed,
                                                                added))
-            # FIXME(gongwb): control which pods can register on rank.
             if len(failed) == 0 and len(added) == 0:
                 return None, True
 
@@ -178,7 +183,7 @@ def on_rank_pods_changed(job_env,
             else:
                 rank_register.stop()
                 # wait followers release their registers
-                db.wait_following_ranks(timeout=20)
+                db.wait_following_ranks(added, timeout=20)
 
                 # re-regist to reserver dense rank order
                 rank_register = PodRankRegister(job_env, pod)
@@ -189,6 +194,7 @@ def on_rank_pods_changed(job_env,
             # watch agagin
             watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod,
                               cluster)
+            watcher.start()
 
             return new_cluster, True
         except Exception as e:
@@ -208,11 +214,11 @@ def on_rank_pods_changed(job_env,
 def set_pod_complete_flag(pod, local_status):
     # set pod's status
     if not local_status:
-        db.set_pod_complete_flag(False)
+        db.set_pod_status(pod.get_id(), JobStatus.ERROR)
         logger.fatal("local trainers meets error!")
         return
 
-    db.set_pod_complete_flag(True, pod.get_id())
+    db.set_pod_status(pod.get_id(), JobStatus.COMPLETE)
     logger.info("local trainers succeeded!")
 
 
@@ -228,7 +234,7 @@ def set_job_complete_flag(rank_register, local_status, job_status, timeout=60):
             db.wait_following_ranks(timeout=10)
 
             if local_status and job_status:
-                db.set_job_complete_flag(True)
+                db.set_job_status(JobStatus.COMPLETE)
                 logger.info("Congratulate! This job complete!")
         except:
             if time.time() - start >= timeout:
@@ -245,6 +251,10 @@ def watch_registers(rank_register, resource_register):
 
 
 def launch(args):
+    """
+    Every function called in it have `timeout` consideration if it may meets error.
+    If they meet error and can't retry, exit!
+    """
     args_dict = _convert_args_to_dict(args)
 
     # job enviroment.
@@ -265,6 +275,9 @@ def launch(args):
     pod = Pod()
     pod.from_env(job_env)
 
+    # update pod status
+    db.set_pod_status(JobStatus.INITIAL)
+
     # launch pod server
     pod_server = None
     pod_server = PodServer(job_env, pod.get_id())
@@ -274,18 +287,25 @@ def launch(args):
     # register pod resource, they can't be stopped.
     resource_register = PodResourceRegister(job_env.etcd_endpoints,
                                             job_env.job_id, pod)
+    resource_register.start()
 
     # regist and get rank, leader is in it.
     # and leader will change the stage to a unique string
-    rank_register = PodRankRegister(job_env, pod)
+    # rank_register = PodRankRegister(job_env, pod)
+    # rank_register.start()
 
     # register rank and watch the rank
     # if the rank changed, the pods should restart the training proc.
-    cluster = edl_barrier(job_env, pod, timeout=600)
+    # pod exit if barrier error
+    cluster = get_cluster(job_env, pod, timeout=600)
+
+    # update pod status
+    db.set_pod_status(JobStatus.RUNNING)
 
     # watcher after barrier
     watcher = Watcher(
         job_env.etcd_endpoints, job_env.job_id, pod, cluster=cluster)
+    watcher.start()
 
     procs = start_local_trainers(
         cluster,
@@ -303,14 +323,15 @@ def launch(args):
         if not alive or not local_status:
             break
 
-        if not watch_registers(rank_register, resource_register):
+        if resource_register.is_stopped():
             register_status = False
             break
 
         # check job status second
         if watcher.changed:
-            new_cluster, job_status = on_rank_pods_changed(
-                job_env, cluster, pod, rank_register, watcher)
+            new_cluster = get_cluster(job_env, cluster, pod, rank_register,
+                                      watcher)
+
             if new_cluster is None:
                 time.sleep(2)
                 continue
@@ -338,6 +359,7 @@ def launch(args):
     if not register_status:
         logger.fatal("register meets error and local exit!")
     else:
+        # update pod status
         set_pod_complete_flag(pod, local_status)
         set_job_complete_flag(rank_register, local_status, job_status)
 
