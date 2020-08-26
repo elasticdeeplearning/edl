@@ -44,7 +44,7 @@ class Watcher(object):
 
         self._t_watcher = None
 
-    def start(self):
+        # assign value
         self._etcd = EtcdClient(etcd_endpoints, root=job_id)
         self._etcd.init()
 
@@ -55,19 +55,17 @@ class Watcher(object):
         begin = time.time()
         while not self._stop.is_set():
             servers = self._etcd.get_service(ETCD_POD_RANK)
-            ranks = {}
-            for s in servers:
-                ranks[int(s.server)] = s.info
+            assert len(servers) <= 1
+            if len(servers) == 0:
+                time.sleep(1)
+                continue
+
+            s = servers[0]
+            leader = Leader()
+            leader.from_json(s.info)
 
             with self._lock:
-                if ranks is None:
-                    #self._ranks = ranks
-                    self._cluster.from_rank_dict(ranks)
-                    self._new_cluster = copy.copy(self._cluster)
-                    continue
-
-            with self._lock:
-                self._new_cluster.from_rank_dict(ranks)
+                self._new_cluster = leader._cluster
 
             if self._is_world_changed():
                 break
@@ -76,7 +74,7 @@ class Watcher(object):
                 # update the cluster info.
                 self._cluster = copy.copy(self._new_cluster)
 
-            time.sleep(2)
+            time.sleep(3)
 
     @property
     def changed(self):

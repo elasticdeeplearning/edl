@@ -53,13 +53,15 @@ class EtcdClient(object):
     def __init__(self,
                  endpoints=['127.0.0.1:2379'],
                  passwd=None,
-                 root="service"):
+                 root="service",
+                 timeout=6):
         assert isinstance(endpoints, list), "endpoints must be list"
         self._endpoints = set(endpoints)
         self._passwd = passwd
         self._etcd = None
         self._leases = {}
         self._root = root
+        self._timeout = timeout
 
     def _endpoint_to_ip_port(self, endpoint):
         a = endpoint.split(":")
@@ -72,7 +74,7 @@ class EtcdClient(object):
         for ep in ep_lst:
             try:
                 ip, port = self._endpoint_to_ip_port(ep)
-                conn = etcd.client(host=ip, port=port)
+                conn = etcd.client(host=ip, port=port, timeout=self._timeout)
             except Exception as e:
                 print(e)
                 continue
@@ -174,7 +176,7 @@ class EtcdClient(object):
                               server,
                               info,
                               ttl=10,
-                              timeout=20):
+                              timeout=6):
         """
         :returns: state of transaction, ``True`` if the put was successful,
                   ``False`` otherwise

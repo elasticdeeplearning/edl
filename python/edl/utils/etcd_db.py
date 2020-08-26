@@ -115,12 +115,7 @@ class EtcdDB(object):
 
         s = servers[0]
         d = json.loads(s.info)
-        if d["status"] == int(JobStatus.ERROR):
-            return False
-        elif d["status"] == int(JobStatus.COMPLETE):
-            return True
-        else:
-            assert False, "can't reach here!"
+        return d["status"]
 
     @staticmethod
     def get_resource_pods_ids_set():
@@ -182,3 +177,11 @@ class EtcdDB(object):
         inited = now & all_inited
 
         return (succeed, failed, added, inited)
+
+    @staticmethod
+    def make_cluster(self):
+        """
+        get cluster from resource and return a cluster
+        """
+        cluster = Cluster()
+        return cluster

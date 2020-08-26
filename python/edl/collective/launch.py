@@ -32,7 +32,7 @@ import traceback
 
 from ..utils.edl_env import JobEnv
 from ..utils.pod import Pod, JobStatus
-from ..utils.register import PodRankRegister, PodResourceRegister
+from ..utils.register import LeaderRegister, PodResourceRegister
 from ..utils.etcd_db import EtcdDB as db
 from ..utils.watcher import Watcher
 from ..utils.pod_server import PodServer
@@ -123,10 +123,7 @@ def _convert_args_to_dict(args):
     return d
 
 
-def edl_barrier(job_env, pod, rank_register, timeout):
-    """
-    Pod under resource barrier togather and return the cluster.
-    """
+def edl_barrier(job_env, pod, leader_register, timeout):
     start = time.time()
 
     log_time = time.time()
@@ -155,7 +152,7 @@ def edl_barrier(job_env, pod, rank_register, timeout):
 def on_rank_pods_changed(job_env,
                          cluster,
                          pod,
-                         rank_register,
+                         leader_register,
                          watcher,
                          timeout=600):
     """
@@ -178,15 +175,15 @@ def on_rank_pods_changed(job_env,
             watcher.stop()
 
             # leader need't to regist
-            if rank_register.is_leader():
+            if leader_register.is_leader():
                 logger.info("leader need not to re-regist")
             else:
-                rank_register.stop()
+                leader_register.stop()
                 # wait followers release their registers
                 db.wait_following_ranks(added, timeout=20)
 
                 # re-regist to reserver dense rank order
-                rank_register = PodRankRegister(job_env, pod)
+                leader_register = LeaderRegister(job_env, pod)
                 logger.info("pod re-regist:{}".format(pod))
 
             new_cluster = edl_barrier(job_env, pod, timeout=60)
@@ -222,11 +219,14 @@ def set_pod_complete_flag(pod, local_status):
     logger.info("local trainers succeeded!")
 
 
-def set_job_complete_flag(rank_register, local_status, job_status, timeout=60):
+def set_job_complete_flag(leader_register,
+                          local_status,
+                          job_status,
+                          timeout=60):
     start = time.time()
 
     while True:
-        if rank_register.is_leader():
+        if leader_register.is_leader():
             return
 
         try:
@@ -243,18 +243,14 @@ def set_job_complete_flag(rank_register, local_status, job_status, timeout=60):
         time.sleep(3)
 
 
-def watch_registers(rank_register, resource_register):
-    if rank_register.is_stoped() or resource_register.is_stoped():
+def watch_registers(leader_register, resource_register):
+    if leader_register.is_stoped() or resource_register.is_stoped():
         return False
 
     return True
 
 
-def launch(args):
-    """
-    Every function called in it have `timeout` consideration if it may meets error.
-    If they meet error and can't retry, exit!
-    """
+def prepare(args):
     args_dict = _convert_args_to_dict(args)
 
     # job enviroment.
@@ -264,19 +260,18 @@ def launch(args):
     # get global etcd and lock
     get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
 
-    flag = db.get_job_complete_flag()
-    if flag is not None:
-        if flag:
-            logger.info("job:{} has completed {}! Can't try!".format(
-                job_env.job_id, flag))
-            sys.exit(1)
+    last_status = db.get_job_status()
+    if last_status is not None and last_status == JobStatus.COMPLETE:
+        logger.info("job:{} has completed! Need't try!".format(job_env.job_id,
+                                                               last_status))
+        sys.exit(0)
 
     # local pod, and the pod's id does't change.
     pod = Pod()
     pod.from_env(job_env)
 
     # update pod status
-    db.set_pod_status(JobStatus.INITIAL)
+    db.set_pod_status(pod.get_id(), JobStatus.INITIAL)
 
     # launch pod server
     pod_server = None
@@ -284,28 +279,31 @@ def launch(args):
     pod_server.start(job_env, pod)
     logger.info("pod server started:[{}]".format(pod))
 
-    # register pod resource, they can't be stopped.
+    return job_env, pod
+
+
+def launch(args):
+    job_env, pod = prepare(args)
+
+    # register pod resource to tell others:
+    # this resource can use to train
     resource_register = PodResourceRegister(job_env.etcd_endpoints,
                                             job_env.job_id, pod)
-    resource_register.start()
 
-    # regist and get rank, leader is in it.
-    # and leader will change the stage to a unique string
-    # rank_register = PodRankRegister(job_env, pod)
-    # rank_register.start()
+    # seize the leader
+    leader_register = LeaderRegister(job_env, pod)
 
     # register rank and watch the rank
     # if the rank changed, the pods should restart the training proc.
     # pod exit if barrier error
-    cluster = get_cluster(job_env, pod, timeout=600)
+    cluster = edl_barrier(job_env, pod, timeout=600)
 
     # update pod status
-    db.set_pod_status(JobStatus.RUNNING)
+    db.set_pod_status(pod.get_id(), JobStatus.RUNNING)
 
     # watcher after barrier
     watcher = Watcher(
         job_env.etcd_endpoints, job_env.job_id, pod, cluster=cluster)
-    watcher.start()
 
     procs = start_local_trainers(
         cluster,
@@ -323,13 +321,13 @@ def launch(args):
         if not alive or not local_status:
             break
 
-        if resource_register.is_stopped():
+        if resource_register.is_stopped() or leader_register.is_stopped():
             register_status = False
             break
 
         # check job status second
         if watcher.changed:
-            new_cluster = get_cluster(job_env, cluster, pod, rank_register,
+            new_cluster = edl_barrier(job_env, cluster, pod, leader_register,
                                       watcher)
 
             if new_cluster is None:
@@ -361,9 +359,9 @@ def launch(args):
     else:
         # update pod status
         set_pod_complete_flag(pod, local_status)
-        set_job_complete_flag(rank_register, local_status, job_status)
+        set_job_complete_flag(leader_register, local_status, job_status)
 
-    rank_register.stop()
+    leader_register.stop()
     resource_register.stop()
 
 

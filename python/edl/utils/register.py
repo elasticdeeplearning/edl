@@ -15,6 +15,7 @@ import threading
 import time
 import json
 import uuid
+import copy
 
 from .utils import logger
 from .pod import Pod, JobStatus
@@ -29,14 +30,15 @@ class Register(object):
         self._service = service
         self._server = server
         self._stop = threading.Event()
-        self._stopped = False
-        #don't change this ttl
+        self._etcd = None
+        self._t_register = None
+
         self._etcd = EtcdClient(
             endpoints=etcd_endpoints, root=job_id, timeout=6)
         self._etcd.init()
 
         try:
-            self._etcd.set_server_not_exists(service, server, info, ttl=10)
+            self._etcd.set_server_not_exists(service, server, info, ttl=15)
             logger.info("register pod:{} in resource:{}".format(
                 info, self._etcd.get_full_path(service, server)))
         except Exception as e:
@@ -60,132 +62,130 @@ class Register(object):
 
     def stop(self):
         self._stop.set()
-        if self._t_register.is_alive():
-            self._t_register.join()
-            with self._lock:
-                self._t_register = None
-
         with self._lock:
-            self._stopped = True
+            if self._t_register:
+                self._t_register.join()
+                self._t_register = None
 
     def is_stopped(self):
         with self._lock:
-            return self._stopped
+            return self._t_register == None
 
     def __exit__(self):
         self.stop()
 
 
-class PodRankRegister(object):
+class GenerateCluster(object):
+    def __init__(self):
+        pass
+
+    def start(self):
+        """
+        self._t_make_cluster = threading.Thread(make_cluster)
+        self._t_make_cluster.start()
+        """
+        pass
+
+    def stop(self):
+        pass
+
+    def __exit__(self):
+        self._stop()
+
+
+class LeaderRegister(object):
     def __init__(self, job_env, pod):
         self._job_env = job_env
-        self._pod = pod
+        self._leader = Leader()
+        self._is_leader = False
+        self._leader._pod_id = pod.get_id()
+        self._generate_cluster = None
 
         self._stop = threading.Event()
         self._service_name = ETCD_POD_RANK
         self._lock = threading.Lock()
 
         self._etcd = None
-        self._rank = None
-        self._server = None
         self._t_register = None
 
-    def start(self):
+        # assign value
         self._etcd = EtcdClient(
-            self._ob_env.etcd_endpoints, root=self._job_env.job_id, timeout=6)
+            self._job_env.etcd_endpoints, root=self._job_env.job_id, timeout=6)
         self._etcd.init()
 
-        self._rank, self._server = self._register_rank(job_env, pod)
+        self._seize_leader(job_env, pod.to_json())
 
         self._t_register = threading.Thread(target=self._refresher)
         self._t_register.start()
 
-    def _register_rank(self, job_env, pod, timeout=300):
-        rank = -1
+    def _seize_leader(self, timeout=6):
         begin = time.time()
-        for rank in range(0, job_env.up_limit_nodes):
-            server = "{}".format(rank)
-            valid = True
-            while valid:
-                try:
-                    pod._rank = rank
-                    # register the leader stage
-                    if rank == 0:
-                        pod._stage = str(uuid.uuid1())
-                    else:
-                        pod._stage = None
+        server = "0"
+        self._leader._stage = str(uuid.uuid1())
 
-                    info = pod.to_json()
-                    if not self._etcd.set_server_not_exists(
-                            self._service_name,
-                            server,
-                            info=info,
-                            timeout=0,
-                            ttl=10):
-                        valid = False
-                        continue
+        if not self._etcd.set_server_not_exists(
+                self._service_name,
+                server,
+                info=self._leader.to_json(),
+                timeout=6,
+                ttl=15):
+            logger.debug("register rank:{} on etcd key:{} error".format(
+                rank, self._etcd.get_full_path(self._service_name, server)))
 
-                    logger.info("register rank:{} on etcd key:{}".format(
-                        rank,
-                        self._etcd.get_full_path(self._service_name, server)))
-                    # set rank
-                    pod.rank = rank
-                    return rank, server
-                except (etcd3.exceptions.ConnectionTimeoutError,
-                        etcd3.exceptions.ConnectionFailedError
-                        ) as e:  # timeout and other
-                    if time.time() - begin > timeout:
-                        raise EdlRegisterError(
-                            "register {} to etcd:{} timeout:{}".format(
-                                server, job_env.ectd_endpoints, timeout))
-                    time.sleep(1)
-                    logger.warning("register to etcd error:{}".format(e))
-                    continue
+            with self._lock:
+                self._is_leader = False
 
-        pod._rank = None
-        pod._stage = None
-        raise EdlRegisterError(
-            "register {} to etcd:{} but can't find valid rank:{}".format(
-                server, job_env.ectd_endpoints, rank))
+            return False
 
-    @property
-    def rank(self):
-        return self._rank
+        self._generate_cluster = GenerateCluster()
+        self._generate_cluster.start()
+        with self._lock:
+            self._is_leader = True
+        logger.info("register rank:{} on etcd key:{}".format(
+            rank, self._etcd.get_full_path(self._service_name, server)))
+        return True
+
+    def is_leader(self):
+        with self._lock:
+            return self._is_leader
+
+    def _refresh(self):
+        try:
+            self._etcd.refresh(self._service_name, self._server)
+            return True
+        except Exception as e:
+            logger.warning("refresh error:{}".format(e))
+            with self._lock:
+                self._is_leader = False
+        return False
 
     def _refresher(self):
         while not self._stop.is_set():
+            with self._lock:
+                is_leader = self._is_leader
+
             try:
-                self._etcd.refresh(self._service_name, self._server)
+                if is_leader:
+                    self._refresh()
+                else:
+                    self._seize_leader()
             except Exception as e:
                 # exit when error ocurred
                 break
 
-            # don't change the waited time
             time.sleep(1)
 
-        with self._lock:
-            self._rank = None
-
     def stop(self):
-        with self._lock:
-            if self._t_register and self._t_register.is_alive():
-                return False
-
         self._stop.set()
         with self._lock:
             if self._t_register:
                 self._t_register.join()
                 self._t_register = None
-                self._rank = None
 
         logger.info("pod_register stopped")
 
     def __exit__(self):
         self.stop()
-
-    def is_leader(self):
-        with self._lock:
-            return self._rank == 0
 
     def is_stopped(self):
         with self._lock:

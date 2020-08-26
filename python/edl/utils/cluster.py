@@ -24,8 +24,8 @@ import signal
 import copy
 import sys
 import subprocess
-import uuid
 import json
+import uuid
 import collections
 from .exceptions import *
 from . import utils
@@ -191,3 +191,16 @@ class Cluster(object):
 
     def get_master_endpoint(self):
         return "{}:{}".format(self._pods[0].addr, self._pods[0].port)
+
+
+class Leader(object):
+    def __init__(self):
+        self._cluter = None
+        self._pod_id = None
+        self._stage = None
+
+    def to_json(self):
+        pass
+
+    def from_json(self):
+        pass
