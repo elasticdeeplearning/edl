@@ -86,10 +86,6 @@ class Register(object):
 
 
 class GenerateCluster(self):
-    """
-    generate cluster from table resource to table cluster and try to reserve the pod order.
-    """
-
     def __init__(self):
         self._cluster = Cluster()
         pass
@@ -110,107 +106,7 @@ class GenerateCluster(self):
         pass
 
 
-class LeaderRegister(object):
-    def __init__(self, job_env, pod_id):
-        self._job_env = job_env
-        self._is_leader = False
-        self._pod_id = pod_id
-        self._generate_cluster = GenerateCluster()
-
-        self._stop = threading.Event()
-        self._service_name = ETCD_POD_RANK
-        self._lock = threading.Lock()
-
-        self._etcd = None
-        self._t_register = None
-
-        # assign value
-        self._etcd = EtcdClient(
-            self._job_env.etcd_endpoints, root=self._job_env.job_id, timeout=6)
-        self._etcd.init()
-
-        self._seize_leader(job_env, pod.to_json())
-
-        self._t_register = threading.Thread(target=self._refresher)
-        self._t_register.start()
-
-    def _seize_leader(self, timeout=6):
-        begin = time.time()
-        server = "0"
-        info = self._pod_id
-
-        if not self._etcd.set_server_not_exists(
-                self._service_name, server, info=info, timeout=6, ttl=15):
-            logger.debug("register rank:{} on etcd key:{} error".format(
-                rank, self._etcd.get_full_path(self._service_name, server)))
-
-            with self._lock:
-                self._is_leader = False
-
-            self._generate_cluster.stop()
-            return False
-
-        with self._lock:
-            self._is_leader = True
-
-        self._generate_cluster.start()
-        logger.info("register rank:{} on etcd key:{}".format(
-            rank, self._etcd.get_full_path(self._service_name, server)))
-        return True
-
-    def is_leader(self):
-        with self._lock:
-            return self._is_leader
-
-    def _refresh(self):
-        try:
-            self._etcd.refresh(self._service_name, self._server, ttl=15)
-            return True
-        except Exception as e:
-            logger.warning("refresh error:{}".format(e))
-            with self._lock:
-                self._is_leader = False
-        return False
-
-    def _refresher(self):
-        while not self._stop.is_set():
-            with self._lock:
-                is_leader = self._is_leader
-
-            try:
-                if is_leader:
-                    self._refresh()
-                else:
-                    self._seize_leader()
-            except Exception as e:
-                # exit when error ocurred
-                break
-
-            time.sleep(3)
-
-    def stop(self):
-        self._stop.set()
-        with self._lock:
-            if self._t_register:
-                self._t_register.join()
-                self._t_register = None
-
-        logger.info("pod_register stopped")
-
-    def __exit__(self):
-        self.stop()
-
-    def is_stopped(self):
-        with self._lock:
-            return self._t_register == None
-
-
 class PodResourceRegister(Register):
-    """
-    Registe pod resource under  /jobid/data_reader/nodes/resource
-    If it stop, it means the pods disappear.
-    """
-
     def __init__(self, job_env, pod):
         service = ETCD_POD_RESOURCE
         server = "{}".format(pod.get_id())
