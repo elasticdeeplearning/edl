@@ -34,6 +34,7 @@ class LeaderRegister(object):
 
         self._stop = threading.Event()
         self._service_name = ETCD_POD_RANK
+        self._server = "0"
         self._lock = threading.Lock()
 
         self._etcd = None
@@ -51,7 +52,6 @@ class LeaderRegister(object):
 
     def _seize_leader(self, timeout=6):
         begin = time.time()
-        server = "0"
         info = self._pod_id
 
         if not self._etcd.set_server_not_exists(
@@ -109,6 +109,7 @@ class LeaderRegister(object):
             if self._t_register:
                 self._t_register.join()
                 self._t_register = None
+                self._etcd.remove_server(self._service_name, self._server)
 
         logger.info("pod_register stopped")
 

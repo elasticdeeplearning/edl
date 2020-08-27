@@ -85,27 +85,6 @@ class Register(object):
         self.stop()
 
 
-class GenerateCluster(self):
-    def __init__(self):
-        self._cluster = Cluster()
-        pass
-
-    def _refresher(self):
-        pass
-
-    def _refresh(self):
-        pass
-
-    def start(self):
-        pass
-
-    def stop(self):
-        pass
-
-    def __exit__(self):
-        pass
-
-
 class PodResourceRegister(Register):
     def __init__(self, job_env, pod):
         service = ETCD_POD_RESOURCE
@@ -140,6 +119,7 @@ class DataReaderRegister(Register):
             info=value)
 
 
+"""
 class TrainStatusRegister(Register):
     def __init__(self, etcd_endoints, job_id, pod_id, status):
         service = ETCD_POD_TRAIN_STATUS
@@ -158,3 +138,4 @@ class TrainStatusRegister(Register):
 
         with self._lock:
             self._info = json.dumps(value)
+"""

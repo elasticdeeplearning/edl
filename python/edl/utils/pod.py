@@ -41,6 +41,13 @@ class JobStatus(IntEnum):
     COMPLETE = 3
     ERROR = 4
 
+    @staticmethod
+    def bool_to_status(b):
+        if b:
+            return JobStatus.COMPLETE
+
+        return JobStatus.ERROR
+
 
 class Pod(object):
     def __init__(self):

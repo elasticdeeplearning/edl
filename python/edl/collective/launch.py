@@ -209,17 +209,17 @@ def launch(args):
         args.training_script_args,
         log_dir=args.log_dir)
 
-    local_status = True
-    register_status = True
+    trainer_flag = True
+    register_flag = True
     while True:
         # check local status first
-        alive, local_status = watch_local_trainers(procs, pod.trainers_num)
-        if not alive or not local_status:
+        alive, trainer_flag = watch_local_trainers(procs, pod.trainers_num)
+        if not alive or not trainer_flag:
             break
 
         if resource_register.is_stopped() or leader_register.is_stopped():
             terminate_local_procs()
-            register_status = False
+            register_flag = False
             break
 
         # check job status second
@@ -245,18 +245,32 @@ def launch(args):
 
         time.sleep(3)
 
-    # release resource in inverse order
+    if not register_flag:
+        logger.fatal("register meets error and local exit!")
+        trainer_flag = False
+
+    if not leader_register.is_leader():
+        leader_register.stop()
+
     watcher.stop()
 
-    # disappeared
-    if not register_status:
-        logger.fatal("register meets error and local exit!")
-    else:
-        # update pod status
-        db.set_pod_complete_flag(pod, local_status)
-        db.set_job_complete_flag(leader_register, local_status)
+    # How to exit:
+    # 1. followers update their status to resource(with ttl) and status(permanent) path
+    # 2. leader waits followers' resource status
+    # 2.1 if some one failed(or disappeared) and some one succeed, this job failed and leader exit
+    # 3. followers wait leader util it exits(or disappears)
 
-    leader_register.stop()
+    # update pod status as log
+    db.set_pod_flag(pod.get_id(), trainer_flag)
+
+    if not leader_register.is_leader():
+        db.wait_leader_exit()
+    else:
+        job_flag = db.wait_resource_flag(cluster)
+        if job_flag:
+            db.set_job_flag(job_flag)
+        leader_register.stop()
+
     resource_register.stop()
 
 

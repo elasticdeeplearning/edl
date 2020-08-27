@@ -78,6 +78,16 @@ class EtcdDB(object):
             etcd.set_server_permanent(service, server, info)
 
     @staticmethod
+    def set_job_flag(flag):
+        if not flag:
+            EtcdDB.set_job_status(pod.get_id(), JobStatus.ERROR)
+            logger.fatal("This job meets error!")
+            return
+
+        EtcdDB.set_job_status(pod.get_id(), JobStatus.COMPLETE)
+        logger.info("This job succeeded!")
+
+    @staticmethod
     def get_job_status():
         etcd, lock = get_global_etcd()
         service = ETCD_JOB_STATUS
@@ -189,39 +199,14 @@ class EtcdDB(object):
         return (inited, added, succeed, failed)
 
     @staticmethod
-    def set_pod_complete_flag(pod, local_status):
-        # set pod's status
-        if not local_status:
+    def set_pod_flag(pod_id, flag):
+        if not flag:
             EtcdDB.set_pod_status(pod.get_id(), JobStatus.ERROR)
             logger.fatal("local trainers meets error!")
             return
 
         EtcdDB.set_pod_status(pod.get_id(), JobStatus.COMPLETE)
         logger.info("local trainers succeeded!")
-
-    @staticmethod
-    def set_job_complete_flag(leader_register,
-                              local_status,
-                              job_status,
-                              timeout=60):
-        start = time.time()
-
-        while True:
-            if leader_register.is_leader():
-                return
-
-            try:
-                # wait all followers exit
-                db.wait_following_ranks(timeout=10)
-
-                if local_status and job_status:
-                    db.set_job_status(JobStatus.COMPLETE)
-                    logger.info("Congratulate! This job complete!")
-            except:
-                if time.time() - start >= timeout:
-                    return
-
-            time.sleep(3)
 
     @staticmethod
     def get_train_status():
@@ -245,3 +230,13 @@ class EtcdDB(object):
         info = json.dumps({"status": int(status)})
         with lock:
             etcd.set_server_permanent(service, server, info)
+
+    @staticmethod
+    def wait_leader_exit():
+        logger.info("begin to wait leader exit!")
+        logger.info("leader exit so this pod exit!")
+
+    @staticmethod
+    def wait_resource_flag(cluster):
+        logger.info("begin to wait resource exit!")
+        logger.info("leader exit!")
