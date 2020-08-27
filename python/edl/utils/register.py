@@ -75,31 +75,37 @@ class Register(object):
         self.stop()
 
 
-class GenerateCluster(object):
+class GenerateCluster(self):
+    """
+    generate cluster from table resource to table cluster and try to reserve the pod order.
+    """
+
     def __init__(self):
+        self._cluster = Cluster()
+        pass
+
+    def _refresher(self):
+        """
+        if cluster changed, changed the stage of cluster
+        """
         pass
 
     def start(self):
-        """
-        self._t_make_cluster = threading.Thread(make_cluster)
-        self._t_make_cluster.start()
-        """
         pass
 
     def stop(self):
         pass
 
     def __exit__(self):
-        self._stop()
+        pass
 
 
 class LeaderRegister(object):
-    def __init__(self, job_env, pod):
+    def __init__(self, job_env, pod_id):
         self._job_env = job_env
-        self._leader = Leader()
         self._is_leader = False
-        self._leader._pod_id = pod.get_id()
-        self._generate_cluster = None
+        self._pod_id = pod_id
+        self._generate_cluster = GenerateCluster()
 
         self._stop = threading.Event()
         self._service_name = ETCD_POD_RANK
@@ -121,26 +127,23 @@ class LeaderRegister(object):
     def _seize_leader(self, timeout=6):
         begin = time.time()
         server = "0"
-        self._leader._stage = str(uuid.uuid1())
+        info = self._pod_id
 
         if not self._etcd.set_server_not_exists(
-                self._service_name,
-                server,
-                info=self._leader.to_json(),
-                timeout=6,
-                ttl=15):
+                self._service_name, server, info=info, timeout=6, ttl=15):
             logger.debug("register rank:{} on etcd key:{} error".format(
                 rank, self._etcd.get_full_path(self._service_name, server)))
 
             with self._lock:
                 self._is_leader = False
 
+            self._generate_cluster.stop()
             return False
 
-        self._generate_cluster = GenerateCluster()
-        self._generate_cluster.start()
         with self._lock:
             self._is_leader = True
+
+        self._generate_cluster.start()
         logger.info("register rank:{} on etcd key:{}".format(
             rank, self._etcd.get_full_path(self._service_name, server)))
         return True
@@ -151,7 +154,7 @@ class LeaderRegister(object):
 
     def _refresh(self):
         try:
-            self._etcd.refresh(self._service_name, self._server)
+            self._etcd.refresh(self._service_name, self._server, ttl=15)
             return True
         except Exception as e:
             logger.warning("refresh error:{}".format(e))
@@ -173,7 +176,7 @@ class LeaderRegister(object):
                 # exit when error ocurred
                 break
 
-            time.sleep(1)
+            time.sleep(3)
 
     def stop(self):
         self._stop.set()

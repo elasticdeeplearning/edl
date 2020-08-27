@@ -52,11 +52,6 @@ class Pod(object):
         self._trainers = None
         self._port = None
         self._status = JobStatus.INITIAL  # status maybe changed
-        self._stage = None
-
-    @property
-    def stage(self):
-        return self._stage
 
     def to_json(self):
         d = {
@@ -66,7 +61,6 @@ class Pod(object):
             "trainer_ports": self._trainer_ports,
             "addr": self._addr,
             "gpus": self._gpus,
-            "stage": self._stage,
         }
 
         d["trainers"] = {}
@@ -84,7 +78,6 @@ class Pod(object):
         self._port = d["port"]
         self._trainer_ports = d["trainer_ports"]
         self._gpus = d["gpus"]
-        self._stage = d["stage"]
 
         self._trainers = []
 
@@ -127,8 +120,6 @@ class Pod(object):
                 endpoint=endpoint, rank_in_pod=i, gpus=job_env.gpus[b:e])
             self._trainers.append(t)
 
-        # self._stage need not to set when from_env
-
     def from_pb(self, pod):
         self._id = pod._id
         self._rank = pod.rank
@@ -145,8 +136,6 @@ class Pod(object):
             t.from_pb(trainer)
 
             self._trainers.append(t)
-
-        self._stage = pod.stage
 
     def __str__(self):
         return "rank:{} id:{} addr:{} port:{} gpus:{} status:{} trainers_num:{}".format(

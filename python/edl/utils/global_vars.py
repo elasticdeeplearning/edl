@@ -16,9 +16,12 @@ import threading
 from ..discovery.etcd_client import EtcdClient
 
 ETCD_POD_RESOURCE = "pod_resource"
-ETCD_POD_RANK = "pod_rank"
+ETCD_POD_RANK = "rank"
 ETCD_POD_STATUS = "pod_status"
 ETCD_JOB_STATUS = "job_status"
+ETCD_TRAIN_STATUS = "train_status"
+ETCD_CLUSTER = "cluster"
+ETCD_READER = "reader"
 
 g_etcd = None
 g_etcd_lock = None

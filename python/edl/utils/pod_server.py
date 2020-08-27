@@ -82,15 +82,22 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         2. pods num must large then the job_env.min_nodes
         3. pods num must equal the pods registed under resource.
         """
-        ids = db.get_resource_pod_ids_set()
-        leader = db.get_pod_leader()
+        res = pod_server_pb.BarrierResponse()
+
+        cluster = db.get_cluster()
+        if cluster == None:
+            serialize_exception(
+                res, EdlBarrierError("get current running cluster error"))
+            return res
+
+        ids = cluster.get_pods_ids_set()
         logger.debug(
             "get barrier request from job_id:{} pod_id:{} ids_set:{} leader:{}".
-            format(request.job_id, request.pod_id, ids, leader.get_id()))
+            format(request.job_id, request.pod_id, ids, cluster.pods[0].get_id(
+            )))
 
-        res = pod_server_pb.BarrierResponse()
         try:
-            key = leader.stage
+            key = cluster.stage
 
             with self._lock:
                 if key not in self._barrier_in:

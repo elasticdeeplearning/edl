@@ -149,107 +149,6 @@ def edl_barrier(job_env, pod, leader_register, timeout):
         time.sleep(3)
 
 
-def on_rank_pods_changed(job_env,
-                         cluster,
-                         pod,
-                         leader_register,
-                         watcher,
-                         timeout=600):
-    """
-    return new_cluster, job_status
-    """
-    start = time.time()
-    while True:
-        try:
-            leader = db.get_pod_leader()
-            c = PodServerClient(leader.endpoint)
-
-            # barrier and get the changed pods.
-            succeed, failed, added, inited = c.get_diff_pods(cluster)
-            logger.info("succeed:{} failed:{} added:{}".format(succeed, failed,
-                                                               added))
-            if len(failed) == 0 and len(added) == 0:
-                return None, True
-
-            # all pods stop watch
-            watcher.stop()
-
-            # leader need't to regist
-            if leader_register.is_leader():
-                logger.info("leader need not to re-regist")
-            else:
-                leader_register.stop()
-                # wait followers release their registers
-                db.wait_following_ranks(added, timeout=20)
-
-                # re-regist to reserver dense rank order
-                leader_register = LeaderRegister(job_env, pod)
-                logger.info("pod re-regist:{}".format(pod))
-
-            new_cluster = edl_barrier(job_env, pod, timeout=60)
-
-            # watch agagin
-            watcher = Watcher(job_env.etcd_endpoints, job_env.job_id, pod,
-                              cluster)
-            watcher.start()
-
-            return new_cluster, True
-        except Exception as e:
-            if time.time() - start >= timeout:
-                logger.Fatal("on_ranks_pods_changed meets {}".format(
-                    traceback.format_exc()))
-                return None, False
-
-            logger.debug("on_rank_pods_changed meets {}".format(
-                traceback.format_exc()))
-            time.sleep(3)
-            continue
-
-    return None, False
-
-
-def set_pod_complete_flag(pod, local_status):
-    # set pod's status
-    if not local_status:
-        db.set_pod_status(pod.get_id(), JobStatus.ERROR)
-        logger.fatal("local trainers meets error!")
-        return
-
-    db.set_pod_status(pod.get_id(), JobStatus.COMPLETE)
-    logger.info("local trainers succeeded!")
-
-
-def set_job_complete_flag(leader_register,
-                          local_status,
-                          job_status,
-                          timeout=60):
-    start = time.time()
-
-    while True:
-        if leader_register.is_leader():
-            return
-
-        try:
-            # wait all followers exit
-            db.wait_following_ranks(timeout=10)
-
-            if local_status and job_status:
-                db.set_job_status(JobStatus.COMPLETE)
-                logger.info("Congratulate! This job complete!")
-        except:
-            if time.time() - start >= timeout:
-                return
-
-        time.sleep(3)
-
-
-def watch_registers(leader_register, resource_register):
-    if leader_register.is_stoped() or resource_register.is_stoped():
-        return False
-
-    return True
-
-
 def prepare(args):
     args_dict = _convert_args_to_dict(args)
 
@@ -261,9 +160,8 @@ def prepare(args):
     get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
 
     last_status = db.get_job_status()
-    if last_status is not None and last_status == JobStatus.COMPLETE:
-        logger.info("job:{} has completed! Need't try!".format(job_env.job_id,
-                                                               last_status))
+    if last_status == JobStatus.COMPLETE:
+        logger.info("job:{} has completed! Need't try!".format(job_env.job_id))
         sys.exit(0)
 
     # local pod, and the pod's id does't change.
@@ -302,8 +200,7 @@ def launch(args):
     db.set_pod_status(pod.get_id(), JobStatus.RUNNING)
 
     # watcher after barrier
-    watcher = Watcher(
-        job_env.etcd_endpoints, job_env.job_id, pod, cluster=cluster)
+    watcher = Watcher(job_env, cluster, pod)
 
     procs = start_local_trainers(
         cluster,
@@ -313,7 +210,6 @@ def launch(args):
         log_dir=args.log_dir)
 
     local_status = True
-    job_status = True
     register_status = True
     while True:
         # check local status first
@@ -322,6 +218,7 @@ def launch(args):
             break
 
         if resource_register.is_stopped() or leader_register.is_stopped():
+            terminate_local_procs()
             register_status = False
             break
 
@@ -331,16 +228,14 @@ def launch(args):
                                       watcher)
 
             if new_cluster is None:
-                time.sleep(2)
+                time.sleep(3)
                 continue
 
-            # terminate and restart again
             terminate_local_procs(procs)
 
-            if not job_status:
-                break
-
             cluster = new_cluster
+            watcher = Watcher(job_env, cluster, pod)
+
             procs = start_local_trainers(
                 cluster,
                 pod,
@@ -348,7 +243,7 @@ def launch(args):
                 args.training_script_args,
                 log_dir=args.log_dir)
 
-        time.sleep(2)
+        time.sleep(3)
 
     # release resource in inverse order
     watcher.stop()
@@ -358,8 +253,8 @@ def launch(args):
         logger.fatal("register meets error and local exit!")
     else:
         # update pod status
-        set_pod_complete_flag(pod, local_status)
-        set_job_complete_flag(leader_register, local_status, job_status)
+        db.set_pod_complete_flag(pod, local_status)
+        db.set_job_complete_flag(leader_register, local_status)
 
     leader_register.stop()
     resource_register.stop()

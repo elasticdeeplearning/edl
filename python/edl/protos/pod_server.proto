@@ -22,17 +22,11 @@ package pod_server;
 message BarrierRequest {
   string job_id = 1;
   string pod_id = 2;
-  // string stage = 3;
-}
-
-message Pod {
-  int32 rank = 1;
-  string json = 2;
 }
 
 message BarrierResponse {
   common.Status status = 1;
-  repeated Pod pods = 2;
+  string cluster_json = 2;
 }
 
 message ScaleInRequest { int32 num = 1; }

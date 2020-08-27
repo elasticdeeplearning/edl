@@ -66,8 +66,6 @@ class Trainer(object):
             self._ids, self._rank_in_pod, self._gpus, self._endpoint,
             self._global_rank)
 
-        s += " stage:{}".format(stage)
-
         return s
 
     def __eq__(self, t):
