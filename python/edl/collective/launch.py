@@ -270,8 +270,8 @@ def launch(args):
         resource_flag = db.wait_resource_flag(cluster)
         job_flag = trainer_flag & register_flag & barrier_flag & resource_flag
         db.set_job_flag(job_flag)
-        leader_register.stop()
 
+    leader_register.stop()
     watcher.stop()
     resource_register.stop()
 
