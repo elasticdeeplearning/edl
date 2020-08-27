@@ -79,13 +79,12 @@ class EtcdDB(object):
 
     @staticmethod
     def set_job_flag(flag):
-        if not flag:
-            EtcdDB.set_job_status(pod.get_id(), JobStatus.ERROR)
-            logger.fatal("This job meets error!")
+        if flag:
+            EtcdDB.set_job_status(pod.get_id(), JobStatus.COMPLETE)
+            logger.info("This job succeeded!")
             return
 
-        EtcdDB.set_job_status(pod.get_id(), JobStatus.COMPLETE)
-        logger.info("This job succeeded!")
+        logger.fatal("This job meets error!")
 
     @staticmethod
     def get_job_status():

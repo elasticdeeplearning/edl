@@ -267,8 +267,7 @@ def launch(args):
         db.wait_leader_exit()
     else:
         job_flag = db.wait_resource_flag(cluster)
-        if job_flag:
-            db.set_job_flag(job_flag)
+        db.set_job_flag(job_flag)
         leader_register.stop()
 
     resource_register.stop()
