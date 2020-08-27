@@ -20,6 +20,7 @@ ETCD_POD_RANK = "rank"
 ETCD_POD_STATUS = "pod_status"
 ETCD_JOB_STATUS = "job_status"
 ETCD_TRAIN_STATUS = "train_status"
+ETCD_DATA_READER = "train_status"
 ETCD_CLUSTER = "cluster"
 ETCD_READER = "reader"
 

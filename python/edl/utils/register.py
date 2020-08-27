@@ -32,13 +32,16 @@ class Register(object):
         self._stop = threading.Event()
         self._etcd = None
         self._t_register = None
+        self._lock = Threading.Lock()
+        self._info = info
 
         self._etcd = EtcdClient(
             endpoints=etcd_endpoints, root=job_id, timeout=6)
         self._etcd.init()
 
         try:
-            self._etcd.set_server_not_exists(service, server, info, ttl=15)
+            self._etcd.set_server_not_exists(
+                service, server, self._info, ttl=15)
             logger.info("register pod:{} in resource:{}".format(
                 info, self._etcd.get_full_path(service, server)))
         except Exception as e:
@@ -52,8 +55,11 @@ class Register(object):
 
     def _refresher(self):
         while not self._stop.is_set():
+            with self._lock:
+                info = self._info
+
             try:
-                self._etcd.refresh(self._service, self._server)
+                self._etcd.refresh(self._service, self._server, info)
                 time.sleep(2)
             except Exception as e:
                 logger.fatal("register meet error and exit! error:".format(e))
@@ -66,6 +72,10 @@ class Register(object):
             if self._t_register:
                 self._t_register.join()
                 self._t_register = None
+
+                self._etcd.remove_server(self._service, self._server)
+
+        logger.info("{} exit".format(self.__class__.__name__))
 
     def is_stopped(self):
         with self._lock:
@@ -213,25 +223,18 @@ class PodResourceRegister(Register):
             server=server,
             info=value)
 
-    def stop(self):
-        super(PodResourceRegister, self).stop()
-        logger.info("pod resource register stopped!")
-
 
 class DataReaderRegister(Register):
-    def __init__(self, etcd_endoints, job_id, rank, reader):
-        """
-        /jobid/data_reader/nodes/rank:value
-        So the others can find it.
-        """
-        service = "data_reader"
-        sever = "{}".format(rank)
+    def __init__(self, etcd_endoints, job_id, pod_id, reader):
+        service = ETCD_POD_DATA_READER
+        sever = pod_id
         value = {
             "id": reader.get_id(),
             "name": reader.name,
             "endpoint": reader.endpoint,
-            "rank": rank
         }
+
+        info = value.dumps(value)
 
         super(DataReaderRegister, self).__init__(
             etcd_endpoints=etcd_endpoints,
@@ -239,3 +242,23 @@ class DataReaderRegister(Register):
             service=service,
             server=server,
             info=value)
+
+
+class TrainStatusRegister(Register):
+    def __init__(self, etcd_endoints, job_id, pod_id, status):
+        service = ETCD_POD_TRAIN_STATUS
+        server = pod_id
+        value = {"status": status, }
+
+        super(DataReaderRegister, self).__init__(
+            etcd_endpoints=etcd_endpoints,
+            job_id=job_id,
+            service=service,
+            server=server,
+            info=info)
+
+    def update(self, status):
+        value = {"status": status, }
+
+        with self._lock:
+            self._info = json.dumps(value)
