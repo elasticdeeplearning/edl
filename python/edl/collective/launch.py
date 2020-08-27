@@ -133,7 +133,7 @@ def edl_barrier(job_env, pod, leader_register, timeout):
             c = PodServerClient(leader.endpoint)
 
             cluster = c.barrier(job_env.job_id, pod.get_id())
-            rank_register.update_pod_stage(pod)
+            return cluster
         except Exception as e:
             if time.time() - log_time > 30:
                 logger.info("wait to barrier now!")
@@ -144,9 +144,12 @@ def edl_barrier(job_env, pod, leader_register, timeout):
         if time.time() - start > timeout:
             message = "wait to barrier with all error:{} leader:[{}] current pod:[{}]".format(
                 traceback.format_exc(), leader, pod)
-            raise EdlBarrierError(message)
+            logger.fatal(message)
+            #raise EdlBarrierError(message)
 
         time.sleep(3)
+
+    return None
 
 
 def prepare(args):
@@ -211,6 +214,7 @@ def launch(args):
 
     trainer_flag = True
     register_flag = True
+    barrier_flag = True
     while True:
         # check local status first
         alive, trainer_flag = watch_local_trainers(procs, pod.trainers_num)
@@ -224,12 +228,11 @@ def launch(args):
 
         # check job status second
         if watcher.changed:
-            new_cluster = edl_barrier(job_env, cluster, pod, leader_register,
-                                      watcher)
-
-            if new_cluster is None:
-                time.sleep(3)
-                continue
+            new_cluster = edl_barrier(
+                job_env, cluster, pod, leader_register, watcher, timeout=600)
+            if not new_cluster:
+                barrier_flag = False
+                break
 
             terminate_local_procs(procs)
 
@@ -247,12 +250,9 @@ def launch(args):
 
     if not register_flag:
         logger.fatal("register meets error and local exit!")
-        trainer_flag = False
 
     if not leader_register.is_leader():
         leader_register.stop()
-
-    watcher.stop()
 
     # How to exit:
     # 1. followers update their status to resource(with ttl) and status(permanent) path
@@ -261,15 +261,18 @@ def launch(args):
     # 3. followers wait leader util it exits(or disappears)
 
     # update pod status as log
-    db.set_pod_flag(pod.get_id(), trainer_flag)
+    local_flag = trainer_flag & register_flag & barrier_flag
+    db.set_pod_flag(pod.get_id(), local_flag)
 
     if not leader_register.is_leader():
         db.wait_leader_exit()
     else:
-        job_flag = db.wait_resource_flag(cluster)
+        resource_flag = db.wait_resource_flag(cluster)
+        job_flag = trainer_flag & register_flag & barrier_flag & resource_flag
         db.set_job_flag(job_flag)
         leader_register.stop()
 
+    watcher.stop()
     resource_register.stop()
 
 
