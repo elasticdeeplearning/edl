@@ -77,10 +77,7 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
 
     def Barrier(self, request, context):
         """
-        1. pods barrier on the leader's current stage
-        1.1 leader's stage changed on leader changed
-        2. pods num must large then the job_env.min_nodes
-        3. pods num must equal the pods registed under resource.
+        1. pods barrier on the cluster's current stage
         """
         res = pod_server_pb.BarrierResponse()
 
@@ -107,21 +104,13 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
                 bd.add(request.pod_id)
 
             if ids == bd:
-                cluster = db.get_rank_cluster()
-                rank_ids = cluster.get_pods_ids_set()
-                if rank_ids != ids:
-                    message = "barrier's context:{}, rank cluster now:{}".format(
-                        ids, cluster.get_pods_ids_set())
-                    serialize_exception(res, EdlBarrierError(message))
-                    return res
-
                 if len(rank_ids) < self._job_env.min_nodes:
                     message = "barrier's rank cluster now:{} is not enough of job's min nodes:{}".format(
-                        cluster.get_pods_ids_set(), self._job_env.min_nodes())
+                        ids, self._job_env.min_nodes())
                     serialize_exception(res, EdlBarrierError(message))
                     return res
 
-                cluster.to_pb_response(res)
+                res.cluster_json = cluster.to_json()
                 return res
 
             serialize_exception(

@@ -85,9 +85,9 @@ class GenerateCluster(self):
         pass
 
     def _refresher(self):
-        """
-        if cluster changed, changed the stage of cluster
-        """
+        pass
+
+    def _refresh(self):
         pass
 
     def start(self):
