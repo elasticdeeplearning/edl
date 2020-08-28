@@ -43,7 +43,9 @@ class LeaderRegister(object):
 
         # assign value
         self._etcd = EtcdClient(
-            self._job_env.etcd_endpoints, root=self._job_env.job_id, timeout=6)
+            self._job_env.etcd_endpoints,
+            root=self._job_env.job_id,
+            timeout=g_etcd_conn_timeout)
         self._etcd.init()
 
         self._seize_leader()
@@ -51,15 +53,18 @@ class LeaderRegister(object):
         self._t_register = threading.Thread(target=self._refresher)
         self._t_register.start()
 
-    def _seize_leader(self, timeout=6):
+    def _seize_leader(self, timeout=g_etcd_conn_timeout):
         begin = time.time()
         info = self._pod_id
 
         if not self._etcd.set_server_not_exists(
-                self._service_name, self._server, info=info, timeout=6,
+                self._service_name,
+                self._server,
+                info=info,
+                timeout=g_etcd_conn_timeout,
                 ttl=15):
-            logger.debug("register leader on etcd key:{} error".format(
-                self._etcd.get_full_path(self._service_name, server)))
+            logger.debug("Can't seize leader on etcd key:{}".format(
+                self._etcd.get_full_path(self._service_name, self._server)))
 
             with self._lock:
                 self._is_leader = False
@@ -71,8 +76,8 @@ class LeaderRegister(object):
             self._is_leader = True
 
         self._generate_cluster.start()
-        logger.info("register leader on etcd key:{}".format(
-            self._etcd.get_full_path(self._service_name, self._server)))
+        logger.info("register leader:{} on etcd key:{}".format(
+            info, self._etcd.get_full_path(self._service_name, self._server)))
         return True
 
     def is_leader(self):
