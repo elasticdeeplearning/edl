@@ -32,7 +32,8 @@ import traceback
 
 from ..utils.edl_env import JobEnv
 from ..utils.pod import Pod, JobStatus
-from ..utils.register import LeaderRegister, PodResourceRegister
+from ..utils.register import PodResourceRegister
+from ..utils.leader_register import LeaderRegister
 from ..utils.etcd_db import EtcdDB as db
 from ..utils.watcher import Watcher
 from ..utils.pod_server import PodServer
@@ -123,7 +124,7 @@ def _convert_args_to_dict(args):
     return d
 
 
-def edl_barrier(job_env, pod, leader_register, timeout):
+def edl_barrier(job_env, pod, timeout):
     start = time.time()
 
     log_time = time.time()
@@ -188,11 +189,10 @@ def launch(args):
 
     # register pod resource to tell others:
     # this resource can use to train
-    resource_register = PodResourceRegister(job_env.etcd_endpoints,
-                                            job_env.job_id, pod)
+    resource_register = PodResourceRegister(job_env, pod)
 
     # seize the leader
-    leader_register = LeaderRegister(job_env, pod)
+    leader_register = LeaderRegister(job_env, pod.get_id())
 
     # register rank and watch the rank
     # if the rank changed, the pods should restart the training proc.
@@ -228,8 +228,7 @@ def launch(args):
 
         # check job status second
         if watcher.changed:
-            new_cluster = edl_barrier(
-                job_env, cluster, pod, leader_register, watcher, timeout=600)
+            new_cluster = edl_barrier(job_env, pod, timeout=60)
             if not new_cluster:
                 barrier_flag = False
                 break

@@ -5,9 +5,13 @@ unset https_proxy http_proxy
 name=${TEST_TARGET_NAME}
 TEST_TIMEOUT=${TEST_TIMEOUT}
 
+# rm flag file
+rm -f ${name}_*.log
+
 nohup etcd > ${name}_etcd.log 2>&1 &
 etcd_pid=$!
 
+echo "etcd_pid:${etcd_pid} ${name}_etcd.log"
 
 if [[ ${TEST_TIMEOUT}"x" == "x" ]]; then
     echo "can't find ${TEST_TIMEOUT}, please set ${TEST_TIMEOUT} first"
@@ -25,8 +29,6 @@ export PADDLE_EDL_ONLY_FOR_CE_TEST="1"
 export PADDLE_EDL_HDFS_CHECKPOINT_PATH="./success_job"
 export PADDLE_EDL_HDFS_HOME="./hadoop"
 
-# rm flag file
-rm -f ${name}_*.log
 #clean keys
 python del_from_etcd.py
 
@@ -45,10 +47,18 @@ key="/${PADDLE_JOB_ID}/job_flag/nodes/complete"
 value=`etcdctl get ${key}`
 echo "job complete flag:${value}"
 
-if [ wait $pid_00 $pid_01 ] ; then
+job_flag=True
+for pid in $pid_00 $pid_01; do
+    echo "wait ${pid}"
+    if ! wait ${pid} ; then
+        job_flag=False
+    fi
+done
+#----
+
+if [[ $job_flag == "True" ]]; then
     exit 0
 fi
-#----
 
 echo "cat ${name}_run_00.log"
 cat ${name}_run_00.log

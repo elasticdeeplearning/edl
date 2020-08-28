@@ -15,6 +15,7 @@ import threading
 import time
 import json
 import uuid
+from enum import IntEnum
 
 from .utils import logger
 from .pod import Pod, JobStatus
@@ -23,6 +24,7 @@ from .cluster import Cluster
 
 import etcd3
 from .global_vars import *
+from .exceptions import EdlBarrierError
 
 
 class TrainStatus(IntEnum):
@@ -155,12 +157,14 @@ class EtcdDB(object):
 
         return value
 
-    @staticmethod()
+    @staticmethod
     def get_cluster(timeout=15):
+        begin = time.time()
+        etcd, lock = get_global_etcd()
         while True:
             if time.time() - begin > timeout:
                 logger.warning("get pod leader error!")
-                return None
+                raise EdlBarrierError("get cluster error")
 
             leader_id = EtcdDB.get_pod_leader_id()
             if leader_id is None:
@@ -168,14 +172,30 @@ class EtcdDB(object):
                 continue
 
             with lock:
-                value, _, _, _, _, = etcd._get_server(ETCD_CLUSTER, leader_id)
+                try:
+                    value, _, _, _, _, = etcd._get_server(ETCD_CLUSTER,
+                                                          leader_id)
+                except Exception as e:
+                    logger.debug("get cluster of leader_id:{} error:{}".format(
+                        leader_id, e))
+                    time.sleep(1)
+                    continue
 
             if value is None:
                 time.sleep(1)
                 continue
 
             cluster = Cluster()
-            return cluster.from_json(value)
+            cluster.from_json(value)
+            if len(cluster.pods) == 0:
+                raise EdlBarrierError("get cluster error")
+
+            return cluster
+
+    @staticmethod
+    def get_pod_leader(timeout=15):
+        cluster = EtcdDB.get_cluster(timeout)
+        return cluster.pods[0]
 
     @staticmethod
     def get_data_reader_leader():

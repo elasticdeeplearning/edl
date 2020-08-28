@@ -32,7 +32,7 @@ class Register(object):
         self._stop = threading.Event()
         self._etcd = None
         self._t_register = None
-        self._lock = Threading.Lock()
+        self._lock = threading.Lock()
         self._info = info
 
         self._etcd = EtcdClient(
@@ -42,7 +42,7 @@ class Register(object):
         try:
             self._etcd.set_server_not_exists(
                 service, server, self._info, ttl=15)
-            logger.info("register pod:{} in resource:{}".format(
+            logger.info("register pod:{} in etcd path:{}".format(
                 info, self._etcd.get_full_path(service, server)))
         except Exception as e:
             logger.fatal(
