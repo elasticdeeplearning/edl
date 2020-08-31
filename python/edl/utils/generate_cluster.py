@@ -50,7 +50,7 @@ class GenerateCluster(object):
         begin = time.time()
         while True:
             try:
-                if EtcdDB.generate_cluster(self._etcd, self._lock):
+                if self._generate_cluster_and_check(self._etcd, self._lock):
                     return True
 
                 raise EdlGenerateClusterError("can't generate cluster")
@@ -86,11 +86,8 @@ class GenerateCluster(object):
     def __exit__(self):
         self.stop()
 
-    def _generate_cluster_from_resource(etcd=None, lock=None, resource_pods):
-        if etcd is None:
-            etcd, lock = get_global_etcd()
-
-        leader_id = Etcd.get_pod_leader_id(etcd, lock)
+    def _generate_cluster_from_resource(resource_pods):
+        leader_id = Etcd.get_pod_leader_id()
         if leader_id is None or len(resource_pods) <= 0:
             return None
 
@@ -113,8 +110,7 @@ class GenerateCluster(object):
         new_cluster.new_stage()
         return new_cluster
 
-    @staticmethod
-    def _append_inited_pods(current_cluster, resource_pods, new_cluster):
+    def _append_inited_pods(self, current_cluster, resource_pods, new_cluster):
         rank = current_cluster.get_pods_nranks()
         new_cluster = copy.copy(current_cluster)
         new_pods = new_cluster.get_pods()
@@ -127,23 +123,18 @@ class GenerateCluster(object):
         if new_cluster.get_pods_nranks() != current_cluster.get_pods_nranks():
             new_cluster.new_stage()
 
-    @staticmethod
-    def _generate_cluster(etcd=None, lock=None):
-        if etcd is None:
-            etcd, lock = get_global_etcd()
-
-        current_cluster = EtcdDB.get_current_cluster(etcd, lock)
-        resource_pods = EtcdDB.get_resource_pods_dict(etcd, lock)
+    def _generate_cluster_once(self):
+        current_cluster = EtcdDB.get_current_cluster()
+        resource_pods = EtcdDB.get_resource_pods_dict()
 
         if current_cluster is None:
-            new_cluster = EtcdDB._generate_cluster_from_resource(etcd, lock,
-                                                                 resource_pods)
+            new_cluster = EtcdDB._generate_cluster_from_resource(resource_pods)
             return None, new_cluster
 
         current_ids = current_cluster.get_pods_ids_set()
         resource_ids = resource_pods.keys()
         all_inited, all_running, all_succeed, all_failed = EtcdDB.get_pods_status(
-            etcd, lock)
+        )
 
         disappeared = current_ids - resource_ids - all_inited - all_running - all_succeed - all_failed
         failed = current_ids & all_failed
@@ -151,7 +142,7 @@ class GenerateCluster(object):
             logger.warning("find disappeard pods:{} failed_pods:{}".format(
                 disappeared, failed))
             return current_cluster, EtcdDB._generate_cluster_from_resource(
-                etcd, lock, resource_pods)
+                resource_pods)
 
         succeed = current_ids & all_succeed
         if len(succeed) > 0:
@@ -162,7 +153,7 @@ class GenerateCluster(object):
         running = current_ids & all_running
         inited = current_ids & all_inited
         if len(inited) > 0:
-            train_status = EtcdDB.get_train_status(etcd, lock)
+            train_status = EtcdDB.get_train_status()
             if train_status == TrainStatus.INITIAL or train_status == TrainStatus.RUNNING:
                 logger.info("find running pods:{} and init pods{}".format(
                     inited, running))
@@ -174,13 +165,12 @@ class GenerateCluster(object):
         new_cluster = copy.copy(current_cluster)
         return current_cluster, new_cluster
 
-    @staticmethod
-    def _set_cluster_if_leader(cluster, pod, etcd_client, lock):
-        leader_key = etcd_client.get_full_path(ETCD_POD_RANK, "0")
-        cluster_key = etcd_client.get_full_path(ETCD_CLUSTER, ETCD_CLUSTER)
+    def _set_cluster_if_leader(self, cluster, pod):
+        leader_key = self._etcd.get_full_path(ETCD_POD_RANK, "0")
+        cluster_key = self._etcd.get_full_path(ETCD_CLUSTER, ETCD_CLUSTER)
 
         with lock:
-            etcd = etcd_client._etcd
+            etcd = self._etcd._etcd
             status, _ = etcd.transaction(
                 compare=[
                     etcd.transactions.value(leader_key) == pod.get_id(),
@@ -192,13 +182,8 @@ class GenerateCluster(object):
 
         return status
 
-    @staticmethod
-    def generate_cluster(job_env):
-        if etcd is None:
-            etcd, lock = get_global_etcd()
-
-        current_cluster, new_cluster = EtcdDB._generate_cluster(etcd, lock,
-                                                                job_env)
+    def _generate_cluster_and_check(self, job_env):
+        current_cluster, new_cluster = self._generate_cluster_once()
         if new_cluster is None:
             logger.warning("can't generate new cluster")
             return False
