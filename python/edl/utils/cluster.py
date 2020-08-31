@@ -40,6 +40,7 @@ class Cluster(object):
     def __init__(self):
         self._pods = []
         self._stage = None
+        self._status = JobStatus.INITIAL
 
     def __str__(self):
         return "pods:{} job_stage:{}".format([str(pod) for pod in self._pods],
@@ -73,6 +74,9 @@ class Cluster(object):
 
     def get_pods_nranks(self):
         return len(self._pods)
+
+    def get_pods(self):
+        return pods
 
     @property
     def pods(self):
@@ -157,3 +161,6 @@ class Cluster(object):
     def get_leader_id(self):
         assert len(self._pods) > 0
         return self._pods[0].get_id()
+
+    def new_stage(self):
+        self._stage = str(uuid.uuid1())

@@ -38,15 +38,15 @@ class JobStatus(IntEnum):
     INITIAL = 0
     RUNNING = 1
     PENDING = 2
-    COMPLETE = 3
-    ERROR = 4
+    SUCCEED = 3
+    FAILED = 4
 
     @staticmethod
     def bool_to_status(b):
         if b:
-            return JobStatus.COMPLETE
+            return JobStatus.SUCCEED
 
-        return JobStatus.ERROR
+        return JobStatus.FAILED
 
 
 class Pod(object):

@@ -220,6 +220,13 @@ class EtcdClient(object):
         return value, meta.key, meta.version, meta.create_revision, meta.mod_revision
 
     @_handle_errors
+    def get_value(self, service_name, server):
+        # for debug
+        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        value = self._etcd.get(key=key)
+        return value
+
+    @_handle_errors
     def remove_server(self, service_name, server):
         key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
         self._etcd.delete(key)

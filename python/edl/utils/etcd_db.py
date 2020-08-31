@@ -31,8 +31,8 @@ class TrainStatus(IntEnum):
     INITIAL = 0
     RUNNING = 1
     NEARTHEEND = 3
-    COMPLETE = 3
-    ERROR = 4
+    SUCCEED = 3
+    FAILED = 4
 
 
 class EtcdDB(object):
@@ -46,8 +46,10 @@ class EtcdDB(object):
             etcd.set_server_permanent(service, server, info)
 
     @staticmethod
-    def get_pods_status():
-        etcd, lock = get_global_etcd()
+    def get_pods_status(etcd=None, lock=None):
+        if etcd is None:
+            etcd, lock = get_global_etcd()
+
         service = ETCD_POD_STATUS
         with lock:
             servers = etcd.get_service(service)
@@ -59,9 +61,9 @@ class EtcdDB(object):
         for server in servers:
             d = json.loads(server.info)
             status = d["status"]
-            if status == int(JobStatus.ERROR):
+            if status == int(JobStatus.FAILED):
                 failed.add(server.server)
-            elif status == int(JobStatus.COMPLETE):
+            elif status == int(JobStatus.SUCCEED):
                 succeed.add(server.server)
             elif status == int(JobStatus.INITIAL):
                 inited.add(server.server)
@@ -82,7 +84,7 @@ class EtcdDB(object):
     @staticmethod
     def set_job_flag(flag):
         if flag:
-            EtcdDB.set_job_status(pod.get_id(), JobStatus.COMPLETE)
+            EtcdDB.set_job_status(pod.get_id(), JobStatus.SUCCEED)
             logger.info("This job succeeded!")
             return
 
@@ -138,22 +140,26 @@ class EtcdDB(object):
             return True
 
     @staticmethod
-    def get_resource_pods_ids_set():
-        etcd, lock = get_global_etcd()
+    def get_resource_pods_dict(etcd=None, lock=None):
+        if etcd is None:
+            etcd, lock = get_global_etcd()
+
         with lock:
             servers = etcd.get_service(ETCD_POD_RESOURCE)
 
-        ids = set()
+        pods = {}
         for s in servers:
-            ids.add(s.server)
+            p = Pod()
+            p.from_json(s.info)
+            pods[p.get_id()] = p
 
-        return ids
+        return pods
 
     @staticmethod
     def get_pod_leader_id():
         etcd, lock = get_global_etcd()
         with lock:
-            value, _, _, _, _, = etcd._get_server(ETCD_POD_RANK, "0")
+            value = etcd.get_value(ETCD_POD_RANK, "0")
 
         return value
 
@@ -173,8 +179,7 @@ class EtcdDB(object):
 
             with lock:
                 try:
-                    value, _, _, _, _, = etcd._get_server(ETCD_CLUSTER,
-                                                          leader_id)
+                    value = etcd.get_value(ETCD_CLUSTER, leader_id)
                 except Exception as e:
                     logger.debug("get cluster of leader_id:{} error:{}".format(
                         leader_id, e))
@@ -201,6 +206,7 @@ class EtcdDB(object):
     def get_data_reader_leader():
         raise NotImplementedError()
 
+    """
     @staticmethod
     def get_diff_pods(cluster):
         all_inited, all_running, all_succeed, all_failed = EtcdDB.get_pods_status(
@@ -216,24 +222,169 @@ class EtcdDB(object):
         inited = now & all_inited
 
         return (inited, added, succeed, failed)
+    """
+
+    @staticmethod
+    def get_current_cluster(etcd=None, lock=None):
+        if etcd is None:
+            etcd, lock = get_global_etcd()
+
+        with lock:
+            value = etcd.get_value(ETCD_CLUSTER, ETCD_CLUSTER)
+
+        if value is None:
+            return None
+
+        cluster = Cluster()
+        cluster.loads(value)
+        return cluster
+
+    @staticmethod
+    def _generate_cluster_from_resource(etcd=None, lock=None, resource_pods):
+        if etcd is None:
+            etcd, lock = get_global_etcd()
+
+        leader_id = Etcd.get_pod_leader_id(etcd, lock)
+        if leader_id is None or len(resource_pods) <= 0:
+            return None
+
+        new_cluster = Cluster()
+        pods = new_cluster.get_pods()
+        if leader_id not in resource_pods:
+            return None
+
+        rank = 0
+        pods.add(resource_pods[leader_id])
+        # set rank
+        pods[0].rank = rank
+        rank += 1
+        resource_pods.pop(leader_id)
+        for pod_id, pod in six.iteritems(resource_pods):
+            pod.rank = rank
+            pods.append(pod)
+            rank += 1
+
+        new_cluster.new_stage()
+        return new_cluster
+
+    @staticmethod
+    def _append_inited_pods(current_cluster, resource_pods, new_cluster):
+        rank = current_cluster.get_pods_nranks()
+        new_cluster = copy.copy(current_cluster)
+        new_pods = new_cluster.get_pods()
+        for pod_id, pod in six.iteritems(resource_pods):
+            if pod.status == JobStatus.INITIAL:
+                pod.rank = rank
+                rank += 1
+                new_pods.append(pod)
+
+        if new_cluster.get_pods_nranks() != current_cluster.get_pods_nranks():
+            new_cluster.new_stage()
+
+    @staticmethod
+    def _generate_cluster(etcd=None, lock=None):
+        if etcd is None:
+            etcd, lock = get_global_etcd()
+
+        current_cluster = EtcdDB.get_current_cluster(etcd, lock)
+        resource_pods = EtcdDB.get_resource_pods_dict(etcd, lock)
+
+        if current_cluster is None:
+            new_cluster = EtcdDB._generate_cluster_from_resource(etcd, lock,
+                                                                 resource_pods)
+            return None, new_cluster
+
+        current_ids = current_cluster.get_pods_ids_set()
+        resource_ids = resource_pods.keys()
+        all_inited, all_running, all_succeed, all_failed = EtcdDB.get_pods_status(
+            etcd, lock)
+
+        disappeared = current_ids - resource_ids - all_inited - all_running - all_succeed - all_failed
+        failed = current_ids & all_failed
+        if len(disappeared) > 0 or len(failed) > 0:
+            logger.warning("find disappeard pods:{} failed_pods:{}".format(
+                disappeared, failed))
+            return current_cluster, EtcdDB._generate_cluster_from_resource(
+                etcd, lock, resource_pods)
+
+        succeed = current_ids & all_succeed
+        if len(succeed) > 0:
+            logger.debug("find succeed pods:{}".format(succeed))
+            new_cluster = copy.copy(current_cluster)
+            return new_cluster
+
+        running = current_ids & all_running
+        inited = current_ids & all_inited
+        if len(inited) > 0:
+            train_status = EtcdDB.get_train_status(etcd, lock)
+            if train_status == TrainStatus.INITIAL or train_status == TrainStatus.RUNNING:
+                logger.info("find running pods:{} and init pods{}".format(
+                    inited, running))
+                EtcdDB._append_inited_pods(current_cluster, resource_pods,
+                                           new_cluster)
+                return current_cluster, new_cluster
+
+        logger.debug("find succeed pods:{}".format(succeed))
+        new_cluster = copy.copy(current_cluster)
+        return current_cluster, new_cluster
+
+    @staticmethod
+    def _set_cluster_if_leader(cluster, pod, etcd_client, lock):
+        leader_key = etcd_client.get_full_path(ETCD_POD_RANK, "0")
+        cluster_key = etcd_client.get_full_path(ETCD_CLUSTER, ETCD_CLUSTER)
+
+        with lock:
+            etcd = etcd_client._etcd
+            status, _ = etcd.transaction(
+                compare=[
+                    etcd.transactions.value(leader_key) == pod.get_id(),
+                ],
+                success=[
+                    etcd.transactions.put(cluster_key, cluster.to_json()),
+                ],
+                failure=[])
+
+        return status
+
+    @staticmethod
+    def generate_cluster(job_env):
+        if etcd is None:
+            etcd, lock = get_global_etcd()
+
+        current_cluster, new_cluster = EtcdDB._generate_cluster(etcd, lock,
+                                                                job_env)
+        if new_cluster is None:
+            return False
+
+        if new_cluster.get_pods_nranks() < job_env.min_nodes:
+            new_cluster.status = JobStatus.FAILED
+        elif new_cluster.get_pods_nranks() > job_env.max_nodes:
+            pods = new_cluster.get_pods()
+            pods = pods[0:job_env.max_nodes]
+
+        if current_cluster is None or current_cluster.stage != new_cluter.stage:
+            return etcd._set_cluster_if_leader(new_cluster, pod, etcd, lock)
+
+        return True
 
     @staticmethod
     def set_pod_flag(pod_id, flag):
         if not flag:
-            EtcdDB.set_pod_status(pod.get_id(), JobStatus.ERROR)
+            EtcdDB.set_pod_status(pod.get_id(), JobStatus.FAILED)
             logger.fatal("local trainers meets error!")
             return
 
-        EtcdDB.set_pod_status(pod.get_id(), JobStatus.COMPLETE)
+        EtcdDB.set_pod_status(pod.get_id(), JobStatus.SUCCEED)
         logger.info("local trainers succeeded!")
 
     @staticmethod
-    def get_train_status():
-        etcd, lock = get_global_etcd()
+    def get_train_status(etcd=None, etcd_lock=None):
+        if etcd is None:
+            etcd, lock = get_global_etcd()
 
         leader_id = Etcd.get_pod_leader_id()
         with lock:
-            value, _, _, _, _, = etcd._get_server(ETCD_TRAIN_STATUS, leader_id)
+            value = etcd.get_value(ETCD_TRAIN_STATUS, leader_id)
 
         if value is None:
             return None

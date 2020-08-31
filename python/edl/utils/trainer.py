@@ -33,6 +33,20 @@ from enum import IntEnum
 from .utils import logger
 
 
+class TrainStatus(IntEnum):
+    INITIAL = 0
+    RUNNING = 1
+    TAILED = 3  # almost complete
+    COMPLETE = 4
+
+    @staticmethod
+    def bool_to_status(b):
+        if b:
+            return JobStatus.SUCCEED
+
+        return JobStatus.ERROR
+
+
 class Trainer(object):
     def __init__(self):
         self._id = None

@@ -164,7 +164,7 @@ def prepare(args):
     get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
 
     last_status = db.get_job_status()
-    if last_status == JobStatus.COMPLETE:
+    if last_status == JobStatus.SUCCEED:
         logger.info("job:{} has completed! Need't try!".format(job_env.job_id))
         sys.exit(0)
 
