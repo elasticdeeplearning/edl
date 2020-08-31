@@ -156,46 +156,31 @@ class EtcdDB(object):
         return pods
 
     @staticmethod
-    def get_pod_leader_id():
-        etcd, lock = get_global_etcd()
+    def get_pod_leader_id(etcd=None, lock=None):
+        if etcd is None:
+            etcd, lock = get_global_etcd()
+
         with lock:
             value = etcd.get_value(ETCD_POD_RANK, "0")
 
         return value
 
     @staticmethod
-    def get_cluster(timeout=15):
+    def get_cluster(etcd=None, lock=None):
         begin = time.time()
-        etcd, lock = get_global_etcd()
-        while True:
-            if time.time() - begin > timeout:
-                logger.warning("get pod leader error!")
-                raise EdlBarrierError("get cluster error")
+        if etcd is None:
+            etcd, lock = get_global_etcd()
 
-            leader_id = EtcdDB.get_pod_leader_id()
-            if leader_id is None:
-                time.sleep(1)
-                continue
+        leader_id = EtcdDB.get_pod_leader_id()
+        with lock:
+            value = etcd.get_value(ETCD_CLUSTER, leader_id)
 
-            with lock:
-                try:
-                    value = etcd.get_value(ETCD_CLUSTER, leader_id)
-                except Exception as e:
-                    logger.debug("get cluster of leader_id:{} error:{}".format(
-                        leader_id, e))
-                    time.sleep(1)
-                    continue
+        cluster = Cluster()
+        cluster.from_json(value)
+        if len(cluster.pods) == 0:
+            raise EdlGetClusterError("get cluster error")
 
-            if value is None:
-                time.sleep(1)
-                continue
-
-            cluster = Cluster()
-            cluster.from_json(value)
-            if len(cluster.pods) == 0:
-                raise EdlBarrierError("get cluster error")
-
-            return cluster
+        return cluster
 
     @staticmethod
     def get_pod_leader(timeout=15):
