@@ -117,25 +117,3 @@ class DataReaderRegister(Register):
             service=service,
             server=server,
             info=value)
-
-
-"""
-class TrainStatusRegister(Register):
-    def __init__(self, etcd_endoints, job_id, pod_id, status):
-        service = ETCD_POD_TRAIN_STATUS
-        server = pod_id
-        value = {"status": status, }
-
-        super(DataReaderRegister, self).__init__(
-            etcd_endpoints=etcd_endpoints,
-            job_id=job_id,
-            service=service,
-            server=server,
-            info=info)
-
-    def update(self, status):
-        value = {"status": status, }
-
-        with self._lock:
-            self._info = json.dumps(value)
-"""

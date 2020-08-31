@@ -206,24 +206,6 @@ class EtcdDB(object):
     def get_data_reader_leader():
         raise NotImplementedError()
 
-    """
-    @staticmethod
-    def get_diff_pods(cluster):
-        all_inited, all_running, all_succeed, all_failed = EtcdDB.get_pods_status(
-        )
-
-        resource = EtcdDB.get_resource_pods_ids_set()
-        last = cluster.get_pods_ids_set()
-
-        added = now - last
-        #diff = init.symmetric_difference(now)
-        succeed = last & all_succeed
-        failed = last - now - succeeded
-        inited = now & all_inited
-
-        return (inited, added, succeed, failed)
-    """
-
     @staticmethod
     def get_current_cluster(etcd=None, lock=None):
         if etcd is None:
@@ -354,6 +336,7 @@ class EtcdDB(object):
         current_cluster, new_cluster = EtcdDB._generate_cluster(etcd, lock,
                                                                 job_env)
         if new_cluster is None:
+            logger.warning("can't generate new cluster")
             return False
 
         if new_cluster.get_pods_nranks() < job_env.min_nodes:
@@ -363,6 +346,7 @@ class EtcdDB(object):
             pods = pods[0:job_env.max_nodes]
 
         if current_cluster is None or current_cluster.stage != new_cluter.stage:
+            logger.info("generate new cluster:{}".format(new_cluster))
             return etcd._set_cluster_if_leader(new_cluster, pod, etcd, lock)
 
         return True
@@ -407,6 +391,13 @@ class EtcdDB(object):
         logger.info("leader exit so this pod exit!")
 
     @staticmethod
-    def wait_resource_flag(cluster):
-        logger.info("begin to wait resource exit!")
-        logger.info("leader exit!")
+    def wait_resource(pod, timeout=15):
+        pods = EtdbDB.get_resource_pods_dict()
+        if len(pods) == 1:
+            if pod.get_id() in pods:
+                return True
+
+        if len(pods) == 0:
+            return True
+
+        return False

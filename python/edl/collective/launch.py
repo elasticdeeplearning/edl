@@ -184,6 +184,44 @@ def prepare(args):
     return job_env, pod
 
 
+def job_exit(leader_register,
+             resource_register,
+             watcher,
+             pod,
+             trainer_flag,
+             register_flag,
+             barrier_flag,
+             resource_flag,
+             timeout=300):
+    local_flag = trainer_flag & register_flag & barrier_flag
+    db.set_pod_flag(pod.get_id(), local_flag)
+
+    begin = time.time()
+    while True:
+        try:
+            if leader_register.is_leader():
+                if db.wait_resource(cluster, timeout=15):
+                    job_flag = trainer_flag & register_flag & barrier_flag & resource_flag
+                    db.set_job_flag(job_flag)
+                    logger.info("set job status:{} ok!".format(job_flag))
+                    break
+                raise EdlWaitFollowersReleaseError("can't wait resource")
+            else:
+                break
+        except Exception as e:
+            logger.warning("prepare job_exit meets error:{}".format(e))
+            if time.time() - begin >= timeout:
+                logger.warning("wait resource error")
+                break
+
+            time.sleep(3)
+            continue
+
+    leader_register.stop()
+    watcher.stop()
+    resource_register.stop()
+
+
 def launch(args):
     job_env, pod = prepare(args)
 
@@ -253,26 +291,14 @@ def launch(args):
     if not leader_register.is_leader():
         leader_register.stop()
 
-    # How to exit:
-    # 1. followers update their status to resource(with ttl) and status(permanent) path
-    # 2. leader waits followers' resource status
-    # 2.1 if some one failed(or disappeared) and some one succeed, this job failed and leader exit
-    # 3. followers wait leader util it exits(or disappears)
-
-    # update pod status as log
-    local_flag = trainer_flag & register_flag & barrier_flag
-    db.set_pod_flag(pod.get_id(), local_flag)
-
-    if not leader_register.is_leader():
-        db.wait_leader_exit()
-    else:
-        resource_flag = db.wait_resource_flag(cluster)
-        job_flag = trainer_flag & register_flag & barrier_flag & resource_flag
-        db.set_job_flag(job_flag)
-
-    leader_register.stop()
-    watcher.stop()
-    resource_register.stop()
+    job_exit(
+        leader_register=leader_register,
+        resource_register=resource_register,
+        watcher=watcher,
+        pod=pod,
+        trainer_flag=trainer_flag,
+        register_flag=register_flag,
+        barrier_flag=barrier_flag)
 
 
 def run_commandline():
