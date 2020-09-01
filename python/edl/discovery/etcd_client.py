@@ -224,7 +224,7 @@ class EtcdClient(object):
         # for debug
         key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
         value = self._etcd.get(key=key)
-        return value
+        return value[0]
 
     @_handle_errors
     def remove_server(self, service_name, server):

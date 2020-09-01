@@ -145,36 +145,34 @@ class EtcdDB(object):
 
         return value
 
-    def get_cluster(self):
-        begin = time.time()
-        leader_id = self.get_pod_leader_id()
-        with self._lock:
-            value = self._etcd.get_value(ETCD_CLUSTER, leader_id)
-
-        cluster = Cluster()
-        cluster.from_json(value)
-        if len(cluster.pods) == 0:
-            raise EdlGetClusterError("get cluster error")
-
-        return cluster
-
-    def get_pod_leader(self, timeout=15):
-        cluster = self.get_cluster(timeout)
-        return cluster.pods[0]
-
     def get_data_reader_leader(self):
         raise NotImplementedError()
 
-    def get_current_cluster(self):
+    def get_cluster(self):
         with self._lock:
             value = self._etcd.get_value(ETCD_CLUSTER, ETCD_CLUSTER)
 
         if value is None:
             return None
 
+        print("cluster value:", value)
         cluster = Cluster()
-        cluster.loads(value)
+        cluster.from_json(value)
         return cluster
+
+    def get_pod_leader(self):
+        leader_id = self.get_pod_leader_id()
+        if leader_id is None:
+            return None
+
+        cluster = self.get_cluster()
+        if cluster is None:
+            return None
+
+        if cluster.pods[0].get_id() != leader_id:
+            return None
+
+        return cluster.pods[0]
 
     def set_pod_flag(self, pod_id, flag):
         if not flag:

@@ -77,7 +77,7 @@ class Cluster(object):
         return len(self._pods)
 
     def get_pods(self):
-        return pods
+        return self._pods
 
     @property
     def pods(self):

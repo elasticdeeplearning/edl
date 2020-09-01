@@ -16,6 +16,8 @@ import time
 import json
 import uuid
 import copy
+import traceback
+import six
 
 from .utils import logger
 from .pod import Pod
@@ -24,10 +26,11 @@ from ..discovery.etcd_client import EtcdClient
 import etcd3
 from .global_vars import *
 from .cluster import Cluster
+from .etcd_db import get_global_etcd
 
 
 class GenerateCluster(object):
-    def __init__(self, job_env):
+    def __init__(self, job_env, pod_id):
         self._cluster = Cluster()
         self._service = ETCD_CLUSTER
         self._server = ETCD_CLUSTER
@@ -36,6 +39,8 @@ class GenerateCluster(object):
         self._t_register = None
         self._lock = threading.Lock()
         self._job_env = job_env
+        self._db = get_global_etcd()
+        self._pod_id = pod_id
 
     def start(self):
         self._etcd = EtcdClient(
@@ -62,6 +67,8 @@ class GenerateCluster(object):
                     logger.fatal("can't generate cluster exit!")
 
                 time.sleep(3)
+                logger.debug("_generate_cluster error:{} {}".format(
+                    e, traceback.format_exc()))
                 raise e
 
     def _refresher(self):
@@ -90,7 +97,7 @@ class GenerateCluster(object):
         self.stop()
 
     def _generate_cluster_from_resource(self, resource_pods):
-        leader_id = Etcd.get_pod_leader_id()
+        leader_id = self._db.get_pod_leader_id()
         if leader_id is None or len(resource_pods) <= 0:
             return None
 
@@ -100,10 +107,12 @@ class GenerateCluster(object):
             return None
 
         rank = 0
-        pods.add(resource_pods[leader_id])
+        pods.append(resource_pods[leader_id])
+        assert len(pods) == 1
         # set rank
         pods[0].rank = rank
         rank += 1
+
         resource_pods.pop(leader_id)
         for pod_id, pod in six.iteritems(resource_pods):
             pod.rank = rank
@@ -127,16 +136,16 @@ class GenerateCluster(object):
             new_cluster.new_stage()
 
     def _generate_cluster_once(self):
-        current_cluster = EtcdDB.get_current_cluster()
-        resource_pods = EtcdDB.get_resource_pods_dict()
+        current_cluster = self._db.get_cluster()
+        resource_pods = self._db.get_resource_pods_dict()
 
         if current_cluster is None:
-            new_cluster = EtcdDB._generate_cluster_from_resource(resource_pods)
+            new_cluster = self._generate_cluster_from_resource(resource_pods)
             return None, new_cluster
 
         current_ids = current_cluster.get_pods_ids_set()
         resource_ids = resource_pods.keys()
-        all_inited, all_running, all_succeed, all_failed = EtcdDB.get_pods_status(
+        all_inited, all_running, all_succeed, all_failed = self._db.get_pods_status(
         )
 
         disappeared = current_ids - resource_ids - all_inited - all_running - all_succeed - all_failed
@@ -144,7 +153,7 @@ class GenerateCluster(object):
         if len(disappeared) > 0 or len(failed) > 0:
             logger.warning("find disappeard pods:{} failed_pods:{}".format(
                 disappeared, failed))
-            return current_cluster, EtcdDB._generate_cluster_from_resource(
+            return current_cluster, self._generate_cluster_from_resource(
                 resource_pods)
 
         succeed = current_ids & all_succeed
@@ -156,25 +165,25 @@ class GenerateCluster(object):
         running = current_ids & all_running
         inited = current_ids & all_inited
         if len(inited) > 0:
-            train_status = EtcdDB.get_train_status()
+            train_status = self._db.get_train_status()
             if train_status == TrainStatus.INITIAL or train_status == TrainStatus.RUNNING:
                 logger.info("find running pods:{} and init pods{}".format(
                     inited, running))
-                EtcdDB._append_inited_pods(current_cluster, resource_pods,
-                                           new_cluster)
+                self._append_inited_pods(current_cluster, resource_pods,
+                                         new_cluster)
                 return current_cluster, new_cluster
 
         logger.debug("find succeed pods:{}".format(succeed))
         new_cluster = copy.copy(current_cluster)
         return current_cluster, new_cluster
 
-    def _set_cluster_if_leader(self, cluster, pod):
+    def _set_cluster_if_leader(self, cluster):
         leader_key = self._etcd.get_full_path(ETCD_POD_RANK, "0")
         cluster_key = self._etcd.get_full_path(ETCD_CLUSTER, ETCD_CLUSTER)
 
         etcd = self._etcd._etcd
         status, _ = etcd.transaction(
-            compare=[etcd.transactions.value(leader_key) == pod.get_id(), ],
+            compare=[etcd.transactions.value(leader_key) == self._pod_id, ],
             success=[etcd.transactions.put(cluster_key, cluster.to_json()), ],
             failure=[])
 
@@ -194,6 +203,6 @@ class GenerateCluster(object):
 
         if current_cluster is None or current_cluster.stage != new_cluter.stage:
             logger.info("generate new cluster:{}".format(new_cluster))
-            return etcd._set_cluster_if_leader(new_cluster, pod, etcd, lock)
+            return self._set_cluster_if_leader(new_cluster)
 
         return True
