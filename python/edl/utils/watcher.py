@@ -14,17 +14,16 @@
 
 from threading import Lock, Thread, Event
 import time
-from utils import logger
-from edl.discovery.etcd_client import EtcdClient
+import six
 import json
 import collections
 import copy
+
+from utils import logger
+from edl.discovery.etcd_client import EtcdClient
 from .cluster import Cluster
-from .pod import Pod, JobStatus
-
-from .global_vars import get_global_etcd, ETCD_POD_RANK, ETCD_POD_RESOURCE
-
-import six
+from .pod import Pod
+from .global_vars import *
 
 
 class Watcher(object):

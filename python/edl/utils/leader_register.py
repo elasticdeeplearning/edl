@@ -18,7 +18,7 @@ import uuid
 import copy
 
 from .utils import logger
-from .pod import Pod, JobStatus
+from .pod import Pod
 from ..discovery.etcd_client import EtcdClient
 from .generate_cluster import GenerateCluster
 
@@ -31,7 +31,7 @@ class LeaderRegister(object):
         self._job_env = job_env
         self._is_leader = False
         self._pod_id = pod_id
-        self._generate_cluster = GenerateCluster()
+        self._generate_cluster = GenerateCluster(job_env)
 
         self._stop = threading.Event()
         self._service_name = ETCD_POD_RANK
@@ -45,7 +45,7 @@ class LeaderRegister(object):
         self._etcd = EtcdClient(
             self._job_env.etcd_endpoints,
             root=self._job_env.job_id,
-            timeout=g_etcd_conn_timeout)
+            timeout=ETCD_CONN_TIMEOUT)
         self._etcd.init()
 
         self._seize_leader()
@@ -53,7 +53,7 @@ class LeaderRegister(object):
         self._t_register = threading.Thread(target=self._refresher)
         self._t_register.start()
 
-    def _seize_leader(self, timeout=g_etcd_conn_timeout):
+    def _seize_leader(self, timeout=ETCD_CONN_TIMEOUT):
         begin = time.time()
         info = self._pod_id
 
@@ -61,8 +61,8 @@ class LeaderRegister(object):
                 self._service_name,
                 self._server,
                 info=info,
-                timeout=g_etcd_conn_timeout,
-                ttl=15):
+                timeout=ETCD_CONN_TIMEOUT,
+                ttl=ETCD_TTL):
             logger.debug("Can't seize leader on etcd key:{}".format(
                 self._etcd.get_full_path(self._service_name, self._server)))
 
@@ -86,7 +86,7 @@ class LeaderRegister(object):
 
     def _refresh(self):
         try:
-            self._etcd.refresh(self._service_name, self._server, ttl=15)
+            self._etcd.refresh(self._service_name, self._server, ttl=ETCD_TTL)
             return True
         except Exception as e:
             logger.warning("refresh error:{}".format(e))

@@ -34,13 +34,14 @@ from .utils import logger
 from .pod import Pod
 from .trainer import Trainer
 from . import pod_server_pb2 as pod_server_pb
+from .global_vars import Status
 
 
 class Cluster(object):
     def __init__(self):
         self._pods = []
         self._stage = None
-        self._status = JobStatus.INITIAL
+        self._status = Status.INITIAL
 
     def __str__(self):
         return "pods:{} job_stage:{}".format([str(pod) for pod in self._pods],

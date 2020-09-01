@@ -15,10 +15,9 @@ import threading
 import time
 import json
 import uuid
-from enum import IntEnum
 
 from .utils import logger
-from .pod import Pod, JobStatus
+from .pod import Pod
 from ..discovery.etcd_client import EtcdClient
 from .cluster import Cluster
 
@@ -26,33 +25,29 @@ import etcd3
 from .global_vars import *
 from .exceptions import EdlBarrierError
 
-
-class TrainStatus(IntEnum):
-    INITIAL = 0
-    RUNNING = 1
-    NEARTHEEND = 3
-    SUCCEED = 3
-    FAILED = 4
+import threading
+from ..discovery.etcd_client import EtcdClient
 
 
 class EtcdDB(object):
-    @staticmethod
-    def set_pod_status(pod_id, status):
-        etcd, lock = get_global_etcd()
+    # TODO(gongwb): make a connections pool
+    def __init__(self, etcd_endpoints, job_id):
+        self._lock = threading.Lock()
+        self._etcd = EtcdClient(
+            endpoints=etcd_endpoints, root=job_id, timeout=6)
+        self._etcd.init()
+
+    def set_pod_status(self, pod_id, status):
         service = ETCD_POD_STATUS
         server = pod_id
         info = json.dumps({"status": int(status)})
-        with lock:
-            etcd.set_server_permanent(service, server, info)
+        with self._lock:
+            self._etcd.set_server_permanent(service, server, info)
 
-    @staticmethod
-    def get_pods_status(etcd=None, lock=None):
-        if etcd is None:
-            etcd, lock = get_global_etcd()
-
+    def get_pods_status(self):
         service = ETCD_POD_STATUS
-        with lock:
-            servers = etcd.get_service(service)
+        with self._lock:
+            servers = self._etcd.get_service(service)
 
         inited = set()
         runing = set()
@@ -61,41 +56,36 @@ class EtcdDB(object):
         for server in servers:
             d = json.loads(server.info)
             status = d["status"]
-            if status == int(JobStatus.FAILED):
+            if status == int(Status.FAILED):
                 failed.add(server.server)
-            elif status == int(JobStatus.SUCCEED):
+            elif status == int(Status.SUCCEED):
                 succeed.add(server.server)
-            elif status == int(JobStatus.INITIAL):
+            elif status == int(Status.INITIAL):
                 inited.add(server.server)
-            elif status == int(JobStatus.RUNNING):
+            elif status == int(Status.RUNNING):
                 running.add(server.server)
 
         return inited, running, succeed, failed
 
-    @staticmethod
-    def set_job_status(status):
-        etcd, lock = get_global_etcd()
+    def set_job_status(self, status):
         service = ETCD_JOB_STATUS
         server = "status"
         info = json.dumps({"status": int(status)})
-        with lock:
-            etcd.set_server_permanent(service, server, info)
+        with self._lock:
+            self._self._etcd.set_server_permanent(service, server, info)
 
-    @staticmethod
-    def set_job_flag(flag):
+    def set_job_flag(self, flag):
         if flag:
-            EtcdDB.set_job_status(pod.get_id(), JobStatus.SUCCEED)
+            self.set_job_status(pod.get_id(), Status.SUCCEED)
             logger.info("This job succeeded!")
             return
 
         logger.fatal("This job meets error!")
 
-    @staticmethod
-    def get_job_status():
-        etcd, lock = get_global_etcd()
+    def get_job_status(self):
         service = ETCD_JOB_STATUS
-        with lock:
-            servers = etcd.get_service(service)
+        with self._lock:
+            servers = self._etcd.get_service(service)
 
         assert len(servers) <= 1
         if len(servers) < 1:
@@ -105,18 +95,16 @@ class EtcdDB(object):
         d = json.loads(s.info)
         return d["status"]
 
-    @staticmethod
-    def wait_following_ranks(timeout=60):
+    def wait_following_ranks(self, timeout=60):
         """
         Note: some pod may regist to ranks when other waiting already.
         """
-        etcd, lock = get_global_etcd()
         service = ETCD_POD_RANK
         start = time.time()
 
         while True:
-            with lock:
-                servers = etcd.get_service(service)
+            with self._lock:
+                servers = self._etcd.get_service(service)
 
             if time.time() - start >= timeout:
                 cluster = self.get_rank_cluster()
@@ -139,13 +127,9 @@ class EtcdDB(object):
 
             return True
 
-    @staticmethod
-    def get_resource_pods_dict(etcd=None, lock=None):
-        if etcd is None:
-            etcd, lock = get_global_etcd()
-
-        with lock:
-            servers = etcd.get_service(ETCD_POD_RESOURCE)
+    def get_resource_pods_dict(self):
+        with self._lock:
+            servers = self._etcd.get_service(ETCD_POD_RESOURCE)
 
         pods = {}
         for s in servers:
@@ -155,25 +139,17 @@ class EtcdDB(object):
 
         return pods
 
-    @staticmethod
-    def get_pod_leader_id(etcd=None, lock=None):
-        if etcd is None:
-            etcd, lock = get_global_etcd()
-
-        with lock:
-            value = etcd.get_value(ETCD_POD_RANK, "0")
+    def get_pod_leader_id(self):
+        with self._lock:
+            value = self._etcd.get_value(ETCD_POD_RANK, "0")
 
         return value
 
-    @staticmethod
-    def get_cluster(etcd=None, lock=None):
+    def get_cluster(self):
         begin = time.time()
-        if etcd is None:
-            etcd, lock = get_global_etcd()
-
         leader_id = EtcdDB.get_pod_leader_id()
-        with lock:
-            value = etcd.get_value(ETCD_CLUSTER, leader_id)
+        with self._lock:
+            value = self._etcd.get_value(ETCD_CLUSTER, leader_id)
 
         cluster = Cluster()
         cluster.from_json(value)
@@ -182,22 +158,16 @@ class EtcdDB(object):
 
         return cluster
 
-    @staticmethod
-    def get_pod_leader(timeout=15):
+    def get_pod_leader(self, timeout=15):
         cluster = EtcdDB.get_cluster(timeout)
         return cluster.pods[0]
 
-    @staticmethod
-    def get_data_reader_leader():
+    def get_data_reader_leader(self):
         raise NotImplementedError()
 
-    @staticmethod
-    def get_current_cluster(etcd=None, lock=None):
-        if etcd is None:
-            etcd, lock = get_global_etcd()
-
-        with lock:
-            value = etcd.get_value(ETCD_CLUSTER, ETCD_CLUSTER)
+    def get_current_cluster(self):
+        with self._lock:
+            value = self._etcd.get_value(ETCD_CLUSTER, ETCD_CLUSTER)
 
         if value is None:
             return None
@@ -206,24 +176,19 @@ class EtcdDB(object):
         cluster.loads(value)
         return cluster
 
-    @staticmethod
-    def set_pod_flag(pod_id, flag):
+    def set_pod_flag(self, pod_id, flag):
         if not flag:
-            EtcdDB.set_pod_status(pod.get_id(), JobStatus.FAILED)
+            EtcdDB.set_pod_status(pod.get_id(), Status.FAILED)
             logger.fatal("local trainers meets error!")
             return
 
-        EtcdDB.set_pod_status(pod.get_id(), JobStatus.SUCCEED)
+        EtcdDB.set_pod_status(pod.get_id(), Status.SUCCEED)
         logger.info("local trainers succeeded!")
 
-    @staticmethod
-    def get_train_status(etcd=None, etcd_lock=None):
-        if etcd is None:
-            etcd, lock = get_global_etcd()
-
-        leader_id = Etcd.get_pod_leader_id()
-        with lock:
-            value = etcd.get_value(ETCD_TRAIN_STATUS, leader_id)
+    def get_train_status(self):
+        leader_id = self.get_pod_leader_id()
+        with self._lock:
+            value = self._etcd.get_value(ETCD_TRAIN_STATUS, leader_id)
 
         if value is None:
             return None
@@ -231,22 +196,14 @@ class EtcdDB(object):
         d = json.load(value)
         return d["status"]
 
-    @staticmethod
-    def set_train_status(pod_id, status):
-        etcd, lock = get_global_etcd()
+    def set_train_status(self, pod_id, status):
         service = ETCD_TRAIN_STATUS
         server = pod_id
         info = json.dumps({"status": int(status)})
-        with lock:
-            etcd.set_server_permanent(service, server, info)
+        with self._lock:
+            self._etcd.set_server_permanent(service, server, info)
 
-    @staticmethod
-    def wait_leader_exit():
-        logger.info("begin to wait leader exit!")
-        logger.info("leader exit so this pod exit!")
-
-    @staticmethod
-    def wait_resource(pod, timeout=15):
+    def wait_resource(self, pod, timeout=15):
         pods = EtdbDB.get_resource_pods_dict()
         if len(pods) == 1:
             if pod.get_id() in pods:
@@ -256,3 +213,16 @@ class EtcdDB(object):
             return True
 
         return False
+
+
+g_etcd_db = None
+
+
+def get_global_etcd(etcd_endpoints=None, job_id=None):
+    global g_etcd_db
+    if g_etcd_db is None:
+        assert etcd_endpoints is not None and job_id is not None
+        g_etcd_db = EtcdDB(etcd_endpoints, job_id)
+        return g_etcd_db
+
+    return g_etcd_db

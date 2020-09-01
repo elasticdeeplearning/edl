@@ -18,7 +18,7 @@ import uuid
 import copy
 
 from .utils import logger
-from .pod import Pod, JobStatus
+from .pod import Pod
 from ..discovery.etcd_client import EtcdClient
 
 import etcd3

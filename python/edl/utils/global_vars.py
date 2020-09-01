@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import threading
-from ..discovery.etcd_client import EtcdClient
+from enum import IntEnum
 
 ETCD_POD_RESOURCE = "pod_resource"
 ETCD_POD_RANK = "rank"
@@ -23,20 +22,28 @@ ETCD_TRAIN_STATUS = "train_status"
 ETCD_CLUSTER = "cluster"
 ETCD_READER = "reader"
 
-g_etcd = None
-g_etcd_lock = None
-g_etcd_conn_timeout = 6
+ETCD_CONN_TIMEOUT = 6
+ETCD_TTL = 15
 
 
-def get_global_etcd(etcd_endpoints=None, job_id=None):
-    global g_etcd
-    global g_etcd_lock
+class Status(IntEnum):
+    INITIAL = 0
+    RUNNING = 1
+    PENDING = 2
+    SUCCEED = 3
+    FAILED = 4
 
-    if g_etcd_lock is None:
-        g_etcd_lock = threading.Lock()
+    @staticmethod
+    def bool_to_status(b):
+        if b:
+            return JobStatus.SUCCEED
 
-    if g_etcd is None:
-        g_etcd = EtcdClient(endpoints=etcd_endpoints, root=job_id, timeout=6)
-        g_etcd.init()
+        return JobStatus.FAILED
 
-    return g_etcd, g_etcd_lock
+
+class TrainStatus(IntEnum):
+    INITIAL = 0
+    RUNNING = 1
+    NEARTHEEND = 3
+    SUCCEED = 3
+    FAILED = 4

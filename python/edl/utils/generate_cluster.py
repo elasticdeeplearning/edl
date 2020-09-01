@@ -18,7 +18,7 @@ import uuid
 import copy
 
 from .utils import logger
-from .pod import Pod, JobStatus
+from .pod import Pod
 from ..discovery.etcd_client import EtcdClient
 
 import etcd3
@@ -27,18 +27,21 @@ from .cluster import Cluster
 
 
 class GenerateCluster(object):
-    def __init__(self):
+    def __init__(self, job_env):
         self._cluster = Cluster()
-        self._service = service
-        self._server = server
+        self._service = ETCD_CLUSTER
+        self._server = ETCD_CLUSTER
         self._stop = threading.Event()
         self._etcd = None
         self._t_register = None
         self._lock = threading.Lock()
+        self._job_env = job_env
 
     def start(self):
         self._etcd = EtcdClient(
-            endpoints=etcd_endpoints, root=job_id, timeout=6)
+            endpoints=self._job_env._etcd_endpoints,
+            root=self._job_env.job_id,
+            timeout=6)
         self._etcd.init()
 
         self._generate_cluster()
@@ -46,11 +49,11 @@ class GenerateCluster(object):
         self._t_register = threading.Thread(target=self._refresher)
         self._t_register.start()
 
-    def _generate_cluster(timeout=600):
+    def _generate_cluster(self, timeout=600):
         begin = time.time()
         while True:
             try:
-                if self._generate_cluster_and_check(self._etcd, self._lock):
+                if self._generate_cluster_and_check():
                     return True
 
                 raise EdlGenerateClusterError("can't generate cluster")
@@ -86,7 +89,7 @@ class GenerateCluster(object):
     def __exit__(self):
         self.stop()
 
-    def _generate_cluster_from_resource(resource_pods):
+    def _generate_cluster_from_resource(self, resource_pods):
         leader_id = Etcd.get_pod_leader_id()
         if leader_id is None or len(resource_pods) <= 0:
             return None
@@ -115,7 +118,7 @@ class GenerateCluster(object):
         new_cluster = copy.copy(current_cluster)
         new_pods = new_cluster.get_pods()
         for pod_id, pod in six.iteritems(resource_pods):
-            if pod.status == JobStatus.INITIAL:
+            if pod.status == Status.INITIAL:
                 pod.rank = rank
                 rank += 1
                 new_pods.append(pod)
@@ -169,30 +172,25 @@ class GenerateCluster(object):
         leader_key = self._etcd.get_full_path(ETCD_POD_RANK, "0")
         cluster_key = self._etcd.get_full_path(ETCD_CLUSTER, ETCD_CLUSTER)
 
-        with lock:
-            etcd = self._etcd._etcd
-            status, _ = etcd.transaction(
-                compare=[
-                    etcd.transactions.value(leader_key) == pod.get_id(),
-                ],
-                success=[
-                    etcd.transactions.put(cluster_key, cluster.to_json()),
-                ],
-                failure=[])
+        etcd = self._etcd._etcd
+        status, _ = etcd.transaction(
+            compare=[etcd.transactions.value(leader_key) == pod.get_id(), ],
+            success=[etcd.transactions.put(cluster_key, cluster.to_json()), ],
+            failure=[])
 
         return status
 
-    def _generate_cluster_and_check(self, job_env):
+    def _generate_cluster_and_check(self):
         current_cluster, new_cluster = self._generate_cluster_once()
         if new_cluster is None:
             logger.warning("can't generate new cluster")
             return False
 
-        if new_cluster.get_pods_nranks() < job_env.min_nodes:
-            new_cluster.status = JobStatus.FAILED
-        elif new_cluster.get_pods_nranks() > job_env.max_nodes:
+        if new_cluster.get_pods_nranks() < self._job_env.min_nodes:
+            new_cluster.status = Status.FAILED
+        elif new_cluster.get_pods_nranks() > self._job_env.max_nodes:
             pods = new_cluster.get_pods()
-            pods = pods[0:job_env.max_nodes]
+            pods = pods[0:self._job_env.max_nodes]
 
         if current_cluster is None or current_cluster.stage != new_cluter.stage:
             logger.info("generate new cluster:{}".format(new_cluster))

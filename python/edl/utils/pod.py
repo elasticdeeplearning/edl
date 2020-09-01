@@ -27,26 +27,13 @@ import subprocess
 import uuid
 import json
 import collections
-from .exceptions import *
-from . import utils
 from enum import IntEnum
+
 from .utils import logger
 from .trainer import Trainer
-
-
-class JobStatus(IntEnum):
-    INITIAL = 0
-    RUNNING = 1
-    PENDING = 2
-    SUCCEED = 3
-    FAILED = 4
-
-    @staticmethod
-    def bool_to_status(b):
-        if b:
-            return JobStatus.SUCCEED
-
-        return JobStatus.FAILED
+from .global_vars import Status
+from .exceptions import *
+from . import utils
 
 
 class Pod(object):
@@ -58,7 +45,7 @@ class Pod(object):
         self._gpus = None
         self._trainers = None
         self._port = None
-        self._status = JobStatus.INITIAL  # status maybe changed
+        self._status = Status.INITIAL  # status maybe changed
 
     def to_json(self):
         d = {

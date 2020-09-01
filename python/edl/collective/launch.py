@@ -31,10 +31,10 @@ import socket
 import traceback
 
 from ..utils.edl_env import JobEnv
-from ..utils.pod import Pod, JobStatus
+from ..utils.pod import Pod
 from ..utils.register import PodResourceRegister
 from ..utils.leader_register import LeaderRegister
-from ..utils.etcd_db import EtcdDB as db
+from ..utils.etcd_db import get_global_etcd
 from ..utils.watcher import Watcher
 from ..utils.pod_server import PodServer
 from ..utils.utils import logger
@@ -130,6 +130,7 @@ def edl_barrier(job_env, pod, timeout):
     log_time = time.time()
     while True:
         try:
+            db = get_global_etcd()
             leader = db.get_pod_leader()
             c = PodServerClient(leader.endpoint)
 
@@ -161,10 +162,10 @@ def prepare(args):
     logger.info("get job env:{}".format(str(job_env)))
 
     # get global etcd and lock
-    get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
+    db = get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
 
     last_status = db.get_job_status()
-    if last_status == JobStatus.SUCCEED:
+    if last_status == Status.SUCCEED:
         logger.info("job:{} has completed! Need't try!".format(job_env.job_id))
         sys.exit(0)
 
@@ -173,7 +174,7 @@ def prepare(args):
     pod.from_env(job_env)
 
     # update pod status
-    db.set_pod_status(pod.get_id(), JobStatus.INITIAL)
+    db.set_pod_status(pod.get_id(), Status.INITIAL)
 
     # launch pod server
     pod_server = None
@@ -194,6 +195,7 @@ def job_exit(leader_register,
              resource_flag,
              timeout=300):
     local_flag = trainer_flag & register_flag & barrier_flag
+    db = get_global_etcd()
     db.set_pod_flag(pod.get_id(), local_flag)
 
     begin = time.time()
@@ -238,7 +240,8 @@ def launch(args):
     cluster = edl_barrier(job_env, pod, timeout=600)
 
     # update pod status
-    db.set_pod_status(pod.get_id(), JobStatus.RUNNING)
+    db = get_global_etcd()
+    db.set_pod_status(pod.get_id(), Status.RUNNING)
 
     # watcher after barrier
     watcher = Watcher(job_env, cluster, pod)

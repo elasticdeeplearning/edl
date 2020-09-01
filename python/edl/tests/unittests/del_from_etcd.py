@@ -14,12 +14,14 @@
 
 from edl.discovery.etcd_client import EtcdClient
 from edl.utils.global_vars import *
+from edl.utils.etcd_db import get_global_etcd
 import os
 
 job_id = os.environ["PADDLE_JOB_ID"]
 etcd_endpoints = os.environ["PADDLE_ETCD_ENDPOINTS"]
 
-etcd, _ = get_global_etcd([etcd_endpoints], job_id)
+db = get_global_etcd([etcd_endpoints], job_id)
+etcd = db._etcd
 etcd.remove_service(ETCD_POD_RESOURCE)
 etcd.remove_service(ETCD_POD_RANK)
 etcd.remove_service(ETCD_POD_STATUS)
