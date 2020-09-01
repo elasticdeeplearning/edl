@@ -187,7 +187,7 @@ def prepare(args):
     pod_server.start(job_env, pod)
     logger.info("pod server started:[{}]".format(pod))
 
-    return job_env, pod
+    return job_env, pod, pod_server
 
 
 def job_exit(leader_register,
@@ -230,7 +230,7 @@ def job_exit(leader_register,
 
 
 def launch(args):
-    job_env, pod = prepare(args)
+    job_env, pod, pod_server = prepare(args)
 
     # register pod resource to tell others:
     # this resource can use to train
