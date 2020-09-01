@@ -49,8 +49,8 @@ class JobEnv(object):
                                                "PADDLE_EDL_HDFS_HOME")
         self._hdfs_name = get_from_dict_or_env(args, "hdfs_name",
                                                "PADDLE_EDL_HDFS_NAME")
-        self._hdfs_path = get_from_dict_or_env(
-            args, "hdfs_path", "PADDLE_EDL_HDFS_CHECKPOINT_PATH")
+        self._hdfs_path = get_from_dict_or_env(args, "hdfs_path",
+                                               "PADDLE_EDL_HDFS_PATH")
         self._hdfs_ugi = get_from_dict_or_env(args, "hdfs_ugi",
                                               "PADDLE_EDL_HDFS_UGI")
 
@@ -67,6 +67,10 @@ class JobEnv(object):
 
     def _get_gpus(self, args):
         # selected gpus
+        cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES")
+        if cuda_visible_devices is None or cuda_visible_devices == "":
+            selected_gpus = [x.strip() for x in selected_gpus.split(',')]
+
         self._gpus = utils.get_gpus(None)
         assert self._gpus != None, "can't get gpu info of this machine"
 
@@ -115,12 +119,6 @@ class JobEnv(object):
             assert len(self._hdfs_home) > 3 and \
                 len(self._hdfs_path) > 0, "hdfs environ must set"
 
-    """
-    @property
-    def up_limit_nodes(self):
-        return self._up_limit_nodes
-    """
-
     @property
     def gpus(self):
         return self._gpus
@@ -164,9 +162,9 @@ class TrainerEnv(JobEnv):
     def __init__(self, args=None):
         super(TrainerEnv, self).__init__(args)
 
-        self._rank = os["PADDLE_TRAINER_ID"]
-        self._rank_in_pod = os["PADDLE_TRAINER_RANK_IN_POD"]
-        self._trainer_endpoints = os["PADDLE_TRAINER_ENDPOINTS"]
+        self._rank = os.environ["PADDLE_TRAINER_ID"]
+        self._rank_in_pod = os.environ["PADDLE_TRAINER_RANK_IN_POD"]
+        self._trainer_endpoints = os.environ["PADDLE_TRAINER_ENDPOINTS"]
 
     @property
     def rank(self):

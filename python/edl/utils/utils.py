@@ -16,6 +16,7 @@ import paddle.fluid as fluid
 import logging
 import google.protobuf.text_format as text_format
 import socket
+import os
 from contextlib import closing
 
 from . import pod_server_pb2

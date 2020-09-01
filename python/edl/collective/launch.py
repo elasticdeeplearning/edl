@@ -133,7 +133,10 @@ def edl_barrier(job_env, pod, timeout):
             db = get_global_etcd()
             leader = db.get_pod_leader()
             if leader is None:
-                raise EdlGenerateClusterError("can't get leader")
+                raise EdlNotFoundLeader("can't get leader")
+
+            logger.debug("barrier on leader:{}".format(leader))
+            #time.sleep(300)
 
             c = PodServerClient(leader.endpoint)
             cluster = c.barrier(job_env.job_id, pod.get_id())

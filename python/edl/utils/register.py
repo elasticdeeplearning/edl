@@ -56,14 +56,12 @@ class Register(object):
 
     def _refresher(self):
         while not self._stop.is_set():
-            with self._lock:
-                info = self._info
-
             try:
-                self._etcd.refresh(self._service, self._server, info)
+                self._etcd.refresh(self._service, self._server)
                 time.sleep(3)
             except Exception as e:
-                logger.fatal("register meet error and exit! error:".format(e))
+                logger.fatal("register meet error and exit! class:{} error:{}".
+                             format(self.__class__.__name__, e))
                 break
 
     def stop(self):

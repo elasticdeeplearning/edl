@@ -173,7 +173,9 @@ class GenerateCluster(object):
                                          new_cluster)
                 return current_cluster, new_cluster
 
-        logger.debug("find succeed pods:{}".format(succeed))
+        if len(succeed) > 0:
+            logger.debug("find succeed pods:{}".format(succeed))
+
         new_cluster = copy.copy(current_cluster)
         return current_cluster, new_cluster
 
@@ -195,11 +197,10 @@ class GenerateCluster(object):
             logger.warning("can't generate new cluster")
             return False
 
-        logger.debug("new clsuter pods size:{} job_env range:[{}:{}]".format(
-            new_cluster.get_pods_nranks(
-            ), self._job_env.min_nodes, self._job_env.max_nodes))
-
         if new_cluster.get_pods_nranks() < self._job_env.min_nodes:
+            logger.debug("new clsuter pods size:{} wait job_env range:[{}:{}]".
+                         format(new_cluster.get_pods_nranks(
+                         ), self._job_env.min_nodes, self._job_env.max_nodes))
             new_cluster.status = Status.FAILED
         elif new_cluster.get_pods_nranks() > self._job_env.max_nodes:
             pods = new_cluster.get_pods()

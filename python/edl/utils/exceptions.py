@@ -52,6 +52,10 @@ class EdlGenerateClusterError(EdlException):
     pass
 
 
+class EdlNotFoundLeader(EdlException):
+    pass
+
+
 def deserialize_exception(s):
     thismodule = sys.modules[__name__]
     cls = getattr(thismodule, s.type)(s.detail)

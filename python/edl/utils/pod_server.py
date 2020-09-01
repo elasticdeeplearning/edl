@@ -21,16 +21,15 @@ import logging
 from threading import Thread, Lock
 from six.moves.queue import Queue
 import traceback
-from .exceptions import *
 import signal
 import threading
 import copy
-from .utils import logger
 from . import common_pb2 as common_pb
 from . import pod_server_pb2 as pod_server_pb
 from . import pod_server_pb2_grpc as pod_server_pb_grpc
 from .etcd_db import EtcdDB
 from .exceptions import *
+from .utils import logger
 
 
 class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
@@ -76,10 +75,8 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
             return res
 
         ids = cluster.get_pods_ids_set()
-        logger.debug(
-            "get barrier request from job_id:{} pod_id:{} ids_set:{} leader:{}".
-            format(request.job_id, request.pod_id, ids, cluster.pods[0].get_id(
-            )))
+        logger.debug("get barrier request from job_id:{} pod_id:{} ids_set:{}".
+                     format(request.job_id, request.pod_id, ids))
 
         try:
             key = cluster.stage
@@ -111,30 +108,30 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
 
 
 class PodServer(object):
-    def __init__(self, job_env, pod_id):
+    def __init__(self, job_env, pod):
         self._server = None
         self._port = None
         self._endpoint = None
-        self._pod_id = pod_id
+        self._pod = pod
         self._job_env = job_env
 
-    def start(self, job_env, pod, concurrency=20, max_workers=100):
+    def start(self, concurrency=20, max_workers=100):
         server = grpc.server(
             futures.ThreadPoolExecutor(max_workers=max_workers),
             options=[('grpc.max_send_message_length', 1024 * 1024 * 1024),
                      ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
             maximum_concurrent_rpcs=concurrency)
         pod_server_pb_grpc.add_PodServerServicer_to_server(
-            PodServerServicer(self._job_env, self._pod_id), server)
+            PodServerServicer(self._job_env, self._pod.get_id()), server)
 
-        self._port = server.add_insecure_port('{}:0'.format(pod.addr))
+        self._port = server.add_insecure_port('{}:0'.format(self._pod.addr))
         assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(
-            pod.addr, self._port)
-        self._endpoint = "{}:{}".format(pod.addr, self._port)
+            self._pod.addr, self._port)
+        self._endpoint = "{}:{}".format(self._pod.addr, self._port)
 
         server.start()
         self._server = server
-        pod.port = self._port
+        self._pod.port = self._port
 
         logger.info("start podserver at:{}".format(self._endpoint))
 

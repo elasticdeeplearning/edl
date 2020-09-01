@@ -43,9 +43,6 @@ class PodServerClient(Client):
         req.job_id = job_id
         req.pod_id = pod_id
 
-        db = get_global_etcd()
-        leader = db.get_pod_leader()
-
         c, s = self.connect()
         begin = time.time()
         cluster = Cluster()
