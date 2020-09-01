@@ -147,7 +147,7 @@ class EtcdDB(object):
 
     def get_cluster(self):
         begin = time.time()
-        leader_id = EtcdDB.get_pod_leader_id()
+        leader_id = self.get_pod_leader_id()
         with self._lock:
             value = self._etcd.get_value(ETCD_CLUSTER, leader_id)
 
@@ -159,7 +159,7 @@ class EtcdDB(object):
         return cluster
 
     def get_pod_leader(self, timeout=15):
-        cluster = EtcdDB.get_cluster(timeout)
+        cluster = self.get_cluster(timeout)
         return cluster.pods[0]
 
     def get_data_reader_leader(self):
@@ -178,11 +178,11 @@ class EtcdDB(object):
 
     def set_pod_flag(self, pod_id, flag):
         if not flag:
-            EtcdDB.set_pod_status(pod.get_id(), Status.FAILED)
+            self.set_pod_status(pod.get_id(), Status.FAILED)
             logger.fatal("local trainers meets error!")
             return
 
-        EtcdDB.set_pod_status(pod.get_id(), Status.SUCCEED)
+        self.set_pod_status(pod.get_id(), Status.SUCCEED)
         logger.info("local trainers succeeded!")
 
     def get_train_status(self):
