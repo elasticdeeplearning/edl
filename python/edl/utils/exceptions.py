@@ -59,6 +59,7 @@ class EdlNotFoundLeader(EdlException):
 def deserialize_exception(s):
     thismodule = sys.modules[__name__]
     cls = getattr(thismodule, s.type)(s.detail)
+    print(type(cls))
     raise cls
 
 

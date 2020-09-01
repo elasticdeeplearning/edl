@@ -26,6 +26,7 @@ from ..discovery.etcd_client import EtcdClient
 import etcd3
 from .global_vars import *
 from .cluster import Cluster
+from .exceptions import EdlGenerateClusterError
 from .etcd_db import get_global_etcd
 
 
@@ -99,11 +100,15 @@ class GenerateCluster(object):
     def _generate_cluster_from_resource(self, resource_pods):
         leader_id = self._db.get_pod_leader_id()
         if leader_id is None or len(resource_pods) <= 0:
+            logger.warning("get leader_id:{} resource_pods:{}".format(
+                leader_id, resource_pods.keys()))
             return None
 
         new_cluster = Cluster()
         pods = new_cluster.get_pods()
         if leader_id not in resource_pods:
+            logger.warning("leader_id:{} is not in resource_pods:{}".format(
+                leader_id, resource_pods.keys()))
             return None
 
         rank = 0
@@ -160,7 +165,7 @@ class GenerateCluster(object):
         if len(succeed) > 0:
             logger.debug("find succeed pods:{}".format(succeed))
             new_cluster = copy.copy(current_cluster)
-            return new_cluster
+            return current_cluster, new_cluster
 
         running = current_ids & all_running
         inited = current_ids & all_inited
@@ -189,6 +194,7 @@ class GenerateCluster(object):
             success=[etcd.transactions.put(cluster_key, cluster.to_json()), ],
             failure=[])
 
+        logger.debug("_set_cluster_if_leader status:{}".format(status))
         return status
 
     def _generate_cluster_and_check(self):

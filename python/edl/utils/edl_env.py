@@ -67,11 +67,7 @@ class JobEnv(object):
 
     def _get_gpus(self, args):
         # selected gpus
-        cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES")
-        if cuda_visible_devices is None or cuda_visible_devices == "":
-            selected_gpus = [x.strip() for x in selected_gpus.split(',')]
-
-        self._gpus = utils.get_gpus(None)
+        self._gpus = utils.get_gpus()
         assert self._gpus != None, "can't get gpu info of this machine"
 
         # proc per node

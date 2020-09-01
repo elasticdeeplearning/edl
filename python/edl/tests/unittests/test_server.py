@@ -27,20 +27,27 @@ from edl.utils.pod import Pod
 from edl.utils.pod_client import PodServerClient
 from edl.utils.exceptions import EdlBarrierError
 import edl.utils.utils as utils
+from edl.utils.global_vars import *
+from edl.utils.generate_cluster import GenerateCluster
+from edl.utils.etcd_db import get_global_etcd
+from edl.utils.leader_register import LeaderRegister
+
+g_job_id = "test_barrier"
+g_etcd_endpoints = "127.0.0.1:2379"
 
 
-class TestServer(unittest.TestCase):
+class TestBarrier(unittest.TestCase):
     def setUp(self):
         utils.get_logger(log_level=10)
-        self.etcd = EtcdClient()
-        self.etcd.init()
+        self._etcd = EtcdClient([g_etcd_endpoints], root=g_job_id)
+        self._etcd.init()
 
         self._args = _parse_args()
         self._old_environ = copy.copy(dict(os.environ))
         proc_env = {
             "PADDLE_TRAINER_ID": "0",
             "PADDLE_RUNNING_PLATFORM": "PADDLE_CLOUD",
-            "PADDLE_JOB_ID": "test_server",
+            "PADDLE_JOB_ID": g_job_id,
             "PADDLE_EDL_HDFS_HOME": "/usr/local/hadoop-2.7.7",
             "PADDLE_EDL_HDFS_NAME": "",
             "PADDLE_EDL_HDFS_UGI": "",
@@ -66,15 +73,40 @@ class TestServer(unittest.TestCase):
         os.environ.clear()
         os.environ.update(self._old_environ)
 
-    def test_server(self):
+    def register_pod(self, job_env):
         pod = Pod()
-        pod.from_env(self._job_env)
+        pod.from_env(job_env)
         s = PodServer(self._job_env, pod)
         s.start()
-        time.sleep(5)
+        self._etcd.set_server_permanent(ETCD_POD_RESOURCE,
+                                        pod.get_id(), pod.to_json())
+        print("set permanent:", self._etcd.get_full_path(ETCD_POD_RESOURCE,
+                                                         pod.get_id()))
+        return pod, s
+
+    def test_server(self):
+        get_global_etcd(self._job_env.etcd_endpoints, self._job_env.job_id)
+
+        pod_0, server_0 = self.register_pod(self._job_env)
+        register = LeaderRegister(self._job_env, pod_0.get_id())
+
+        pod_1, server_1 = self.register_pod(self._job_env)
+
+        generater = GenerateCluster(self._job_env, pod_0.get_id())
+        ret = generater.start()
+
+        cluster_0 = None
+        clsuter_1 = None
         try:
-            c = PodServerClient(pod.endpoint)
-            cluster = c.barrier(self._job_env.job_id, pod.get_id(), timeout=0)
-            self.assertEqual(cluster, None)
+            c = PodServerClient(pod_0.endpoint)
+            cluster_0 = c.barrier(
+                self._job_env.job_id, pod_0.get_id(), timeout=0)
+
+            self.assertEqual(cluster_0, None)
         except EdlBarrierError as e:
+            print(e)
+
+            cluster_1 = c.barrier(
+                self._job_env.job_id, pod_1.get_id(), timeout=0)
+            self.assertNotEqual(cluster_1, None)
             pass

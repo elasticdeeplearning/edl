@@ -68,17 +68,18 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
     def Barrier(self, request, context):
         res = pod_server_pb.BarrierResponse()
 
-        cluster = self._db.get_cluster()
-        if cluster == None:
-            serialize_exception(
-                res, EdlBarrierError("get current running cluster error"))
-            return res
-
-        ids = cluster.get_pods_ids_set()
-        logger.debug("get barrier request from job_id:{} pod_id:{} ids_set:{}".
-                     format(request.job_id, request.pod_id, ids))
-
         try:
+            cluster = self._db.get_cluster()
+            if cluster is None:
+                serialize_exception(
+                    res, EdlBarrierError("get current running cluster error"))
+                return res
+
+            ids = cluster.get_pods_ids_set()
+            logger.debug(
+                "get barrier request from job_id:{} pod_id:{} ids_set:{}".
+                format(request.job_id, request.pod_id, ids))
+
             key = cluster.stage
 
             with self._lock:
