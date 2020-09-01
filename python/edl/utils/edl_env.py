@@ -102,8 +102,8 @@ class JobEnv(object):
         self._get_gpus(args)
         self._get_ports(args)
 
-        self._up_limit_nodes = int(
-            os.getenv("PADDLE_EDL_UP_LIMIT_NODES", 1024))
+        #self._up_limit_nodes = int(
+        #    os.getenv("PADDLE_EDL_UP_LIMIT_NODES", 1024))
 
         # assert hdfs value
         if not self._ce_test:
@@ -115,9 +115,11 @@ class JobEnv(object):
             assert len(self._hdfs_home) > 3 and \
                 len(self._hdfs_path) > 0, "hdfs environ must set"
 
+    """
     @property
     def up_limit_nodes(self):
         return self._up_limit_nodes
+    """
 
     @property
     def gpus(self):

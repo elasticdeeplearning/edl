@@ -44,12 +44,12 @@ class Cluster(object):
         self._status = Status.INITIAL
 
     def __str__(self):
-        return "pods:{} job_stage:{}".format([str(pod) for pod in self._pods],
-                                             self._stage)
+        return "pods:{} job_stage:{} status:{}".format(
+            [str(pod) for pod in self._pods], self._stage, self._status)
 
     def details(self):
-        return "pods:{} job_stage:{}".format(
-            [pod.details() for pod in self._pods], self._stage)
+        return "pods:{} job_stage:{} status:{}".format(
+            [pod.details() for pod in self._pods], self._stage, self._status)
 
     def __eq__(self, cluster):
         if self._stage != cluster._stage:
@@ -135,7 +135,7 @@ class Cluster(object):
         for i, pod in enumerate(self._pods):
             d[i] = pod.to_json()
 
-        d = {"pods": d, "stage": self._stage}
+        d = {"pods": d, "stage": self._stage, "status": int(self._status)}
 
         return json.dumps(d)
 
@@ -143,12 +143,13 @@ class Cluster(object):
         d = json.loads(s)
         pods = d["pods"]
         self._stage = d["stage"]
+        self._status = d["status"]
 
         od = collections.OrderedDict(sorted(d["pods"].items()))
         pods = []
         for i, (key, value) in enumerate(od.iteritems()):
             pod = Pod()
-            if i != key:
+            if i != int(key):
                 raise EdlRankError("rank:{} is not exists in {}".format(i, d))
             pod.from_json(value)
             pods.append(pod)
@@ -165,3 +166,7 @@ class Cluster(object):
 
     def new_stage(self):
         self._stage = str(uuid.uuid1())
+
+    @property
+    def stage(self):
+        return self._stage

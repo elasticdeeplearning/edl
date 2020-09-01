@@ -87,7 +87,7 @@ class GenerateCluster(object):
                 self._t_register.join()
                 self._t_register = None
 
-        logger.info("{} exit".format(self.__class__.__name__))
+        logger.debug("{} exit".format(self.__class__.__name__))
 
     def is_stopped(self):
         with self._lock:
@@ -144,7 +144,7 @@ class GenerateCluster(object):
             return None, new_cluster
 
         current_ids = current_cluster.get_pods_ids_set()
-        resource_ids = resource_pods.keys()
+        resource_ids = set(resource_pods.keys())
         all_inited, all_running, all_succeed, all_failed = self._db.get_pods_status(
         )
 
@@ -195,14 +195,19 @@ class GenerateCluster(object):
             logger.warning("can't generate new cluster")
             return False
 
+        logger.debug("new clsuter pods size:{} job_env range:[{}:{}]".format(
+            new_cluster.get_pods_nranks(
+            ), self._job_env.min_nodes, self._job_env.max_nodes))
+
         if new_cluster.get_pods_nranks() < self._job_env.min_nodes:
             new_cluster.status = Status.FAILED
         elif new_cluster.get_pods_nranks() > self._job_env.max_nodes:
             pods = new_cluster.get_pods()
             pods = pods[0:self._job_env.max_nodes]
 
-        if current_cluster is None or current_cluster.stage != new_cluter.stage:
-            logger.info("generate new cluster:{}".format(new_cluster))
+        if current_cluster is None or current_cluster.stage != new_cluster.stage:
+            logger.info("current_cluster:{} to  new_cluster:{}".format(
+                current_cluster, new_cluster))
             return self._set_cluster_if_leader(new_cluster)
 
         return True

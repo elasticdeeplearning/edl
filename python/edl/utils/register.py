@@ -23,6 +23,7 @@ from ..discovery.etcd_client import EtcdClient
 
 import etcd3
 from .global_vars import *
+from .etcd_db import get_global_etcd, ETCD_TTL
 
 
 class Register(object):
@@ -41,7 +42,7 @@ class Register(object):
 
         try:
             self._etcd.set_server_not_exists(
-                service, server, self._info, ttl=15)
+                service, server, self._info, ttl=ETCD_TTL)
             logger.info("register pod:{} in etcd path:{}".format(
                 info, self._etcd.get_full_path(service, server)))
         except Exception as e:
@@ -60,10 +61,9 @@ class Register(object):
 
             try:
                 self._etcd.refresh(self._service, self._server, info)
-                time.sleep(2)
+                time.sleep(3)
             except Exception as e:
                 logger.fatal("register meet error and exit! error:".format(e))
-                self._stopped = True
                 break
 
     def stop(self):
@@ -97,6 +97,30 @@ class PodResourceRegister(Register):
             service=service,
             server=server,
             info=value)
+
+        db = get_global_etcd()
+        db.get_resource_pods_dict()
+
+    """
+        time.sleep(300)
+
+    def _refresher(self):
+        while not self._stop.is_set():
+            with self._lock:
+                info = self._info
+
+            try:
+                self._etcd.refresh(self._service, self._server, info)
+
+                db=get_global_etcd()
+                db.get_resource_pods_dict()
+
+                time.sleep(2)
+            except Exception as e:
+                logger.fatal("register meet error and exit! error:".format(e))
+                self._stopped = True
+                break
+    """
 
 
 class DataReaderRegister(Register):

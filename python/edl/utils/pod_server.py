@@ -29,7 +29,7 @@ from .utils import logger
 from . import common_pb2 as common_pb
 from . import pod_server_pb2 as pod_server_pb
 from . import pod_server_pb2_grpc as pod_server_pb_grpc
-from .etcd_db import EtcdDB as db
+from .etcd_db import EtcdDB
 from .exceptions import *
 
 
@@ -44,9 +44,11 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         self._pod_id = pod_id
         self._job_env = job_env
 
+        self._db = EtcdDB(job_env.etcd_endpoints, job_env.job_id)
+
     def ScaleOut(self, request, context):
         status = common_pb.Status()
-        pod = db.get_pod_leader()
+        pod = self._db.get_pod_leader()
         if pod.get_id != self._pod_id:
             status = serialize_exception(
                 EdlLeaderError("this pod is not the leader"))
@@ -56,7 +58,7 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
 
     def ScaleIn(self, request, context):
         status = common_pb.Status()
-        pod = db.get_pod_leader()
+        pod = self._db.get_pod_leader()
         if pod.get_id != self._pod_id:
             status = serialize_exception(
                 EdlLeaderError("this pod is not the leader"))
@@ -64,24 +66,10 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
 
         return status
 
-    def IsWorldChanged(self, request, context):
-        """
-        1. failed/disappeared
-        2. new added?
-        """
-        pass
-
-    def GetDiffPods(self, request, context):
-        # return succeed, failed, added, inited
-        pass
-
     def Barrier(self, request, context):
-        """
-        1. pods barrier on the cluster's current stage
-        """
         res = pod_server_pb.BarrierResponse()
 
-        cluster = db.get_cluster()
+        cluster = self._db.get_cluster()
         if cluster == None:
             serialize_exception(
                 res, EdlBarrierError("get current running cluster error"))
@@ -100,16 +88,10 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
                 if key not in self._barrier_in:
                     self._barrier_in[key] = set()
 
-                bd = self._barrier_in[leader.stage]
+                bd = self._barrier_in[key]
                 bd.add(request.pod_id)
 
             if ids == bd:
-                if len(rank_ids) < self._job_env.min_nodes:
-                    message = "barrier's rank cluster now:{} is not enough of job's min nodes:{}".format(
-                        ids, self._job_env.min_nodes())
-                    serialize_exception(res, EdlBarrierError(message))
-                    return res
-
                 res.cluster_json = cluster.to_json()
                 return res
 

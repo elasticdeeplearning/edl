@@ -50,7 +50,7 @@ class EtcdDB(object):
             servers = self._etcd.get_service(service)
 
         inited = set()
-        runing = set()
+        running = set()
         succeed = set()
         failed = set()
         for server in servers:
@@ -155,7 +155,6 @@ class EtcdDB(object):
         if value is None:
             return None
 
-        print("cluster value:", value)
         cluster = Cluster()
         cluster.from_json(value)
         return cluster
