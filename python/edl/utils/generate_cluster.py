@@ -62,16 +62,14 @@ class GenerateCluster(object):
         begin = time.time()
         while not self._stop.is_set():
             try:
-                if not self._generate_cluster_and_check():
-                    raise EdlGenerateClusterError("can't generate cluster")
+                self._generate_cluster_and_check()
 
                 begin = time.time()
                 logger.debug("generate cluster ok!")
                 time.sleep(3)
             except Exception as e:
                 if time.time() - begin >= timeout:
-                    mesage = "can't generate cluster exit!"
-                    raise EdlGenerateClusterError(message)
+                    raise e
 
                 time.sleep(3)
                 logger.debug("_generate_cluster error:{} {}".format(
@@ -95,17 +93,16 @@ class GenerateCluster(object):
 
     def _generate_cluster_from_resource(self, resource_pods):
         leader_id = self._db.get_pod_leader_id()
-        if leader_id is None or len(resource_pods) <= 0:
-            logger.warning("get leader_id:{} resource_pods:{}".format(
-                leader_id, resource_pods.keys()))
-            return None
+        if leader_id is None:
+            raise EdlTableError("leader key={}:{}".format(
+                self._etcd.get_full_path(ETCD_POD_RESOURCE, ETCD_POD_RANK),
+                leader_id))
 
         new_cluster = Cluster()
         pods = new_cluster.get_pods()
         if leader_id not in resource_pods:
-            logger.warning("leader_id:{} is not in resource_pods:{}".format(
-                leader_id, resource_pods.keys()))
-            return None
+            raise EdlTableError("leader error, leader:{} not in resource:{}".
+                                format(leader_id, resource.keys()))
 
         rank = 0
         pods.append(resource_pods[leader_id])
@@ -147,14 +144,19 @@ class GenerateCluster(object):
         current_cluster = self._db.get_cluster()
         resource_pods = self._db.get_resource_pods_dict()
 
+        if len(resource_pods) <= 0:
+            raise EdlTableError("resource pods key={}:{}".format(
+                self._etcd.get_full_path(ETCD_POD_RESOURCE, self._pod_id),
+                resource_pods))
+
         if current_cluster is None:
             new_cluster = self._generate_cluster_from_resource(resource_pods)
             return None, new_cluster
 
         current_ids = current_cluster.get_pods_ids_set()
         resource_ids = set(resource_pods.keys())
-        all_inited, all_running, all_succeed, all_failed = self._db.get_pods_status(
-        )
+        all_inited, all_running, all_succeed, all_failed =\
+            self._db.get_pods_status()
 
         disappeared = current_ids - resource_ids - all_inited - all_running - all_succeed - all_failed
         failed = current_ids & all_failed
@@ -172,8 +174,8 @@ class GenerateCluster(object):
 
         running = current_ids & all_running
         inited = current_ids & all_inited
-        if len(inited) > 0 and current_cluster.get_pods_nranks(
-        ) < self._job_env.max_nodes:
+        if len(inited) > 0 and \
+                current_cluster.get_pods_nranks() < self._job_env.max_nodes:
             train_status = self._db.get_train_status()
             if train_status == TrainStatus.INITIAL or train_status == TrainStatus.RUNNING:
                 logger.info("find running pods:{} and init pods{}".format(
@@ -205,22 +207,16 @@ class GenerateCluster(object):
 
     def _generate_cluster_and_check(self):
         current_cluster, new_cluster = self._generate_cluster_once()
-        if new_cluster is None:
-            logger.warning("can't generate new cluster")
-            return False
 
         if new_cluster.get_pods_nranks() < self._job_env.min_nodes:
-            logger.debug(
-                "new cluster pods size:{} ids:{}wait job_env range:[{}:{}]".
-                format(new_cluster.get_pods_nranks(),
-                       new_cluster.get_pods_ids_set(), self._job_env.min_nodes,
-                       self._job_env.max_nodes))
-            new_cluster.status = Status.FAILED
-            return False
+            message = "new cluster pods size:{} ids:{} wait job_env range:[{}:{}]".format(
+                new_cluster.get_pods_nranks(),
+                new_cluster.get_pods_ids_set(), self._job_env.min_nodes,
+                self._job_env.max_nodes)
+            #new_cluster.status = Status.FAILED
+            raise EdlGenerateClusterError(message)
 
         if current_cluster is None or current_cluster.stage != new_cluster.stage:
             logger.info("current_cluster:{} to  new_cluster:{}".format(
                 current_cluster, new_cluster))
-            return self._set_cluster_if_leader(new_cluster)
-
-        return True
+            self._set_cluster_if_leader(new_cluster)

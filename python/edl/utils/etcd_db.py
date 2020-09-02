@@ -95,38 +95,6 @@ class EtcdDB(object):
         d = json.loads(s.info)
         return d["status"]
 
-    def wait_following_ranks(self, timeout=60):
-        """
-        Note: some pod may regist to ranks when other waiting already.
-        """
-        service = ETCD_POD_RANK
-        start = time.time()
-
-        while True:
-            with self._lock:
-                servers = self._etcd.get_service(service)
-
-            if time.time() - start >= timeout:
-                cluster = self.get_rank_cluster()
-                raise EdlWaitFollowersReleaseError(
-                    "the pods did't release their register:{}".format(
-                        cluster.get_pods_ids()))
-
-            if len(servers) > 1:
-                time.sleep(2)
-                continue
-
-            if len(servers) < 1:
-                return True
-
-            pod = Pod()
-            pod.from_json(servers[0].info)
-
-            if pod.rank != 0:
-                continue
-
-            return True
-
     def get_resource_pods_dict(self):
         with self._lock:
             servers = self._etcd.get_service(ETCD_POD_RESOURCE)
@@ -142,6 +110,9 @@ class EtcdDB(object):
     def get_pod_leader_id(self):
         with self._lock:
             value = self._etcd.get_value(ETCD_POD_RANK, ETCD_POD_LEADER)
+
+        if value is None:
+            return None
 
         return value
 
@@ -161,15 +132,19 @@ class EtcdDB(object):
 
     def get_pod_leader(self):
         leader_id = self.get_pod_leader_id()
-        if leader_id is None:
-            return None
-
         cluster = self.get_cluster()
+
+        if leader_id is None:
+            raise EdlTableError("leader_id={}:{}".format(
+                self.get_rank_table_key(), leader_id))
+
         if cluster is None:
-            return None
+            raise EdlTableError("cluster={}:{}".format(
+                self.get_cluster_table_key(), cluster))
 
         if cluster.pods[0].get_id() != leader_id:
-            return None
+            raise EdlLeaderError("{} not equal to {}".format(cluster.pods[
+                0].get_id(), leader_id))
 
         return cluster.pods[0]
 
@@ -192,6 +167,15 @@ class EtcdDB(object):
 
         d = json.load(value)
         return d["status"]
+
+    def get_train_status_table_key(self, server_name):
+        return self._etcd.get_full_path(ETCD_TRAIN_STATUS, server_name)
+
+    def get_cluster_table_key(self):
+        return self._etcd.get_full_path(ETCD_CLUSTER, ETCD_CLUSTER)
+
+    def get_rank_table_key(self):
+        return self._etcd.get_full_path(ETCD_POD_RANK, ETCD_POD_LEADER)
 
     def set_train_status(self, pod_id, status):
         service = ETCD_TRAIN_STATUS

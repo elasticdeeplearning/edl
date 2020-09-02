@@ -136,7 +136,6 @@ def edl_barrier(job_env, pod, timeout):
                 raise EdlNotFoundLeader("can't get leader")
 
             logger.debug("barrier on leader:{}".format(leader))
-            #time.sleep(300)
 
             c = PodServerClient(leader.endpoint)
             cluster = c.barrier(job_env.job_id, pod.get_id())

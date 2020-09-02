@@ -48,11 +48,15 @@ class EdlWaitFollowersReleaseError(EdlException):
     pass
 
 
+class EdlLeaderError(EdlException):
+    pass
+
+
 class EdlGenerateClusterError(EdlException):
     pass
 
 
-class EdlNotFoundLeader(EdlException):
+class EdlTableError(EdlException):
     pass
 
 
