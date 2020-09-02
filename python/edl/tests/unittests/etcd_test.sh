@@ -1,6 +1,4 @@
 #!/bin/bash
-set -e
-
 name=${TEST_TARGET_NAME}
 TEST_TIMEOUT=${TEST_TIMEOUT}
 
@@ -27,7 +25,6 @@ echo "run_time: ${run_time}"
 timeout -s SIGKILL ${run_time} python -u ${name}.py > ${name}_run.log 2>&1
 exit_code=$?
 
-set +e
 kill -9 $etcd_pid
 
 echo "${name} faild with ${exit_code}"
