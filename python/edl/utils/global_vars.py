@@ -37,9 +37,9 @@ class Status(IntEnum):
     @staticmethod
     def bool_to_status(b):
         if b:
-            return JobStatus.SUCCEED
+            return Status.SUCCEED
 
-        return JobStatus.FAILED
+        return Status.FAILED
 
 
 class TrainStatus(IntEnum):

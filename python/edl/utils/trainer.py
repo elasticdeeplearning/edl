@@ -31,20 +31,7 @@ from .exceptions import *
 from . import utils
 from enum import IntEnum
 from .utils import logger
-
-
-class TrainStatus(IntEnum):
-    INITIAL = 0
-    RUNNING = 1
-    TAILED = 3  # almost complete
-    COMPLETE = 4
-
-    @staticmethod
-    def bool_to_status(b):
-        if b:
-            return JobStatus.SUCCEED
-
-        return JobStatus.ERROR
+from .global_vars import TrainStatus
 
 
 class Trainer(object):
