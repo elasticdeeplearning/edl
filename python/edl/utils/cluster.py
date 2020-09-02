@@ -52,6 +52,9 @@ class Cluster(object):
             [pod.details() for pod in self._pods], self._stage, self._status)
 
     def __eq__(self, cluster):
+        if cluster is None:
+            return False
+
         if self._stage != cluster._stage:
             return False
 
@@ -170,3 +173,11 @@ class Cluster(object):
     @property
     def stage(self):
         return self._stage
+
+    @property
+    def status(self):
+        return self._status
+
+    @status.setter
+    def status(self, s):
+        self._status = s

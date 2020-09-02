@@ -118,6 +118,8 @@ class LeaderRegister(object):
                 self._t_register = None
                 self._etcd.remove_server(self._service_name, self._server)
 
+                self._generate_cluster.stop()
+
         logger.info("pod_register stopped")
 
     def __exit__(self):

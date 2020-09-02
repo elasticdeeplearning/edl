@@ -141,7 +141,7 @@ class EtcdDB(object):
 
     def get_pod_leader_id(self):
         with self._lock:
-            value = self._etcd.get_value(ETCD_POD_RANK, "0")
+            value = self._etcd.get_value(ETCD_POD_RANK, ETCD_POD_LEADER)
 
         return value
 

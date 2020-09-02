@@ -49,15 +49,15 @@ class PodServerClient(Client):
         while True:
             res = s.Barrier(req)
             if res.status.type == "":
-                cluster.from_pb_response(res)
+                cluster.from_json(res.cluster_json)
                 logger.debug("pod client get cluster:{}".format(cluster))
                 logger.info("barrier ok!")
                 return cluster
 
-            deserialize_exception(res.status)
             if time.time() - begin > timeout:
                 message = "job_id:{} pod_id:{} barrier time out".format(job_id,
                                                                         pod_id)
+                logger.info(message)
                 deserialize_exception(res.status)
             time.sleep(1)
 

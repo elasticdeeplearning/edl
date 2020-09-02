@@ -18,6 +18,7 @@ import time
 import threading
 import os
 import copy
+import atexit
 from etcd3.events import PutEvent, DeleteEvent
 
 from edl.utils.edl_env import JobEnv
@@ -31,6 +32,7 @@ from edl.utils.global_vars import *
 from edl.utils.generate_cluster import GenerateCluster
 from edl.utils.etcd_db import get_global_etcd
 from edl.utils.leader_register import LeaderRegister
+from threading import Thread
 
 g_job_id = "test_barrier"
 g_etcd_endpoints = "127.0.0.1:2379"
@@ -41,8 +43,9 @@ class TestBarrier(unittest.TestCase):
         utils.get_logger(log_level=10)
         self._etcd = EtcdClient([g_etcd_endpoints], root=g_job_id)
         self._etcd.init()
+        self._db = get_global_etcd([g_etcd_endpoints], g_job_id)
 
-        self._args = _parse_args()
+        #self._args = _parse_args()
         self._old_environ = copy.copy(dict(os.environ))
         proc_env = {
             "PADDLE_TRAINER_ID": "0",
@@ -66,8 +69,16 @@ class TestBarrier(unittest.TestCase):
         os.environ.pop("http_proxy", None)
         os.environ.update(proc_env)
 
-        args_dict = _convert_args_to_dict(self._args)
-        self._job_env = JobEnv(args_dict)
+        #args_dict = _convert_args_to_dict(None)
+        self._job_env = JobEnv(None)
+
+        self._etcd.remove_service(ETCD_POD_RESOURCE)
+        self._etcd.remove_service(ETCD_POD_RANK)
+        self._etcd.remove_service(ETCD_POD_STATUS)
+        self._etcd.remove_service(ETCD_JOB_STATUS)
+        self._etcd.remove_service(ETCD_TRAIN_STATUS)
+        self._etcd.remove_service(ETCD_CLUSTER)
+        self._etcd.remove_service(ETCD_READER)
 
     def tearDown(self):
         os.environ.clear()
@@ -80,15 +91,23 @@ class TestBarrier(unittest.TestCase):
         s.start()
         self._etcd.set_server_permanent(ETCD_POD_RESOURCE,
                                         pod.get_id(), pod.to_json())
+        self._etcd.set_server_permanent(ETCD_POD_STATUS,
+                                        pod.get_id(), pod.to_json())
         print("set permanent:", self._etcd.get_full_path(ETCD_POD_RESOURCE,
                                                          pod.get_id()))
+
+        self._db.set_pod_status(pod.get_id(), Status.INITIAL)
+        print("set permanent:", self._etcd.get_full_path(ETCD_POD_STATUS,
+                                                         pod.get_id()))
+
         return pod, s
 
-    def test_server(self):
-        get_global_etcd(self._job_env.etcd_endpoints, self._job_env.job_id)
-
+    def _test_server(self):
         pod_0, server_0 = self.register_pod(self._job_env)
-        register = LeaderRegister(self._job_env, pod_0.get_id())
+        self._etcd.set_server_permanent(ETCD_POD_RANK, ETCD_POD_LEADER,
+                                        pod_0.get_id())
+        print("set permanent:", self._etcd.get_full_path(ETCD_POD_RANK,
+                                                         ETCD_POD_LEADER))
 
         pod_1, server_1 = self.register_pod(self._job_env)
 
@@ -102,11 +121,21 @@ class TestBarrier(unittest.TestCase):
             cluster_0 = c.barrier(
                 self._job_env.job_id, pod_0.get_id(), timeout=0)
 
-            self.assertEqual(cluster_0, None)
+            self.assertNotEqual(cluster_0, None)
         except EdlBarrierError as e:
-            print(e)
-
-            cluster_1 = c.barrier(
-                self._job_env.job_id, pod_1.get_id(), timeout=0)
-            self.assertNotEqual(cluster_1, None)
             pass
+        except:
+            generater.stop()
+
+        try:
+            cluster_1 = c.barrier(
+                self._job_env.job_id, pod_1.get_id(), timeout=15)
+        except:
+            generater.stop()
+
+        self.assertNotEqual(cluster_1, None)
+        generater.stop()
+
+
+if __name__ == '__main__':
+    unittest.main()

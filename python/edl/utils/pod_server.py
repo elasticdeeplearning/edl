@@ -30,6 +30,7 @@ from . import pod_server_pb2_grpc as pod_server_pb_grpc
 from .etcd_db import EtcdDB
 from .exceptions import *
 from .utils import logger
+from .global_vars import *
 
 
 class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
@@ -75,9 +76,14 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
                     res, EdlBarrierError("get current running cluster error"))
                 return res
 
+            if cluster.status == Status.FAILED:
+                serialize_exception(
+                    res, EdlBarrierError("cluster's status is status.Failed"))
+                return res
+
             ids = cluster.get_pods_ids_set()
             logger.debug(
-                "get barrier request from job_id:{} pod_id:{} ids_set:{}".
+                "get barrier request from job_id:{} pod_id:{} cluster table ids is {}".
                 format(request.job_id, request.pod_id, ids))
 
             key = cluster.stage

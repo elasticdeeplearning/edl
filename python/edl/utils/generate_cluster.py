@@ -50,36 +50,32 @@ class GenerateCluster(object):
             timeout=6)
         self._etcd.init()
 
-        self._generate_cluster()
+        try:
+            self._generate_cluster_and_check()
+        except:
+            pass
 
-        self._t_register = threading.Thread(target=self._refresher)
+        self._t_register = threading.Thread(target=self._generate_cluster)
         self._t_register.start()
 
     def _generate_cluster(self, timeout=600):
         begin = time.time()
-        while True:
+        while not self._stop.is_set():
             try:
-                if self._generate_cluster_and_check():
-                    return True
+                if not self._generate_cluster_and_check():
+                    raise EdlGenerateClusterError("can't generate cluster")
 
-                raise EdlGenerateClusterError("can't generate cluster")
+                begin = time.time()
+                logger.debug("generate cluster ok!")
+                time.sleep(3)
             except Exception as e:
                 if time.time() - begin >= timeout:
-                    logger.fatal("can't generate cluster exit!")
+                    mesage = "can't generate cluster exit!"
+                    raise EdlGenerateClusterError(message)
 
                 time.sleep(3)
                 logger.debug("_generate_cluster error:{} {}".format(
                     e, traceback.format_exc()))
-                raise e
-
-    def _refresher(self):
-        while not self._stop.is_set():
-            try:
-                self._generate_cluster(timeout=60)
-            except Exception as e:
-                break
-
-            time.sleep(3)
 
     def stop(self):
         self._stop.set()
@@ -120,6 +116,9 @@ class GenerateCluster(object):
 
         resource_pods.pop(leader_id)
         for pod_id, pod in six.iteritems(resource_pods):
+            if rank >= self._job_env.max_nodes:
+                break
+
             pod.rank = rank
             pods.append(pod)
             rank += 1
@@ -131,8 +130,12 @@ class GenerateCluster(object):
         rank = current_cluster.get_pods_nranks()
         new_cluster = copy.copy(current_cluster)
         new_pods = new_cluster.get_pods()
+
+        ids = current_cluster.get_pods_ids_set()
         for pod_id, pod in six.iteritems(resource_pods):
-            if pod.status == Status.INITIAL:
+            if pod.status == Status.INITIAL \
+                    and pod.get_pod_id() not in ids \
+                    and len(new_pods) < self._job_env.max_nodes:
                 pod.rank = rank
                 rank += 1
                 new_pods.append(pod)
@@ -169,7 +172,8 @@ class GenerateCluster(object):
 
         running = current_ids & all_running
         inited = current_ids & all_inited
-        if len(inited) > 0:
+        if len(inited) > 0 and current_cluster.get_pods_nranks(
+        ) < self._job_env.max_nodes:
             train_status = self._db.get_train_status()
             if train_status == TrainStatus.INITIAL or train_status == TrainStatus.RUNNING:
                 logger.info("find running pods:{} and init pods{}".format(
@@ -185,7 +189,7 @@ class GenerateCluster(object):
         return current_cluster, new_cluster
 
     def _set_cluster_if_leader(self, cluster):
-        leader_key = self._etcd.get_full_path(ETCD_POD_RANK, "0")
+        leader_key = self._etcd.get_full_path(ETCD_POD_RANK, ETCD_POD_LEADER)
         cluster_key = self._etcd.get_full_path(ETCD_CLUSTER, ETCD_CLUSTER)
 
         etcd = self._etcd._etcd
@@ -194,7 +198,9 @@ class GenerateCluster(object):
             success=[etcd.transactions.put(cluster_key, cluster.to_json()), ],
             failure=[])
 
-        logger.debug("_set_cluster_if_leader status:{}".format(status))
+        logger.debug(
+            "pod_id:{} leader_id:{} _set_cluster_if_leader status:{}".format(
+                self._pod_id, self._db.get_pod_leader_id(), status))
         return status
 
     def _generate_cluster_and_check(self):
@@ -204,13 +210,13 @@ class GenerateCluster(object):
             return False
 
         if new_cluster.get_pods_nranks() < self._job_env.min_nodes:
-            logger.debug("new clsuter pods size:{} wait job_env range:[{}:{}]".
-                         format(new_cluster.get_pods_nranks(
-                         ), self._job_env.min_nodes, self._job_env.max_nodes))
+            logger.debug(
+                "new cluster pods size:{} ids:{}wait job_env range:[{}:{}]".
+                format(new_cluster.get_pods_nranks(),
+                       new_cluster.get_pods_ids_set(), self._job_env.min_nodes,
+                       self._job_env.max_nodes))
             new_cluster.status = Status.FAILED
-        elif new_cluster.get_pods_nranks() > self._job_env.max_nodes:
-            pods = new_cluster.get_pods()
-            pods = pods[0:self._job_env.max_nodes]
+            return False
 
         if current_cluster is None or current_cluster.stage != new_cluster.stage:
             logger.info("current_cluster:{} to  new_cluster:{}".format(
