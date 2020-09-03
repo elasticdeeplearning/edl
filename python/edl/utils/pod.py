@@ -107,6 +107,7 @@ class Pod(object):
             if i == job_env.nproc_per_node - 1:
                 e = job_env.nproc_per_node
 
+            logger.debug("[b:e]=[{}:{}]".format(b, e))
             endpoint = "{}:{}".format(self._addr, job_env.trainer_ports[i])
 
             t = Trainer()
