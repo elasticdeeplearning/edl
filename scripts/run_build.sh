@@ -3,9 +3,10 @@ set -e
 unset GREP_OPTIONS
 BASEDIR=$(dirname $(readlink -f $0))
 
+echo ${BASEDIR}
 cd ${BASEDIR}
 
-build_edl 2.7
+./build.sh 2.7
 
 python3.6 -m pip install pip==20.1.1
-build_edl 3.6
+./build 3.6
