@@ -32,10 +32,17 @@ from .utils import logger
 
 
 class DataServerServicer(pb_grpc.DataServerServicer):
-    def __init__(self, file_list, trainer_env):
+    def __init__(self, file_list, trainer_env, pod_leader_id):
         self._file_list = file_list
         self._trainer_env = trainer_env
         self._lock = Threading.Lock()
+        self._checkpoint = None
+        self._db = None
+
+        if trainer_env.pod_id == pod_leader_id:
+            self._checkpoint = Checkpoint()
+            self._db = get_global_etcd()
+            self._checkpoint.load_from_etcd(self._db)
 
     def _initital(self):
         for i, f in enumerate(self._file_list):

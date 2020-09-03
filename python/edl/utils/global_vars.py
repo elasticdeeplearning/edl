@@ -59,7 +59,7 @@ class DistReader(object):
     def to_json(self):
         d = {
             "id": self._id,
-            "self._pod_id": self._pod_id,
+            "pod_id": self._pod_id,
             "endpoint": self._endpoint
         }
 

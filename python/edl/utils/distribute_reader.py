@@ -30,6 +30,7 @@ from .exceptions import EdlGenerateClusterError, EdlTableError
 from .etcd_db import get_global_etcd
 
 from .utils.edl_env import TrainerEnv
+from .utils import handle_timeout_errors
 
 
 class Connection(self):
@@ -37,23 +38,6 @@ class Connection(self):
         self._endpoint = endpoint
         self.channel = channel
         self.stub = stub
-
-
-def _handle_errors(f):
-    def handler(*args, **kwargs):
-        begin = time.time()
-        while True:
-            try:
-                return f(*args, **kwargs)
-            except Exception as e:
-                if time.time() - begin >= timeout:
-                    logger.warning("{} execute timeout:{}".format(f.__name__))
-                    raise e
-
-                time.sleep(3)
-                continue
-
-    return functools.wraps(f)(handler)
 
 
 class DistributeReader(object):
@@ -77,19 +61,20 @@ class DistributeReader(object):
 
         self._record_to_dist_reader_table()
 
-        self._timeout = 120
-
         self._db = get_global_etcd(trainer_env.endpoints, trainer_env.job_id)
         self._wait_all_dist_readers()
         self._wait_dist_reader_leader()
 
-    def _wait_dist_reader_leader(self):
+    @handle_timeout_errors
+    def _wait_dist_reader_leader(self, timeout=120):
         self._leader = self._db.get_dist_reader_leader()
 
-    def _wait_all_dist_readers(self):
+    @handle_timeout_errors
+    def _wait_all_dist_readers(self, timeout=120):
         self._readers = self._db.check_dist_readers()
 
-    def _record_to_dist_reader_table(self):
+    @handle_timeout_errors
+    def _record_to_dist_reader_table(self, timeout=120):
         self._db.record_to_dist_reader_table(
             self._pod_id, self._data_server.endpoint, self._id)
 
