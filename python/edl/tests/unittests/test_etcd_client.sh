@@ -2,9 +2,11 @@
 set -e
 
 nohup etcd > test_etcd_client_etcd.log 2>&1 &
-pid=$!
+etcd_pid=$!
 
 unset https_proxy http_proxy
 python -u ./etcd_client_test.py
 
-kill -9 $pid
+set +e
+kill -9 $etcd_pid
+echo $etcd_pid

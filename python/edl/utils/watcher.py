@@ -14,104 +14,105 @@
 
 from threading import Lock, Thread, Event
 import time
-from utils import logger
-from edl.discovery.etcd_client import EtcdClient
+import six
 import json
 import collections
-from .cluster import Cluster, Pod
+import copy
 
-from .global_vars import get_etcd, ETCD_POD_RANK, ETCD_POD_RESOURCE
-
-import six
+from .utils import logger
+from edl.discovery.etcd_client import EtcdClient
+from .cluster import Cluster
+from .pod import Pod
+from .global_vars import *
 
 
 class Watcher(object):
-    def __init__(self, etcd_endpoints, job_id, current_pod):
-        self._etcd = EtcdClient(etcd_endpoints, root=job_id)
-        self._etcd.init()
+    def __init__(self, job_env, cluster, pod):
+        self._etcd = None
 
-        self._job_id = job_id
+        self._job_id = job_env.job_id
+
+        # current context
+        self._cluster = copy.copy(cluster)
+        self._leader_id = clsuter.get_pod_leader_id()
+        self._current_pod = pod
+
+        self._new_cluster = None
+        self._new_leader_id = None
         self._changed = False
-        self._current_pod = current_pod
+        logger.info("watcher gets the init cluster:{}".format(self._cluster))
 
-        # servers in etcd
-        self._ranks = None  # {rank:pod_json}
-
-        self._cluster = Cluster()
         self._lock = Lock()
         self._stop = Event()
 
-        # get the inital cluster
-        """
-        servers = self._etcd.get_service(ETCD_POD_RANK)
-        ranks={}
-        for s in servers:
-            ranks[int(s.server)] = s.info
-        self._cluster.from_json(ranks)
-        logger.info("watch init cluster:{}", self._cluster)
-        """
+        self._t_watcher = None
 
-    def watch(self):
+        # assign value
+        self._etcd = EtcdClient(etcd_endpoints, root=job_id)
+        self._etcd.init()
+
         self._t_watcher = Thread(target=self._watcher)
         self._t_watcher.start()
 
     def _watcher(self):
         begin = time.time()
         while not self._stop.is_set():
+            # if leader_id changed?
             servers = self._etcd.get_service(ETCD_POD_RANK)
-            ranks = {}
-            for s in servers:
-                ranks[int(s.server)] = s.info
-            #logger.info("ranks:{}".format(ranks))
-
-            new_cluster = Cluster()
-            with self._lock:
-                if self._ranks is None:
-                    self._ranks = ranks
-                    self._cluster.from_json(ranks)
-                    #logger.info("clusters:{}".format(self._cluster))
-                    continue
-
-                if not self._is_cluster_changed(self._ranks, ranks):
-                    time.sleep(1)
-                    continue
-
-                self._changed = True
-
-            new_cluster.from_json(ranks)
-
-            if len(new_cluster.pods) == 0:
+            assert len(servers) <= 1
+            if len(servers) == 0:
                 time.sleep(1)
                 continue
 
-            pod = new_cluster.get_pod_by_id(current_pod.get_id())
-            if pod != current_pod:  # current pod rank changed
-                self._pod_rank_changed = True
+            with self._lock:
+                self._new_leader_id = s.info
+
+            # if cluster changed?
+            value, _, _, _, _, = etcd._get_server(ETCD_CLUSTER,
+                                                  self._new_leader_id)
+            if value is None:
+                time.sleep(1)
+                continue
+            new_cluster = Cluster()
+            new_cluster.from_json(value)
+
+            with self._lock:
+                self._new_cluster = new_cluster
+
+            if self._is_world_changed():
                 break
 
-    def _is_cluster_changed(self, old, new):
-        for k, v in six.iteritems(old):
-            if k not in new:
-                logger.info(
-                    "train world changed, old_cluster k:{} not in new_cluster:{}".
-                    format(k, new))
-                return True
+            with self._lock:
+                # update the cluster info.
+                self._cluster = copy.copy(self._new_cluster)
 
-            if old[k] != new[k]:
-                logger.info(
-                    "train world changed, old_cluster k:{}=>v:{} != new_cluster k:{}=>v:{}".
-                    format(k, old[k], k, new[k]))
-                return True
-            """
-            old_pod = Pod()
-            old_pod.from_json(old[k])
+            time.sleep(3)
 
-            new_pod = Pod()
-            new_pod.from_json(new[k])
+    @property
+    def changed(self):
+        with self._lock:
+            return self._changed
 
-            if new_pod != old_pod:
-                return True
-            """
+    def _is_world_changed(self):
+        """
+        list[Rank ordered pod_id] changed
+        """
+
+        with self._lock:
+            old_stage = self._cluster.stage
+            new_stage = self._new_cluster.stage
+
+            old_ids = self._cluster.get_pods_ids_list()
+            new_ids = self._new_cluster.get_pods_ids_list()
+
+        if old_stage != new_stage or old_ids != new_ids:
+            logger.info(
+                "_is_world_changed find changed, old_stage:{} new_stage:{} old_ids:{} new_ids:{}".
+                format(old_stage, new_stage, old_ids, new_ids))
+            with self._lock:
+                self._changed = True
+
+            return True
 
         return False
 
@@ -119,57 +120,21 @@ class Watcher(object):
         with self._lock:
             return self._cluster
 
-    def is_changed(self):
+    def get_new_cluster(self):
         with self._lock:
-            return self._changed
-
-    def is_self_rank_changed(self):
-        with self._lock:
-            return self._pod_rank_changed
+            return self._new_cluster
 
     def stop(self):
         self._stop.set()
-        self._t_watcher.join()
+        with self._lock:
+            if self._t_watcher:
+                self._t_watcher.join()
+                self._t_watcher = None
+        logger.debug("watcher stopped")
+
+    def is_stopped(self):
+        with self._lock:
+            return self._t_watcher == None
 
     def __exit__(self):
         self.stop()
-
-
-def get_current_pod_ids_from_resource():
-    etcd, lock = get_etcd()
-    with lock:
-        pod_resource_servers = etcd.get_service(ETCD_POD_RESOURCE)
-
-    p = Pod()
-    ids = set()
-    for m in pod_resource_servers:
-        p.from_json(m.info)
-        ids.add(p.get_id())
-
-    return ids
-
-
-def get_cluster():
-    etcd, lock = get_etcd()
-    cluster = Cluster()
-    servers = etcd.get_service(ETCD_POD_RANK)
-    ranks = {}
-    for s in servers:
-        ranks[int(s.server)] = s.info
-    cluster.from_json(ranks)
-    return cluster
-
-
-def get_pod_leader():
-    etcd, lock = get_etcd()
-    with lock:
-        value, _, _, _, _, = etcd._get_server(ETCD_POD_RANK, "0")
-
-    leader = Pod()
-    leader.from_json(value)
-    return leader
-
-
-def get_data_reader_leader():
-    #raise NotImplementedError()
-    pass

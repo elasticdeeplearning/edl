@@ -37,7 +37,7 @@ class JobEnv(object):
                 "port num:{} must large than gpus:{}".format(len(self._trainer_ports), len(self._gpus))
             logger.info("get ports from env:{}".format(self._trainer_ports))
         else:
-            assert len(self._gpus) >= 0, "gpus must be visible, now:{}".format(
+            assert len(self._gpus) > 0, "gpus must be visible, now:{}".format(
                 self._gpus)
             self._trainer_ports = list(utils.find_free_ports(len(self._gpus)))
             logger.info("get ports from unused:{} now gpus:{}".format(
@@ -62,12 +62,12 @@ class JobEnv(object):
         a = self._nodes_range.split(":")
         assert len(a) == 2, "nodes_range not a valid format:{}".format(
             self._nodes_range)
-        self._min_nodes = a[0]
-        self._max_nodes = a[1]
+        self._min_nodes = int(a[0])
+        self._max_nodes = int(a[1])
 
     def _get_gpus(self, args):
         # selected gpus
-        self._gpus = utils.get_gpus(None)
+        self._gpus = utils.get_gpus()
         assert self._gpus != None, "can't get gpu info of this machine"
 
         # proc per node
@@ -102,27 +102,18 @@ class JobEnv(object):
         self._get_gpus(args)
         self._get_ports(args)
 
-        self._up_limit_nodes = int(
-            os.getenv("PADDLE_EDL_UP_LIMIT_NODES", 1024))
+        #self._up_limit_nodes = int(
+        #    os.getenv("PADDLE_EDL_UP_LIMIT_NODES", 1024))
 
-        if self._etcd_endpoints != "" and self._hdfs_home == "":
-            self._backend_type = "etcd"
+        # assert hdfs value
+        if not self._ce_test:
+            assert len(self._hdfs_home) > 3 and \
+                len(self._hdfs_name) > 6 and \
+                len(self._hdfs_ugi) > 3 and \
+                len(self._hdfs_path) > 0, "hdfs environ must set"
         else:
-            self._backend_type = "hdfs"
-
-            # assert hdfs value
-            if not self._ce_test:
-                assert len(self._hdfs_home) > 3 and \
-                    len(self._hdfs_name) > 6 and \
-                    len(self._hdfs_ugi) > 3 and \
-                    len(self._hdfs_checkpoint_path) > 0, "hdfs environ must set"
-            else:
-                assert len(self._hdfs_home) > 3 and \
-                    len(self._hdfs_checkpoint_path) > 0, "hdfs environ must set"
-
-    @property
-    def up_limit_nodes(self):
-        return self._up_limit_nodes
+            assert len(self._hdfs_home) > 3 and \
+                len(self._hdfs_path) > 0, "hdfs environ must set"
 
     @property
     def gpus(self):
@@ -144,6 +135,14 @@ class JobEnv(object):
     def trainer_ports(self):
         return self._trainer_ports
 
+    @property
+    def min_nodes(self):
+        return self._min_nodes
+
+    @property
+    def max_nodes(self):
+        return self._max_nodes
+
     def __str__(self):
         d = vars(self)
         s = ""
@@ -159,9 +158,9 @@ class TrainerEnv(JobEnv):
     def __init__(self, args=None):
         super(TrainerEnv, self).__init__(args)
 
-        self._rank = os["PADDLE_TRAINER_ID"]
-        self._rank_in_pod = os["PADDLE_TRAINER_RANK_IN_POD"]
-        self._trainer_endpoints = os["PADDLE_TRAINER_ENDPOINTS"]
+        self._rank = os.environ["PADDLE_TRAINER_ID"]
+        self._rank_in_pod = os.environ["PADDLE_TRAINER_RANK_IN_POD"]
+        self._trainer_endpoints = os.environ["PADDLE_TRAINER_ENDPOINTS"]
 
     @property
     def rank(self):

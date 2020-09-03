@@ -19,6 +19,7 @@ from .client import Client
 from .cluster import Cluster
 from .exceptions import deserialize_exception, EdlBarrierError
 from .utils import logger
+from .etcd_db import get_global_etcd
 
 
 class PodServerClient(Client):
@@ -44,15 +45,20 @@ class PodServerClient(Client):
 
         c, s = self.connect()
         begin = time.time()
+        cluster = Cluster()
         while True:
             res = s.Barrier(req)
-            if res.type == "":
+            if res.status.type == "":
+                cluster.from_json(res.cluster_json)
+                logger.debug("pod client get cluster:{}".format(cluster))
                 logger.info("barrier ok!")
-                return
+                return cluster
 
-            deserialize_exception(res)
             if time.time() - begin > timeout:
                 message = "job_id:{} pod_id:{} barrier time out".format(job_id,
                                                                         pod_id)
-                deserialize_exception(res)
+                logger.info(message)
+                deserialize_exception(res.status)
             time.sleep(1)
+
+        return None

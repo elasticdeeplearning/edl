@@ -20,29 +20,35 @@ import os
 import logging
 from threading import Thread, Lock
 from six.moves.queue import Queue
-from .exceptions import *
+import traceback
 import signal
 import threading
 import copy
-from .utils import logger
-from . import pod_server_pb2_grpc as pb2_grpc
-from . import pod_server_pb2 as pb
 from . import common_pb2 as common_pb
-from .watcher import get_current_pod_ids_from_resource, get_pod_leader
+from . import pod_server_pb2 as pod_server_pb
+from . import pod_server_pb2_grpc as pod_server_pb_grpc
+from .etcd_db import EtcdDB
 from .exceptions import *
+from .utils import logger
+from .global_vars import *
 
 
-class PodServerServicer(pb2_grpc.PodServerServicer):
-    def __init__(self, pod_id):
+class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
+    def __init__(self, job_env, pod_id):
         # to control the cache size.
         self._lock = Lock()
+
         # stage => set(pod_id)
         self._barrier_in = {}
+
         self._pod_id = pod_id
+        self._job_env = job_env
+
+        self._db = EtcdDB(job_env.etcd_endpoints, job_env.job_id)
 
     def ScaleOut(self, request, context):
         status = common_pb.Status()
-        pod = get_pod_leader()
+        pod = self._db.get_pod_leader()
         if pod.get_id != self._pod_id:
             status = serialize_exception(
                 EdlLeaderError("this pod is not the leader"))
@@ -52,7 +58,7 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
 
     def ScaleIn(self, request, context):
         status = common_pb.Status()
-        pod = get_pod_leader()
+        pod = self._db.get_pod_leader()
         if pod.get_id != self._pod_id:
             status = serialize_exception(
                 EdlLeaderError("this pod is not the leader"))
@@ -61,61 +67,78 @@ class PodServerServicer(pb2_grpc.PodServerServicer):
         return status
 
     def Barrier(self, request, context):
-        ids = get_current_pod_ids_from_resource()
-        leader = get_pod_leader()
-        logger.info(
-            "get barrier request from job_id:{} pod_id:{} ids_set:{} leader:{}".
-            format(request.job_id, request.pod_id, ids, leader.get_id()))
+        res = pod_server_pb.BarrierResponse()
 
-        status = common_pb.Status()
-        with self._lock:
-            try:
-                key = leader.stage
+        try:
+            cluster = self._db.get_cluster()
+            if cluster is None:
+                serialize_exception(
+                    res, EdlBarrierError("get current running cluster error"))
+                return res
+
+            if cluster.status == Status.FAILED:
+                serialize_exception(
+                    res, EdlBarrierError("cluster's status is status.Failed"))
+                return res
+
+            ids = cluster.get_pods_ids_set()
+            logger.debug(
+                "get barrier request from job_id:{} pod_id:{} cluster table ids is {}".
+                format(request.job_id, request.pod_id, ids))
+
+            key = cluster.stage
+
+            with self._lock:
                 if key not in self._barrier_in:
                     self._barrier_in[key] = set()
 
-                bd = self._barrier_in[leader.stage]
+                bd = self._barrier_in[key]
                 bd.add(request.pod_id)
 
-                if ids == bd:
-                    return status
+            if ids == bd:
+                res.cluster_json = cluster.to_json()
+                return res
 
-                status = serialize_exception(
-                    EdlBarrierError("barrier's context:{}, now:{}".format(ids,
-                                                                          bd)))
-                return status
-            except Exception as e:
-                status = serialize_exception(EdlInternalError(str(e)))
-                return status
+            serialize_exception(
+                res,
+                EdlBarrierError("barrier's context:{}, now:{}".format(ids,
+                                                                      bd)))
+            return res
+        except Exception as e:
+            logger.debug("internal error:{} {}".format(e,
+                                                       traceback.format_exc()))
+            serialize_exception(res, EdlInternalError(str(e)))
+            return res
 
     def ShutDown(self, request, context):
         pass
 
 
 class PodServer(object):
-    def __init__(self, pod_id):
+    def __init__(self, job_env, pod):
         self._server = None
         self._port = None
         self._endpoint = None
-        self._pod_id = pod_id
+        self._pod = pod
+        self._job_env = job_env
 
-    def start(self, job_env, pod, concurrency=20, max_workers=100):
+    def start(self, concurrency=20, max_workers=100):
         server = grpc.server(
             futures.ThreadPoolExecutor(max_workers=max_workers),
             options=[('grpc.max_send_message_length', 1024 * 1024 * 1024),
                      ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
             maximum_concurrent_rpcs=concurrency)
-        pb2_grpc.add_PodServerServicer_to_server(
-            PodServerServicer(self._pod_id), server)
+        pod_server_pb_grpc.add_PodServerServicer_to_server(
+            PodServerServicer(self._job_env, self._pod.get_id()), server)
 
-        self._port = server.add_insecure_port('{}:0'.format(pod.addr))
+        self._port = server.add_insecure_port('{}:0'.format(self._pod.addr))
         assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(
-            pod.addr, self._port)
-        self._endpoint = "{}:{}".format(pod.addr, self._port)
+            self._pod.addr, self._port)
+        self._endpoint = "{}:{}".format(self._pod.addr, self._port)
 
         server.start()
         self._server = server
-        pod.port = self._port
+        self._pod.port = self._port
 
         logger.info("start podserver at:{}".format(self._endpoint))
 

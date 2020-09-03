@@ -7,8 +7,7 @@ if [[ ${version_str} > "Python 3" ]]; then
     exit 0
 fi
 
-#nohup /tmp/etcd-download-test/etcd 2>&1 &
-nohup etcd 2>&1 &
+nohup etcd > test_distill_reader_etcd.log  2>&1 &
 etcd_pid=$!
 
 # wait etcd start
