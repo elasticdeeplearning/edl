@@ -192,7 +192,8 @@ class GenerateCluster(object):
         new_cluster = copy.copy(current_cluster)
         return current_cluster, new_cluster
 
-    def _set_cluster_if_leader(self, cluster):
+    @handle_errors_until_timeout
+    def _set_cluster_if_leader(self, cluster, timeout=120):
         leader_key = self._etcd.get_full_path(ETCD_POD_RANK, ETCD_POD_LEADER)
         cluster_key = self._etcd.get_full_path(ETCD_CLUSTER, ETCD_CLUSTER)
 
@@ -202,9 +203,12 @@ class GenerateCluster(object):
             success=[etcd.transactions.put(cluster_key, cluster.to_json()), ],
             failure=[])
 
-        logger.debug(
-            "pod_id:{} leader_id:{} _set_cluster_if_leader status:{}".format(
-                self._pod_id, self._db.get_pod_leader_id(), status))
+        message = "pod_id:{} leader_id:{} _set_cluster_if_leader status:{}".format(
+            self._pod_id, self._db.get_pod_leader_id(), status)
+
+        if not status:
+            raise EdlPutError(message)
+
         return status
 
     def _generate_cluster_and_check(self):

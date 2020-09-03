@@ -155,7 +155,7 @@ def find_free_ports(num):
     return None
 
 
-def handle_timeout_errors(f):
+def handle_errors_until_timeout(f):
     def handler(*args, **kwargs):
         begin = time.time()
         timeout = kwargs['timeout']

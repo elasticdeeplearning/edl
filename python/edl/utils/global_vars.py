@@ -20,7 +20,7 @@ ETCD_POD_STATUS = "pod_status"
 ETCD_JOB_STATUS = "job_status"
 ETCD_TRAIN_STATUS = "train_status"
 ETCD_CLUSTER = "cluster"
-ETCD_READER = "reader"
+ETCD_DIST_READER = "reader"
 ETCD_POD_LEADER = "0"
 
 ETCD_CONN_TIMEOUT = 6

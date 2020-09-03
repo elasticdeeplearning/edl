@@ -65,15 +65,15 @@ class DistributeReader(object):
         self._wait_all_dist_readers()
         self._wait_dist_reader_leader()
 
-    @handle_timeout_errors
+    @handle_errors_until_timeout
     def _wait_dist_reader_leader(self, timeout=120):
         self._leader = self._db.get_dist_reader_leader()
 
-    @handle_timeout_errors
+    @handle_errors_until_timeout
     def _wait_all_dist_readers(self, timeout=120):
         self._readers = self._db.check_dist_readers()
 
-    @handle_timeout_errors
+    @handle_errors_until_timeout
     def _record_to_dist_reader_table(self, timeout=120):
         self._db.record_to_dist_reader_table(
             self._pod_id, self._data_server.endpoint, self._id)

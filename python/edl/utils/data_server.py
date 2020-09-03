@@ -42,7 +42,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
         if trainer_env.pod_id == pod_leader_id:
             self._checkpoint = Checkpoint()
             self._db = get_global_etcd()
-            self._checkpoint.load_from_etcd(self._db)
+            self._checkpoint = load_from_etcd(self._db)
 
     def _initital(self):
         for i, f in enumerate(self._file_list):
