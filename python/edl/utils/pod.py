@@ -97,7 +97,7 @@ class Pod(object):
 
         # init trainers
         self._trainers = []
-        n = job_env.nproc_per_node / len(job_env.gpus)
+        n = int(job_env.nproc_per_node / len(job_env.gpus))
         assert n>=1, \
             "self.nproc_per_node:{} / len(self._gpus):{} must large than 1".format(job_env.nproc_per_node,len(job_env.gpus))
 
