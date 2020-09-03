@@ -19,7 +19,7 @@ import json
 import collections
 import copy
 
-from utils import logger
+from .utils import logger
 from edl.discovery.etcd_client import EtcdClient
 from .cluster import Cluster
 from .pod import Pod
