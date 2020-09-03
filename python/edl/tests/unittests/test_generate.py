@@ -133,11 +133,11 @@ class TestBarrier(unittest.TestCase):
             cluster_1 = c.barrier(
                 self._job_env.job_id, pod_1.get_id(), timeout=15)
         except:
-            sys.exit(1)
             generater.stop()
+            sys.exit(1)
 
-        self.assertNotEqual(cluster_1, None)
         generater.stop()
+        self.assertNotEqual(cluster_1, None)
 
 
 if __name__ == '__main__':

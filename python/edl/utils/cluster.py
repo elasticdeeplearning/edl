@@ -26,6 +26,7 @@ import sys
 import subprocess
 import json
 import uuid
+import six
 import collections
 from .exceptions import *
 from . import utils
@@ -150,7 +151,7 @@ class Cluster(object):
 
         od = collections.OrderedDict(sorted(d["pods"].items()))
         pods = []
-        for i, (key, value) in enumerate(od.iteritems()):
+        for i, (key, value) in enumerate(six.iteritems(od)):
             pod = Pod()
             if i != int(key):
                 raise EdlRankError("rank:{} is not exists in {}".format(i, d))

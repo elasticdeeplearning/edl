@@ -108,6 +108,9 @@ def get_gpus():
 
 
 def bytes_to_string(o, codec='utf-8'):
+    if o is None:
+        return None
+
     if not isinstance(o, str):
         return o.decode(codec)
 

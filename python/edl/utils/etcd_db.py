@@ -27,6 +27,7 @@ from .exceptions import EdlBarrierError
 
 import threading
 from ..discovery.etcd_client import EtcdClient
+from .utils import bytes_to_string
 
 
 class EtcdDB(object):
@@ -114,7 +115,7 @@ class EtcdDB(object):
         if value is None:
             return None
 
-        return value
+        return bytes_to_string(value)
 
     def get_data_reader_leader(self):
         raise NotImplementedError()

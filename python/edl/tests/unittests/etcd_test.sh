@@ -22,7 +22,7 @@ etcd_pid=$!
 run_time=$(( $TEST_TIMEOUT - 10 ))
 echo "run_time: ${run_time}"
 
-timeout -s SIGKILL ${run_time} python -u ${name}.py > ${name}_run.log 2>&1
+timeout -s SIGKILL ${run_time} ${PYTHON_EXECUTABLE} -u ${name}.py > ${name}_run.log 2>&1
 exit_code=$?
 
 kill -9 $etcd_pid

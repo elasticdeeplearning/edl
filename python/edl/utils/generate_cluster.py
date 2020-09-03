@@ -26,7 +26,7 @@ from ..discovery.etcd_client import EtcdClient
 import etcd3
 from .global_vars import *
 from .cluster import Cluster
-from .exceptions import EdlGenerateClusterError
+from .exceptions import EdlGenerateClusterError, EdlTableError
 from .etcd_db import get_global_etcd
 
 
@@ -98,11 +98,13 @@ class GenerateCluster(object):
                 self._etcd.get_full_path(ETCD_POD_RESOURCE, ETCD_POD_RANK),
                 leader_id))
 
-        new_cluster = Cluster()
-        pods = new_cluster.get_pods()
+        print(resource_pods)
         if leader_id not in resource_pods:
             raise EdlTableError("leader error, leader:{} not in resource:{}".
-                                format(leader_id, resource.keys()))
+                                format(leader_id, resource_pods.keys()))
+
+        new_cluster = Cluster()
+        pods = new_cluster.get_pods()
 
         rank = 0
         pods.append(resource_pods[leader_id])
