@@ -284,6 +284,7 @@ def launch(args):
             watcher = Watcher(job_env, cluster, pod)
 
             procs = start_local_trainers(
+                job_env,
                 cluster,
                 pod,
                 args.training_script,

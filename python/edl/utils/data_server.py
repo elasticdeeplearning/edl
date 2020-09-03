@@ -32,18 +32,10 @@ from .utils import logger
 
 
 class DataServerServicer(pb_grpc.DataServerServicer):
-    def __init__(self, file_list, world_rank, self_rank):
+    def __init__(self, file_list, trainer_env):
         self._file_list = file_list
+        self._trainer_env = trainer_env
         self._lock = Threading.Lock()
-
-        # rank=>file_list
-        self._trainer_file_list = {}
-        self._initital()
-
-        # rank => batch_data_meta
-        self._trainer_batch_data_meta = {}
-
-        self._rank = self_rank
 
     def _initital(self):
         for i, f in enumerate(self._file_list):
@@ -93,17 +85,13 @@ class DataServerServicer(pb_grpc.DataServerServicer):
 class DataServer(object):
     def __init__(self):
         self._server = None
+        self._addr = None
         self._port = None
         self_endpoint = None
 
     def start(self,
-              master,
+              trainer_env,
               addr,
-              port,
-              data_set_reader,
-              job_env,
-              pod_id,
-              rank_of_pod,
               cache_capcity=1000,
               file_list=None,
               max_workers=100,
@@ -115,31 +103,24 @@ class DataServer(object):
             maximum_concurrent_rpcs=concurrency)
         data_server_pb2_grpc.add_DataServerServicer_to_server(
             DataServerServicer(
-                master=master,
-                data_set_reader=data_set_reader,
+                file_list=file_list,
+                trainer_env=trainer_env,
                 capcity=cache_capcity,
                 file_list=file_list),
             server)
 
-        endpoint = "{}:{}".format(addr, port)
-        self._port = server.add_insecure_port('{}'.format(endpoint))
+        self._addr = addr
+        self._port = server.add_insecure_port('{}:0'.format(addr))
         assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(
             endpoint, self._port)
-        self._endpoint = "{}:{}".format(addr, self._port)
+        self._endpoint = "{}:{}".format(self._addr, self._port)
 
         server.start()
         self._server = server
 
-        self._register = DataServerRegister(
-            job_env.etcd_endoints,
-            job_env.job_id,
-            affinity_pod_id=affinity_pod_id,
-            affinity_rank_of_pod=affinity_rank_of_pod,
-            endpoint=self._endpoint)
-
     @property
-    def port(self):
-        return self._port
+    def endpoint(self):
+        return self._endpoint
 
     def wait(self, timeout=None):
         if timeout is not None:

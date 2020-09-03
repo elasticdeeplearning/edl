@@ -11,6 +11,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import threading
+import time
+import json
+import uuid
+import copy
+import traceback
+import six
+
+from .utils import logger
+from .pod import Pod
+from ..discovery.etcd_client import EtcdClient
+
+import etcd3
+from .global_vars import *
+from .cluster import Cluster
+from .exceptions import EdlGenerateClusterError, EdlTableError
+from .etcd_db import get_global_etcd
+
+from .utils.edl_env import TrainerEnv
 
 
 class Connection(self):
@@ -20,12 +39,71 @@ class Connection(self):
         self.stub = stub
 
 
+def _handle_errors(f):
+    def handler(*args, **kwargs):
+        begin = time.time()
+        while True:
+            try:
+                return f(*args, **kwargs)
+            except Exception as e:
+                if time.time() - begin >= timeout:
+                    logger.warning("{} execute timeout:{}".format(f.__name__))
+                    raise e
+
+                time.sleep(3)
+                continue
+
+    return functools.wraps(f)(handler)
+
+
 class DistributeReader(object):
-    def __init__(self):
-        # master endpoint
-        self._master = MasterFinder().get_master()
+    def __init__(self, file_list, file_splitter_cls, batch_size):
+        self._file_list = file_list
+        assert isinstance(self._file_list, list)
+
+        self._cls = file_splitter_cls
+        self._batch_size = batch_size
+        assert self._batch_size > 0
+
+        self._id = str(uuid.uuid1())
+
         # connections to data servers
-        self._data_servers = {}
+        self._conns = {}
+
+        self._trainer_env = TrainerEnv()
+
+        self._data_server = DataServer(self._trainer_env, self._id)
+        self._data_server.start()
+
+        self._record_to_dist_reader_table()
+
+        self._timeout = 120
+
+        self._db = get_global_etcd(trainer_env.endpoints, trainer_env.job_id)
+        self._wait_all_dist_readers()
+        self._wait_dist_reader_leader()
+
+    def _wait_dist_reader_leader(self):
+        self._leader = self._db.get_dist_reader_leader()
+
+    def _wait_all_dist_readers(self):
+        self._readers = self._db.check_dist_readers()
+
+    def _record_to_dist_reader_table(self):
+        self._db.record_to_dist_reader_table(
+            self._pod_id, self._data_server.endpoint, self._id)
+
+    def stop(self):
+        self._data_server.stop()
+
+    def __exit__(self):
+        self.stop()
+
+    def __iter__(self):
+        pass
+
+    def _get_file_list(self):
+        self
 
     def get_meta(self, batch_size, step_num):
         pass
@@ -33,12 +111,9 @@ class DistributeReader(object):
     def report(self, metas, success=True):
         pass
 
-    def _connect_master(self, endpoint):
-        pass
-
     def _connect_data_server(self, endpoint):
         if meata.data_server not in self._data_servers:
-            channel = grpc.insecure_channel("127.0.0.1:6700")
+            channel = grpc.insecure_channel(endpoint)
             stub = data_server_pb2_grpc.DataServerStub(channel)
             conn = Connection(endpoint, channel, stub)
             self._data_servers[endpoint] = conn

@@ -117,8 +117,55 @@ class EtcdDB(object):
 
         return bytes_to_string(value)
 
-    def get_data_reader_leader(self):
-        raise NotImplementedError()
+    def get_dist_reader_leader(self):
+        leader_id = self.get_pod_leader_id()
+        if leader_id is None:
+            raise EdlTableError("leader_id={}:{}".format(
+                self.get_rank_table_key(), leader_id))
+
+        with self._lock:
+            value = self._etcd.get_value(ETCD_READER, leader_id)
+
+        if value is None:
+            raise EdlTableError("leader_id={}:{}".format(
+                self.get_reader_table_key(leader_id), cluster))
+
+        reader_leader = DistReader()
+        reader_leader.from_json(value)
+        return reader_leader
+
+    def check_dist_readers(self):
+        with self._lock:
+            servers = self._etcd.get_service(ETCD_READER)
+
+        if len(servers) <= 0:
+            raise EdlTableError("table:{} has no readers".format(ETCD_READER))
+
+        readers = {}
+        for s in servers:
+            r = DistReader()
+            r.from_json(s.value)
+
+            readers[r.key] = r
+
+        cluster = self.get_cluster()
+        if cluster is None:
+            raise EdlTableError("table:{} has no readers".format(ETCD_CLUSTER))
+
+        if cluster.get_pods_ids_set() != set(readers.keys()):
+            raise EdlTableError("reader_ids:{} != cluster_pod_ids:{}".format(
+                reader_ids.keys(), cluster.get_pods_ids_set()))
+
+        return readers
+
+    def record_to_dist_reader_table(self, pod_id, endpoint, reader_id):
+        r = DistReader()
+        r._pod_id = pod_id
+        r._endpoint = endpoint
+        r._id = reader_id
+
+        with self._lock:
+            self._etcd.set_server_permanent(ETCD_READER, pod_id, r.to_json())
 
     def get_cluster(self):
         with self._lock:
@@ -160,6 +207,9 @@ class EtcdDB(object):
 
     def get_train_status(self):
         leader_id = self.get_pod_leader_id()
+        if leader_id is None:
+            return None
+
         with self._lock:
             value = self._etcd.get_value(ETCD_TRAIN_STATUS, leader_id)
 
@@ -177,6 +227,9 @@ class EtcdDB(object):
 
     def get_rank_table_key(self):
         return self._etcd.get_full_path(ETCD_POD_RANK, ETCD_POD_LEADER)
+
+    def get_reader_table_key(self, pod_id):
+        return self._etcd.get_full_path(ETCD_READER, pod_id)
 
     def set_train_status(self, pod_id, status):
         service = ETCD_TRAIN_STATUS

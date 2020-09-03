@@ -48,3 +48,25 @@ class TrainStatus(IntEnum):
     NEARTHEEND = 3
     SUCCEED = 3
     FAILED = 4
+
+
+class DistReader(object):
+    def __init__(self):
+        self._pod_id = None
+        self._id = None
+        self._endpoint = None
+
+    def to_json(self):
+        d = {
+            "id": self._id,
+            "self._pod_id": self._pod_id,
+            "endpoint": self._endpoint
+        }
+
+        return json.dumps(d)
+
+    def from_json(self, s):
+        d = json.loads(s)
+        self._id = d["id"]
+        self._pod_id = d["pod_id"]
+        self._endpoint = d["endpoint"]
