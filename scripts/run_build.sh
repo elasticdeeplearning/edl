@@ -9,4 +9,4 @@ cd ${BASEDIR}
 ./build.sh 2.7
 
 python3.6 -m pip install pip==20.1.1
-./build 3.6
+./build.sh 3.6
