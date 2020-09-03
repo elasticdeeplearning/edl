@@ -31,6 +31,7 @@ from .etcd_db import get_global_etcd
 
 from .utils.edl_env import TrainerEnv
 from .utils import handle_timeout_errors
+from .unique_name import generator
 
 
 class Connection(self):
@@ -45,6 +46,8 @@ class DistributeReader(object):
         self._file_list = file_list
         assert isinstance(self._file_list, list)
 
+        self._name = generator("_dist_reader_")
+
         self._cls = file_splitter_cls
         self._batch_size = batch_size
         assert self._batch_size > 0
@@ -56,7 +59,13 @@ class DistributeReader(object):
 
         self._trainer_env = TrainerEnv()
 
-        self._data_server = DataServer(self._trainer_env, self._id)
+        if trainer_env.pod_id == pod_leader_id:
+            self._checkpoint = Checkpoint.load_from_etcd(
+                etcd_endpoints=self._trainer_env.etcd_endpoints,
+                job_id=self._trainer_env.job_id,
+                reader_name=self._name)
+
+        self._data_server = DataServer(self._trainer_env, self._id, checkpoint)
         self._data_server.start()
 
         self._record_to_dist_reader_table()

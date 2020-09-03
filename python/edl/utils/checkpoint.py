@@ -54,7 +54,7 @@ class Checkpoint(object):
 
     @staticmethod
     @handle_errors_until_timeout
-    def get_checkpoint(etcd_endpoints, job_id, reader_name):
+    def load_from_etcd(etcd_endpoints, job_id, reader_name):
         etcd = EtcdClient(
             endpoints=etcd_endpoints, root=job_id, timeout=EDL_CONN_TIMEOUT)
         etcd.init()
@@ -71,7 +71,8 @@ class Checkpoint(object):
 
     @staticmethod
     @handle_errors_until_timeout
-    def save_data_checkpoint(pod_id, reader_name, mode_path, data_checkpoint):
+    def save_to_etcd(etcd_endpoints, job_id, pod_id, reader_name, mode_path,
+                     data_checkpoint):
         etcd = EtcdClient(
             endpoints=etcd_endpoints, root=job_id, timeout=EDL_CONN_TIMEOUT)
         etcd.init()

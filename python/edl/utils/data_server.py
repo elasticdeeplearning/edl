@@ -32,17 +32,17 @@ from .utils import logger
 
 
 class DataServerServicer(pb_grpc.DataServerServicer):
-    def __init__(self, file_list, trainer_env, pod_leader_id):
+    def __init__(self, file_list, trainer_env, data_checkpoint):
         self._file_list = file_list
         self._trainer_env = trainer_env
         self._lock = Threading.Lock()
-        self._checkpoint = None
-        self._db = None
+        self._checkpoint = data_checkpoint
 
-        if trainer_env.pod_id == pod_leader_id:
-            self._checkpoint = Checkpoint()
-            self._db = get_global_etcd()
-            self._checkpoint = load_from_etcd(self._db)
+    def to_json(self):
+        pass
+
+    def from_json(self):
+        pass
 
     def _initital(self):
         for i, f in enumerate(self._file_list):
@@ -90,14 +90,18 @@ class DataServerServicer(pb_grpc.DataServerServicer):
 
 
 class DataServer(object):
-    def __init__(self):
+    def __init__(self, trainer_env, reader_id, reader_name, data_checkpoint):
         self._server = None
         self._addr = None
         self._port = None
-        self_endpoint = None
+        self._endpoint = None
+
+        self._trainer_env = trainer_env
+        self._reader_id = reader_id
+        self._reader_name = reader_name
+        self._data_checkoint = data_checkpoint
 
     def start(self,
-              trainer_env,
               addr,
               cache_capcity=1000,
               file_list=None,
@@ -112,6 +116,7 @@ class DataServer(object):
             DataServerServicer(
                 file_list=file_list,
                 trainer_env=trainer_env,
+                data_checkpoint=data_checkpoint,
                 capcity=cache_capcity,
                 file_list=file_list),
             server)
