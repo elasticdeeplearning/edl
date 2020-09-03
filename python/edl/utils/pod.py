@@ -25,6 +25,7 @@ import copy
 import sys
 import subprocess
 import uuid
+import six
 import json
 import collections
 from enum import IntEnum
@@ -76,7 +77,7 @@ class Pod(object):
         self._trainers = []
 
         od = collections.OrderedDict(sorted(d["trainers"].items()))
-        for i, (key, value) in enumerate(od.iteritems()):
+        for i, (key, value) in enumerate(six.iteritems(od)):
             t = Trainer()
             t.from_json(value)
 

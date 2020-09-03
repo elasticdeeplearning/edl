@@ -16,6 +16,7 @@ function build_edl(){
 
     ln -s ${python_path} ${tmp_path}/python
     export PATH=${tmp_path}:$old_path
+    echo "current path:${PATH}"
 
     ./build.sh ${py_version}
 

@@ -13,6 +13,7 @@ cd ${BASEDIR}/..
 # check python version
 which python
 version_str=$(python --version 2>&1)
+echo "python version:${version_str}"
 py_version=$1
 if [[ ${version_str} != "Python ${py_verion}"* ]]; then
   echo "${version_str} not valid for argument:${py_version}"
