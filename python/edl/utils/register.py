@@ -15,13 +15,15 @@ import threading
 import time
 import json
 import uuid
+import copy
 
 from .utils import logger
-from .cluster import Pod, PodStatus
+from .pod import Pod
 from ..discovery.etcd_client import EtcdClient
 
 import etcd3
 from .global_vars import *
+from .etcd_db import get_global_etcd, ETCD_TTL
 
 
 class Register(object):
@@ -29,184 +31,107 @@ class Register(object):
         self._service = service
         self._server = server
         self._stop = threading.Event()
-        #don't change this ttl
-        self._etcd = EtcdClient(endpoints=etcd_endpoints, root=job_id)
+        self._etcd = None
+        self._t_register = None
+        self._lock = threading.Lock()
+        self._info = info
+
+        self._etcd = EtcdClient(
+            endpoints=etcd_endpoints, root=job_id, timeout=6)
         self._etcd.init()
 
         try:
-            self._etcd.set_server_not_exists(service, server, info, ttl=10)
+            self._etcd.set_server_not_exists(
+                service, server, self._info, ttl=ETCD_TTL)
+            logger.info("register pod:{} in etcd path:{}".format(
+                info, self._etcd.get_full_path(service, server)))
         except Exception as e:
             logger.fatal(
                 "connect to etcd:{} error:{} service:{} server:{} info:{}".
                 format(etcd_endpoints, e, service, server, info))
             raise e
+
         self._t_register = threading.Thread(target=self._refresher)
-
-    def _refresher(self):
-        while not self._stop.is_set():
-            self._etcd_lock.refresh(service, server)
-            time.sleep(3)
-
-    def stop(self):
-        self._stop.set()
-        self._t_register.join()
-
-    def __exit__(self):
-        self.stop()
-
-
-class PodRankRegister(object):
-    def __init__(self, job_env, pod):
-        self._stop = threading.Event()
-        self._etcd = EtcdClient(job_env.etcd_endpoints, root=job_env.job_id)
-        self._etcd.init()
-
-        self._service_name = ETCD_POD_RANK
-        self._rank, self._server = self._register_rank(job_env, pod)
-        self._t_register = threading.Thread(target=self._refresher)
-        self._lock = threading.Lock()
-        self._stopped = False
-        self._pod = pod
-        self._job_env = job_env
-
-    def _register_rank(self, job_env, pod, timeout=300):
-        rank = -1
-        begin = time.time()
-        for rank in range(0, job_env.up_limit_nodes):
-            server = "{}".format(rank)
-            valid = True
-            while valid:
-                try:
-                    pod._rank = rank
-                    # register the leader stage
-                    if rank == 0:
-                        pod._stage = str(uuid.uuid1())
-                    else:
-                        pod._stage = None
-
-                    info = pod.to_json()
-                    if not self._etcd.set_server_not_exists(
-                            self._service_name, server, info=info, timeout=0):
-                        valid = False
-                        continue
-
-                    logger.info("register rank:{} on etcd key:{}".format(
-                        rank,
-                        self._etcd.get_full_path(self._service_name, server)))
-                    # set rank
-                    pod.rank = rank
-                    return rank, server
-                except (etcd3.exceptions.ConnectionTimeoutError,
-                        etcd3.exceptions.ConnectionFailedError
-                        ) as e:  # timeout and other
-                    if time.time() - begin > timeout:
-                        raise EdlRegisterError(
-                            "register {} to etcd:{} timeout:{}".format(
-                                server, job_env.ectd_endpoints, timeout))
-                    time.sleep(1)
-                    logger.warning("register to etcd error:{}".format(e))
-                    continue
-
-        pod._rank = None
-        pod._stage = None
-        raise EdlRegisterError(
-            "register {} to etcd:{} but can't find valid rank:{}".format(
-                server, job_env.ectd_endpoints, rank))
-
-    @property
-    def rank(self):
-        return self._rank
+        self._t_register.start()
 
     def _refresher(self):
         while not self._stop.is_set():
             try:
-                self._etcd.refresh(self._service_name, self._server)
+                self._etcd.refresh(self._service, self._server)
+                time.sleep(3)
             except Exception as e:
-                # exit when error ocurred
+                logger.fatal("register meet error and exit! class:{} error:{}".
+                             format(self.__class__.__name__, e))
                 break
-
-            # don't change the waited time
-            time.sleep(1)
-
-        with self._lock:
-            self._rank = None
-            self._stopped = True
-
-    def update_stage(self):
-        if not self.is_leader():
-            return
-
-        with self._lock:
-            self._pod._stage = str(uuid.uuid1())
-            info = self._pod.to_json()
-
-        self._etcd.refresh(self._service_name, self._server, info=info)
 
     def stop(self):
         self._stop.set()
-
-        if self._t_register.is_alive():
-            self._t_register.join()
-
         with self._lock:
-            self._stopped = True
-            self._rank = None
+            if self._t_register:
+                self._t_register.join()
+                self._t_register = None
+
+                self._etcd.remove_server(self._service, self._server)
+
+        logger.info("{} exit".format(self.__class__.__name__))
+
+    def is_stopped(self):
+        with self._lock:
+            return self._t_register == None
 
     def __exit__(self):
         self.stop()
 
-    def is_leader(self):
-        with self._lock:
-            return self._rank == 0
-
-    def complete(self, status):
-        with self._lock:
-            if status:
-                self._pod.status = PodStatus.COMPLETE
-            else:
-                self._pod.status = PodStatus.ERROR
-
-        info = self._pod.to_json()
-        self._etcd.set_server_permanent(self._service_name, self._server, info)
-        self.stop()
-
-    def is_stoped(self):
-        with self._lock:
-            return self._stopped
-
 
 class PodResourceRegister(Register):
-    def __init__(self, etcd_endpoints, job_id, pod):
-        """
-        /jobid/data_reader/nodes/rank:value
-        So the others can find it.
-        """
+    def __init__(self, job_env, pod):
         service = ETCD_POD_RESOURCE
         server = "{}".format(pod.get_id())
         value = pod.to_json()
 
         super(PodResourceRegister, self).__init__(
-            etcd_endpoints=etcd_endpoints,
-            job_id=job_id,
+            etcd_endpoints=job_env.etcd_endpoints,
+            job_id=job_env.job_id,
             service=service,
             server=server,
             info=value)
 
+        db = get_global_etcd()
+        db.get_resource_pods_dict()
+
+    """
+        time.sleep(300)
+
+    def _refresher(self):
+        while not self._stop.is_set():
+            with self._lock:
+                info = self._info
+
+            try:
+                self._etcd.refresh(self._service, self._server, info)
+
+                db=get_global_etcd()
+                db.get_resource_pods_dict()
+
+                time.sleep(2)
+            except Exception as e:
+                logger.fatal("register meet error and exit! error:".format(e))
+                self._stopped = True
+                break
+    """
+
 
 class DataReaderRegister(Register):
-    def __init__(self, etcd_endoints, job_id, rank, reader):
-        """
-        /jobid/data_reader/nodes/rank:value
-        So the others can find it.
-        """
-        service = "data_reader"
-        sever = "{}".format(rank)
+    def __init__(self, etcd_endoints, job_id, pod_id, reader):
+        service = ETCD_POD_DATA_READER
+        sever = pod_id
         value = {
             "id": reader.get_id(),
             "name": reader.name,
             "endpoint": reader.endpoint,
-            "rank": rank
         }
+
+        info = value.dumps(value)
 
         super(DataReaderRegister, self).__init__(
             etcd_endpoints=etcd_endpoints,

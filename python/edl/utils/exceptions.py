@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import sys
-from ..utils import common_pb2 as pb
+from ..utils import common_pb2 as common_pb
 
 
 class EdlException(Exception):
@@ -44,14 +44,36 @@ class EdlInternalError(EdlException):
     pass
 
 
+class EdlWaitFollowersReleaseError(EdlException):
+    pass
+
+
+class EdlLeaderError(EdlException):
+    pass
+
+
+class EdlGenerateClusterError(EdlException):
+    pass
+
+
+class EdlTableError(EdlException):
+    pass
+
+
 def deserialize_exception(s):
     thismodule = sys.modules[__name__]
     cls = getattr(thismodule, s.type)(s.detail)
+    print(type(cls))
     raise cls
 
 
 def serialize_exception(e):
-    s = pb.Status()
+    s = common_pb.Status()
     s.type = e.__class__.__name__
     s.detail = str(e)
     return s
+
+
+def serialize_exception(res, e):
+    res.status.type = e.__class__.__name__
+    res.status.detail = str(e)
