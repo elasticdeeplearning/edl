@@ -36,8 +36,9 @@ class State(object):
         # interface
         self._default = {
             "total_batch_size": total_batch_size,
-            "epoch_no": epoch_no,
-            "step_no": step_no,
+            "epoch_no": None,
+            "step_no_of_epoch": None,
+            "global_step_no": None,
         }
         self._user_defined = user_defined
         self._adjust_func = []
@@ -50,6 +51,26 @@ class State(object):
 
     def register_adjust_function(self, f):
         self._adjust_func.append(f)
+
+    @property
+    def epoch_no(self):
+        return self._defaults["epcho_no"]
+
+    @property
+    def step_no_of_epoch(self):
+        return self._defaults["step_no_of_epoch"]
+
+    @property
+    def global_step_no(self):
+        return self._defaults["global_step_no"]
+
+    @property
+    def total_batch_size(self):
+        return self._defaults["total_batch_size"]
+
+    @total_batch_size.setter
+    def total_batch_size(self, size):
+        self._defaults["total_batch_size"] = size
 
     def to_json(self):
         d = {
