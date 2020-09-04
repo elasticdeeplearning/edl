@@ -36,6 +36,7 @@ class State(object):
         # interface
         self._default = {
             "total_batch_size": total_batch_size,
+            "world_size": None,
             "epoch_num": None,
             "epoch_no": None,
             "global_step_no": None,
@@ -48,10 +49,14 @@ class State(object):
         self._name = generator("_edl_state_")
         self._model_path = None
         self._data_checkpoint = DataCheckpoint()
-        self._train_status = TrainStatus()
+        self._train_status = TrainStatusCheckpoint()
 
     def register_adjust_function(self, f):
         self._adjust_func.append(f)
+
+    @property
+    def world_size(self):
+        return self._defaults["world_size"]
 
     @property
     def epoch_num(self):
@@ -145,7 +150,6 @@ class State(object):
 
         message = "pod_id:{} save_data_checkpoint status:{}".format(pod_id,
                                                                     status)
-
         if not status:
             raise EdlPutError(message)
 
