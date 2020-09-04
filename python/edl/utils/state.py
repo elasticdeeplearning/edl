@@ -36,9 +36,10 @@ class State(object):
         # interface
         self._default = {
             "total_batch_size": total_batch_size,
+            "epoch_num": None,
             "epoch_no": None,
-            "step_no_of_epoch": None,
             "global_step_no": None,
+            "step_no_of_epoch": None,
         }
         self._user_defined = user_defined
         self._adjust_func = []
@@ -53,8 +54,12 @@ class State(object):
         self._adjust_func.append(f)
 
     @property
+    def epoch_num(self):
+        return self._defaults["epoch_num"]
+
+    @property
     def epoch_no(self):
-        return self._defaults["epcho_no"]
+        return self._defaults["epoch_no"]
 
     @property
     def step_no_of_epoch(self):
@@ -89,7 +94,8 @@ class State(object):
         d = json.loads(s)
 
         self._defaults = d["default"]
-        self._user_defined.from_json(d["user_defined"])
+        if self._user_defined and d["user_defined"] is not None:
+            self._user_defined.from_json(d["user_defined"])
 
         self._name = d["name"]
         self._model_path = d["model_path"]
