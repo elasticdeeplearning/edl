@@ -18,6 +18,7 @@ import uuid
 import copy
 import traceback
 import six
+from enum import IntEnum
 
 from .utils import logger
 from .pod import Pod
@@ -30,65 +31,89 @@ from .exceptions import EdlPutError
 from .etcd_db import get_global_etcd
 
 
-class Checkpoint(object):
-    def __init__(self):
-        self._reader_name = None
+class State(object):
+    def __init__(self, total_batch_size, user_defined=None):
+        # interface
+        self._default = {
+            "total_batch_size": total_batch_size,
+            "epoch_no": epoch_no,
+            "step_no": step_no,
+        }
+        self._user_defined = user_defined
+        self._adjust_func = []
+
+        # internal
+        self._name = generator("_edl_state_")
         self._model_path = None
-        self._data_checkpoint = None
+        self._data_checkpoint = DataCheckpoint()
+        self._train_status = TrainStatus()
+
+    def register_adjust_function(self, f):
+        self._adjust_func.append(f)
 
     def to_json(self):
         d = {
-            "reader_name": self._reader_name,
+            "default": json.to_json(self._default),
+            "user_defined": self._user_defined.to_json()
+            if self._user_defined else None,
+            "name": self._name,
             "model_path": self._model_path,
-            "data_checkpoint": self._data_checkpoint,
+            "data_checkpoint": self._data_checkpoint.to_json(),
+            "train_status": self._train_status.to_json(),
         }
 
         return json.dumps(d)
 
     def from_json(self, s):
         d = json.loads(s)
-        self._reader_name = d["reader_name"]
+
+        self._defaults = d["default"]
+        self._user_defined.from_json(d["user_defined"])
+
+        self._name = d["name"]
         self._model_path = d["model_path"]
-        self._data_checkpoint = d["data_checkpoint"]
+        self._data_checkpoint.from_json(d["data_checkpoint"])
+        self._train_status.from_json(d["train_status"])
         return d
 
     @staticmethod
     @handle_errors_until_timeout
-    def load_from_etcd(etcd_endpoints, job_id, reader_name):
+    def load_from_etcd(etcd_endpoints, job_id, name):
         etcd = EtcdClient(
             endpoints=etcd_endpoints, root=job_id, timeout=EDL_CONN_TIMEOUT)
         etcd.init()
 
-        value = etcd.get_value(ETCD_DIST_READER, reader_name)
+        value = etcd.get_value(ETCD_DIST_READER, name)
 
         if value is None:
             raise EdlTableError("key:value = {}:{}".format(
-                etcd.get_full_path(ETCD_DIST_READER, reader_name), value))
+                etcd.get_full_path(ETCD_DIST_READER, name), value))
 
-        c = Checkpoint()
+        c = State()
         c.from_json(value)
         return c
 
     @staticmethod
     @handle_errors_until_timeout
-    def save_to_etcd(etcd_endpoints, job_id, pod_id, reader_name, mode_path,
-                     data_checkpoint):
+    def save_to_etcd(etcd_endpoints, job_id, pod_id, name, mode_path,
+                     data_checkpoint, user_defined):
         etcd = EtcdClient(
             endpoints=etcd_endpoints, root=job_id, timeout=EDL_CONN_TIMEOUT)
         etcd.init()
 
-        c = Checkpoint()
-        c._reader_name = reader_name
+        c = State()
+        c._name = name
         c._data_checkpoint = data_checkpoint
         c._model_path = model_path
+        c._user_defined = user_defined
 
         leader_key = etcd.get_full_path(ETCD_POD_RANK, ETCD_POD_LEADER)
-        dist_reader_key = etcd.get_full_path(ETCD_DIST_READER, reader_name)
+        state_key = etcd.get_full_path(ETCD_STATE, name)
 
         etcd = etcd._etcd
         status, _ = etcd.transaction(
             compare=[etcd.transactions.value(leader_key) == pod_id, ],
-            success=[etcd.transactions.put(dist_reader_key, c.to_json()), ],
+            success=[etcd.transactions.put(state_key, c.to_json()), ],
             failure=[])
 
         message = "pod_id:{} save_data_checkpoint status:{}".format(pod_id,
@@ -98,3 +123,16 @@ class Checkpoint(object):
             raise EdlPutError(message)
 
         return status
+
+
+class PaddleState(State):
+    def __init__(self,
+                 total_batch_size,
+                 user_defined=None,
+                 optimizer=None,
+                 exe=None,
+                 program=None):
+        super(PaddleState, self).__init__(
+            total_batch_size=total_batch_size, user_defined=user_defined)
+        self._exe = None
+        self._program = None

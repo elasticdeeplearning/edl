@@ -32,17 +32,20 @@ from .utils import logger
 
 
 class DataServerServicer(pb_grpc.DataServerServicer):
-    def __init__(self, file_list, trainer_env, data_checkpoint):
+    def __init__(self, file_list, trainer_env, data_checkpoint_json):
         self._file_list = file_list
         self._trainer_env = trainer_env
+
+        # file_list idx->record_range
+        self._batch_data = {}
         self._lock = Threading.Lock()
-        self._checkpoint = data_checkpoint
 
     def to_json(self):
         pass
 
-    def from_json(self):
-        pass
+    def from_json(self, s):
+        d = json.load(s)
+        self._checkpoint = data_checkpoint
 
     def _initital(self):
         for i, f in enumerate(self._file_list):
@@ -114,11 +117,9 @@ class DataServer(object):
             maximum_concurrent_rpcs=concurrency)
         data_server_pb2_grpc.add_DataServerServicer_to_server(
             DataServerServicer(
-                file_list=file_list,
-                trainer_env=trainer_env,
-                data_checkpoint=data_checkpoint,
-                capcity=cache_capcity,
-                file_list=file_list),
+                file_list=self._file_list,
+                trainer_env=self._trainer_env,
+                data_checkpoint_json=self._data_checkpoint_json),
             server)
 
         self._addr = addr
