@@ -57,6 +57,7 @@ class DistributeReader(object):
 
         # connections to data servers
         self._conns = {}
+        self._batch_data_id = 0
 
         self._trainer_env = TrainerEnv()
         """
@@ -70,10 +71,10 @@ class DistributeReader(object):
         self._data_server = DataServer(self._trainer_env, self._id, checkpoint)
         self._data_server.start()
 
-        self._record_to_dist_reader_table()
+        #self._record_to_dist_reader_table()
 
         self._db = get_global_etcd(trainer_env.endpoints, trainer_env.job_id)
-        self._wait_all_dist_readers()
+        #self._wait_all_dist_readers()
         self._wait_dist_reader_leader()
         self._client = DataServerClient()
 
@@ -81,16 +82,19 @@ class DistributeReader(object):
     def _wait_dist_reader_leader(self, timeout=120):
         self._reader_leader = self._db.get_dist_reader_leader()
 
+    """
     @handle_errors_until_timeout
     def _wait_all_dist_readers(self, timeout=120):
         self._readers = self._db.check_dist_readers()
-
+    """
+    """
     @handle_errors_until_timeout
     def _record_to_dist_reader_table(self, timeout=120):
         self._db.record_to_dist_reader_table(
             pod_id=self._pod_id,
             endpoint=self._data_server.endpoint,
             reader_name=self._name)
+    """
 
     def stop(self):
         self._data_server.stop()
@@ -98,12 +102,17 @@ class DistributeReader(object):
     def __exit__(self):
         self.stop()
 
+    def _generate_batch_data(self):
+        self._batch_data_id += 1
+        return {
+            "id:": self._batch_data_id,
+            "meta": None,  # {idx=>record_nos, }
+            "data": None,  # [(field_data...) ...]
+        }
+
     def _reader_batch_data_from_file(self):
         while True:
-            b = {
-                "meta": None,  # {idx=>record_nos, }
-                "data": None,  # [(field_data...) ...]
-            }
+            self._generate_batch_data()
             for m in _get_file_list():
                 assert self._file_list[m.idx] == m.path
                 fields = self._cls(m.path)
@@ -114,23 +123,35 @@ class DistributeReader(object):
 
                     if len(b['data']) >= self._batch_size:
                         yield b
-
-                        b = {
-                            "meta": None,  # {idx=>record_nos, }
-                            "data": None,  # [(field_data...) ...]
-                        }
+                        self._generate_batch_data()
 
             if len(b["data"]) > 0:
                 yield b
 
     def __iter__(self):
         for b in self._reader_batch_data_from_file():
-            yield b
+            # report and get
+            self._client.get_batch_data_idx(
+                reader_name=self._name,
+                pod_id=self._trainer_env.pod_id,
+                endpoint=self._data_server.endpoint,
+                batch_data_ids=[b["id"]])
+
+        try:
+            self._client.get_batch_data_idx(
+                reader_name=self._name,
+                pod_id=self._trainer_env.pod_id,
+                endpoint=self._data_server.endpoint)
+        except EdlDataEndError as e:
+            raise StopIteration
 
     @handle_errors_until_timeout
     def _get_file_list(self, timeout=120):
         return self._client.get_file_list(self._reader_leader._endpoint,
                                           self._name, self._trainer_env.pod_id)
+
+    def _get_batch_data_idx(self, timeout=30):
+        pass
 
     def report(self, metas, success=True):
         pass

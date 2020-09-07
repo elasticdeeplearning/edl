@@ -47,17 +47,17 @@ message CheckpointRequest {
   string model_path = 2;
 }
 
-message BatchDataMetaRequest {
-  string data_reader_id = 1;
-  // if batch_id == "" means there's no data local
-  string batch_data_id = 2;
+message BatchDataMeta {
+  string reader_name = 1;
+  string pod_id = 2;
+  string data_server_endpoint = 3;
+  // if batch_data_id is None it means no batch_data local
+  repeated string batch_data_ids = 3;
 }
 
 message BatchDataMetaResponse {
   common.Status status = 1;
-  string data_reader_id = 2;
-  // string data_reader_endpoint = 3;
-  string batch_data_id = 3;
+  repeated BatchDataMeta metas = 2;
 }
 
 message FileBatchData {
@@ -74,7 +74,7 @@ message BatchDataResponse {
 
 service DataServer {
   rpc GetFileList(FileListRequest) returns (FileListResponse) {}
-  rpc GetBatchDataMeta(BatchDataMetaRequest) returns (BatchDataMetaResponse) {}
+  rpc GetBatchDataMeta(BatchDataMeta) returns (BatchDataMetaResponse) {}
   rpc GetBatchData(BatchDataRequest) returns (BatchDataResponse) {}
   rpc ShutDown(ShutDownRequest) returns (common.Status) {}
 

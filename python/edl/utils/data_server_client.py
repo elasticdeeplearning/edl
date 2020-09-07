@@ -51,7 +51,7 @@ class DataServerClient(object):
         req.pod_id = pod_id
         req.reader_name = reader_name
 
-        res = s.Barrier(req)
+        res = s.GetFileList(req)
         if res.status.type != "":
             deserialize_exception(res.status)
 
@@ -61,3 +61,28 @@ class DataServerClient(object):
 
         logger.debug("pod client get file_list:{}".format(ret))
         return ret
+
+    @handle_timeout_errors
+    def get_batch_data_idx(self,
+                           reader_name=None,
+                           pod_id=None,
+                           endpoint=None,
+                           batch_data_ids=None,
+                           timeout=6):
+        self._connect(endpoint)
+
+        req = pb.BatchDataMeta()
+        req.reader_name = reader_name
+        req.pod_id = pod_id
+        req.data_server_endpoint = endpoint
+        for idx in batch_data_ids:
+            req.batch_data_ids.append(idx)
+
+        res = s.GetBatchDataMeta(req)
+        if res.status.type != "":
+            deserialize_exception(res.status)
+
+        for m in res.metas:
+            logger.debug("pod client get batch_idx endpoint:{} ids:{}".format(
+                m.data_server_endpoint, [x for x in m.batch_data_ids]))
+        return res.metas
