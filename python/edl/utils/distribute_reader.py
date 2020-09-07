@@ -43,7 +43,7 @@ class Connection(self):
 
 
 class DistributeReader(object):
-    def __init__(self, file_list, file_splitter_cls):
+    def __init__(self, file_list, file_splitter_cls, batch_size):
         self._file_list = file_list
         assert isinstance(self._file_list, list)
 
@@ -98,17 +98,34 @@ class DistributeReader(object):
     def __exit__(self):
         self.stop()
 
-    def _read_one_file(self, path):
-        pass
+    def _reader_batch_data_from_file(self):
+        while True:
+            b = {
+                "meta": None,  # {idx=>record_nos, }
+                "data": None,  # [(field_data...) ...]
+            }
+            for m in _get_file_list():
+                assert self._file_list[m.idx] == m.path
+                fields = self._cls(m.path)
+                for i in o:
+                    assert fields[0] == m.idx
+                    b["meta"]["idx"] = fields[0]
+                    b["data"].append((fields[1:]))
+
+                    if len(b['data']) >= self._batch_size:
+                        yield b
+
+                        b = {
+                            "meta": None,  # {idx=>record_nos, }
+                            "data": None,  # [(field_data...) ...]
+                        }
+
+            if len(b["data"]) > 0:
+                yield b
 
     def __iter__(self):
-        while True:
-            try:
-                for m in _get_file_list():
-                    self._read_one_file(m.path)
-
-            except EdlDataEndError as e:
-                raise StopIteration
+        for b in self._reader_batch_data_from_file():
+            yield b
 
     @handle_errors_until_timeout
     def _get_file_list(self, timeout=120):
