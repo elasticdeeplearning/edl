@@ -132,6 +132,7 @@ class EtcdDB(object):
 
         reader_leader = DistReader()
         reader_leader.from_json(value)
+        logger.debug("get reader_leader:".format(reader_leader))
         return reader_leader
 
     def check_dist_readers(self):
@@ -156,16 +157,18 @@ class EtcdDB(object):
             raise EdlTableError("reader_ids:{} != cluster_pod_ids:{}".format(
                 reader_ids.keys(), cluster.get_pods_ids_set()))
 
+        logger.debug("get readers:{}".format(readers))
         return readers
 
-    def record_to_dist_reader_table(self, pod_id, endpoint, reader_id):
+    def record_to_dist_reader_table(self, endpoint, reader_name, pod_id):
         r = DistReader()
         r._pod_id = pod_id
         r._endpoint = endpoint
-        r._id = reader_id
+        r._name = reader_name
 
         with self._lock:
-            self._etcd.set_server_permanent(ETCD_READER, pod_id, r.to_json())
+            self._etcd.set_server_permanent(ETCD_DIST_READER, pod_id,
+                                            r.to_json())
 
     def get_cluster(self):
         with self._lock:

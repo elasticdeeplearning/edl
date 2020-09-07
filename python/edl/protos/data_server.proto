@@ -24,19 +24,22 @@ message EmptyRequest {}
 
 message Record {
   int64 record_no = 1;
-  bytes data = 2;
+  repeated bytes field_data = 2;
 }
 
-message FileListRequest { string data_reader_id = 1; }
+message FileListRequest {
+  string pod_id = 1;
+  string reader_name = 2;
+}
 
-message FileMeta {
+message FileListMeta {
   int64 idx = 1;
   string path = 2;
 }
 
 message FileListResponse {
   common.Status ret = 1;
-  repeated FileMeta metas = 2;
+  repeated FileListMeta metas = 2;
 }
 
 message CheckpointRequest {
@@ -47,27 +50,26 @@ message CheckpointRequest {
 message BatchDataMetaRequest {
   string data_reader_id = 1;
   // if batch_id == "" means there's no data local
-  string batch_id = 2;
+  string batch_data_id = 2;
 }
 
 message BatchDataMetaResponse {
   common.Status status = 1;
   string data_reader_id = 2;
-  string data_reader_endpoint = 3;
-  string batch_data_id = 4;
+  // string data_reader_endpoint = 3;
+  string batch_data_id = 3;
 }
 
 message FileBatchData {
-  int64 idx = 1;
-  string path = 2;
-  repeated Record records = 3;
+  FileListMeta file_meta = 1;
+  repeated Record records = 2;
 }
 
 message BatchDataRequest { string batch_id = 1; }
 
 message BatchDataResponse {
   common.Status status = 1;
-  repeated FileBatchData batch = 2;
+  repeated FileBatchData batch_data = 2;
 }
 
 service DataServer {

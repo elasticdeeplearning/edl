@@ -162,6 +162,8 @@ def handle_errors_until_timeout(f):
         while True:
             try:
                 return f(*args, **kwargs)
+            except EdlDataEndError as e:
+                raise EdlDataEndError
             except Exception as e:
                 if time.time() - begin >= timeout:
                     logger.warning("{} execute timeout:{}".format(f.__name__))

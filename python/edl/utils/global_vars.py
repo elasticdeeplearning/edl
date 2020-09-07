@@ -54,13 +54,11 @@ class TrainStatus(IntEnum):
 class DistReader(object):
     def __init__(self, pod_id, name, endpoint):
         self._pod_id = pod_id
-        #self._id = None
         self._name = name
         self._endpoint = endpoint
 
     def to_json(self):
         d = {
-            #"id": self._id,
             "pod_id": self._pod_id,
             "endpoint": self._endpoint,
             "name": self._name,
@@ -70,10 +68,12 @@ class DistReader(object):
 
     def from_json(self, s):
         d = json.loads(s)
-        #self._id = d["id"]
         self._pod_id = d["pod_id"]
         self._endpoint = d["endpoint"]
         self._name = d["name"]
+
+    def __str_(self):
+        return self._to_json()
 
 
 class DataCheckpoint(object):
@@ -125,3 +125,6 @@ class TrainStatusCheckpoint(object):
         self._epoch_no = d["epoch_no"]
         self._epochs = d["epochs"]
         self._status = d["status"]
+
+    def __str__(self):
+        return self.to_json()

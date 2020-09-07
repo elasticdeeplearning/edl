@@ -63,6 +63,12 @@ class DataServerServicer(pb_grpc.DataServerServicer):
         """
         pass
 
+    def ReportBatchDataIdx(self, request, context):
+        pass
+
+    def GetBatchDataIdx(self, request, context):
+        pass
+
     def GetBatchDataMeta(self, request, context):
         pass
 
