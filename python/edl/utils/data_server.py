@@ -32,7 +32,7 @@ from .utils import logger
 
 
 class DataServerServicer(pb_grpc.DataServerServicer):
-    def __init__(self, file_list, trainer_env, data_checkpoint_json):
+    def __init__(self, file_list, data_reporter):
         self._file_list = file_list
         self._trainer_env = trainer_env
 
@@ -40,13 +40,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
         self._batch_data = {}
         self._lock = Threading.Lock()
 
-    def to_json(self):
-        pass
-
-    def from_json(self, s):
-        d = json.load(s)
-        self._checkpoint = data_checkpoint
-
+    """
     def _initital(self):
         for i, f in enumerate(self._file_list):
             if i not in self._dispatched:
@@ -56,11 +50,9 @@ class DataServerServicer(pb_grpc.DataServerServicer):
     def _check_leader(self, self_rank):
         if self._rank != 0:
             raise EdlNotLeaderError("This server is not Leader")
+    """
 
     def GetBatchData(self, request, context):
-        """
-        try to get data from loader's queue and return.
-        """
         pass
 
     def ReportBatchDataIdx(self, request, context):

@@ -24,6 +24,7 @@ import subprocess
 from contextlib import closing
 import socket
 import psutil
+import threading
 
 from .utils import logger
 
@@ -193,3 +194,40 @@ def watch_local_trainers(procs, nranks):
         return False, False
 
     return alive, True
+
+
+def spawn(func, args, error_queue, std_queue):
+    pass
+
+
+class ProcessWrapper(object):
+    def __init__(self):
+        self._stop = None
+        self._lock = None
+        self._worker = None
+
+        self._stop = multiprocessing.Event()
+        self._lock = threading.Lock()
+        self._worker = multiprocessing.Process(target=self._worker_func)
+
+    def _worker_func(self):
+        raise NotImplementedError
+
+    def start(self):
+        self._worker.start()
+
+    def stop(self):
+        self._stop.set()
+        with self._lock:
+            if self._worker:
+                self._worker.join()
+                self._worker = None
+
+        logger.info("{} exit".format(self.__class__.__name__))
+
+    def is_stopped(self):
+        with self._lock:
+            return self._worker == None
+
+    def __exit__(self):
+        self.stop()

@@ -51,11 +51,18 @@ class TrainStatus(IntEnum):
     FAILED = 4
 
 
+"""
 class DistReader(object):
     def __init__(self, pod_id, name, endpoint):
         self._pod_id = pod_id
         self._name = name
         self._endpoint = endpoint
+
+    def to_pb(self):
+        pass
+
+    def from_pb(self):
+        pass
 
     def to_json(self):
         d = {
@@ -74,6 +81,7 @@ class DistReader(object):
 
     def __str_(self):
         return self._to_json()
+"""
 
 
 class DataCheckpoint(object):

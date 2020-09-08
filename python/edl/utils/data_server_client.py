@@ -73,7 +73,7 @@ class DataServerClient(object):
 
         req = pb.BatchDataMeta()
         req.reader_name = reader_name
-        req.pod_id = pod_id
+        req.producer_pod_id = pod_id
         req.data_server_endpoint = endpoint
         for idx in batch_data_ids:
             req.batch_data_ids.append(idx)
