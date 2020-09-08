@@ -196,10 +196,6 @@ def watch_local_trainers(procs, nranks):
     return alive, True
 
 
-def spawn(func, args, error_queue, std_queue):
-    pass
-
-
 class ProcessWrapper(object):
     def __init__(self):
         self._stop = None
