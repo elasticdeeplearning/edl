@@ -51,39 +51,6 @@ class TrainStatus(IntEnum):
     FAILED = 4
 
 
-"""
-class DistReader(object):
-    def __init__(self, pod_id, name, endpoint):
-        self._pod_id = pod_id
-        self._name = name
-        self._endpoint = endpoint
-
-    def to_pb(self):
-        pass
-
-    def from_pb(self):
-        pass
-
-    def to_json(self):
-        d = {
-            "pod_id": self._pod_id,
-            "endpoint": self._endpoint,
-            "name": self._name,
-        }
-
-        return json.dumps(d)
-
-    def from_json(self, s):
-        d = json.loads(s)
-        self._pod_id = d["pod_id"]
-        self._endpoint = d["endpoint"]
-        self._name = d["name"]
-
-    def __str_(self):
-        return self._to_json()
-"""
-
-
 class DataCheckpoint(object):
     def __init__(self, reader_name, file_list, data_checkpoint):
         self._reader_name = reader_name
