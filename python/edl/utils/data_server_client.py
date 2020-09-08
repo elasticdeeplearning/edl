@@ -86,3 +86,12 @@ class DataServerClient(object):
             logger.debug("pod client get batch_idx endpoint:{} ids:{}".format(
                 m.data_server_endpoint, [x for x in m.batch_data_ids]))
         return res.metas
+
+    @handle_time_errors
+    def get_batch_data(self,
+                       reader_name,
+                       endpoint,
+                       pod_id,
+                       batch_data_ids,
+                       time=6):
+        pass

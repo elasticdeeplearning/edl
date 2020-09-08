@@ -37,46 +37,31 @@ from .unique_name import generator
 from .data_server_client import DataServerClient
 
 
-class Connection(self):
-    def __init__(self, endpoint, channel, stub):
-        self._endpoint = endpoint
-        self.channel = channel
-        self.stub = stub
-
-
 class DataGenerator(ProcessWrapper):
-    def __init__(self,
-                 endpoint,
-                 total_file_list,
-                 splitter_cls,
-                 data_queue,
-                 error_queue=None):
+    def __init__(self, leader_endpoint, reader_name, pod_id, total_file_list,
+                 splitter_cls, data_queue):
         super(DataGenerator, self).__init__()
 
         self._batch_data_id = 0
 
+        self._leader_endpoint = leader_endpoint
+        self._pod_id = pod_id
+        self._reader_name = reader_name
+
         self._file_list = total_file_list
         self._splitter_cls = splitter_cls
         self._data_queue = data_queue
-        self._error_queue = error_queue
-
-        self._client = DataServerClient()
-
-    def start(self):
-        super(DataGenerator, self).start()
-        self._client.connect(endpoint)
 
     @handle_errors_until_timeout
     def _get_file_list(self, timeout=120):
-        return self._client.get_file_list(self._reader_leader._endpoint,
-                                          self._name, self._trainer_env.pod_id)
+        client = DataServerClient()
+        return client.get_file_list(self.leader_endpoint, self._reader_name,
+                                    self._pod_id)
 
     def _generate_batch_data(self):
         self._batch_data_id += 1
         return {
             "id:": self._batch_data_id,
-            #"producer_pod_id":None,
-            #"consumer_pod_id":None,
             "meta": None,  # {idx=>record_nos, }
             "data": None,  # [(field_data...) ...]
         }
@@ -120,17 +105,20 @@ class DataGenerator(ProcessWrapper):
             sys.exit(1)
 
 
-class DataReporter(object):
-    def __init__(self, leader, reader_name, input_queue, out_queue,
-                 trainer_env):
+class DataAccess(object):
+    def __init__(self, leader, reader_name, trainer_env, input_queue,
+                 out_queue):
         super(DataGenerator, self).__init__()
 
         self._reader_name = reader_name
-        self._trainer_env = trainer_env
         self._leader = leader
+        self._trainer_env = trainer_env
+
         self._client = DataServerClient()
         self._input_queue = input_queue
         self._cache = {}
+
+        self._meta_queue = threading.Queue()
 
         self._data_server = DataServer(self)
         self._data_server.start()
@@ -138,8 +126,8 @@ class DataReporter(object):
         self._t_reporter = threading.Thread(target=self._report)
         self._t_reporter.start()
 
-        self._t_getter = threading.Thread(target=self._report)
-        self._t_getter.start()
+        self._t_accesser = threading.Thread(target=self._access)
+        self._t_accesser.start()
 
     def start(self):
         try:
@@ -149,12 +137,15 @@ class DataReporter(object):
             print(e, file=stderr)
             sys.exit(1)
 
-    def _report(self):
+    def _report_and_access(self, report_size=10):
+        a = []
         while not self._stop.set():
-            b = self._input_queue.pop()
-            if b is None:
-                logger.info("data read to end!")
-                break
+            while len(a) < report_size:
+                b = self._input_queue.pop()
+                if b is None:
+                    logger.info("data read to end!")
+                    break
+                a.append(b)
 
             ret = self._client.get_batch_data_idx(
                 reader_name=self._name,
@@ -162,28 +153,39 @@ class DataReporter(object):
                 endpoint=self._leader.endpoint,
                 batch_data_ids=[b["id"]])
 
-    def _getter(self):
-        self._client.get_batch_data_idx(
-            reader_name=self._name,
-            pod_id=self._trainer_env.pod_id,
-            endpoint=self._data_server.endpoint)
+            for meta in ret:
+                batch_data = self._get_batch_data(meta)
+                self._meta_queue.put(meta)
 
-        for meta in ret:
-            batch_data = self._get_batch_data(meta)
+            a = []
 
-    def get_data(self, meta):
-        conn = self._connect_data_server(endpoint)
-        response = conn.stub.GetData(request)
+        while not self._stop.set():
+            self._client.get_batch_data_idx(
+                reader_name=self._name,
+                pod_id=self.pod_id,
+                endpoint=self._data_server.endpoint)
 
-        if len(response.errors.errors) > 1:
-            return
+            for meta in ret:
+                batch_data = self._get_batch_data(meta)
 
-        data = []
-        for f in response.files.files:
-            for rec in f.records:
-                data.append(rec.data)
+    def generate(self):
+        while not self._stop.set() and not self._meta_queue.empty():
+            meta = self._meta_queue.pop()
 
-        return data
+            if meta.pod_id != self._trainer_env.pod_id:
+                b = self._client.get_batch_data(meta)
+            else:
+                b = self._cache[meta.batch_data_id]
+
+            self._out_queue.put(b)
+
+    def _access(self):
+        try:
+            self._report_and_access()
+        except EdlDataEndError as e:
+            print("reach to data end.")
+        except Exception as e:
+            raise e
 
 
 def data_report(self):
@@ -207,30 +209,36 @@ class DistributeReader(object):
         assert self._batch_size > 0
 
         # connections to data servers
-        #self._conns = {}
         self._trainer_env = TrainerEnv()
 
         self._db = get_global_etcd(trainer_env.endpoints, trainer_env.job_id)
+        self._wait_record_to_dist_reader_table()
         self._wait_dist_reader_leader()
 
         self._generater_out_queue = multiprocessing.Queue()
-        self._reporter_out_queue = multiprocessing.Queue()
+        self._accesser_out_queue = multiprocessing.Queue()
 
         self._generater = None
-        self._reporter = None
+        self._accesser = None
 
     @handle_errors_until_timeout
     def _wait_dist_reader_leader(self, timeout=120):
         self._reader_leader = self._db.get_dist_reader_leader()
+
+    @handle_errors_until_timeout
+    def _wait_record_to_dist_reader_table(self, timeout=120):
+        self._db.record_to_dist_reader_table(self._trainer_env.etcd_endpoint,
+                                             self._name,
+                                             self._trainer_env.pod_id)
 
     def stop(self):
         if self._generater:
             self._generater.stop()
             self._generater = None
 
-        if self._reporter:
-            self._reporter.terminate()
-            self._reporter = None
+        if self._accesser:
+            self._accesser.terminate()
+            self._accesser = None
 
     def __exit__(self):
         self.stop()
@@ -239,8 +247,9 @@ class DistributeReader(object):
         self._generater = DataGenerator()
         self._generator.start()
 
-        self._reporter = multiprocessing.Process(data_report)
-        self._reporter.start()
+        self._accesser = multiprocessing.Process(data_report)
+        self._accesser.start()
 
-        while not self._reporter_out_queue.empty():
-            yield self._reporter_out_queue.pop()
+        while not self._accesser_out_queue.empty():
+            b = self._accesser_out_queue.pop()
+            yield b["meta"], b["data"]

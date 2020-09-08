@@ -103,3 +103,27 @@ class TrainStatusCheckpoint(object):
 
     def __str__(self):
         return self.to_json()
+
+
+class DistReader(object):
+    def __init__(self, pod_id, name, endpoint):
+        self._pod_id = pod_id
+        self._name = name
+        self._endpoint = endpoint
+
+    def to_json(self):
+        d = {
+            "pod_id": self._pod_id,
+            "endpoint": self._endpoint,
+            "name": self._name,
+        }
+        return json.dumps(d)
+
+    def from_json(self, s):
+        d = json.loads(s)
+        self._pod_id = d["pod_id"]
+        self._endpoint = d["endpoint"]
+        self._name = d["name"]
+
+    def __str_(self):
+        return self._to_json()
