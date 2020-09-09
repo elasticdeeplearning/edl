@@ -22,55 +22,45 @@ package data_server;
 message ShutDownRequest {}
 message EmptyRequest {}
 
-message Record {
-  int64 record_no = 1;
-  repeated bytes field_data = 2;
+message FileListElement {
+  int64 idx = 1;
+  string path = 2;
 }
 
 message FileListRequest {
   string pod_id = 1;
   string reader_name = 2;
-}
-
-message FileListMeta {
-  int64 idx = 1;
-  string path = 2;
+  // to verify
+  repeated FileListElement file_list = 3;
 }
 
 message FileListResponse {
   common.Status ret = 1;
-  repeated FileListMeta metas = 2;
+  repeated FileListElement file_list = 2;
 }
 
-message CheckpointRequest {
-  string data_path = 1;
-  string model_path = 2;
+message Record {
+  int64 record_no = 1;
+  repeated bytes field_data = 2;
 }
 
-message BatchDataMeta {
+message BatchData {
+  string batch_data_id = 1;
+  repeated Record records = 2;
+}
+
+message BatchDataRequest {
   string reader_name = 1;
   string producer_pod_id = 2;
   string consumer_pod_id = 3;
   string data_server_endpoint = 4;
-  // if batch_data_id is None it means no batch_data local
-  repeated string batch_data_ids = 5;
-}
 
-message BatchDataMetaResponse {
-  common.Status status = 1;
-  repeated BatchDataMeta metas = 2;
+  repeated BatchData data = 5;
 }
-
-message FileBatchData {
-  FileListMeta file_meta = 1;
-  repeated Record records = 2;
-}
-
-message BatchDataRequest { string batch_id = 1; }
 
 message BatchDataResponse {
   common.Status status = 1;
-  repeated FileBatchData batch_data = 2;
+  repeated BatchData data = 2;
 }
 
 service DataServer {
@@ -80,6 +70,6 @@ service DataServer {
   rpc ShutDown(ShutDownRequest) returns (common.Status) {}
 
   // two step's to do it.
-  rpc PrePareSaveCheckpoint(CheckpointRequest) returns (common.Status) {}
-  rpc SaveCheckpoint(CheckpointRequest) returns (common.Status) {}
+  // rpc PrePareSaveCheckpoint(CheckpointRequest) returns (common.Status) {}
+  // rpc SaveCheckpoint(CheckpointRequest) returns (common.Status) {}
 }

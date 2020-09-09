@@ -37,6 +37,10 @@ from .unique_name import generator
 from .data_server_client import DataServerClient
 
 
+class BatchData(object):
+    pass
+
+
 class DataGenerator(ProcessWrapper):
     def __init__(self, leader_endpoint, reader_name, pod_id, total_file_list,
                  splitter_cls, data_queue):
@@ -62,19 +66,10 @@ class DataGenerator(ProcessWrapper):
         self._batch_data_id += 1
         return {
             "id:": self._batch_data_id,
-            "meta": None,  # {idx=>record_nos, }
-            "data": None,  # [(field_data...) ...]
+            "data": None,  # {idx=>(record_no,(field_data...))... }
         }
 
     def _read_batch_data(self):
-        """
-        #  load checkpoint from etcd 
-        self._checkpoint = Checkpoint.load_from_etcd(
-                etcd_endpoints=self._trainer_env.etcd_endpoints,
-                job_id=self._trainer_env.job_id,
-                reader_name=self._name)
-        """
-
         while True:
             b = self._generate_batch_data()
             for m in _get_file_list():
@@ -105,7 +100,7 @@ class DataGenerator(ProcessWrapper):
             sys.exit(1)
 
 
-class DataAccess(object):
+class DataAccesser(object):
     def __init__(self, leader, reader_name, trainer_env, input_queue,
                  out_queue):
         super(DataGenerator, self).__init__()
@@ -123,19 +118,19 @@ class DataAccess(object):
         self._data_server = DataServer(self)
         self._data_server.start()
 
-        self._t_reporter = threading.Thread(target=self._report)
-        self._t_reporter.start()
+        self._connect()
 
+        self._stop = threading.Event()
+        self._t_reporter = threading.Thread(target=self._report)
         self._t_accesser = threading.Thread(target=self._access)
-        self._t_accesser.start()
+
+    @handle_errors_until_timeout
+    def _connect(self, timeout=60):
+        self._client.connect(self._leader.endpoint)
 
     def start(self):
-        try:
-            super(DataGenerator, self).start()
-            self._client.connect(self._leader.endpoint)
-        except Exception as e:
-            print(e, file=stderr)
-            sys.exit(1)
+        self._t_reporter.start()
+        self._t_accesser.start()
 
     def _report_and_access(self, report_size=10):
         a = []
@@ -145,13 +140,13 @@ class DataAccess(object):
                 if b is None:
                     logger.info("data read to end!")
                     break
-                a.append(b)
+                a.append(b["id"])
 
             ret = self._client.get_batch_data_idx(
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
                 endpoint=self._leader.endpoint,
-                batch_data_ids=[b["id"]])
+                batch_data_ids=a)
 
             for meta in ret:
                 batch_data = self._get_batch_data(meta)
@@ -167,6 +162,9 @@ class DataAccess(object):
 
             for meta in ret:
                 batch_data = self._get_batch_data(meta)
+
+        # data end
+        self._meta_queue.put(None)
 
     def generate(self):
         while not self._stop.set() and not self._meta_queue.empty():
@@ -188,25 +186,31 @@ class DataAccess(object):
             raise e
 
 
-def data_report(self):
+def access_data(self, leader, reader_name, trainer_env, input_queue,
+                out_queue):
     try:
-        reporter = DataReporter()
-        reporter.start()
+        a = DataAccesser(leader, reader_name, trainer_env, input_queue,
+                         out_queue)
+        a.start()
     except Exception as e:
         print(e, file=sys.stderr)
         sys.exit(1)
 
 
 class DistributeReader(object):
-    def __init__(self, file_list, file_splitter_cls, batch_size):
+    def __init__(self,
+                 file_list,
+                 file_splitter_cls,
+                 batch_size,
+                 batch_data_cache_size=100):
         self._file_list = file_list
-        assert isinstance(self._file_list, list)
+        assert isinstance(self._file_list, list), "file_list must be a list"
 
         self._name = generator("_dist_reader_")
 
         self._cls = file_splitter_cls
         self._batch_size = batch_size
-        assert self._batch_size > 0
+        assert self._batch_size > 0, "batch size must > 0"
 
         # connections to data servers
         self._trainer_env = TrainerEnv()
@@ -226,7 +230,7 @@ class DistributeReader(object):
         self._reader_leader = self._db.get_dist_reader_leader()
 
     @handle_errors_until_timeout
-    def _wait_record_to_dist_reader_table(self, timeout=120):
+    def _record_to_dist_reader_table(self, timeout=120):
         self._db.record_to_dist_reader_table(self._trainer_env.etcd_endpoint,
                                              self._name,
                                              self._trainer_env.pod_id)
@@ -238,6 +242,7 @@ class DistributeReader(object):
 
         if self._accesser:
             self._accesser.terminate()
+            self._accesser.join()
             self._accesser = None
 
     def __exit__(self):
@@ -247,9 +252,13 @@ class DistributeReader(object):
         self._generater = DataGenerator()
         self._generator.start()
 
-        self._accesser = multiprocessing.Process(data_report)
-        self._accesser.start()
-
-        while not self._accesser_out_queue.empty():
+        self._accesser = multiprocessing.Process(
+            access_data,
+            args=(self._reader_leader, self._name, self._trainer_env,
+                  self._generater_out_queue, self._accesser_out_queue))
+        while True:
             b = self._accesser_out_queue.pop()
+            if b is None:
+                logger.debug("{} reach data end".format(self._name))
+                break
             yield b["meta"], b["data"]
