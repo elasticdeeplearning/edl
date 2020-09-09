@@ -60,7 +60,7 @@ message BatchDataRequest {
 
 message BatchDataResponse {
   common.Status status = 1;
-  repeated BatchData data = 2;
+  BatchDataRequest ret = 2;
 }
 
 service DataServer {

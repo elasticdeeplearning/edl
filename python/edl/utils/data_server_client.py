@@ -35,7 +35,8 @@ class DataServerClient(object):
     def _connect(self, endpoint):
         return channel, stub
 
-    def connect(self, endpoint):
+    @handle_errors_until_timeout
+    def connect(self, endpoint, timeout=30):
         if endpoint not in self._conn:
             c = grpc.insecure_channel(endpoint)
             s = pb_grpc.DataServerServerStub(channel)
@@ -49,7 +50,7 @@ class DataServerClient(object):
                       reader_name,
                       pod_id,
                       file_list,
-                      timeout=60):
+                      timeout=30):
         self.connect(leader_endpoint)
 
         req = pb.FileListRequest()
@@ -69,36 +70,31 @@ class DataServerClient(object):
         logger.debug("pod client get file_list:{}".format(ret))
         return ret
 
-    @handle_timeout_errors
-    def get_batch_data_idx(self,
-                           reader_name=None,
-                           pod_id=None,
-                           endpoint=None,
-                           batch_data_ids=None,
-                           timeout=6):
-        self._connect(endpoint)
+    @handle_errors_until_timeout
+    def get_batch_data_meta(self,
+                            reader_leader_endpoint,
+                            reader_name,
+                            pod_id,
+                            endpoint,
+                            batch_data=None,
+                            timeout=30):
+        self.connect(reader_leader_endpoint)
 
-        req = pb.BatchDataMeta()
+        req = pb.BatchDataRequest()
         req.reader_name = reader_name
         req.producer_pod_id = pod_id
+        req.consumer_pod_id = None
         req.data_server_endpoint = endpoint
-        for idx in batch_data_ids:
-            req.batch_data_ids.append(idx)
+        req.data = batch_data
 
-        res = s.GetBatchDataMeta(req)
+        res = s.GetBatchData(req)
         if res.status.type != "":
             deserialize_exception(res.status)
 
-        for m in res.metas:
-            logger.debug("pod client get batch_idx endpoint:{} ids:{}".format(
-                m.data_server_endpoint, [x for x in m.batch_data_ids]))
-        return res.metas
+        logger.debug("pod client get batch_data meta:{}".format(
+            batch_data_response_to_string(res)))
+        return res.ret
 
-    @handle_time_errors
-    def get_batch_data(self,
-                       reader_name,
-                       endpoint,
-                       pod_id,
-                       batch_data_ids,
-                       time=6):
+    @handle_errors_until_timeout
+    def get_batch_data(self, req, time=30):
         pass

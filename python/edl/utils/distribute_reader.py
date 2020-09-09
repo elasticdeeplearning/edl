@@ -39,8 +39,8 @@ from . import data_server_pb2 as pb
 
 
 class DataGenerator(ProcessWrapper):
-    def __init__(self, leader_endpoint, reader_name, pod_id, total_file_list,
-                 splitter_cls, out_queue):
+    def __init__(self, reader_leader_endpoint, reader_name, pod_id,
+                 total_file_list, splitter_cls, out_queue):
         super(DataGenerator, self).__init__()
 
         self._batch_data_id = 0
@@ -56,7 +56,7 @@ class DataGenerator(ProcessWrapper):
     def _get_file_list(self, timeout=60):
         client = DataServerClient()
         return client.get_file_list(
-            lader_endpoint=self._leader_endpoint,
+            leader_endpoint=self._leader_endpoint,
             reader_name=self._reader_name,
             pod_id=self._pod_id,
             file_list=self._file_list)
@@ -107,12 +107,12 @@ class DataAccesser(object):
                  out_queue):
         super(DataGenerator, self).__init__()
 
+        self._reader_leader = leader
         self._reader_name = reader_name
-        self._leader = leader
         self._trainer_env = trainer_env
 
-        self._client = DataServerClient()
         self._input_queue = input_queue
+        self._out_queu = out_queue
         self._cache = {}
 
         self._meta_queue = threading.Queue()
@@ -120,21 +120,18 @@ class DataAccesser(object):
         self._data_server = DataServer(self)
         self._data_server.start()
 
-        self._connect()
-
         self._stop = threading.Event()
-        self._t_reporter = threading.Thread(target=self._report)
-        self._t_accesser = threading.Thread(target=self._access)
+        self._t_accesser = threading.Thread(target=self.access)
+        self._t_generater = threading.Thread(target=self.generate)
 
-    @handle_errors_until_timeout
-    def _connect(self, timeout=60):
-        self._client.connect(self._leader.endpoint)
+        self._client = DataServerClient()
 
     def start(self):
-        self._t_reporter.start()
+        self._client.connect(self._reader_leader.endpoint)
         self._t_accesser.start()
+        self._t_generater.start()
 
-    def _report_and_access(self, report_size=10):
+    def _access(self, report_size=10):
         a = []
         while not self._stop.set():
             while len(a) < report_size:
@@ -147,51 +144,63 @@ class DataAccesser(object):
             ret = self._client.get_batch_data_idx(
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
-                endpoint=self._leader.endpoint,
+                endpoint=self._reader_leader.endpoint,
                 batch_data_ids=a)
 
-            for meta in ret:
-                batch_data = self._get_batch_data(meta)
-                self._meta_queue.put(meta)
-
+            self._meta_queue.put(ret)
             a = []
 
         while not self._stop.set():
-            self._client.get_batch_data_idx(
+            ret = self._client.get_batch_data_idx(
                 reader_name=self._name,
-                pod_id=self.pod_id,
-                endpoint=self._data_server.endpoint)
+                pod_id=self._trainer_env.pod_id,
+                endpoint=self._reader_leader.endpoint,
+                batch_data_ids=a)
 
-            for meta in ret:
-                batch_data = self._get_batch_data(meta)
+            self._meta_queue.put(ret)
 
         # data end
         self._meta_queue.put(None)
 
-    def generate(self):
-        while not self._stop.set() and not self._meta_queue.empty():
+    def _get_batch_data(self, req_meta):
+        if self._trainer_env.pod_id != req_meta.producer_pod_id:
+            return self._client.get_batch_data(req_meta)
+
+        ret = []
+        for batch_data_id in req_meta.batch_data_ids:
+            ret.append(self._cache[batch_data_id])
+
+        return ret
+
+    def _generate(self):
+        while not self._stop.set():
             meta = self._meta_queue.pop()
+            if meta is None:
+                break
 
-            if meta.pod_id != self._trainer_env.pod_id:
-                b = self._client.get_batch_data(meta)
-            else:
-                b = self._cache[meta.batch_data_id]
+            ret = self._client.get_batch_data(meta)
+            for i in ret:
+                self._out_queue.put(b)
 
-            self._out_queue.put(b)
+        self._out_queue.put(None)
 
-    def _access(self):
+    def access(self):
         try:
-            self._report_and_access()
-        except EdlDataEndError as e:
-            print("reach to data end.")
+            self._access()
         except Exception as e:
-            raise e
+            sys.exit(1)
+
+    def generate(self):
+        try:
+            self._generate()
+        except Exception as e:
+            sys.exit(1)
 
 
-def access_data(self, leader, reader_name, trainer_env, input_queue,
+def access_data(self, reader_leader, reader_name, trainer_env, input_queue,
                 out_queue):
     try:
-        a = DataAccesser(leader, reader_name, trainer_env, input_queue,
+        a = DataAccesser(reader_leader, reader_name, trainer_env, input_queue,
                          out_queue)
         a.start()
     except Exception as e:
@@ -204,7 +213,7 @@ class DistributeReader(object):
                  file_list,
                  file_splitter_cls,
                  batch_size,
-                 batch_data_cache_size=100):
+                 cache_size=100):
         self._file_list = file_list
         assert isinstance(self._file_list, list), "file_list must be a list"
 
@@ -213,6 +222,7 @@ class DistributeReader(object):
         self._cls = file_splitter_cls
         self._batch_size = batch_size
         assert self._batch_size > 0, "batch size must > 0"
+        self._cache_size = cache_size
 
         # connections to data servers
         self._trainer_env = TrainerEnv()
@@ -221,8 +231,8 @@ class DistributeReader(object):
         self._wait_record_to_dist_reader_table()
         self._wait_dist_reader_leader()
 
-        self._generater_out_queue = multiprocessing.Queue()
-        self._accesser_out_queue = multiprocessing.Queue()
+        self._generater_out_queue = multiprocessing.Queue(self._cache_size)
+        self._accesser_out_queue = multiprocessing.Queue(self._cache_size)
 
         self._generater = None
         self._accesser = None
