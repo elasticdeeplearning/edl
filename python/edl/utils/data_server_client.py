@@ -44,19 +44,26 @@ class DataServerClient(object):
         return self._conn[endpoint]
 
     @handle_errors_until_timeout
-    def get_file_list(self, endpoint, reader_name, pod_id, timeout=6):
-        self._connect(endpoint)
+    def get_file_list(self,
+                      leader_endpoint,
+                      reader_name,
+                      pod_id,
+                      file_list,
+                      timeout=60):
+        self.connect(leader_endpoint)
 
         req = pb.FileListRequest()
         req.pod_id = pod_id
         req.reader_name = reader_name
+        for l in file_list:
+            req.file_list.append(l)
 
         res = s.GetFileList(req)
         if res.status.type != "":
             deserialize_exception(res.status)
 
         ret = []
-        for m in res.metas:
+        for m in res.file_list:
             ret.append((m.idx, m.path))
 
         logger.debug("pod client get file_list:{}".format(ret))

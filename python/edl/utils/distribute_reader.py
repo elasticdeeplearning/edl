@@ -35,15 +35,12 @@ from .utils.edl_env import TrainerEnv
 from .utils import handle_timeout_errors
 from .unique_name import generator
 from .data_server_client import DataServerClient
-
-
-class BatchData(object):
-    pass
+from . import data_server_pb2 as pb
 
 
 class DataGenerator(ProcessWrapper):
     def __init__(self, leader_endpoint, reader_name, pod_id, total_file_list,
-                 splitter_cls, data_queue):
+                 splitter_cls, out_queue):
         super(DataGenerator, self).__init__()
 
         self._batch_data_id = 0
@@ -54,20 +51,23 @@ class DataGenerator(ProcessWrapper):
 
         self._file_list = total_file_list
         self._splitter_cls = splitter_cls
-        self._data_queue = data_queue
+        self._data_queue = out_queue
 
-    @handle_errors_until_timeout
-    def _get_file_list(self, timeout=120):
+    def _get_file_list(self, timeout=60):
         client = DataServerClient()
-        return client.get_file_list(self.leader_endpoint, self._reader_name,
-                                    self._pod_id)
+        return client.get_file_list(
+            lader_endpoint=self._leader_endpoint,
+            reader_name=self._reader_name,
+            pod_id=self._pod_id,
+            file_list=self._file_list)
 
     def _generate_batch_data(self):
         self._batch_data_id += 1
-        return {
-            "id:": self._batch_data_id,
-            "data": None,  # {idx=>(record_no,(field_data...))... }
-        }
+        b = pb.BatchData()
+        b.batch_data_id = self._batch_data_id
+        b.data = None
+
+        return b
 
     def _read_batch_data(self):
         while True:
@@ -77,17 +77,19 @@ class DataGenerator(ProcessWrapper):
                     break
 
                 assert self._file_list[m.idx] == m.path
-                fields = self._cls(m.path)
+                fields = self._splitter_cls(m.path)
                 for i in o:
                     assert fields[0] == m.idx
-                    b["meta"]["idx"] = fields[0]
-                    b["data"].append((fields[1:]))
+                    rec = pb.Record()
+                    rec.record_no = fields[0]
+                    for field in fields[1:]:
+                        rec.field_data.append(field)
 
-                    if len(b['data']) >= self._batch_size:
+                    if len(b.records) >= self._batch_size:
                         self._data_queue.put(b)
                         b = self._generate_batch_data()
 
-            if len(b["data"]) > 0:
+            if len(b.records) > 0:
                 self._data_queue.put(b)
 
             self._data_queue.put(None)

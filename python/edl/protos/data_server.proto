@@ -30,7 +30,7 @@ message FileListElement {
 message FileListRequest {
   string pod_id = 1;
   string reader_name = 2;
-  // to verify
+  // used for verify
   repeated FileListElement file_list = 3;
 }
 
@@ -65,7 +65,6 @@ message BatchDataResponse {
 
 service DataServer {
   rpc GetFileList(FileListRequest) returns (FileListResponse) {}
-  rpc GetBatchDataMeta(BatchDataMeta) returns (BatchDataMetaResponse) {}
   rpc GetBatchData(BatchDataRequest) returns (BatchDataResponse) {}
   rpc ShutDown(ShutDownRequest) returns (common.Status) {}
 
