@@ -24,8 +24,9 @@ from .etcd_db import get_global_etcd
 
 class Conn(object):
     def __init__(self, channel, stub):
-        self._channel = channel
-        self._stub = stub
+        self.channel = channel
+        self.stub = stub
+        self.lock = threading.Lock()
 
 
 class DataServerClient(object):
@@ -51,7 +52,7 @@ class DataServerClient(object):
                       pod_id,
                       file_list,
                       timeout=30):
-        self.connect(leader_endpoint)
+        conn = self.connect(leader_endpoint)
 
         req = pb.FileListRequest()
         req.pod_id = pod_id
@@ -59,7 +60,8 @@ class DataServerClient(object):
         for l in file_list:
             req.file_list.append(l)
 
-        res = s.GetFileList(req)
+        with conn.lock:
+            res = conn.stub.GetFileList(req)
         if res.status.type != "":
             deserialize_exception(res.status)
 
@@ -78,7 +80,7 @@ class DataServerClient(object):
                             endpoint,
                             batch_data=None,
                             timeout=30):
-        self.connect(reader_leader_endpoint)
+        conn = self.connect(reader_leader_endpoint)
 
         req = pb.BatchDataRequest()
         req.reader_name = reader_name
@@ -87,7 +89,8 @@ class DataServerClient(object):
         req.data_server_endpoint = endpoint
         req.data = batch_data
 
-        res = s.GetBatchData(req)
+        with conn.lock:
+            res = conn.stub.GetBatchData(req)
         if res.status.type != "":
             deserialize_exception(res.status)
 
@@ -97,4 +100,16 @@ class DataServerClient(object):
 
     @handle_errors_until_timeout
     def get_batch_data(self, req, time=30):
-        pass
+        """
+        return BatchDataResponse
+        """
+        conn = self.connect(reader_leader_endpoint)
+
+        with conn.lock:
+            res = conn.stub.GetBatchData(req)
+        if res.status.type != "":
+            deserialize_exception(res.status)
+
+        logger.debug("pod client get batch_data meta:{}".format(
+            batch_data_response_to_string(res)))
+        return res.ret

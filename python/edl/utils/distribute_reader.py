@@ -104,18 +104,20 @@ class DataGenerator(ProcessWrapper):
 
 class DataAccesser(object):
     def __init__(self, leader, reader_name, trainer_env, input_queue,
-                 out_queue):
+                 out_queue, queue_size):
         super(DataGenerator, self).__init__()
 
         self._reader_leader = leader
         self._reader_name = reader_name
         self._trainer_env = trainer_env
 
+        # BatchData
         self._input_queue = input_queue
-        self._out_queu = out_queue
+        self._out_queue = out_queue
         self._cache = {}
 
-        self._meta_queue = threading.Queue()
+        # BatchDataRequest
+        self._meta_queue = threading.Queue(queue_size)
 
         self._data_server = DataServer(self)
         self._data_server.start()
@@ -139,9 +141,11 @@ class DataAccesser(object):
                 if b is None:
                     logger.info("data read to end!")
                     break
-                a.append(b["id"])
+                a.append(b.batch_data_id)
+                with self._lock:
+                    self._cache[b.batch_data_id] = b
 
-            ret = self._client.get_batch_data_idx(
+            ret = self._client.get_batch_data_meta(
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
                 endpoint=self._reader_leader.endpoint,
@@ -151,7 +155,7 @@ class DataAccesser(object):
             a = []
 
         while not self._stop.set():
-            ret = self._client.get_batch_data_idx(
+            ret = self._client.get_batch_data_meta(
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
                 endpoint=self._reader_leader.endpoint,
@@ -167,8 +171,9 @@ class DataAccesser(object):
             return self._client.get_batch_data(req_meta)
 
         ret = []
-        for batch_data_id in req_meta.batch_data_ids:
-            ret.append(self._cache[batch_data_id])
+        for batch_data_id in req_meta.data.batch_data_ids:
+            with self._lock:
+                ret.append(self._cache[batch_data_id])
 
         return ret
 
@@ -178,8 +183,8 @@ class DataAccesser(object):
             if meta is None:
                 break
 
-            ret = self._client.get_batch_data(meta)
-            for i in ret:
+            ret = self._get_batch_data(meta)
+            for b in ret:
                 self._out_queue.put(b)
 
         self._out_queue.put(None)
@@ -198,10 +203,10 @@ class DataAccesser(object):
 
 
 def access_data(self, reader_leader, reader_name, trainer_env, input_queue,
-                out_queue):
+                out_queue, cache_size):
     try:
         a = DataAccesser(reader_leader, reader_name, trainer_env, input_queue,
-                         out_queue)
+                         out_queue, queue_size)
         a.start()
     except Exception as e:
         print(e, file=sys.stderr)
@@ -267,7 +272,8 @@ class DistributeReader(object):
         self._accesser = multiprocessing.Process(
             access_data,
             args=(self._reader_leader, self._name, self._trainer_env,
-                  self._generater_out_queue, self._accesser_out_queue))
+                  self._generater_out_queue, self._accesser_out_queue,
+                  cache_size))
         while True:
             b = self._accesser_out_queue.pop()
             if b is None:

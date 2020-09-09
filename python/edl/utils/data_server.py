@@ -31,10 +31,43 @@ from . import utils
 from .utils import logger
 
 
+class PodBatchData(object):
+    def __init__(self, pod_id, data_server_endpoint, max_size=1000000):
+        self._lock = threading.Lock()
+        # batch_data_id=>BatchData
+        self._cache = {}
+        self._queue = Queue(max_size)
+        self._pod_id = pod_id
+        self._data_server_endpoint = data_server_endpoint
+        self._max_size = max_size
+
+    @property
+    def size(self):
+        with self._lock:
+            return len(self._cache)
+
+    @property
+    def max_size():
+        return self._max_size
+
+    def pop(self):
+        with self._lock:
+            b = self._queue.pop()
+            self._cache.pop(b.batch_data_id)
+
+    def put(self, b):
+        with self._lock:
+            self._queue.put(b)
+            self._cache[b.batch_data_id] = b
+
+
 class DataServerServicer(pb_grpc.DataServerServicer):
     def __init__(self, file_list, data_reporter):
         self._file_list = file_list
         self._trainer_env = trainer_env
+
+        # reader_name => PodBatchData
+        self._cache = {}
 
         # file_list idx->record_range
         self._batch_data = {}
@@ -55,10 +88,10 @@ class DataServerServicer(pb_grpc.DataServerServicer):
     def GetBatchData(self, request, context):
         pass
 
-    def ReportBatchDataIdx(self, request, context):
+    def BalanceBatchData(self, request, context):
         pass
 
-    def GetBatchDataIdx(self, request, context):
+    def GetBatchData(self, request, context):
         pass
 
     def GetBatchDataMeta(self, request, context):
