@@ -58,6 +58,24 @@ message BatchDataRequest {
   repeated BatchData data = 5;
 }
 
+/*
+message BalanceBatchDataRequest{
+  string reader_name = 1;
+  string pod_id = 2;
+  string data_server_endpoint = 4;
+  repeated BatchData data = 5;
+}
+
+message BalanceBatchDataResponse{
+  string reader_name = 1;
+  string producer_pod_id = 2;
+  string consumer_pod_id = 3;
+  string data_server_endpoint = 4;
+
+  repeated BatchData data = 5;
+}
+*/
+
 message BatchDataResponse {
   common.Status status = 1;
   BatchDataRequest ret = 2;

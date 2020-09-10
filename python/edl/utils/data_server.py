@@ -31,56 +31,81 @@ from . import utils
 from .utils import logger
 
 
-class PodBatchData(object):
+class PodData(object):
     def __init__(self, pod_id, data_server_endpoint, max_size=1000000):
         self._lock = threading.Lock()
         # batch_data_id=>BatchData
-        self._cache = {}
+        self._batch_data = {}
         self._queue = Queue(max_size)
         self._pod_id = pod_id
         self._data_server_endpoint = data_server_endpoint
+        self._pod_file_list = []
         self._max_size = max_size
+        self._reach_data_end = False
+
+    def append_file_list_element(self, element):
+        with self._lock:
+            self._file_list.append(element)
+
+    @property
+    def reach_data_end(self):
+        with self._lock:
+            return self._reach_data_end
+
+    @reach_data_end.setter
+    def reach_data_end(self, r):
+        with self._lock:
+            self._reach_data_end = r
 
     @property
     def size(self):
         with self._lock:
-            return len(self._cache)
+            return len(self._batch_data)
 
     @property
     def max_size():
         return self._max_size
 
-    def pop(self):
+    def pop(self, num=1):
+        a = []
         with self._lock:
-            b = self._queue.pop()
-            self._cache.pop(b.batch_data_id)
+            while not self._queue.empty():
+                if (num > 0 and len(a) < num) or num <= 0:
+                    b = self._queue.pop()
+                    self._batch_data.pop(b.batch_data_id)
+                    a.append(b)
+                else:
+                    break
 
-    def put(self, b):
+        return a
+
+    def put(self, batch_data_array):
         with self._lock:
-            self._queue.put(b)
-            self._cache[b.batch_data_id] = b
+            for b in batch_data_array:
+                self._queue.put(b)
+                self._cache[b.batch_data_id] = b
 
 
 class ReaderPodData(object):
     def __init__(self, reader_name, file_list, pod_ids):
         self._reader_name = reader_name
 
-        # pod_id => PodBatchData
-        self._data = {}
+        # pod_id => PodData
+        self._pod_data = {}
         self._lock = Lock()
 
-        # pod_id => [FileListElement]
-        self._pod_file_list = {}
         self._file_list = file_list
-
         self._pod_ids = pod_ids
 
         self._init()
+        self._minimum = 0
+        self._need_balance = False
 
     def _init(self):
         for pod_id in pod_ids:
-            self._data[pod_id] = PodBatchData()
+            self._data[pod_id] = PodData()
             self._pod_file_list[pod_id] = []
+            self._reach_data_end[pod_id] = False
 
         i = 0
         while i < len(self._file_list):
@@ -89,19 +114,52 @@ class ReaderPodData(object):
                 m.idx = i
                 m.path = self._file_list[i]
 
-                self._pod_file_list[pod_id].append(m)
+                self._pod_data[pod_id].append_file_list_element(m)
                 i += 1
                 if i >= len(self._file_list):
                     break
 
     def get_pod_data(self, pod_id):
-        with self._lock:
-            if pod_id in self._data:
-                return self._data[pod_id]
-            return None
+        if pod_id in self._data:
+            return self._pod_data[pod_id]
+        return None
 
     def get_pod_file_list(self, pod_id):
         return self._pod_file_list[pod_id]
+
+    def is_reach_data_end(self, pod_id):
+        return self._reach_data_end[pod_id]
+
+    def put(self, pod_id, batch_data_array):
+        if len(batch_data_array) == 0:
+            with self._lock:
+                self._reach_data_end[pod_id] = True
+                self._need_balance = True
+                return
+
+        pod_data = self._data[pod_id]
+        pod_data.put(batch_data_array)
+
+    def _balance(self):
+        pass
+
+    def pop(self, pod_id, ret):
+        with self._lock:
+            pod_data = self._data[pod_id]
+            need_balance = self._need_balance
+
+        if not need_balance:
+            assert pod_data.size() > 0
+            batch_data_array = pod_data.pop()
+            ret.reader_name = self._reader_name
+            ret.producer_pod_id = pod_id
+            ret.consumer_pod_id = pod_id
+            ret.data_server_endpoint = pod_data._data_server_endpoint
+            for b in batch_data_array:
+                m = BatchData()
+                m.batch_data_id = b.batch_data_id
+                ret.data.append(m)
+            return ret
 
 
 class DataServerServicer(pb_grpc.DataServerServicer):
@@ -118,8 +176,19 @@ class DataServerServicer(pb_grpc.DataServerServicer):
         if self._trainer_env.global_rank != 0:
             raise EdlNotLeaderError("This server is not Leader")
 
+    # only leader can do this
     def BalanceBatchData(self, request, context):
-        pass
+        res = BatchDataResponse()
+        try:
+            self._check_leader()
+            self._check_pod_id(request.producer_pod_id)
+            self._check_reader_name(request.reader_name)
+
+            ret = self._reader_pod_data.pop(request.producer_pod_id, res.ret)
+            return res
+        except Exception as e:
+            res.status = serialize_exception(e)
+            return res
 
     def GetBatchData(self, request, context):
         pass
@@ -140,13 +209,14 @@ class DataServerServicer(pb_grpc.DataServerServicer):
             raise EdlReaderNameError("{} not equal {}".format(
                 reader_name, self._reader_name))
 
+    # only leader can do this
     def GetFileList(self, request, context):
         res = FileListResponse()
         try:
             self._check_leader()
-            self._check_file_list()
-            self._check_pod_id()
-            self._check_reader_name()
+            self._check_file_list(request.file_list)
+            self._check_pod_id(request.pod_id)
+            self._check_reader_name(request.reader_name)
 
             pod_file_list = self._reader_pod_data.get_pod_file_list(
                 request.pod_id)
