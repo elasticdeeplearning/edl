@@ -73,13 +73,13 @@ class DataServerClient(object):
         return ret
 
     @handle_errors_until_timeout
-    def get_batch_data_meta(self,
-                            reader_leader_endpoint,
-                            reader_name,
-                            pod_id,
-                            endpoint,
-                            batch_data=None,
-                            timeout=30):
+    def balance_batch_data(self,
+                           reader_leader_endpoint,
+                           reader_name,
+                           pod_id,
+                           dataserver_endpoint,
+                           batch_data_ids=None,
+                           timeout=30):
         conn = self.connect(reader_leader_endpoint)
 
         req = pb.BatchDataRequest()
@@ -87,10 +87,14 @@ class DataServerClient(object):
         req.producer_pod_id = pod_id
         req.consumer_pod_id = None
         req.data_server_endpoint = endpoint
-        req.data = batch_data
+        for i in batch_data_ids:
+            b = pb.BatchData()
+            b.batch_data_id = i
+            req.data.append(b)
 
         with conn.lock:
             res = conn.stub.GetBatchData(req)
+
         if res.status.type != "":
             deserialize_exception(res.status)
 

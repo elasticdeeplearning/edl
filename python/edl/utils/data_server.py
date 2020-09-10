@@ -163,11 +163,13 @@ class ReaderPodData(object):
 
 
 class DataServerServicer(pb_grpc.DataServerServicer):
-    def __init__(self, trainer_env, reader_name, file_list, pod_ids):
+    def __init__(self, trainer_env, reader_name, file_list, pod_ids,
+                 local_data):
         self._lock = threading.Lock()
         self._trainer_env = trainer_env
         self._file_list = file_list
         self._pod_ids = pod_ids
+        self._local_data = local_data
 
         # reader_name=>ReaderPodData
         self._reader_pod_data = ReaderPodData(reader_name, file_list, pod_ids)
@@ -184,14 +186,19 @@ class DataServerServicer(pb_grpc.DataServerServicer):
             self._check_pod_id(request.producer_pod_id)
             self._check_reader_name(request.reader_name)
 
-            ret = self._reader_pod_data.pop(request.producer_pod_id, res.ret)
+            self._reader_pod_data.pop(request.producer_pod_id, res.ret)
             return res
         except Exception as e:
             res.status = serialize_exception(e)
             return res
 
     def GetBatchData(self, request, context):
-        pass
+        res = BatchDataResponse()
+        try:
+            a = local_data.get_local_batch_data(request)
+        except:
+            res.status = serialize_exception(e)
+            return res
 
     def _check_file_list(self, file_list):
         for i in file_list:
@@ -231,23 +238,18 @@ class DataServerServicer(pb_grpc.DataServerServicer):
 
 
 class DataServer(object):
-    def __init__(self, trainer_env, reader_id, reader_name, data_checkpoint):
+    def __init__(self, trainer_env, reader_name, file_list, local_data):
         self._server = None
         self._addr = None
         self._port = None
         self._endpoint = None
 
         self._trainer_env = trainer_env
-        self._reader_id = reader_id
-        self._reader_name = reader_name
-        self._data_checkoint = data_checkpoint
+        self._eader_name = reader_name
+        self._file_list = file_list
+        self._local_data = local_data
 
-    def start(self,
-              addr,
-              cache_capcity=1000,
-              file_list=None,
-              max_workers=100,
-              concurrency=20):
+    def start(self, addr, cache_capcity=1000, max_workers=100, concurrency=20):
         server = grpc.server(
             futures.ThreadPoolExecutor(max_workers=max_workers),
             options=[('grpc.max_send_message_length', 1024 * 1024 * 1024),
@@ -255,7 +257,9 @@ class DataServer(object):
             maximum_concurrent_rpcs=concurrency)
         data_server_pb2_grpc.add_DataServerServicer_to_server(
             DataServerServicer(
-                file_list=self._file_list, trainer_env=self._trainer_env),
+                file_list=self._file_list,
+                trainer_env=self._trainer_env,
+                local_data=local_data),
             server)
 
         self._addr = addr

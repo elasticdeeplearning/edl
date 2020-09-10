@@ -114,10 +114,11 @@ class DataAccesser(object):
         # BatchData
         self._input_queue = input_queue
         self._out_queue = out_queue
+        # batch_data_id => BatchData
         self._cache = {}
 
         # BatchDataRequest
-        self._meta_queue = threading.Queue(queue_size)
+        self._req_queue = threading.Queue(queue_size)
 
         self._data_server = DataServer(self)
         self._data_server.start()
@@ -145,33 +146,37 @@ class DataAccesser(object):
                 with self._lock:
                     self._cache[b.batch_data_id] = b
 
-            ret = self._client.get_batch_data_meta(
+            ret = self._client.balance_batch_data(
+                reader_leader_endpoint=self._reader_leader.endpoint,
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
                 endpoint=self._reader_leader.endpoint,
                 batch_data_ids=a)
 
-            self._meta_queue.put(ret)
+            self._req_queue.put(ret)
             a = []
 
         while not self._stop.set():
-            ret = self._client.get_batch_data_meta(
+            ret = self._client.balance_batch_data(
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
                 endpoint=self._reader_leader.endpoint,
                 batch_data_ids=a)
 
-            self._meta_queue.put(ret)
+            self._req_queue.put(ret)
 
         # data end
-        self._meta_queue.put(None)
+        self._req_queue.put(None)
 
-    def _get_batch_data(self, req_meta):
-        if self._trainer_env.pod_id != req_meta.producer_pod_id:
-            return self._client.get_batch_data(req_meta)
+    def _get_batch_data(self, req):
+        if self._trainer_env.pod_id != req.producer_pod_id:
+            return self._client.get_batch_data(req)
 
+        return self._get_local_batch_data(req)
+
+    def get_local_batch_data(self, req):
         ret = []
-        for batch_data_id in req_meta.data.batch_data_ids:
+        for batch_data_id in req.data.batch_data_ids:
             with self._lock:
                 ret.append(self._cache[batch_data_id])
 
@@ -179,7 +184,7 @@ class DataAccesser(object):
 
     def _generate(self):
         while not self._stop.set():
-            meta = self._meta_queue.pop()
+            meta = self._req_queue.pop()
             if meta is None:
                 break
 
