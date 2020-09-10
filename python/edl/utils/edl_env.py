@@ -166,6 +166,11 @@ class TrainerEnv(JobEnv):
         self._global_rank = os.environ["PADDLE_TRAINER_ID"]
         self._rank_in_pod = os.environ["PADDLE_TRAINER_RANK_IN_POD"]
         self._trainer_endpoints = os.environ["PADDLE_TRAINER_ENDPOINTS"]
+        self._pod_ids = os.environ["EDL_POD_IDS"].split(",")
+
+    @property
+    def pod_ids(self):
+        return self._pods_ids
 
     @property
     def pod_id(self):

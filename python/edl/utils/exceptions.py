@@ -68,6 +68,18 @@ class EdlDataEndError(EdlException):
     pass
 
 
+class EdlPodIDNotExistError(EdlException):
+    pass
+
+
+class EdlReaderNameError(EdlException):
+    pass
+
+
+class EdlFileListNotMatchError(EdlException):
+    pass
+
+
 def deserialize_exception(s):
     thismodule = sys.modules[__name__]
     cls = getattr(thismodule, s.type)(s.detail)

@@ -67,7 +67,7 @@ service DataServer {
   rpc GetFileList(FileListRequest) returns (FileListResponse) {}
   rpc GetBatchData(BatchDataRequest) returns (BatchDataResponse) {}
   rpc BalanceBatchData(BatchDataRequest) returns (BatchDataResponse) {}
-  rpc ShutDown(ShutDownRequest) returns (common.Status) {}
+  // rpc ShutDown(ShutDownRequest) returns (common.Status) {}
 
   // two step's to do it.
   // rpc PrePareSaveCheckpoint(CheckpointRequest) returns (common.Status) {}

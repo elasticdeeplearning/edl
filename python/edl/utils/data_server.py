@@ -61,32 +61,62 @@ class PodBatchData(object):
             self._cache[b.batch_data_id] = b
 
 
-class DataServerServicer(pb_grpc.DataServerServicer):
-    def __init__(self, file_list, data_reporter):
+class ReaderPodData(object):
+    def __init__(self, reader_name, file_list, pod_ids):
+        self._reader_name = reader_name
+
+        # pod_id => PodBatchData
+        self._data = {}
+        self._lock = Lock()
+
+        # pod_id => [FileListElement]
+        self._pod_file_list = {}
         self._file_list = file_list
+
+        self._pod_ids = pod_ids
+
+        self._init()
+
+    def _init(self):
+        for pod_id in pod_ids:
+            self._data[pod_id] = PodBatchData()
+            self._pod_file_list[pod_id] = []
+
+        i = 0
+        while i < len(self._file_list):
+            for pod_id in pod_ids:
+                m = pb.FileListElement()
+                m.idx = i
+                m.path = self._file_list[i]
+
+                self._pod_file_list[pod_id].append(m)
+                i += 1
+                if i >= len(self._file_list):
+                    break
+
+    def get_pod_data(self, pod_id):
+        with self._lock:
+            if pod_id in self._data:
+                return self._data[pod_id]
+            return None
+
+    def get_pod_file_list(self, pod_id):
+        return self._pod_file_list[pod_id]
+
+
+class DataServerServicer(pb_grpc.DataServerServicer):
+    def __init__(self, trainer_env, reader_name, file_list, pod_ids):
+        self._lock = threading.Lock()
         self._trainer_env = trainer_env
+        self._file_list = file_list
+        self._pod_ids = pod_ids
 
-        # reader_name => PodBatchData
-        self._cache = {}
+        # reader_name=>ReaderPodData
+        self._reader_pod_data = ReaderPodData(reader_name, file_list, pod_ids)
 
-        # file_list idx->record_range
-        self._batch_data = {}
-        self._lock = Threading.Lock()
-
-    """
-    def _initital(self):
-        for i, f in enumerate(self._file_list):
-            if i not in self._dispatched:
-                self._trainer_file_list[i] = []
-            self._trainer_file_list[i].append(f)
-
-    def _check_leader(self, self_rank):
-        if self._rank != 0:
+    def _check_leader(self):
+        if self._trainer_env.global_rank != 0:
             raise EdlNotLeaderError("This server is not Leader")
-    """
-
-    def GetBatchData(self, request, context):
-        pass
 
     def BalanceBatchData(self, request, context):
         pass
@@ -94,33 +124,40 @@ class DataServerServicer(pb_grpc.DataServerServicer):
     def GetBatchData(self, request, context):
         pass
 
-    def GetBatchDataMeta(self, request, context):
-        pass
+    def _check_file_list(self, file_list):
+        for i in file_list:
+            if self._file_list[i] != file_list[i]:
+                raise EdlFileListNotMatchError("client:{} server:{}".format(
+                    file_list, self._file_list))
+
+    def _check_pod_id(self, pod_id):
+        if pod_id not in self._pod_ids:
+            raise EdlPodIDNotExistError("pod_id:{} not exist in {}".format(
+                pod_id, self._pod_ids))
+
+    def _check_reader_name(self, reader_name):
+        if reader_name != self._reader_name:
+            raise EdlReaderNameError("{} not equal {}".format(
+                reader_name, self._reader_name))
 
     def GetFileList(self, request, context):
         res = FileListResponse()
         try:
-            with self._lock:
-                if i not in self._trainer_file_list[i]:
-                    raise EdlFileListNotFoundError(
-                        "can't get filelist of rank:{} id:{}".format(
-                            request.rank, request.id))
+            self._check_leader()
+            self._check_file_list()
+            self._check_pod_id()
+            self._check_reader_name()
 
-                res.status = common_pb.Status()
-                res.metas
-                for f in self._trainer_file_list[i]:
-                    meta = pb.Meta()
-                    res.metas.append(meta)
+            pod_file_list = self._reader_pod_data.get_pod_file_list(
+                request.pod_id)
+
+            if m not in pod_file_list:
+                res.file_list.append(m)
+
             return res
         except Exception as e:
             res.status = serialize_exception(e)
             return res
-
-    def SaveCheckpoint(self, request, context):
-        pass
-
-    def ShutDown(self, request, context):
-        pass
 
 
 class DataServer(object):
@@ -148,9 +185,7 @@ class DataServer(object):
             maximum_concurrent_rpcs=concurrency)
         data_server_pb2_grpc.add_DataServerServicer_to_server(
             DataServerServicer(
-                file_list=self._file_list,
-                trainer_env=self._trainer_env,
-                data_checkpoint_json=self._data_checkpoint_json),
+                file_list=self._file_list, trainer_env=self._trainer_env),
             server)
 
         self._addr = addr
