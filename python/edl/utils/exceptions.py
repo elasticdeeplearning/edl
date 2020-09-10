@@ -60,7 +60,7 @@ class EdlTableError(EdlException):
     pass
 
 
-class EdlPutError(EdlException):
+class EdlEtcdIOError(EdlException):
     pass
 
 

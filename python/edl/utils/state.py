@@ -27,7 +27,7 @@ from ..discovery.etcd_client import EtcdClient
 import etcd3
 from .global_vars import *
 from .cluster import Cluster
-from .exceptions import EdlPutError
+from .exceptions import EdlEtcdIOError
 from .etcd_db import get_global_etcd
 
 
@@ -151,7 +151,7 @@ class State(object):
         message = "pod_id:{} save_data_checkpoint status:{}".format(pod_id,
                                                                     status)
         if not status:
-            raise EdlPutError(message)
+            raise EdlEtcdIOError(message)
 
         return status
 
@@ -165,5 +165,6 @@ class PaddleState(State):
                  program=None):
         super(PaddleState, self).__init__(
             total_batch_size=total_batch_size, user_defined=user_defined)
-        self._exe = None
-        self._program = None
+        self._exe = exe
+        self._program = program
+        self._optimizer = optimizer
