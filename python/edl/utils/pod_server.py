@@ -13,24 +13,17 @@
 # limitations under the License.
 
 from __future__ import print_function
-from concurrent import futures
+
 import grpc
-import sys
-import os
-import logging
-from threading import Thread, Lock
-from six.moves.queue import Queue
 import traceback
-import signal
-import threading
-import copy
+from concurrent import futures
+from threading import Lock
+
 from . import common_pb2 as common_pb
 from . import pod_server_pb2 as pod_server_pb
 from . import pod_server_pb2_grpc as pod_server_pb_grpc
 from .etcd_db import EtcdDB
-from .exceptions import *
 from .log_utils import logger
-from .global_vars import *
 
 
 class PodServerServicer(pod_server_pb_grpc.PodServerServicer):

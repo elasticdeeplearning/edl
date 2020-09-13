@@ -12,15 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
 from . import data_server_pb2 as pb
 from . import data_server_pb2_grpc as pb_grpc
-from .client import Client
-from .cluster import Cluster
-from .exceptions import deserialize_exception, EdlBarrierError
+from .exceptions import deserialize_exception
 from .log_utils import logger
-from .etcd_db import get_global_etcd
-
+from .error_utils import  handle_errors_until_timeout
 
 class Conn(object):
     def __init__(self, channel, stub):

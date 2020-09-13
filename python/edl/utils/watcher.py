@@ -12,18 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from threading import Lock, Thread, Event
-import time
-import six
-import json
-import collections
 import copy
-
-from .log_utils import logger
+import time
 from edl.discovery.etcd_client import EtcdClient
+from threading import Lock, Thread, Event
+
 from .cluster import Cluster
-from .pod import Pod
-from .global_vars import *
+from .log_utils import logger
 
 
 class Watcher(object):

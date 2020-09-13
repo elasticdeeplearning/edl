@@ -13,22 +13,15 @@
 # limitations under the License.
 
 from __future__ import print_function
+
+import grpc
+import threading
 from concurrent import futures
-from . import common_pb2 as common_pb
+from six.moves.queue import Queue
+from threading import Lock
+
 from . import data_server_pb2 as pb
 from . import data_server_pb2_grpc as pb_grpc
-import grpc
-import sys
-import os
-import logging
-from threading import Thread, Lock
-from six.moves.queue import Queue
-from .exceptions import *
-import signal
-import threading
-import copy
-from . import utils
-from .log_utils import logger
 
 
 class PodData(object):

@@ -13,17 +13,10 @@
 # limitations under the License.
 import threading
 import time
-import json
-import uuid
-import copy
 
-from .log_utils import logger
-from .pod import Pod
-from ..discovery.etcd_client import EtcdClient
-
-import etcd3
-from .global_vars import *
 from .etcd_db import get_global_etcd, ETCD_TTL
+from .log_utils import logger
+from ..discovery.etcd_client import EtcdClient
 
 
 class Register(object):

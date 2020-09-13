@@ -13,9 +13,6 @@
 # limitations under the License.
 
 from . import data_server_pb2 as pb
-from . import data_sever_pb2_grpc as pb_grpc
-from .cluster import Cluster
-from .exceptions import raise_execption
 
 
 class DistReaderClient(Client):

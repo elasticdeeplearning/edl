@@ -13,17 +13,10 @@
 # limitations under the License.
 import threading
 import time
-import json
-import uuid
-import copy
 
-from .log_utils import logger
-from .pod import Pod
-from ..discovery.etcd_client import EtcdClient
 from .generate_cluster import GenerateCluster
-
-import etcd3
-from .global_vars import *
+from .log_utils import logger
+from ..discovery.etcd_client import EtcdClient
 
 
 class LeaderRegister(object):

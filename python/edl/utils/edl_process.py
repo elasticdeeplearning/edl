@@ -12,18 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
-import logging
-import socket
-import time
-import os
-import signal
 import copy
-import sys
-import subprocess
-from contextlib import closing
-import socket
+import os
 import psutil
+import signal
+import subprocess
+import sys
 import threading
 
 from .log_utils import logger

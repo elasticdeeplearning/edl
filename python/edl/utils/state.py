@@ -11,25 +11,89 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import threading
-import time
 import json
-import uuid
-import copy
-import traceback
-import six
-from enum import IntEnum
 
+from .exceptions import EdlEtcdIOError
 from .log_utils import logger
-from .pod import Pod
 from ..discovery.etcd_client import EtcdClient
 
-import etcd3
-from .global_vars import *
-from .cluster import Cluster
-from .exceptions import EdlEtcdIOError
-from .etcd_db import get_global_etcd
 
+class DistReader(object):
+    def __init__(self, pod_id, name, endpoint):
+        self._pod_id = pod_id
+        self._name = name
+        self._endpoint = endpoint
+
+    def to_json(self):
+        d = {
+            "pod_id": self._pod_id,
+            "endpoint": self._endpoint,
+            "name": self._name,
+        }
+        return json.dumps(d)
+
+    def from_json(self, s):
+        d = json.loads(s)
+        self._pod_id = d["pod_id"]
+        self._endpoint = d["endpoint"]
+        self._name = d["name"]
+
+    def __str_(self):
+        return self._to_json()
+
+
+class DataCheckpoint(object):
+    def __init__(self, reader_name, file_list, data_checkpoint):
+        self._reader_name = reader_name
+        self._file_list = file_list
+        self._data_checkpoint = data_checkpoint
+
+
+class TrainStatusCheckpoint(object):
+    def __init__(self, max_epoch_num):
+        self._max_epoch_num = max_epoch_num
+        self._epoch_no = None
+        self._epochs = {}
+        self._status = TrainStatus.INITIAL
+
+    def update_epoch(self, epoch_no, step_num, step_time):
+        if epoch_no not in self._epoch:
+            self._epochs[epoch_no] = {}
+        epoch = self._epochs[epoch_no]
+        epoch = {
+            "epoch_no": epoch_no,
+            "step_num": step_num,
+            "step_time": step_time
+        }
+
+        left_time = (max_epoch_num - epoch_no) * step_num * step_time
+        if left_time > 15 * 60:
+            self._status = TrainStatus.RUNNING
+        else:
+            self._status = TrainStatus.NEARTHEEND
+
+        logger.debug("train status left_time is {} train status is {}".format(
+            left_time))
+
+    def to_json(self):
+        d = {
+            "max_epoch_num": self._max_epoch_num,
+            "epoch_no": self._epoch_no,
+            "epochs": self._epochs,
+            "status": int(self._status),
+        }
+
+        return json.dumps(d)
+
+    def from_json(self, s):
+        d = json.loads(s)
+        self._max_epoch_num = d["max_epoch_num"]
+        self._epoch_no = d["epoch_no"]
+        self._epochs = d["epochs"]
+        self._status = d["status"]
+
+    def __str__(self):
+        return self.to_json()
 
 class State(object):
     def __init__(self, total_batch_size, user_defined=None):

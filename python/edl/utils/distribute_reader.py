@@ -11,31 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import threading
-import time
-import json
-import uuid
-import copy
-import traceback
-import six
-import multiprocessing
 from __future__ import print_function
 
-from .log_utils import logger
-from .pod import Pod
-from ..discovery.etcd_client import EtcdClient
+import multiprocessing
+import threading
 
-import etcd3
-from .global_vars import *
-from .cluster import Cluster
-from .exceptions import EdlGenerateClusterError, EdlTableError
-from .etcd_db import get_global_etcd
-
-from .utils.edl_env import TrainerEnv
-from .utils import handle_timeout_errors
-from .unique_name import generator
-from .data_server_client import DataServerClient
 from . import data_server_pb2 as pb
+from .data_server_client import DataServerClient
+from .etcd_db import get_global_etcd
+from .log_utils import logger
+from .unique_name import generator
+from .edl_env import TrainerEnv
 
 
 class DataGenerator(ProcessWrapper):

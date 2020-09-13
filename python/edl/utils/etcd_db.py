@@ -11,23 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import threading
-import time
 import json
-import uuid
+import threading
 
+from . import string_utils
+from .cluster import Cluster
 from .log_utils import logger
 from .pod import Pod
 from ..discovery.etcd_client import EtcdClient
-from .cluster import Cluster
-
-import etcd3
-from .global_vars import *
-from .exceptions import EdlBarrierError
-
-import threading
-from ..discovery.etcd_client import EtcdClient
-from .utils import bytes_to_string
 
 
 class EtcdDB(object):
@@ -115,7 +106,7 @@ class EtcdDB(object):
         if value is None:
             return None
 
-        return bytes_to_string(value)
+        return string_utils.bytes_to_string(value)
 
     def get_dist_reader_leader(self):
         leader_id = self.get_pod_leader_id()

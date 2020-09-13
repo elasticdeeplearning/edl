@@ -37,11 +37,11 @@ from ..utils.leader_register import LeaderRegister
 from ..utils.etcd_db import get_global_etcd
 from ..utils.watcher import Watcher
 from ..utils.pod_server import PodServer
-from ..utils.utils import logger
-from ..utils import utils
-from ..utils.global_vars import *
-from ..utils.pod_client import PodServerClient
-from ..utils.exceptions import *
+from ..utils.log_utils import logger
+from ..utils import log_utils
+from ..utils import constants
+from ..utils import pod_client
+from ..utils import exceptions
 from ..utils.edl_process import start_local_trainers, terminate_local_procs, watch_local_trainers
 
 
@@ -310,7 +310,7 @@ def launch(args):
 
 
 def run_commandline():
-    utils.get_logger(log_level=10)
+    log_utils.get_logger(log_level=10)
     args = _parse_args()
     launch(args)
 

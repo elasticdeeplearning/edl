@@ -13,11 +13,21 @@
 # limitations under the License.
 
 import os
-import sys
-
-from . import utils
-from .log_utils import logger
 import six
+
+from . import network_utils
+from .log_utils import logger
+
+
+def get_gpus():
+    cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES")
+    if cuda_visible_devices is None or cuda_visible_devices == "":
+        selected_gpus = [x.strip() for x in selected_gpus.split(',')]
+    else:
+        selected_gpus = cuda_visible_devices.split(',')
+
+    logger.info("get selected_gpus:{}".format(selected_gpus))
+    return selected_gpus
 
 
 def get_from_dict_or_env(args, name, key):
@@ -39,7 +49,7 @@ class JobEnv(object):
         else:
             assert len(self._gpus) > 0, "gpus must be visible, now:{}".format(
                 self._gpus)
-            self._trainer_ports = list(utils.find_free_ports(len(self._gpus)))
+            self._trainer_ports = list(network_utils.find_free_ports(len(self._gpus)))
             logger.info("get ports from unused:{} now gpus:{}".format(
                 self._trainer_ports, self._gpus))
 
@@ -67,7 +77,7 @@ class JobEnv(object):
 
     def _get_gpus(self, args):
         # selected gpus
-        self._gpus = utils.get_gpus()
+        self._gpus = get_gpus()
         assert self._gpus != None, "can't get gpu info of this machine"
 
         # proc per node
