@@ -28,7 +28,7 @@ import signal
 import threading
 import copy
 from . import utils
-from .utils import logger
+from .log_utils import logger
 
 
 class PodData(object):

@@ -20,7 +20,7 @@ import traceback
 import six
 from enum import IntEnum
 
-from .utils import logger
+from .log_utils import logger
 from .pod import Pod
 from ..discovery.etcd_client import EtcdClient
 

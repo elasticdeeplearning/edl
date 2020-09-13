@@ -16,7 +16,7 @@ import os
 import sys
 
 from . import utils
-from .utils import logger
+from .log_utils import logger
 import six
 
 

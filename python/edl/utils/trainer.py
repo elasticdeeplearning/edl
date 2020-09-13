@@ -30,7 +30,7 @@ import collections
 from .exceptions import *
 from . import utils
 from enum import IntEnum
-from .utils import logger
+from .log_utils import logger
 from .global_vars import TrainStatus
 
 

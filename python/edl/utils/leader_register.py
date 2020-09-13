@@ -17,7 +17,7 @@ import json
 import uuid
 import copy
 
-from .utils import logger
+from .log_utils import logger
 from .pod import Pod
 from ..discovery.etcd_client import EtcdClient
 from .generate_cluster import GenerateCluster

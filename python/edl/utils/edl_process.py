@@ -26,7 +26,7 @@ import socket
 import psutil
 import threading
 
-from .utils import logger
+from .log_utils import logger
 
 
 class TrainerProc(object):

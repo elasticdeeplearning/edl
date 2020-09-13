@@ -29,7 +29,7 @@ from . import pod_server_pb2 as pod_server_pb
 from . import pod_server_pb2_grpc as pod_server_pb_grpc
 from .etcd_db import EtcdDB
 from .exceptions import *
-from .utils import logger
+from .log_utils import logger
 from .global_vars import *
 
 

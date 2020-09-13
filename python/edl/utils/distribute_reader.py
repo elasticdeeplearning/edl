@@ -21,7 +21,7 @@ import six
 import multiprocessing
 from __future__ import print_function
 
-from .utils import logger
+from .log_utils import logger
 from .pod import Pod
 from ..discovery.etcd_client import EtcdClient
 

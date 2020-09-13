@@ -16,7 +16,7 @@ import time
 import json
 import uuid
 
-from .utils import logger
+from .log_utils import logger
 from .pod import Pod
 from ..discovery.etcd_client import EtcdClient
 from .cluster import Cluster

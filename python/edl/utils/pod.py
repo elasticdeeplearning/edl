@@ -30,7 +30,7 @@ import json
 import collections
 from enum import IntEnum
 
-from .utils import logger
+from .log_utils import logger
 from .trainer import Trainer
 from .global_vars import Status
 from .exceptions import *

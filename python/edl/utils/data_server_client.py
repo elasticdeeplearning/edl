@@ -18,7 +18,7 @@ from . import data_server_pb2_grpc as pb_grpc
 from .client import Client
 from .cluster import Cluster
 from .exceptions import deserialize_exception, EdlBarrierError
-from .utils import logger
+from .log_utils import logger
 from .etcd_db import get_global_etcd
 
 
