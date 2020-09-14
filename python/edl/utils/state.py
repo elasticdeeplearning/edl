@@ -60,8 +60,8 @@ class TrainStatusCheckpoint(object):
     def update_epoch(self, epoch_no, step_num, step_time):
         if epoch_no not in self._epoch:
             self._epochs[epoch_no] = {}
-        epoch = self._epochs[epoch_no]
-        epoch = {
+
+        self._epochs[epoch_no] = {
             "epoch_no": epoch_no,
             "step_num": step_num,
             "step_time": step_time

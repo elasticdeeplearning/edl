@@ -82,7 +82,7 @@ class DataServerClient(object):
         req.reader_name = reader_name
         req.producer_pod_id = pod_id
         req.consumer_pod_id = None
-        req.data_server_endpoint = endpoint
+        req.data_server_endpoint = dataserver_endpoint
         for i in batch_data_ids:
             b = pb.BatchData()
             b.batch_data_id = i
@@ -99,7 +99,7 @@ class DataServerClient(object):
         return res.ret
 
     @handle_errors_until_timeout
-    def get_batch_data(self, req, time=30):
+    def get_batch_data(self, req, timeout=30):
         """
         return BatchDataResponse
         """

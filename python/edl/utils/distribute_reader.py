@@ -15,6 +15,7 @@ from __future__ import print_function
 
 import multiprocessing
 import threading
+import sys
 
 from . import data_server_pb2 as pb
 from .data_server_client import DataServerClient
@@ -23,16 +24,18 @@ from .log_utils import logger
 from .unique_name import generator
 from .edl_env import TrainerEnv
 from .error_utils import  handle_errors_until_timeout
+from . import edl_process
+from . import data_server
 
 
-class DataGenerator(ProcessWrapper):
+class DataGenerator(edl_process.ProcessWrapper):
     def __init__(self, reader_leader_endpoint, reader_name, pod_id,
                  total_file_list, splitter_cls, out_queue):
         super(DataGenerator, self).__init__()
 
         self._batch_data_id = 0
 
-        self._leader_endpoint = leader_endpoint
+        self._leader_endpoint = reader_leader_endpoint
         self._pod_id = pod_id
         self._reader_name = reader_name
 
@@ -59,7 +62,7 @@ class DataGenerator(ProcessWrapper):
     def _read_batch_data(self):
         while True:
             b = self._generate_batch_data()
-            for m in _get_file_list():
+            for m in self._get_file_list():
                 if self._stop.set():
                     break
 
@@ -92,7 +95,7 @@ class DataGenerator(ProcessWrapper):
 class DataAccesser(object):
     def __init__(self, leader, reader_name, trainer_env, input_queue,
                  out_queue, queue_size):
-        super(DataGenerator, self).__init__()
+        super(DataAccesser, self).__init__()
 
         self._reader_leader = leader
         self._reader_name = reader_name
@@ -107,7 +110,7 @@ class DataAccesser(object):
         # BatchDataRequest
         self._req_queue = threading.Queue(queue_size)
 
-        self._data_server = DataServer(self)
+        self._data_server = data_server.DataServer(self)
         self._data_server.start()
 
         self._stop = threading.Event()
@@ -194,11 +197,11 @@ class DataAccesser(object):
             sys.exit(1)
 
 
-def access_data(self, reader_leader, reader_name, trainer_env, input_queue,
+def access_data(reader_leader, reader_name, trainer_env, input_queue,
                 out_queue, cache_size):
     try:
         a = DataAccesser(reader_leader, reader_name, trainer_env, input_queue,
-                         out_queue, queue_size)
+                         out_queue, cache_size)
         a.start()
     except Exception as e:
         print(e, file=sys.stderr)
@@ -224,7 +227,7 @@ class DistributeReader(object):
         # connections to data servers
         self._trainer_env = TrainerEnv()
 
-        self._db = get_global_etcd(trainer_env.endpoints, trainer_env.job_id)
+        self._db = get_global_etcd(self._trainer_env.endpoints, self._trainer_env.job_id)
         self._wait_record_to_dist_reader_table()
         self._wait_dist_reader_leader()
 
@@ -265,7 +268,7 @@ class DistributeReader(object):
             access_data,
             args=(self._reader_leader, self._name, self._trainer_env,
                   self._generater_out_queue, self._accesser_out_queue,
-                  cache_size))
+                  self._cache_size))
         while True:
             b = self._accesser_out_queue.pop()
             if b is None:
