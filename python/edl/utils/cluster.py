@@ -18,10 +18,15 @@ import json
 import six
 import time
 import uuid
+import threading
 
 from . import constants
 from .pod import Pod
 from . import exceptions
+from . import error_utils
+from . import etcd_db
+from ..discovery import etcd_client
+from .log_utils import logger
 
 
 class Cluster(object):
@@ -140,7 +145,8 @@ class Cluster(object):
         for i, (key, value) in enumerate(six.iteritems(od)):
             pod = Pod()
             if i != int(key):
-                raise exceptions.EdlRankError("rank:{} is not exists in {}".format(i, d))
+                raise exceptions.EdlRankError(
+                    "rank:{} is not exists in {}".format(i, d))
             pod.from_json(value)
             pods.append(pod)
 
@@ -169,6 +175,7 @@ class Cluster(object):
     def status(self, s):
         self._status = s
 
+
 class ClusterGenerator(object):
     def __init__(self, job_env, pod_id):
         self._cluster = Cluster()
@@ -179,11 +186,11 @@ class ClusterGenerator(object):
         self._t_register = None
         self._lock = threading.Lock()
         self._job_env = job_env
-        self._db = get_global_etcd()
+        self._db = etcd_db.get_global_etcd()
         self._pod_id = pod_id
 
     def start(self):
-        self._etcd = EtcdClient(
+        self._etcd = etcd_client.EtcdClient(
             endpoints=self._job_env._etcd_endpoints,
             root=self._job_env.job_id,
             timeout=6)
@@ -234,13 +241,14 @@ class ClusterGenerator(object):
         leader_id = self._db.get_pod_leader_id()
         if leader_id is None:
             raise exceptions.EdlTableError("leader key={}:{}".format(
-                self._etcd.get_full_path(constants.ETCD_POD_RESOURCE, constants.ETCD_POD_RANK),
-                leader_id))
+                self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
+                                         constants.ETCD_POD_RANK), leader_id))
 
         print(resource_pods)
         if leader_id not in resource_pods:
-            raise exceptions.EdlTableError("leader error, leader:{} not in resource:{}".
-                                format(leader_id, resource_pods.keys()))
+            raise exceptions.EdlTableError(
+                "leader error, leader:{} not in resource:{}".format(
+                    leader_id, resource_pods.keys()))
 
         new_cluster = Cluster()
         pods = new_cluster.get_pods()
@@ -287,8 +295,8 @@ class ClusterGenerator(object):
 
         if len(resource_pods) <= 0:
             raise EdlTableError("resource pods key={}:{}".format(
-                self._etcd.get_full_path(constants.ETCD_POD_RESOURCE, self._pod_id),
-                resource_pods))
+                self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
+                                         self._pod_id), resource_pods))
 
         if current_cluster is None:
             new_cluster = self._generate_cluster_from_resource(resource_pods)
@@ -331,10 +339,12 @@ class ClusterGenerator(object):
         new_cluster = copy.copy(current_cluster)
         return current_cluster, new_cluster
 
-    @handle_errors_until_timeout
+    @error_utils.handle_errors_until_timeout
     def _set_cluster_if_leader(self, cluster, timeout=120):
-        leader_key = self._etcd.get_full_path(constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER)
-        cluster_key = self._etcd.get_full_path(constants.ETCD_CLUSTER, constants.ETCD_CLUSTER)
+        leader_key = self._etcd.get_full_path(constants.ETCD_POD_RANK,
+                                              constants.ETCD_POD_LEADER)
+        cluster_key = self._etcd.get_full_path(constants.ETCD_CLUSTER,
+                                               constants.ETCD_CLUSTER)
 
         etcd = self._etcd._etcd
         status, _ = etcd.transaction(

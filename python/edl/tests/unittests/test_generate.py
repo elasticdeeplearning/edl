@@ -28,18 +28,17 @@ from edl.utils.pod_server import PodServer
 from edl.utils.pod import Pod
 from edl.utils.pod_server_client import PodServerClient
 from edl.utils.exceptions import EdlBarrierError
-import edl.utils.utils as utils
 from edl.utils.constants import *
-from edl.utils.generate_cluster import GenerateCluster
+import edl.utils.cluster as cluster
 from edl.utils.etcd_db import get_global_etcd
 from edl.utils.leader_register import LeaderRegister
-from edl.utils.etcd_test_base import EtcdTestBase
+from edl.tests.unittests.etcd_test_base import EtcdTestBase
 from threading import Thread
 
 
 class TestGenerate(EtcdTestBase):
     def setUp(self):
-        super(TestGenerate, self).__init__("test_generate")
+        super(TestGenerate, self).setUp("test_generate")
 
     def register_pod(self, job_env):
         pod = Pod()
@@ -68,7 +67,7 @@ class TestGenerate(EtcdTestBase):
 
         pod_1, server_1 = self.register_pod(self._job_env)
 
-        generater = GenerateCluster(self._job_env, pod_0.get_id())
+        generater = cluster.ClusterGenerator(self._job_env, pod_0.get_id())
         ret = generater.start()
 
         cluster_0 = None

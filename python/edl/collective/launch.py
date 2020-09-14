@@ -39,9 +39,9 @@ from ..utils.watcher import Watcher
 from ..utils.pod_server import PodServer
 from ..utils.log_utils import logger
 from ..utils import log_utils
-from .utils import pod_server_client
-from .utils import constants
-from .utils import exceptions
+from ..utils import pod_server_client
+from ..utils import constants
+from ..utils import exceptions
 from ..utils.edl_process import start_local_trainers, terminate_local_procs, watch_local_trainers
 
 
@@ -208,7 +208,8 @@ def job_exit(cluster,
                     db.set_job_flag(job_flag)
                     logger.info("set job status:{} ok!".format(job_flag))
                     break
-                raise exceptions.EdlWaitFollowersReleaseError("can't wait resource")
+                raise exceptions.EdlWaitFollowersReleaseError(
+                    "can't wait resource")
             else:
                 break
         except Exception as e:

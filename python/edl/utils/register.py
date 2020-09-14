@@ -14,7 +14,7 @@
 import threading
 import time
 
-from .etcd_db import get_global_etcd, ETCD_TTL
+from .etcd_db import get_global_etcd
 from .log_utils import logger
 from ..discovery.etcd_client import EtcdClient
 from . import constants
@@ -36,7 +36,7 @@ class Register(object):
 
         try:
             self._etcd.set_server_not_exists(
-                service, server, self._info, ttl=ETCD_TTL)
+                service, server, self._info, ttl=constants.ETCD_TTL)
             logger.info("register pod:{} in etcd path:{}".format(
                 info, self._etcd.get_full_path(service, server)))
         except Exception as e:

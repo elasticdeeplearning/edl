@@ -17,6 +17,7 @@ from . import exceptions
 from .log_utils import logger
 from ..discovery.etcd_client import EtcdClient
 from . import constants
+from . import error_utils
 
 
 class DistReader(object):
@@ -96,6 +97,7 @@ class TrainStatusCheckpoint(object):
     def __str__(self):
         return self.to_json()
 
+
 class State(object):
     def __init__(self, total_batch_size, user_defined=None):
         # interface
@@ -174,10 +176,12 @@ class State(object):
         return d
 
     @staticmethod
-    @handle_errors_until_timeout
+    @error_utils.handle_errors_until_timeout
     def load_from_etcd(etcd_endpoints, job_id, name):
         etcd = EtcdClient(
-            endpoints=etcd_endpoints, root=job_id, timeout=constants.EDL_CONN_TIMEOUT)
+            endpoints=etcd_endpoints,
+            root=job_id,
+            timeout=constants.EDL_CONN_TIMEOUT)
         etcd.init()
 
         value = etcd.get_value(constants.ETCD_DIST_READER, name)
@@ -191,11 +195,13 @@ class State(object):
         return c
 
     @staticmethod
-    @handle_errors_until_timeout
+    @error_utils.handle_errors_until_timeout
     def save_to_etcd(etcd_endpoints, job_id, pod_id, name, mode_path,
                      data_checkpoint, user_defined):
         etcd = EtcdClient(
-            endpoints=etcd_endpoints, root=job_id, timeout=constants.EDL_CONN_TIMEOUT)
+            endpoints=etcd_endpoints,
+            root=job_id,
+            timeout=constants.EDL_CONN_TIMEOUT)
         etcd.init()
 
         c = State()
@@ -204,7 +210,8 @@ class State(object):
         c._model_path = model_path
         c._user_defined = user_defined
 
-        leader_key = etcd.get_full_path(constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER)
+        leader_key = etcd.get_full_path(constants.ETCD_POD_RANK,
+                                        constants.ETCD_POD_LEADER)
         state_key = etcd.get_full_path(constants.ETCD_STATE, name)
 
         etcd = etcd._etcd
