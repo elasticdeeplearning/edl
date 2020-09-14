@@ -22,6 +22,7 @@ from .etcd_db import get_global_etcd
 from .log_utils import logger
 from .unique_name import generator
 from .edl_env import TrainerEnv
+from .error_utils import  handle_errors_until_timeout
 
 
 class DataGenerator(ProcessWrapper):

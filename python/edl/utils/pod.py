@@ -18,7 +18,7 @@ import six
 import uuid
 
 from . import network_utils
-from .global_vars import Status
+from .constants import Status
 from .log_utils import logger
 from .trainer import Trainer
 

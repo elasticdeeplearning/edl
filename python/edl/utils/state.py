@@ -13,9 +13,10 @@
 # limitations under the License.
 import json
 
-from .exceptions import EdlEtcdIOError
+from . import exceptions
 from .log_utils import logger
 from ..discovery.etcd_client import EtcdClient
+from . import constants
 
 
 class DistReader(object):
@@ -54,7 +55,7 @@ class TrainStatusCheckpoint(object):
         self._max_epoch_num = max_epoch_num
         self._epoch_no = None
         self._epochs = {}
-        self._status = TrainStatus.INITIAL
+        self._status = constants.TrainStatus.INITIAL
 
     def update_epoch(self, epoch_no, step_num, step_time):
         if epoch_no not in self._epoch:
@@ -68,9 +69,9 @@ class TrainStatusCheckpoint(object):
 
         left_time = (max_epoch_num - epoch_no) * step_num * step_time
         if left_time > 15 * 60:
-            self._status = TrainStatus.RUNNING
+            self._status = constants.TrainStatus.RUNNING
         else:
-            self._status = TrainStatus.NEARTHEEND
+            self._status = constants.TrainStatus.NEARTHEEND
 
         logger.debug("train status left_time is {} train status is {}".format(
             left_time))
@@ -176,14 +177,14 @@ class State(object):
     @handle_errors_until_timeout
     def load_from_etcd(etcd_endpoints, job_id, name):
         etcd = EtcdClient(
-            endpoints=etcd_endpoints, root=job_id, timeout=EDL_CONN_TIMEOUT)
+            endpoints=etcd_endpoints, root=job_id, timeout=constants.EDL_CONN_TIMEOUT)
         etcd.init()
 
-        value = etcd.get_value(ETCD_DIST_READER, name)
+        value = etcd.get_value(constants.ETCD_DIST_READER, name)
 
         if value is None:
-            raise EdlTableError("key:value = {}:{}".format(
-                etcd.get_full_path(ETCD_DIST_READER, name), value))
+            raise exceptions.EdlTableError("key:value = {}:{}".format(
+                etcd.get_full_path(constants.ETCD_DIST_READER, name), value))
 
         c = State()
         c.from_json(value)
@@ -194,7 +195,7 @@ class State(object):
     def save_to_etcd(etcd_endpoints, job_id, pod_id, name, mode_path,
                      data_checkpoint, user_defined):
         etcd = EtcdClient(
-            endpoints=etcd_endpoints, root=job_id, timeout=EDL_CONN_TIMEOUT)
+            endpoints=etcd_endpoints, root=job_id, timeout=constants.EDL_CONN_TIMEOUT)
         etcd.init()
 
         c = State()
@@ -203,8 +204,8 @@ class State(object):
         c._model_path = model_path
         c._user_defined = user_defined
 
-        leader_key = etcd.get_full_path(ETCD_POD_RANK, ETCD_POD_LEADER)
-        state_key = etcd.get_full_path(ETCD_STATE, name)
+        leader_key = etcd.get_full_path(constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER)
+        state_key = etcd.get_full_path(constants.ETCD_STATE, name)
 
         etcd = etcd._etcd
         status, _ = etcd.transaction(

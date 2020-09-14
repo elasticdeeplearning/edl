@@ -169,7 +169,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
 
     def _check_leader(self):
         if self._trainer_env.global_rank != 0:
-            raise EdlNotLeaderError("This server is not Leader")
+            raise exceptions.EdlNotLeaderError("This server is not Leader")
 
     # only leader can do this
     def BalanceBatchData(self, request, context):
@@ -182,7 +182,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
             self._reader_pod_data.pop(request.producer_pod_id, res.ret)
             return res
         except Exception as e:
-            res.status = serialize_exception(e)
+            res.status = exceptions.serialize_exception(e)
             return res
 
     def GetBatchData(self, request, context):
@@ -190,23 +190,23 @@ class DataServerServicer(pb_grpc.DataServerServicer):
         try:
             a = local_data.get_local_batch_data(request)
         except:
-            res.status = serialize_exception(e)
+            res.status = exceptions.serialize_exception(e)
             return res
 
     def _check_file_list(self, file_list):
         for i in file_list:
             if self._file_list[i] != file_list[i]:
-                raise EdlFileListNotMatchError("client:{} server:{}".format(
+                raise exceptions.EdlFileListNotMatchError("client:{} server:{}".format(
                     file_list, self._file_list))
 
     def _check_pod_id(self, pod_id):
         if pod_id not in self._pod_ids:
-            raise EdlPodIDNotExistError("pod_id:{} not exist in {}".format(
+            raise exceptions.EdlPodIDNotExistError("pod_id:{} not exist in {}".format(
                 pod_id, self._pod_ids))
 
     def _check_reader_name(self, reader_name):
         if reader_name != self._reader_name:
-            raise EdlReaderNameError("{} not equal {}".format(
+            raise exceptions.EdlReaderNameError("{} not equal {}".format(
                 reader_name, self._reader_name))
 
     # only leader can do this
@@ -226,7 +226,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
 
             return res
         except Exception as e:
-            res.status = serialize_exception(e)
+            res.status = exceptions.serialize_exception(e)
             return res
 
 

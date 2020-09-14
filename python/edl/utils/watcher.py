@@ -19,7 +19,7 @@ from threading import Lock, Thread, Event
 
 from .cluster import Cluster
 from .log_utils import logger
-
+from . import constants
 
 class Watcher(object):
     def __init__(self, job_env, cluster, pod):
@@ -29,7 +29,7 @@ class Watcher(object):
 
         # current context
         self._cluster = copy.copy(cluster)
-        self._leader_id = clsuter.get_pod_leader_id()
+        self._leader_id = cluster.get_pod_leader_id()
         self._current_pod = pod
 
         self._new_cluster = None
@@ -53,7 +53,7 @@ class Watcher(object):
         begin = time.time()
         while not self._stop.is_set():
             # if leader_id changed?
-            servers = self._etcd.get_service(ETCD_POD_RANK)
+            servers = self._etcd.get_service(constants.ETCD_POD_RANK)
             assert len(servers) <= 1
             if len(servers) == 0:
                 time.sleep(1)
@@ -63,7 +63,7 @@ class Watcher(object):
                 self._new_leader_id = s.info
 
             # if cluster changed?
-            value, _, _, _, _, = etcd._get_server(ETCD_CLUSTER,
+            value, _, _, _, _, = etcd._get_server(constants.ETCD_CLUSTER,
                                                   self._new_leader_id)
             if value is None:
                 time.sleep(1)

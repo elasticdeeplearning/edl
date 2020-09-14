@@ -39,9 +39,8 @@ from ..utils.watcher import Watcher
 from ..utils.pod_server import PodServer
 from ..utils.log_utils import logger
 from ..utils import log_utils
-from ..utils import constants
-from ..utils import pod_client
-from ..utils import exceptions
+from .utils import pod_client
+from .utils import constants
 from ..utils.edl_process import start_local_trainers, terminate_local_procs, watch_local_trainers
 
 
@@ -137,7 +136,7 @@ def edl_barrier(job_env, pod, timeout):
 
             logger.debug("barrier on leader:{}".format(leader))
 
-            c = PodServerClient(leader.endpoint)
+            c = pod_client.PodServerClient(leader.endpoint)
             cluster = c.barrier(job_env.job_id, pod.get_id())
             return cluster
         except Exception as e:
@@ -181,7 +180,6 @@ def prepare(args):
     db.set_pod_status(pod.get_id(), Status.INITIAL)
 
     # launch pod server
-    pod_server = None
     pod_server = PodServer(job_env, pod.get_id())
     pod_server.start(job_env, pod)
     logger.info("pod server started:[{}]".format(pod))
@@ -245,7 +243,7 @@ def launch(args):
 
     # update pod status
     db = get_global_etcd()
-    db.set_pod_status(pod.get_id(), Status.RUNNING)
+    db.set_pod_status(pod.get_id(), constants.Status.RUNNING)
 
     # watcher after barrier
     watcher = Watcher(job_env, cluster, pod)
