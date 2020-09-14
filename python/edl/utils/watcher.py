@@ -21,6 +21,7 @@ from .cluster import Cluster
 from .log_utils import logger
 from . import constants
 
+
 class Watcher(object):
     def __init__(self, job_env, cluster, pod):
         self._etcd = None

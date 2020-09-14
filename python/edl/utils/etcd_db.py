@@ -104,7 +104,8 @@ class EtcdDB(object):
 
     def get_pod_leader_id(self):
         with self._lock:
-            value = self._etcd.get_value(constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER)
+            value = self._etcd.get_value(constants.ETCD_POD_RANK,
+                                         constants.ETCD_POD_LEADER)
 
         if value is None:
             return None
@@ -134,7 +135,8 @@ class EtcdDB(object):
             servers = self._etcd.get_service(constants.ETCD_READER)
 
         if len(servers) <= 0:
-            raise exceptions.EdlTableError("table:{} has no readers".format(constants.ETCD_READER))
+            raise exceptions.EdlTableError("table:{} has no readers".format(
+                constants.ETCD_READER))
 
         readers = {}
         for s in servers:
@@ -145,11 +147,13 @@ class EtcdDB(object):
 
         cluster = self.get_cluster()
         if cluster is None:
-            raise exceptions.EdlTableError("table:{} has no readers".format(constants.ETCD_CLUSTER))
+            raise exceptions.EdlTableError("table:{} has no readers".format(
+                constants.ETCD_CLUSTER))
 
         if cluster.get_pods_ids_set() != set(readers.keys()):
-            raise exceptions.EdlTableError("reader_ids:{} != cluster_pod_ids:{}".format(
-                reader_ids.keys(), cluster.get_pods_ids_set()))
+            raise exceptions.EdlTableError(
+                "reader_ids:{} != cluster_pod_ids:{}".format(reader_ids.keys(
+                ), cluster.get_pods_ids_set()))
 
         logger.debug("get readers:{}".format(readers))
         return readers
@@ -166,7 +170,8 @@ class EtcdDB(object):
 
     def get_cluster(self):
         with self._lock:
-            value = self._etcd.get_value(constants.ETCD_CLUSTER, constants.ETCD_CLUSTER)
+            value = self._etcd.get_value(constants.ETCD_CLUSTER,
+                                         constants.ETCD_CLUSTER)
 
         if value is None:
             return None
@@ -188,8 +193,8 @@ class EtcdDB(object):
                 self.get_cluster_table_key(), cluster))
 
         if cluster.pods[0].get_id() != leader_id:
-            raise exceptions.EdlLeaderError("{} not equal to {}".format(cluster.pods[
-                0].get_id(), leader_id))
+            raise exceptions.EdlLeaderError("{} not equal to {}".format(
+                cluster.pods[0].get_id(), leader_id))
 
         return cluster.pods[0]
 
@@ -208,7 +213,8 @@ class EtcdDB(object):
             return None
 
         with self._lock:
-            value = self._etcd.get_value(constants.ETCD_TRAIN_STATUS, leader_id)
+            value = self._etcd.get_value(constants.ETCD_TRAIN_STATUS,
+                                         leader_id)
 
         if value is None:
             return None
@@ -217,13 +223,16 @@ class EtcdDB(object):
         return d["status"]
 
     def get_train_status_table_key(self, server_name):
-        return self._etcd.get_full_path(constants.ETCD_TRAIN_STATUS, server_name)
+        return self._etcd.get_full_path(constants.ETCD_TRAIN_STATUS,
+                                        server_name)
 
     def get_cluster_table_key(self):
-        return self._etcd.get_full_path(constants.ETCD_CLUSTER, constants.ETCD_CLUSTER)
+        return self._etcd.get_full_path(constants.ETCD_CLUSTER,
+                                        constants.ETCD_CLUSTER)
 
     def get_rank_table_key(self):
-        return self._etcd.get_full_path(constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER)
+        return self._etcd.get_full_path(constants.ETCD_POD_RANK,
+                                        constants.ETCD_POD_LEADER)
 
     def get_reader_table_key(self, pod_id):
         return self._etcd.get_full_path(constants.ETCD_READER, pod_id)

@@ -196,13 +196,13 @@ class DataServerServicer(pb_grpc.DataServerServicer):
     def _check_file_list(self, file_list):
         for i in file_list:
             if self._file_list[i] != file_list[i]:
-                raise exceptions.EdlFileListNotMatchError("client:{} server:{}".format(
-                    file_list, self._file_list))
+                raise exceptions.EdlFileListNotMatchError(
+                    "client:{} server:{}".format(file_list, self._file_list))
 
     def _check_pod_id(self, pod_id):
         if pod_id not in self._pod_ids:
-            raise exceptions.EdlPodIDNotExistError("pod_id:{} not exist in {}".format(
-                pod_id, self._pod_ids))
+            raise exceptions.EdlPodIDNotExistError(
+                "pod_id:{} not exist in {}".format(pod_id, self._pod_ids))
 
     def _check_reader_name(self, reader_name):
         if reader_name != self._reader_name:

@@ -49,7 +49,8 @@ class JobEnv(object):
         else:
             assert len(self._gpus) > 0, "gpus must be visible, now:{}".format(
                 self._gpus)
-            self._trainer_ports = list(network_utils.find_free_ports(len(self._gpus)))
+            self._trainer_ports = list(
+                network_utils.find_free_ports(len(self._gpus)))
             logger.info("get ports from unused:{} now gpus:{}".format(
                 self._trainer_ports, self._gpus))
 

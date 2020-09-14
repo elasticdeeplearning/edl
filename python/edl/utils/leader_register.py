@@ -80,7 +80,8 @@ class LeaderRegister(object):
 
     def _refresh(self):
         try:
-            self._etcd.refresh(self._service_name, self._server, ttl=constants.ETCD_TTL)
+            self._etcd.refresh(
+                self._service_name, self._server, ttl=constants.ETCD_TTL)
             return True
         except Exception as e:
             logger.warning("refresh error:{}".format(e))
