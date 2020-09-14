@@ -19,6 +19,7 @@ import six
 import time
 import uuid
 import threading
+import traceback
 
 from . import constants
 from .pod import Pod
@@ -374,4 +375,4 @@ class ClusterGenerator(object):
         if current_cluster is None or current_cluster.stage != new_cluster.stage:
             logger.info("current_cluster:{} to  new_cluster:{}".format(
                 current_cluster, new_cluster))
-            self._set_cluster_if_leader(new_cluster)
+            self._set_cluster_if_leader(new_cluster, timeout=120)

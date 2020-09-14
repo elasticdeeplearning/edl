@@ -25,6 +25,7 @@ from . import pod_server_pb2_grpc as pod_server_pb_grpc
 from .etcd_db import EtcdDB
 from .log_utils import logger
 from . import exceptions
+from . import constants
 
 
 class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
@@ -67,12 +68,16 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
             cluster = self._db.get_cluster()
             if cluster is None:
                 exceptions.serialize_exception(
-                    res, exceptions.EdlBarrierError("get current running cluster error"))
+                    res,
+                    exceptions.EdlBarrierError(
+                        "get current running cluster error"))
                 return res
 
-            if cluster.status == Status.FAILED:
+            if cluster.status == constants.Status.FAILED:
                 exceptions.serialize_exception(
-                    res, exceptions.EdlBarrierError("cluster's status is status.Failed"))
+                    res,
+                    exceptions.EdlBarrierError(
+                        "cluster's status is status.Failed"))
                 return res
 
             ids = cluster.get_pods_ids_set()
@@ -95,13 +100,14 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
 
             exceptions.serialize_exception(
                 res,
-                exceptions.EdlBarrierError("barrier's context:{}, now:{}".format(ids,
-                                                                      bd)))
+                exceptions.EdlBarrierError(
+                    "barrier's context:{}, now:{}".format(ids, bd)))
             return res
         except Exception as e:
             logger.debug("internal error:{} {}".format(e,
                                                        traceback.format_exc()))
-            exceptions.serialize_exception(res, exceptions.EdlInternalError(str(e)))
+            exceptions.serialize_exception(
+                res, exceptions.EdlInternalError(str(e)))
             return res
 
     def ShutDown(self, request, context):
