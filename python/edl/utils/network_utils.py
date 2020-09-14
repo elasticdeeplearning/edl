@@ -22,12 +22,9 @@ def get_extern_ip():
 
 
 def get_host_name_ip():
-    try:
-        host_name = socket.gethostname()
-        host_ip = socket.gethostbyname(host_name)
-        return host_name, host_ip
-    except:
-        return None
+    host_name = socket.gethostname()
+    host_ip = socket.gethostbyname(host_name)
+    return host_name, host_ip
 
 
 def find_free_ports(num):

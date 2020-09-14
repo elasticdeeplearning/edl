@@ -19,6 +19,7 @@ import threading
 from concurrent import futures
 from six.moves.queue import Queue
 from threading import Lock
+from random import shuffle
 
 from . import data_server_pb2 as pb
 from . import data_server_pb2_grpc as pb_grpc
@@ -27,9 +28,7 @@ from . import data_server_pb2_grpc as pb_grpc
 class _PodData(object):
     """
     Manage pod's data:
-    batch_data_ids
-    file_list
-    data_server_endpoint
+    batch_data_ids, file_list, data_server_endpoint
     """
 
     def __init__(self, pod_id, data_server_endpoint, max_size=1000000):
@@ -66,12 +65,12 @@ class _PodData(object):
     def max_size():
         return self._max_size
 
-    def pop(self, num=1):
+    def pop(self, num):
         a = []
         with self._lock:
             while not self._queue.empty():
                 if (num > 0 and len(a) < num) or num <= 0:
-                    batch_data_id = self._queue.pop()
+                    batch_data_id = self._queue.get(block=False)
                     self._batch_data.pop(batch_data_id)
                     a.append(batch_data_id)
                 else:
@@ -96,7 +95,7 @@ class _PodsData(object):
         self._reader_name = reader_name
 
         # pod_id => _PodData
-        self._pod_data = {}
+        self._pods_data = {}
         self._lock = Lock()
 
         self._file_list = file_list
@@ -105,6 +104,7 @@ class _PodsData(object):
         self._init()
         self._minimum = 0
         self._need_balance = False
+        self._total_ids = 0
 
     def _init(self):
         for pod_id in pod_ids:
@@ -119,14 +119,14 @@ class _PodsData(object):
                 m.idx = i
                 m.path = self._file_list[i]
 
-                self._pod_data[pod_id].append_file_list_element(m)
+                self._pods_data[pod_id].append_file_list_element(m)
                 i += 1
                 if i >= len(self._file_list):
                     break
 
     def get_pod_data(self, pod_id):
         if pod_id in self._data:
-            return self._pod_data[pod_id]
+            return self._pods_data[pod_id]
         return None
 
     def get_pod_file_list(self, pod_id):
@@ -140,28 +140,62 @@ class _PodsData(object):
             self._reach_data_end[pod_id] = True
             self._need_balance = True
 
-    def put(self, pod_id, batch_datas):
+    def put(self, pod_id, batch_data_ids):
         pod_data = self._data[pod_id]
-        pod_data.put(batch_datas)
+        pod_data.put(batch_data_ids)
+
+        with self._lock:
+            self._total += len(batch_data_ids)
 
     def _balance(self):
         pass
 
+    def _get_all_batch_data_ids(self, pod_data, ret):
+        assert pod_data.size() > 0
+        batch_data_ids = pod_data.pop(num=-1)
+        ret.reader_name = self._reader_name
+        ret.producer_pod_id = pod_id
+        ret.consumer_pod_id = pod_id
+        ret.data_server_endpoint = pod_data._data_server_endpoint
+        for batch_data_id in batch_data_ids:
+            ret.batch_data_ids.append(batch_data_id)
+
+    def is_all_reach_data_end(self):
+        with self._lock:
+            for k, v in six.iteritem(self._reach_data_end):
+                if not v:
+                    return False
+
+        return True
+
     def pop(self, pod_id, ret):
         with self._lock:
-            pod_data = self._data[pod_id]
+            avg = self._total / len(self._pods_data)
+
+        if avg <= 1 and self._is_all_reach_data_end():
+            return None
+
+        pod_data = self._pods_data[pod_id]
+        with self._lock:
             need_balance = self._need_balance
 
         if not need_balance:
-            assert pod_data.size() > 0
-            batch_data_ids = pod_data.pop()
-            ret.reader_name = self._reader_name
-            ret.producer_pod_id = pod_id
-            ret.consumer_pod_id = pod_id
-            ret.data_server_endpoint = pod_data._data_server_endpoint
-            for batch_data_id in batch_data_ids:
-                ret.batch_data_ids.append(batch_data_id)
-            return
+            self._get_all_batch_data_ids(pod_id, ret)
+            with self._lock:
+                self._total -= len(ret.batch_data_ids)
+            return ret
+
+        if avg > 1:
+            pods_data = shuffle(self._pod_data.values())
+            ids = []
+            while True:
+                for pod_data in pods_data:
+                    if pod_data.size() >= 2:
+                        pod_ids = pod_data.pop(num=1)
+                        if ids.empty():
+                            continue
+
+                        ids.extend(pod_ids)
 
 
 class DataServerServicer(pb_grpc.DataServerServicer):
@@ -174,7 +208,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
         self._local_data = local_data
 
         # reader_name=>ReaderPodData
-        self._reader_pod_data = ReaderPodData(reader_name, file_list, pod_ids)
+        self._pods_data = ReaderPodData(reader_name, file_list, pod_ids)
 
     def _check_leader(self):
         if self._trainer_env.global_rank != 0:
@@ -185,10 +219,15 @@ class DataServerServicer(pb_grpc.DataServerServicer):
         res = BatchDataResponse()
         try:
             self._check_leader()
-            self._check_pod_id(request.producer_pod_id)
+            self._check_pod_id(request.pod_id)
             self._check_reader_name(request.reader_name)
 
-            self._reader_pod_data.pop(request.producer_pod_id, res.data)
+            if len(request.batch_data_ids) > 0:
+                self._pods_data.put(request.batch_data_ids)
+            else:
+                self._pods_data.set_data_end(request.pod_id)
+
+            self._pods_data.pop(request.pod_id, res.data)
             return res
         except Exception as e:
             res.status = exceptions.serialize_exception(e)
@@ -230,8 +269,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
             self._check_pod_id(request.pod_id)
             self._check_reader_name(request.reader_name)
 
-            pod_file_list = self._reader_pod_data.get_pod_file_list(
-                request.pod_id)
+            pod_file_list = self._pods_data.get_pod_file_list(request.pod_id)
 
             if m not in pod_file_list:
                 res.file_list.append(m)

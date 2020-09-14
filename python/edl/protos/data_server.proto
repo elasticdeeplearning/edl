@@ -78,14 +78,9 @@ message BatchDataResponse {
 
 service DataServer {
   // only leader can do this
-  rpc GetFileList(FileListRequest) returns (FileListResponse) {}
   rpc BalanceBatchData(BalanceBatchData) returns (BalanceBatchDataResponse) {}
 
   // all data servers can do this
+  rpc GetFileList(FileListRequest) returns (FileListResponse) {}
   rpc GetBatchData(BatchDataRequest) returns (BatchDataResponse) {}
-  // rpc ShutDown(ShutDownRequest) returns (common.Status) {}
-
-  // two step's to do it.
-  // rpc PrePareSaveCheckpoint(CheckpointRequest) returns (common.Status) {}
-  // rpc SaveCheckpoint(CheckpointRequest) returns (common.Status) {}
 }
