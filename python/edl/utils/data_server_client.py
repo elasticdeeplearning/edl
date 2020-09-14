@@ -16,7 +16,8 @@ from . import data_server_pb2 as pb
 from . import data_server_pb2_grpc as pb_grpc
 from .exceptions import deserialize_exception
 from .log_utils import logger
-from .error_utils import  handle_errors_until_timeout
+from .error_utils import handle_errors_until_timeout
+
 
 class Conn(object):
     def __init__(self, channel, stub):
@@ -43,12 +44,12 @@ class DataServerClient(object):
 
     @handle_errors_until_timeout
     def get_file_list(self,
-                      leader_endpoint,
+                      reader_leader_endpoint,
                       reader_name,
                       pod_id,
                       file_list,
                       timeout=30):
-        conn = self.connect(leader_endpoint)
+        conn = self.connect(reader_leader_endpoint)
 
         req = pb.FileListRequest()
         req.pod_id = pod_id
@@ -73,7 +74,7 @@ class DataServerClient(object):
                            reader_leader_endpoint,
                            reader_name,
                            pod_id,
-                           dataserver_endpoint,
+                           current_dataserver_endpoint,
                            batch_data_ids=None,
                            timeout=30):
         conn = self.connect(reader_leader_endpoint)
@@ -82,7 +83,7 @@ class DataServerClient(object):
         req.reader_name = reader_name
         req.producer_pod_id = pod_id
         req.consumer_pod_id = None
-        req.data_server_endpoint = dataserver_endpoint
+        req.data_server_endpoint = current_dataserver_endpoint
         for i in batch_data_ids:
             b = pb.BatchData()
             b.batch_data_id = i
