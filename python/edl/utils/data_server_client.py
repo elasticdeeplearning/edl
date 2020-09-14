@@ -26,6 +26,8 @@ class Conn(object):
         self.lock = threading.Lock()
 
 
+# FIXME(gongwb): fix protocal with
+# https://medium.com/kuranda-labs-engineering/gracefully-handling-grpc-errors-in-a-go-server-python-client-setup-9805a5464692
 class DataServerClient(object):
     def __init__(self):
         self._conn = {}  #endpoint=>(channel, stub)
@@ -74,20 +76,17 @@ class DataServerClient(object):
                            reader_leader_endpoint,
                            reader_name,
                            pod_id,
-                           current_dataserver_endpoint,
+                           dataserver_endpoint,
                            batch_data_ids=None,
                            timeout=30):
         conn = self.connect(reader_leader_endpoint)
 
-        req = pb.BatchDataRequest()
+        req = pb.BalanceBatchDataRequest()
         req.reader_name = reader_name
-        req.producer_pod_id = pod_id
-        req.consumer_pod_id = None
-        req.data_server_endpoint = current_dataserver_endpoint
+        req.pod_id = pod_id
+        req.data_server_endpoint = dataserver_endpoint
         for i in batch_data_ids:
-            b = pb.BatchData()
-            b.batch_data_id = i
-            req.data.append(b)
+            req.batch_data_ids.append(b)
 
         with conn.lock:
             res = conn.stub.GetBatchData(req)
@@ -97,7 +96,7 @@ class DataServerClient(object):
 
         logger.debug("pod client get batch_data meta:{}".format(
             batch_data_response_to_string(res)))
-        return res.ret
+        return res.data
 
     @handle_errors_until_timeout
     def get_batch_data(self, req, timeout=30):
@@ -113,4 +112,4 @@ class DataServerClient(object):
 
         logger.debug("pod client get batch_data meta:{}".format(
             batch_data_response_to_string(res)))
-        return res.ret
+        return res.datas

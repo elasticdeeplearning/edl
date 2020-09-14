@@ -135,40 +135,40 @@ class DataAccesser(object):
 
     def _access(self, report_size=10):
         """
-        1. report BatchData(without real data) to Leader
-        2. get the BatchData need to be processed
+        1. Report BatchData index to Leader
+        2. Get the BatchData index need to be processed
             if there is no data, set None to req_queue
         """
-        a = []
+        batch_data_ids = []
         while not self._stop.set():
             while len(a) < report_size:
                 b = self._input_queue.pop()
                 if b is None:
                     logger.info("data read to end!")
                     break
-                a.append(b.batch_data_id)
+                batch_data_ids.append(b.batch_data_id)
                 with self._lock:
                     self._cache[b.batch_data_id] = b
 
-            ret = self._client.balance_batch_data(
+            res = self._client.balance_batch_data(
                 reader_leader_endpoint=self._reader_leader_endpoint,
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
-                current_dataserver_endpoint=self._data_server.endpoint,
-                batch_data_ids=a)
+                dataserver_endpoint=self._data_server.endpoint,
+                batch_data_ids=batch_data_ids)
 
-            self._req_queue.put(ret)
-            a = []
+            self._req_queue.put(res)
+            batch_data_ids = []
 
-        while not self._stop.set():
-            ret = self._client.balance_batch_data(
+        while not self._stop.set() and len(batch_data_ids) > 0:
+            res = self._client.balance_batch_data(
                 reader_leader_endpoint=self._reader_leader_endpoint,
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
-                current_dataserver_endpoint=self._data_server.endpoint,
-                batch_data_ids=a)
+                dataserver_endpoint=self._data_server.endpoint,
+                batch_data_ids=batch_data_ids)
 
-            self._req_queue.put(ret)
+            self._req_queue.put(res)
 
         # data end
         self._req_queue.put(None)
@@ -178,15 +178,15 @@ class DataAccesser(object):
         Read BatchData from local or remote by BatchDataRequest
         """
         if self._trainer_env.pod_id != req.producer_pod_id:
-            return self._client.get_batch_data(req)
+            return (req, self._client.get_batch_data(req))
 
-        return self._get_local_batch_data(req)
+        return (req, self.get_local_batch_data(req))
 
     def get_local_batch_data(self, req):
         ret = []
         for batch_data_id in req.data.batch_data_ids:
             with self._lock:
-                ret.append(self._cache[batch_data_id])
+                ret.append(self._cache.pop(batch_data_id))
 
         return ret
 
@@ -301,4 +301,4 @@ class DistributeReader(object):
             if b is None:
                 logger.debug("{} reach data end".format(self._name))
                 break
-            yield b["meta"], b["data"]
+            yield {"meta": b[0], "data": b[1]}

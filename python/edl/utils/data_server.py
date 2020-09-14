@@ -24,11 +24,18 @@ from . import data_server_pb2 as pb
 from . import data_server_pb2_grpc as pb_grpc
 
 
-class PodData(object):
+class _PodData(object):
+    """
+    Manage pod's data:
+    batch_data_ids
+    file_list
+    data_server_endpoint
+    """
+
     def __init__(self, pod_id, data_server_endpoint, max_size=1000000):
         self._lock = threading.Lock()
-        # batch_data_id=>BatchData
-        self._batch_data = {}
+        # batch_data_ids
+        self._batch_data_ids = set()
         self._queue = Queue(max_size)
         self._pod_id = pod_id
         self._data_server_endpoint = data_server_endpoint
@@ -64,26 +71,31 @@ class PodData(object):
         with self._lock:
             while not self._queue.empty():
                 if (num > 0 and len(a) < num) or num <= 0:
-                    b = self._queue.pop()
-                    self._batch_data.pop(b.batch_data_id)
-                    a.append(b)
+                    batch_data_id = self._queue.pop()
+                    self._batch_data.pop(batch_data_id)
+                    a.append(batch_data_id)
                 else:
                     break
 
         return a
 
-    def put(self, batch_data_array):
+    def put(self, batch_data_ids):
         with self._lock:
-            for b in batch_data_array:
-                self._queue.put(b)
-                self._cache[b.batch_data_id] = b
+            for batch_data_id in batch_data_ids:
+                self._queue.put(batch_data_id)
+                self._batch_data_ids.put(batch_data_id)
 
 
-class ReaderPodData(object):
+class _PodsData(object):
+    """
+    Reader's pods data
+    pod_id=>_PodData
+    """
+
     def __init__(self, reader_name, file_list, pod_ids):
         self._reader_name = reader_name
 
-        # pod_id => PodData
+        # pod_id => _PodData
         self._pod_data = {}
         self._lock = Lock()
 
@@ -96,7 +108,7 @@ class ReaderPodData(object):
 
     def _init(self):
         for pod_id in pod_ids:
-            self._data[pod_id] = PodData()
+            self._data[pod_id] = _PodData()
             self._pod_file_list[pod_id] = []
             self._reach_data_end[pod_id] = False
 
@@ -123,15 +135,14 @@ class ReaderPodData(object):
     def is_reach_data_end(self, pod_id):
         return self._reach_data_end[pod_id]
 
-    def put(self, pod_id, batch_data_array):
-        if len(batch_data_array) == 0:
-            with self._lock:
-                self._reach_data_end[pod_id] = True
-                self._need_balance = True
-                return
+    def set_data_end(self, pod_id):
+        with self._lock:
+            self._reach_data_end[pod_id] = True
+            self._need_balance = True
 
+    def put(self, pod_id, batch_datas):
         pod_data = self._data[pod_id]
-        pod_data.put(batch_data_array)
+        pod_data.put(batch_datas)
 
     def _balance(self):
         pass
@@ -143,16 +154,14 @@ class ReaderPodData(object):
 
         if not need_balance:
             assert pod_data.size() > 0
-            batch_data_array = pod_data.pop()
+            batch_data_ids = pod_data.pop()
             ret.reader_name = self._reader_name
             ret.producer_pod_id = pod_id
             ret.consumer_pod_id = pod_id
             ret.data_server_endpoint = pod_data._data_server_endpoint
-            for b in batch_data_array:
-                m = BatchData()
-                m.batch_data_id = b.batch_data_id
-                ret.data.append(m)
-            return ret
+            for batch_data_id in batch_data_ids:
+                ret.batch_data_ids.append(batch_data_id)
+            return
 
 
 class DataServerServicer(pb_grpc.DataServerServicer):
@@ -179,7 +188,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
             self._check_pod_id(request.producer_pod_id)
             self._check_reader_name(request.reader_name)
 
-            self._reader_pod_data.pop(request.producer_pod_id, res.ret)
+            self._reader_pod_data.pop(request.producer_pod_id, res.data)
             return res
         except Exception as e:
             res.status = exceptions.serialize_exception(e)
@@ -188,10 +197,13 @@ class DataServerServicer(pb_grpc.DataServerServicer):
     def GetBatchData(self, request, context):
         res = BatchDataResponse()
         try:
-            a = local_data.get_local_batch_data(request)
-        except:
+            datas = local_data.get_local_batch_data(request)
+            for data in datas:
+                b = copy.copy(data)
+                res.datas.append(b)
+        except Exception as e:
             res.status = exceptions.serialize_exception(e)
-            return res
+        return res
 
     def _check_file_list(self, file_list):
         for i in file_list:
