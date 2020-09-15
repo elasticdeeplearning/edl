@@ -236,7 +236,9 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
 
     def _check_leader(self):
         if self._trainer_env.global_rank != 0:
-            raise exceptions.EdlNotLeaderError("This server is not Leader")
+            raise exceptions.EdlNotLeaderError(
+                "This server rank:{} is not Leader".format(
+                    self._trainer_env.global_rank))
 
     # only leader can do this
     def ReportBatchDataIds(self, request, context):
@@ -253,7 +255,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
 
             return res
         except Exception as e:
-            res.status = exceptions.serialize_exception(e)
+            exceptions.serialize_exception(res, e)
             return res
 
     def ReachDataEnd(self, request, context):
@@ -266,12 +268,12 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
             self._pod_data.set_data_end(request.pod_id)
             return res
         except Exception as e:
-            res.status = exceptions.serialize_exception(e)
+            exceptions.serialize_exception(res, e)
             return res
 
     # only leader can do this
-    def GetBatchDataIds(self, request, context):
-        res = BatchDataResponse()
+    def GetBatchDataMeta(self, request, context):
+        res = BatchDataMetaResponse()
         try:
             self._check_leader()
             self._check_pod_id(request.pod_id)
@@ -280,7 +282,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
             self._pod_data.pop(request.pod_id, res.data)
             return res
         except Exception as e:
-            res.status = exceptions.serialize_exception(e)
+            exceptions.serialize_exception(res, e)
             return res
 
     def GetBatchData(self, request, context):
@@ -291,7 +293,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                 b = copy.copy(data)
                 res.datas.append(b)
         except Exception as e:
-            res.status = exceptions.serialize_exception(e)
+            exceptions.serialize_exception(res, e)
         return res
 
     def _check_file_list(self, file_list):
@@ -312,7 +314,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
 
     # only leader can do this
     def GetFileList(self, request, context):
-        res = FileListResponse()
+        res = data_server_pb2.FileListResponse()
         try:
             self._check_leader()
             self._check_file_list(request.file_list)
@@ -326,7 +328,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
 
             return res
         except Exception as e:
-            res.status = exceptions.serialize_exception(e)
+            exceptions.serialize_exception(res, e)
             return res
 
 

@@ -35,7 +35,7 @@ message FileListRequest {
 }
 
 message FileListResponse {
-  common.Status ret = 1;
+  common.Status status = 1;
   repeated FileListElement file_list = 2;
 }
 

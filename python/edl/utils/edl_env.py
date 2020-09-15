@@ -172,8 +172,8 @@ class TrainerEnv(object):
         self._pod_id = os.environ["PADDLE_POD_ID"]
         self._etcd_endpoints = os.environ["PADDLE_ETCD_ENDPOINTS"]
 
-        self._global_rank = os.environ["PADDLE_TRAINER_ID"]
-        self._rank_in_pod = os.environ["PADDLE_TRAINER_RANK_IN_POD"]
+        self._global_rank = int(os.environ["PADDLE_TRAINER_ID"])
+        self._rank_in_pod = int(os.environ["PADDLE_TRAINER_RANK_IN_POD"])
         self._trainer_endpoints = os.environ["PADDLE_TRAINER_ENDPOINTS"]
         self._pod_ids = os.environ["EDL_POD_IDS"].split(",")
 
