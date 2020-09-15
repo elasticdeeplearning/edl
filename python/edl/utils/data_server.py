@@ -20,6 +20,7 @@ from concurrent import futures
 from six.moves.queue import Queue
 from threading import Lock
 from random import shuffle
+import collections
 
 from . import data_server_pb2 as pb
 from . import data_server_pb2_grpc as pb_grpc
@@ -35,10 +36,12 @@ class _PodData(object):
 
     def __init__(self, pod_id, data_server_endpoint, max_size=1000000):
         # batch_data_ids
-        self._batch_data_ids = set()
-        self._queue = Queue(max_size)
         self._pod_id = pod_id
         self._data_server_endpoint = data_server_endpoint
+        # total ids for filter
+        self._batch_data_ids = set()
+
+        self._queue = collections.deque(max_size)
         self._pod_file_list = []
         self._max_size = max_size
         self._reach_data_end = False
@@ -66,8 +69,7 @@ class _PodData(object):
         a = []
         while not self._queue.empty():
             if (num > 0 and len(a) < num) or num <= 0:
-                batch_data_id = self._queue.get(block=False)
-                self._batch_data.pop(batch_data_id)
+                batch_data_id = self._queue.popleft()
                 a.append(batch_data_id)
             else:
                 break
@@ -76,8 +78,10 @@ class _PodData(object):
 
     def put(self, batch_data_ids):
         for batch_data_id in batch_data_ids:
-            self._queue.put(batch_data_id)
-            self._batch_data_ids.put(batch_data_id)
+            if batch_data_id in self._batch_data_ids:
+                continue
+            self._queue.append(batch_data_id)
+            self._batch_data_ids.add(batch_data_id)
 
 
 class _PodsData(object):
@@ -91,20 +95,25 @@ class _PodsData(object):
 
         # pod_id => _PodData
         self._pods_data = {}
+        # pod_id => BalanceBatchData
+        self._balance_batch_data = {}
+        self._barrier_ids = set()
+        self._reach_data_end_ids = set()
         self._lock = Lock()
 
         self._file_list = file_list
-        self._pod_ids = pod_ids
+        self._pod_ids = set(pod_ids)
 
         self._init()
-        self._minimum = 0
-        self._total = 0
+        #self._minimum = 0
+        #self._total = 0
 
     def _init(self):
         for pod_id in pod_ids:
             self._data[pod_id] = _PodData()
             self._pod_file_list[pod_id] = []
-            self._reach_data_end[pod_id] = False
+            self._balance_batch_data[pod_id] = [
+            ]  # array of pb.BalanceBatchData()
 
         i = 0
         while i < len(self._file_list):
@@ -123,25 +132,73 @@ class _PodsData(object):
 
     def set_data_end(self, pod_id):
         with self._lock:
-            self._reach_data_end[pod_id] = True
-            self._need_balance = True
+            pod_data = self._pods_data[pod_id]
+            pod_data.reach_data_end()
+            self._reach_data_end_ids.add(pod_id)
+
+    def _get_batch_data_id_from_others(self, avg_num, need_num):
+        ret = []
+        for pod_id in self._pod_ids:
+            src = self._pods_data[pod_id]
+            if src.size() < avg_num:
+                continue
+
+            dst = pb.BalanceBatchData()
+            dst.reader_name = self._reader_name
+            dst.producer_pod_id = src._pod_id
+            dst.consumer_pod_id = None
+            dst.data_server_endpoint = src._data_server_endpoint
+
+            pop_num = (src.size() - avg_num)
+            ids = src.pop(pop_num)
+            if len(ids) <= 0:
+                continue
+
+            dst.extend(ids)
+            ret.append(dst)
+            need_num -= len(ids)
+
+            if need_num <= 0:
+                break
+
+        return ret
 
     def put(self, pod_id, batch_data_ids):
         with self._lock:
-            pod_data = self._data[pod_id]
+            pod_data = self._pods_data[pod_id]
             pod_data.put(batch_data_ids)
 
             self._total += len(batch_data_ids)
 
-    def _get_batch_data_ids(self, pod_data, ret, num):
-        assert pod_data.size() > 0
-        batch_data_ids = pod_data.pop(num=num)
-        ret.reader_name = self._reader_name
-        ret.producer_pod_id = pod_id
-        ret.consumer_pod_id = pod_id
-        ret.data_server_endpoint = pod_data._data_server_endpoint
-        for batch_data_id in batch_data_ids:
-            ret.batch_data_ids.append(batch_data_id)
+            self._barrier_ids.add(pod_id)
+            if self._barrier_ids + self._reach_data_end_ids != self._pod_ids:
+                return
+
+            avg_num = self._total / len(self._pods_ids)
+            if avg_num < 1:
+                return
+
+            # get batch_data_ids from pods_data to balance_batch_data
+            for pod_id in self._pod_ids:
+                src = self._pods_data[pod_id]
+
+                dst = pb.BalanceBatchData()
+                dst.reader_name = self._reader_name
+                dst.producer_pod_id = src._pod_id
+                dst.consumer_pod_id = None
+                dst.data_server_endpoint = src._data_server_endpoint
+
+                ids = src.pop(num=avg_num)
+                if len(ids) >= avg_num:
+                    dst.batch_data_ids.extend(ids)
+                    self._balance_batch_data.append(dst)
+                else:
+                    need_num = avg_num - len(ids)
+                    ret = self._get_batch_data_id_from_others(avg_num,
+                                                              need_num)
+                    if len(ret) <= 0:
+                        continue
+                    self._balance_batch_data.extend(ret)
 
     def _is_all_reach_data_end(self):
         for k, v in six.iteritem(self._reach_data_end):
@@ -154,27 +211,15 @@ class _PodsData(object):
     @error_utils.handle_error_until_timeout
     def pop(self, pod_id, ret, timeout=60):
         with self._lock:
-            avg_num = self._total / len(self._pods_data)
+            balanced_data = self._balance_batch_data[pod_id]
 
-            if avg_num < 1:
-                if self._is_all_reach_data_end():
-                    return None
-                else:
-                    raise exceptions.EdlBalanceDataError()
+            if len(balanced_data) > 0:
+                return balanced_data
 
-            # try to pop avg num from self
-            pod_data = self._pods_data[pod_id]
-            if pod_data.size() > 0:
-                self._get_batch_data_ids(pod_data, ret, avg)
+            if self._is_all_reach_data_end():
+                return None
 
-            if len(ret.batch_data_ids) >= avg_num:
-                return ret
-
-# try to get_from others
-            for pod_id, pod_data in six.iteritem(self._pods_data):
-                self._get_batch_data_ids(avg_num - len(ret.batch_data_ids))
-                if len(ret.batch_data_ids) >= avg_num:
-                    return ret
+            raise exceptions.EdlDataGenerateError("wait to generate more data")
 
 
 class DataServerServicer(pb_grpc.DataServerServicer):
