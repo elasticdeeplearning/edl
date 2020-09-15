@@ -236,13 +236,13 @@ class DataAccesser(object):
 
 
 def access_batch_data(reader_leader, reader_name, trainer_env, input_queue,
-                      out_queue, cache_size):
+                      out_queue, cache_capcity):
     """
     Run DataAccesser in a seperated process
     """
     try:
         a = DataAccesser(reader_leader, reader_name, trainer_env, input_queue,
-                         out_queue, cache_size)
+                         out_queue, cache_capcity)
         a.start()
     except Exception as e:
         print(e, file=sys.stderr)
@@ -254,7 +254,7 @@ class Reader(object):
                  file_list,
                  file_splitter_cls,
                  batch_size,
-                 cache_size=100):
+                 cache_capcity=100):
         self._file_list = file_list
         assert isinstance(self._file_list, list), "file_list must be a list"
 
@@ -263,7 +263,7 @@ class Reader(object):
         self._cls = file_splitter_cls
         self._batch_size = batch_size
         assert self._batch_size > 0, "batch size must > 0"
-        self._cache_size = cache_size
+        self._cache_capcity = cache_capcity
 
         # connections to data servers
         self._trainer_env = TrainerEnv()
@@ -273,8 +273,8 @@ class Reader(object):
         self._wait_record_to_dist_reader_table()
         self._wait_dist_reader_leader()
 
-        self._generater_out_queue = multiprocessing.Queue(self._cache_size)
-        self._accesser_out_queue = multiprocessing.Queue(self._cache_size)
+        self._generater_out_queue = multiprocessing.Queue(self._cache_capcity)
+        self._accesser_out_queue = multiprocessing.Queue(self._cache_capcity)
 
         self._generater = None
         self._accesser = None
@@ -310,7 +310,7 @@ class Reader(object):
             access_batch_data,
             args=(self._reader_leader, self._name, self._trainer_env,
                   self._generater_out_queue, self._accesser_out_queue,
-                  self._cache_size))
+                  self._cache_capcity))
         while True:
             b = self._accesser_out_queue.pop()
             if b is None:

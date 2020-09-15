@@ -179,7 +179,7 @@ class TrainerEnv(object):
 
     @property
     def pod_ids(self):
-        return self._pods_ids
+        return self._pod_ids
 
     @property
     def pod_id(self):

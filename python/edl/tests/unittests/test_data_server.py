@@ -48,8 +48,8 @@ class TestDataServer(unittest.TestCase):
             trainer_env=self._trainer_env,
             reader_name=self._reader_name,
             file_list=self._file_list,
-            local_data=None)
-        self._data_server.start()
+            local_reader=None)
+        self._data_server.start(addr="127.0.0.1")
 
     def tearDown(self):
         os.environ.clear()

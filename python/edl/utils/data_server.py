@@ -22,10 +22,10 @@ from threading import Lock
 from random import shuffle
 import collections
 
-from . import data_server_pb2 as pb
-from . import data_server_pb2_grpc as pb_grpc
-from . import error_utils
-from . import exceptions
+from edl.utils import data_server_pb2_grpc
+from edl.utils import data_server_pb2
+from edl.utils import error_utils
+from edl.utils import exceptions
 
 
 class PodData(object):
@@ -34,16 +34,16 @@ class PodData(object):
     batch_data_ids, file_list, data_server_endpoint
     """
 
-    def __init__(self, pod_id, data_server_endpoint, max_size=1000000):
+    def __init__(self, pod_id, data_server_endpoint, max_len=1000000):
         # batch_data_ids
         self._pod_id = pod_id
         self._data_server_endpoint = data_server_endpoint
         # total ids for filter
         self._batch_data_ids = set()
 
-        self._queue = collections.deque(max_size)
-        self._pod_file_list = []
-        self._max_size = max_size
+        self._queue = collections.deque(maxlen=max_len)
+        self._file_list = []
+        self._max_len = max_len
         self._reach_data_end = False
 
     def append_file_list_element(self, element):
@@ -62,8 +62,8 @@ class PodData(object):
         return len(self._batch_data)
 
     @property
-    def max_size():
-        return self._max_size
+    def max_len():
+        return self._max_len
 
     def pop(self, num):
         a = []
@@ -76,7 +76,8 @@ class PodData(object):
 
         return a
 
-    def put(self, batch_data_ids):
+    def put(self, data_server_endpoint, batch_data_ids):
+        self._data_server_endpoint = data_server_endpoint
         for batch_data_id in batch_data_ids:
             if batch_data_id in self._batch_data_ids:
                 continue
@@ -94,9 +95,9 @@ class PodsData(object):
         self._reader_name = reader_name
 
         # pod_id => PodData
-        self._pods_data = {}
+        self._pod_data = {}
         # pod_id => BalanceBatchData
-        self._balance_batch_data = {}
+        self._balanced_batch_data = {}
         self._barrier_ids = set()
         self._reach_data_end_ids = set()
         self._lock = Lock()
@@ -108,20 +109,18 @@ class PodsData(object):
         self._total = 0
 
     def _init(self):
-        for pod_id in pod_ids:
-            self._data[pod_id] = PodData()
-            self._pod_file_list[pod_id] = []
-            self._balance_batch_data[pod_id] = [
-            ]  # array of pb.BalanceBatchData()
+        for pod_id in self._pod_ids:
+            self._pod_data[pod_id] = PodData(pod_id, None)
+            self._balanced_batch_data[pod_id] = []  # array of BatchDataMeta
 
         i = 0
         while i < len(self._file_list):
-            for pod_id in pod_ids:
-                m = pb.FileListElement()
+            for pod_id in self._pod_ids:
+                m = data_server_pb2.FileListElement()
                 m.idx = i
                 m.path = self._file_list[i]
 
-                self._pods_data[pod_id].append_file_list_element(m)
+                self._pod_data[pod_id].append_file_list_element(m)
                 i += 1
                 if i >= len(self._file_list):
                     break
@@ -131,14 +130,14 @@ class PodsData(object):
 
     def set_data_end(self, pod_id):
         with self._lock:
-            pod_data = self._pods_data[pod_id]
+            pod_data = self._pod_data[pod_id]
             pod_data.reach_data_end()
             self._reach_data_end_ids.add(pod_id)
 
     def _get_batch_data_id_from_others(self, avg_num, need_num):
         ret = []
         for pod_id in self._pod_ids:
-            src = self._pods_data[pod_id]
+            src = self._pod_data[pod_id]
             if src.size() < avg_num:
                 continue
 
@@ -162,26 +161,26 @@ class PodsData(object):
 
         return ret
 
-    def put(self, pod_id, batch_data_ids):
-        total = 0
+    def put(self, pod_id, data_server_endpoint, batch_data_ids):
         with self._lock:
-            pod_data = self._pods_data[pod_id]
-            pod_data.put(batch_data_ids)
+            pod_data = self._pod_data[pod_id]
+            pod_data.put(data_server_endpoint, batch_data_ids)
 
-            for _, pod_data in self._pods_data:
+            total = 0
+            for _, pod_data in self._pod_data:
                 total += pod_data.size()
 
             self._barrier_ids.add(pod_id)
             if self._barrier_ids + self._reach_data_end_ids != self._pod_ids:
                 return
 
-            avg_num = self._total / len(self._pods_ids)
+            avg_num = total / len(self._pods_ids)
             if avg_num < 1:
                 return
 
             # get batch_data_ids from pods_data to balance_batch_data
             for pod_id in self._pod_ids:
-                src = self._pods_data[pod_id]
+                src = self._pod_data[pod_id]
 
                 dst = pb.BalanceBatchData()
                 dst.reader_name = self._reader_name
@@ -192,17 +191,17 @@ class PodsData(object):
                 ids = src.pop(num=avg_num)
                 if len(ids) >= avg_num:
                     dst.batch_data_ids.extend(ids)
-                    self._balance_batch_data.append(dst)
+                    self._balanced_batch_data.append(dst)
                 else:
                     need_num = avg_num - len(ids)
                     ret = self._get_batch_data_id_from_others(avg_num,
                                                               need_num)
                     if len(ret) <= 0:
                         continue
-                    self._balance_batch_data.extend(ret)
+                    self._balanced_batch_data.extend(ret)
 
     def _is_all_reach_data_end(self):
-        for _, pod_data in six.iteritem(self._pods_data):
+        for _, pod_data in six.iteritem(self._pod_data):
             if not pod_data.reach_data_end:
                 return False
 
@@ -212,7 +211,7 @@ class PodsData(object):
     @error_utils.handle_errors_until_timeout
     def pop(self, pod_id, ret, timeout=60):
         with self._lock:
-            balanced_data = self._balance_batch_data[pod_id]
+            balanced_data = self._balanced_batch_data[pod_id]
 
             if len(balanced_data) > 0:
                 return balanced_data
@@ -223,17 +222,17 @@ class PodsData(object):
             raise exceptions.EdlDataGenerateError("wait to generate more data")
 
 
-class DataServerServicer(pb_grpc.DataServerServicer):
+class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
     def __init__(self, trainer_env, reader_name, file_list, pod_ids,
-                 local_data):
+                 local_reader):
         self._lock = threading.Lock()
         self._trainer_env = trainer_env
         self._file_list = file_list
         self._pod_ids = pod_ids
-        self._local_data = local_data
+        self._local_reader = local_reader
 
         # reader_name=>PodData
-        self._pods_data = PodsData(reader_name, file_list, pod_ids)
+        self._pod_data = PodsData(reader_name, file_list, pod_ids)
 
     def _check_leader(self):
         if self._trainer_env.global_rank != 0:
@@ -248,7 +247,9 @@ class DataServerServicer(pb_grpc.DataServerServicer):
             self._check_reader_name(request.reader_name)
 
             if len(request.batch_data_ids) > 0:
-                self._pods_data.put(request.batch_data_ids)
+                self._pod_data.put(request.pod_id,
+                                   request.data_server_endpoint,
+                                   request.batch_data_ids)
 
             return res
         except Exception as e:
@@ -262,7 +263,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
             self._check_pod_id(request.pod_id)
             self._check_reader_name(request.reader_name)
 
-            self._pods_data.set_data_end(request.pod_id)
+            self._pod_data.set_data_end(request.pod_id)
             return res
         except Exception as e:
             res.status = exceptions.serialize_exception(e)
@@ -276,7 +277,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
             self._check_pod_id(request.pod_id)
             self._check_reader_name(request.reader_name)
 
-            self._pods_data.pop(request.pod_id, res.data)
+            self._pod_data.pop(request.pod_id, res.data)
             return res
         except Exception as e:
             res.status = exceptions.serialize_exception(e)
@@ -285,7 +286,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
     def GetBatchData(self, request, context):
         res = BatchDataResponse()
         try:
-            datas = self._local_data.get_local_batch_data(request)
+            datas = self._local_reader.get_local_batch_data(request)
             for data in datas:
                 b = copy.copy(data)
                 res.datas.append(b)
@@ -318,7 +319,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
             self._check_pod_id(request.pod_id)
             self._check_reader_name(request.reader_name)
 
-            pod_file_list = self._pods_data.get_pod_file_list(request.pod_id)
+            pod_file_list = self._pod_data.get_pod_file_list(request.pod_id)
 
             if m not in pod_file_list:
                 res.file_list.append(m)
@@ -330,7 +331,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
 
 
 class DataServer(object):
-    def __init__(self, trainer_env, reader_name, file_list, local_data):
+    def __init__(self, trainer_env, reader_name, file_list, local_reader):
         self._server = None
         self._addr = None
         self._port = None
@@ -339,7 +340,7 @@ class DataServer(object):
         self._trainer_env = trainer_env
         self._reader_name = reader_name
         self._file_list = file_list
-        self._local_data = local_data
+        self._local_reader = local_reader
 
     def start(self, addr, cache_capcity=1000, max_workers=100, concurrency=20):
         server = grpc.server(
@@ -349,9 +350,11 @@ class DataServer(object):
             maximum_concurrent_rpcs=concurrency)
         data_server_pb2_grpc.add_DataServerServicer_to_server(
             DataServerServicer(
-                file_list=self._file_list,
                 trainer_env=self._trainer_env,
-                local_data=local_data),
+                reader_name=self._reader_name,
+                file_list=self._file_list,
+                pod_ids=self._trainer_env.pod_ids,
+                local_reader=self._local_reader),
             server)
 
         self._addr = addr
