@@ -15,7 +15,7 @@ import json
 import threading
 
 from . import string_utils
-from .cluster import Cluster
+from edl.utils import cluster
 from .log_utils import logger
 from .pod import Pod
 from ..discovery.etcd_client import EtcdClient
@@ -176,7 +176,7 @@ class EtcdDB(object):
         if value is None:
             return None
 
-        cluster = Cluster()
+        cluster = cluster.Cluster()
         cluster.from_json(value)
         return cluster
 

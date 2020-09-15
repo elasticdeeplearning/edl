@@ -22,4 +22,4 @@ message Status {
   string detail = 2;
 }
 
-message Empty { Status status = 1; }
+message EmptyRet { Status status = 1; }

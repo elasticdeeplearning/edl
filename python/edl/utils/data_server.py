@@ -209,7 +209,7 @@ class PodsData(object):
         return True
 
     # FIXME(gongwb): avoid global lock of all pods
-    @error_utils.handle_error_until_timeout
+    @error_utils.handle_errors_until_timeout
     def pop(self, pod_id, ret, timeout=60):
         with self._lock:
             balanced_data = self._balance_batch_data[pod_id]
