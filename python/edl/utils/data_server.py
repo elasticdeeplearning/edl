@@ -28,7 +28,7 @@ from . import error_utils
 from . import exceptions
 
 
-class _PodData(object):
+class PodData(object):
     """
     Manage pod's data:
     batch_data_ids, file_list, data_server_endpoint
@@ -84,16 +84,16 @@ class _PodData(object):
             self._batch_data_ids.add(batch_data_id)
 
 
-class _PodsData(object):
+class PodsData(object):
     """
     Reader's pods data
-    pod_id=>_PodData
+    pod_id=>PodData
     """
 
     def __init__(self, reader_name, file_list, pod_ids):
         self._reader_name = reader_name
 
-        # pod_id => _PodData
+        # pod_id => PodData
         self._pods_data = {}
         # pod_id => BalanceBatchData
         self._balance_batch_data = {}
@@ -105,12 +105,11 @@ class _PodsData(object):
         self._pod_ids = set(pod_ids)
 
         self._init()
-        #self._minimum = 0
-        #self._total = 0
+        self._total = 0
 
     def _init(self):
         for pod_id in pod_ids:
-            self._data[pod_id] = _PodData()
+            self._data[pod_id] = PodData()
             self._pod_file_list[pod_id] = []
             self._balance_batch_data[pod_id] = [
             ]  # array of pb.BalanceBatchData()
@@ -164,11 +163,13 @@ class _PodsData(object):
         return ret
 
     def put(self, pod_id, batch_data_ids):
+        total = 0
         with self._lock:
             pod_data = self._pods_data[pod_id]
             pod_data.put(batch_data_ids)
 
-            self._total += len(batch_data_ids)
+            for _, pod_data in self._pods_data:
+                total += pod_data.size()
 
             self._barrier_ids.add(pod_id)
             if self._barrier_ids + self._reach_data_end_ids != self._pod_ids:
@@ -201,8 +202,8 @@ class _PodsData(object):
                     self._balance_batch_data.extend(ret)
 
     def _is_all_reach_data_end(self):
-        for k, v in six.iteritem(self._reach_data_end):
-            if not v:
+        for _, pod_data in six.iteritem(self._pods_data):
+            if not pod_data.reach_data_end:
                 return False
 
         return True
@@ -239,8 +240,8 @@ class DataServerServicer(pb_grpc.DataServerServicer):
             raise exceptions.EdlNotLeaderError("This server is not Leader")
 
     # only leader can do this
-    def BalanceBatchData(self, request, context):
-        res = BatchDataResponse()
+    def ReportBatchDataIds(self, request, context):
+        res = common_pb.Empty()
         try:
             self._check_leader()
             self._check_pod_id(request.pod_id)
@@ -250,6 +251,19 @@ class DataServerServicer(pb_grpc.DataServerServicer):
                 self._pods_data.put(request.batch_data_ids)
             else:
                 self._pods_data.set_data_end(request.pod_id)
+
+            return res
+        except Exception as e:
+            res.status = exceptions.serialize_exception(e)
+            return res
+
+    # only leader can do this
+    def GetBatchDataIds(self, request, context):
+        res = BatchDataResponse()
+        try:
+            self._check_leader()
+            self._check_pod_id(request.pod_id)
+            self._check_reader_name(request.reader_name)
 
             self._pods_data.pop(request.pod_id, res.data)
             return res

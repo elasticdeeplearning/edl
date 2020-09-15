@@ -57,7 +57,7 @@ message BalanceBatchDataRequest {
   repeated string batch_data_ids = 5;
 }
 
-message GetBalancedBatchDataRequest {
+message GetBatchDataIdsRequest {
   string reader_name = 1;
   string pod_id = 2;
 }
@@ -73,18 +73,18 @@ message BalanceBatchData {
 
 message BalanceBatchDataResponse {
   common.Status status = 1;
-  BalanceBatchData data = 2;
+  repeated BalanceBatchData data = 2;
 }
 
 message BatchDataResponse {
   common.Status status = 1;
-  repeated BatchData datas = 2;
+  repeated BatchData data = 2;
 }
 
 service DataServer {
   // only leader can do this
-  rpc ReportBatchData(BalanceBatchDataRequest) returns (common.Status) {}
-  rpc GetBalancedBatchData(GetBalancedBatchDataRequest)
+  rpc ReportBatchDataIds(BalanceBatchDataRequest) returns (common.Empty) {}
+  rpc GetBatchDataIds(GetBatchDataIdsRequest)
       returns (BalanceBatchDataResponse) {}
 
   // all data servers can do this

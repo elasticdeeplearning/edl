@@ -32,9 +32,6 @@ class DataServerClient(object):
     def __init__(self):
         self._conn = {}  #endpoint=>(channel, stub)
 
-    def _connect(self, endpoint):
-        return channel, stub
-
     @handle_errors_until_timeout
     def connect(self, endpoint, timeout=30):
         if endpoint not in self._conn:
@@ -72,13 +69,13 @@ class DataServerClient(object):
         return ret
 
     @handle_errors_until_timeout
-    def balance_batch_data(self,
-                           reader_leader_endpoint,
-                           reader_name,
-                           pod_id,
-                           dataserver_endpoint,
-                           batch_data_ids=None,
-                           timeout=30):
+    def report_batch_data_ids(self,
+                              reader_leader_endpoint,
+                              reader_name,
+                              pod_id,
+                              dataserver_endpoint,
+                              batch_data_ids=None,
+                              timeout=60):
         conn = self.connect(reader_leader_endpoint)
 
         req = pb.BalanceBatchDataRequest()
@@ -99,7 +96,29 @@ class DataServerClient(object):
         return res.data
 
     @handle_errors_until_timeout
-    def get_batch_data(self, req, timeout=30):
+    def get_balanced_batch_data(self,
+                                reader_leader_endpoint,
+                                reader_name,
+                                pod_id,
+                                timeout=60):
+        conn = self.connect(reader_leader_endpoint)
+
+        req = pb.GetBalanceBatchDataRequest()
+        req.reader_name = reader_name
+        req.pod_id = pod_id
+
+        with conn.lock:
+            res = conn.stub.GetBalancedBatchData(req)
+
+        if res.status.type != "":
+            deserialize_exception(res.status)
+
+        logger.debug("pod client get_balanced_batch_data meta:{}".format(
+            batch_data_response_to_string(res)))
+        return res.data
+
+    @handle_errors_until_timeout
+    def get_batch_data(self, req, timeout=60):
         """
         return BatchDataResponse
         """
@@ -112,4 +131,4 @@ class DataServerClient(object):
 
         logger.debug("pod client get batch_data meta:{}".format(
             batch_data_response_to_string(res)))
-        return res.datas
+        return res.data
