@@ -123,17 +123,19 @@ class DataAccesser(object):
         self._data_server.start()
 
         self._stop = threading.Event()
-        self._t_accesser = threading.Thread(target=self.access)
+        self._t_reporter = threading.Thread(target=self.report)
         self._t_generater = threading.Thread(target=self.generate)
+        self._t_accesser = threading.Thread(target=self.access)
 
         self._client = DataServerClient()
 
     def start(self):
         self._client.connect(self._reader_leader_endpoint)
-        self._t_accesser.start()
+        self._t_reporter.start()
         self._t_generater.start()
+        self._t_accesser.start()
 
-    def _access(self, report_size=10):
+    def _report(self, report_size=10):
         """
         1. Report BatchData index to Leader
         2. Get the BatchData index need to be processed
@@ -150,28 +152,35 @@ class DataAccesser(object):
                 with self._lock:
                     self._cache[b.batch_data_id] = b
 
-            res = self._client.balance_batch_data(
+            self._client.balance_batch_data(
                 reader_leader_endpoint=self._reader_leader_endpoint,
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
                 dataserver_endpoint=self._data_server.endpoint,
                 batch_data_ids=batch_data_ids)
 
-            self._req_queue.put(res)
             batch_data_ids = []
 
         while not self._stop.set() and len(batch_data_ids) > 0:
-            res = self._client.balance_batch_data(
+            self._client.balance_batch_data(
                 reader_leader_endpoint=self._reader_leader_endpoint,
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
                 dataserver_endpoint=self._data_server.endpoint,
                 batch_data_ids=batch_data_ids)
 
+    def _access(self):
+        while not self._stop.set():
+            res = self._client.get_balanced_batch_data(
+                reader_leader_endpoint=self._reader_leader_endpoint,
+                reader_name=self._name,
+                pod_id=self._trainer_env.pod_id)
+
             self._req_queue.put(res)
 
-        # data end
-        self._req_queue.put(None)
+            # data end
+            if res is None:
+                break
 
     def _get_batch_data(self, req):
         """
@@ -201,6 +210,13 @@ class DataAccesser(object):
                 self._out_queue.put(b)
 
         self._out_queue.put(None)
+
+    def report(self):
+        try:
+            self._report()
+        except Exception as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
 
     def access(self):
         try:
