@@ -49,6 +49,7 @@ class TestDataServer(unittest.TestCase):
             reader_name=self._reader_name,
             file_list=self._file_list,
             local_data=None)
+        self._data_server.start()
 
     def tearDown(self):
         os.environ.clear()
