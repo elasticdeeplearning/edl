@@ -100,9 +100,6 @@ class DataGenerator(edl_process.ProcessWrapper):
 
 
 class DataAccesser(object):
-    """
-    """
-
     def __init__(self, reader_leader_endpoint, reader_name, trainer_env,
                  input_queue, out_queue, queue_size):
         self._reader_leader_endpoint = reader_leader_endpoint
@@ -299,9 +296,6 @@ class DistributeReader(object):
 
     def __exit__(self):
         self.stop()
-
-    def _re_org_batch_data(self, b):
-        pass
 
     def __iter__(self):
         self._generater = DataGenerator()

@@ -232,8 +232,8 @@ class DataServerServicer(pb_grpc.DataServerServicer):
         self._pod_ids = pod_ids
         self._local_data = local_data
 
-        # reader_name=>ReaderPodData
-        self._pods_data = ReaderPodData(reader_name, file_list, pod_ids)
+        # reader_name=>PodData
+        self._pods_data = PodsData(reader_name, file_list, pod_ids)
 
     def _check_leader(self):
         if self._trainer_env.global_rank != 0:
@@ -274,7 +274,7 @@ class DataServerServicer(pb_grpc.DataServerServicer):
     def GetBatchData(self, request, context):
         res = BatchDataResponse()
         try:
-            datas = local_data.get_local_batch_data(request)
+            datas = self._local_data.get_local_batch_data(request)
             for data in datas:
                 b = copy.copy(data)
                 res.datas.append(b)
@@ -326,7 +326,7 @@ class DataServer(object):
         self._endpoint = None
 
         self._trainer_env = trainer_env
-        self._eader_name = reader_name
+        self._reader_name = reader_name
         self._file_list = file_list
         self._local_data = local_data
 

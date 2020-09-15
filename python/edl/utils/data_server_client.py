@@ -28,12 +28,12 @@ class Conn(object):
 
 # FIXME(gongwb): fix protocal with
 # https://medium.com/kuranda-labs-engineering/gracefully-handling-grpc-errors-in-a-go-server-python-client-setup-9805a5464692
-class DataServerClient(object):
+class Client(object):
     def __init__(self):
         self._conn = {}  #endpoint=>(channel, stub)
 
     @handle_errors_until_timeout
-    def connect(self, endpoint, timeout=30):
+    def _connect(self, endpoint, timeout=30):
         if endpoint not in self._conn:
             c = grpc.insecure_channel(endpoint)
             s = pb_grpc.DataServerServerStub(channel)
@@ -48,7 +48,7 @@ class DataServerClient(object):
                       pod_id,
                       file_list,
                       timeout=30):
-        conn = self.connect(reader_leader_endpoint)
+        conn = self._connect(reader_leader_endpoint)
 
         req = pb.FileListRequest()
         req.pod_id = pod_id
