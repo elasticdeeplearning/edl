@@ -149,7 +149,7 @@ class DataAccesser(object):
                 with self._lock:
                     self._cache[b.batch_data_id] = b
 
-            self._client.balance_batch_data(
+            self._client.report_batch_data_meta(
                 reader_leader_endpoint=self._reader_leader_endpoint,
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
@@ -159,12 +159,17 @@ class DataAccesser(object):
             batch_data_ids = []
 
         while not self._stop.set() and len(batch_data_ids) > 0:
-            self._client.balance_batch_data(
+            self._client.report_batch_data_meta(
                 reader_leader_endpoint=self._reader_leader_endpoint,
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
                 dataserver_endpoint=self._data_server.endpoint,
                 batch_data_ids=batch_data_ids)
+
+        self._client.reach_data_end(
+            reader_leader_endpoint=self._reader_leader_endpoint,
+            reader_name=self._name,
+            pod_id=self._trainer_env.pod_id)
 
     def _access(self):
         while not self._stop.set():
@@ -244,7 +249,7 @@ def access_batch_data(reader_leader, reader_name, trainer_env, input_queue,
         sys.exit(1)
 
 
-class DistributeReader(object):
+class Reader(object):
     def __init__(self,
                  file_list,
                  file_splitter_cls,

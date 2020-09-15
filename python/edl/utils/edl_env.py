@@ -162,14 +162,12 @@ class JobEnv(object):
         return s
 
 
-class TrainerEnv(JobEnv):
+class TrainerEnv(object):
     """
     Parse all envs when edl_launch starts a trainer. 
     """
 
     def __init__(self, args=None):
-        super(TrainerEnv, self).__init__(args)
-
         self._job_id = os.environ["PADDLE_JOB_ID"]
         self._pod_id = os.environ["PADDLE_POD_ID"]
         self._etcd_endpoints = os.environ["PADDLE_ETCD_ENDPOINTS"]
@@ -189,7 +187,7 @@ class TrainerEnv(JobEnv):
 
     @property
     def global_rank(self):
-        return self._rank
+        return self._global_rank
 
     @property
     def rank_in_pod(self):

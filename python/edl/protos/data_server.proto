@@ -71,6 +71,11 @@ message GetBatchDataMetaRequest {
   string pod_id = 2;
 }
 
+message ReachDataEndRequest {
+  string reader_name = 1;
+  string pod_id = 2;
+}
+
 message BatchDataMetaResponse {
   common.Status status = 1;
   repeated BatchDataMeta data = 2;
@@ -85,6 +90,7 @@ service DataServer {
   // only leader can do this
   rpc ReportBatchDataMeta(ReportBatchDataMetaRequest)
       returns (common.EmptyRet) {}
+  rpc ReachDataEnd(ReachDataEndRequest) returns (common.EmptyRet) {}
   rpc GetBatchDataMeta(GetBatchDataMetaRequest)
       returns (BatchDataMetaResponse) {}
 

@@ -249,9 +249,20 @@ class DataServerServicer(pb_grpc.DataServerServicer):
 
             if len(request.batch_data_ids) > 0:
                 self._pods_data.put(request.batch_data_ids)
-            else:
-                self._pods_data.set_data_end(request.pod_id)
 
+            return res
+        except Exception as e:
+            res.status = exceptions.serialize_exception(e)
+            return res
+
+    def ReachDataEnd(self, request, context):
+        res = common_pb.Empty()
+        try:
+            self._check_leader()
+            self._check_pod_id(request.pod_id)
+            self._check_reader_name(request.reader_name)
+
+            self._pods_data.set_data_end(request.pod_id)
             return res
         except Exception as e:
             res.status = exceptions.serialize_exception(e)

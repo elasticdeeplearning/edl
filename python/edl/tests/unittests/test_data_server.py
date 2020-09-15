@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import numpy as np
-from edl.collective.data_reader import DistributedDataReader, FileMeta
 from edl.collective.dataset import TxtFileSplitter
+
 import unittest
 from edl.utils import data_server
 from edl.utils import data_server_client
@@ -23,20 +24,44 @@ from edl.utils import edl_env
 
 class TestDataServer(unittest.TestCase):
     def setUp(self):
-        self._trainer_env = edl_env.TrainerEnv()
-        self._file_list = ["./data_server/a.txt", "./data_server/b.txt"]
-        self._reader_name = "test_data_server_reader"
+        self._job_id = "test_data_server_job_id"
         self._pod_id = "test_data_server_pod_id"
+        self._reader_name = "test_data_server_reader"
+        self._file_list = ["./data_server/a.txt", "./data_server/b.txt"]
+
+        self._old_environ = dict(os.environ)
+
+        proc_env = {
+            "PADDLE_JOB_ID": self._job_id,
+            "PADDLE_POD_ID": self._pod_id,
+            "PADDLE_ETCD_ENDPOINTS": "127.0.0.1:2379",
+            "PADDLE_TRAINER_ID": "0",
+            "PADDLE_TRAINER_RANK_IN_POD": "0",
+            "PADDLE_TRAINER_ENDPOINTS": "127.0.0.1:0",
+            "EDL_POD_IDS": self._pod_id,
+        }
+
+        os.environ.update(proc_env)
+
+        self._trainer_env = edl_env.TrainerEnv()
         self._data_server = data_server.DataServer(
             trainer_env=self._trainer_env,
             reader_name=self._reader_name,
             file_list=self._file_list,
             local_data=None)
 
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self._old_environ)
+
     def test_get_file_list(self):
         c = data_server_client.Client()
-        res = c.get_file_list(self._data_server.endpoint, self._reader_name,
-                              self._pod_id, self._file_list)
+        res = c.get_file_list(
+            self._data_server.endpoint,
+            self._reader_name,
+            self._pod_id,
+            self._file_list,
+            timeout=60)
         self.assertTrue(len(res.file_list, len(self._file_list)))
 
         for l in self._file_list:
