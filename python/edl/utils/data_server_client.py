@@ -17,6 +17,7 @@ from . import data_server_pb2_grpc as pb_grpc
 from .exceptions import deserialize_exception
 from .log_utils import logger
 from .error_utils import handle_errors_until_timeout
+from edl.utils import pb_utils
 
 
 class Conn(object):
@@ -44,7 +45,7 @@ class Client(object):
     @handle_errors_until_timeout
     def get_file_list(self, reader_leader_endpoint, reader_name, pod_id,
                       file_list, timeout):
-        conn = self._connect(reader_leader_endpoint)
+        conn = self._connect(reader_leader_endpoint, timeout=60)
 
         req = pb.FileListRequest()
         req.pod_id = pod_id
@@ -83,10 +84,6 @@ class Client(object):
         if res.status.type != "":
             deserialize_exception(res.status)
 
-        logger.debug("pod client get batch_data meta:{}".format(
-            batch_data_response_to_string(res)))
-        return res.data
-
     @handle_errors_until_timeout
     def reach_data_end(self, reader_leader_endpoint, reader_name, pod_id,
                        timeout):
@@ -118,7 +115,7 @@ class Client(object):
             deserialize_exception(res.status)
 
         logger.debug("pod client get_balanced_batch_data meta:{}".format(
-            batch_data_response_to_string(res)))
+            pb_utils.batch_data_meta_response_to_string(res.data)))
         return res.data
 
     @handle_errors_until_timeout
@@ -134,5 +131,5 @@ class Client(object):
             deserialize_exception(res.status)
 
         logger.debug("pod client get batch_data meta:{}".format(
-            batch_data_response_to_string(res)))
+            pb_utils.batch_data_response_to_string(res)))
         return res.data
