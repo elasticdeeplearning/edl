@@ -68,6 +68,8 @@ class TestDataServer(unittest.TestCase):
         for l in self._file_list:
             self.assertTrue(l in res.file_list)
 
+        self._data_server.wait()
+
     def test_report_batch_data_ids(self):
         pass
 

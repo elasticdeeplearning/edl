@@ -365,6 +365,7 @@ class DataServer(object):
 
         server.start()
         self._server = server
+        print("start data_server:", self._endpoint)
 
     @property
     def endpoint(self):

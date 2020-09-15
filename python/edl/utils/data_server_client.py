@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import grpc
+import threading
+
 from edl.utils import data_server_pb2_grpc
 from edl.utils import data_server_pb2
 from .exceptions import deserialize_exception
 from .log_utils import logger
 from .error_utils import handle_errors_until_timeout
 from edl.utils import pb_utils
-import grpc
 
 
 class Conn(object):
@@ -38,7 +40,7 @@ class Client(object):
     def _connect(self, endpoint, timeout=30):
         if endpoint not in self._conn:
             c = grpc.insecure_channel(endpoint)
-            s = data_server_pb2_grpc.DataServerStub(channel)
+            s = data_server_pb2_grpc.DataServerStub(c)
             self._conn[endpoint] = Conn(c, s)
 
         return self._conn[endpoint]
@@ -55,8 +57,11 @@ class Client(object):
         req = data_server_pb2.FileListRequest()
         req.pod_id = pod_id
         req.reader_name = reader_name
-        for l in file_list:
-            req.file_list.append(l)
+        for idx, path in enumerate(file_list):
+            ele = data_server_pb2.FileListElement()
+            ele.idx = idx
+            ele.path = path
+            req.file_list.append(ele)
 
         with conn.lock:
             res = conn.stub.GetFileList(req)

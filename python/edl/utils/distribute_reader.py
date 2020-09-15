@@ -236,7 +236,7 @@ class DataAccesser(object):
 
 
 def access_batch_data(reader_leader, reader_name, trainer_env, input_queue,
-                      out_queue, cache_capcity):
+                      out_queue, cache_capcity, error_queue):
     """
     Run DataAccesser in a seperated process
     """
@@ -244,8 +244,11 @@ def access_batch_data(reader_leader, reader_name, trainer_env, input_queue,
         a = DataAccesser(reader_leader, reader_name, trainer_env, input_queue,
                          out_queue, cache_capcity)
         a.start()
+    except KeyboardInterrupt:
+        pass
     except Exception as e:
-        print(e, file=sys.stderr)
+        import traceback
+        error_queue.put(traceback.format_exc())
         sys.exit(1)
 
 
@@ -302,6 +305,21 @@ class Reader(object):
     def __exit__(self):
         self.stop()
 
+    def _check_accesser(self):
+        if self._accesser.is_alive():
+            return True
+
+        self._accesser.join()
+        exitcode = self._accesser.exitcode
+        if exitcode == 0:
+            return False
+
+        if len(self._error_queue) > 0:
+            raise exceptions.EdlAccessDataError(self.error_queue[0])
+        else:
+            raise exceptions.EdlAccessDataError(
+                "access process exit:{}".format(exitcode))
+
     def __iter__(self):
         self._generater = DataGenerator()
         self._generator.start()
@@ -312,7 +330,14 @@ class Reader(object):
                   self._generater_out_queue, self._accesser_out_queue,
                   self._cache_capcity))
         while True:
-            b = self._accesser_out_queue.pop()
+            if not self._check_accesser():
+                break
+
+            try:
+                b = self._accesser_out_queue.pop(60)
+            except multiprocessing.Queue.Empty as e:
+                continue
+
             if b is None:
                 logger.debug("{} reach data end".format(self._name))
                 break
