@@ -42,12 +42,13 @@ class PodData(object):
         self._batch_data_ids = set()
 
         self._queue = collections.deque(maxlen=max_len)
-        self._file_list = []
+        # data_server_pb2.FileListElement
+        self._file_list_slice = []
         self._max_len = max_len
         self._reach_data_end = False
 
     def append_file_list_element(self, element):
-        self._file_list.append(element)
+        self._file_list_slice.append(element)
 
     @property
     def reach_data_end(self):
@@ -102,6 +103,7 @@ class PodsData(object):
         self._reach_data_end_ids = set()
         self._lock = Lock()
 
+        # string list
         self._file_list = file_list
         self._pod_ids = set(pod_ids)
 
@@ -126,7 +128,8 @@ class PodsData(object):
                     break
 
     def get_pod_file_list(self, pod_id):
-        return self._pod_file_list[pod_id]
+        pod_data = self._pod_data[pod_id]
+        return pod_data._file_list_slice
 
     def set_data_end(self, pod_id):
         with self._lock:
@@ -227,9 +230,11 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                  local_reader):
         self._lock = threading.Lock()
         self._trainer_env = trainer_env
+        # string list
         self._file_list = file_list
         self._pod_ids = pod_ids
         self._local_reader = local_reader
+        self._reader_name = reader_name
 
         # reader_name=>PodData
         self._pod_data = PodsData(reader_name, file_list, pod_ids)
@@ -297,8 +302,8 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
         return res
 
     def _check_file_list(self, file_list):
-        for i in file_list:
-            if self._file_list[i] != file_list[i]:
+        for i, ele in enumerate(file_list):
+            if self._file_list[i] != ele.path:
                 raise exceptions.EdlFileListNotMatchError(
                     "client:{} server:{}".format(file_list, self._file_list))
 
@@ -314,6 +319,10 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
 
     # only leader can do this
     def GetFileList(self, request, context):
+        """
+        Get slice of file list for a pod by pod_id
+        Need not lock because there are readonly
+        """
         res = data_server_pb2.FileListResponse()
         try:
             self._check_leader()
@@ -321,13 +330,13 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
             self._check_pod_id(request.pod_id)
             self._check_reader_name(request.reader_name)
 
-            pod_file_list = self._pod_data.get_pod_file_list(request.pod_id)
+            file_list = self._pod_data.get_pod_file_list(request.pod_id)
 
-            if m not in pod_file_list:
+            for m in file_list:
                 res.file_list.append(m)
 
             return res
-        except Exception as e:
+        except exceptions.EdlException as e:
             exceptions.serialize_exception(res, e)
             return res
 

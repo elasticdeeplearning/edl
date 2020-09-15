@@ -57,16 +57,16 @@ class TestDataServer(unittest.TestCase):
 
     def test_get_file_list(self):
         c = data_server_client.Client()
-        res = c.get_file_list(
+        file_list = c.get_file_list(
             self._data_server.endpoint,
             self._reader_name,
             self._pod_id,
             self._file_list,
             timeout=60)
-        self.assertTrue(len(res.file_list, len(self._file_list)))
+        self.assertEqual(len(file_list), len(self._file_list))
 
-        for l in self._file_list:
-            self.assertTrue(l in res.file_list)
+        for ele in file_list:
+            self.assertEqual(ele.path, self._file_list[ele.idx])
 
         self._data_server.wait()
 

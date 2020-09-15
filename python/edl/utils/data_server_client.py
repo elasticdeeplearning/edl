@@ -52,6 +52,9 @@ class Client(object):
                       pod_id,
                       file_list,
                       timeout=60):
+        """
+        Return list[(idx,path)...] for pod
+        """
         conn = self._connect(reader_leader_endpoint, timeout=30)
 
         req = data_server_pb2.FileListRequest()
@@ -68,12 +71,8 @@ class Client(object):
         if res.status.type != "":
             deserialize_exception(res.status)
 
-        ret = []
-        for m in res.file_list:
-            ret.append((m.idx, m.path))
-
-        logger.debug("pod client get file_list:{}".format(ret))
-        return ret
+        logger.debug("pod client get file_list:{}".format(res.file_list))
+        return res.file_list
 
     @handle_errors_until_timeout
     def report_batch_data_meta(self,
