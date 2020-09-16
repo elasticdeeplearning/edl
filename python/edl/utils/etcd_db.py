@@ -13,15 +13,15 @@
 # limitations under the License.
 import json
 import threading
-
-from . import string_utils
 from edl.utils import cluster as cluster_utils
-from .log_utils import logger
-from .pod import Pod
-from ..discovery.etcd_client import EtcdClient
+
 from . import constants
 from . import exceptions
 from . import state
+from . import string_utils
+from .log_utils import logger
+from .pod import Pod
+from ..discovery.etcd_client import EtcdClient
 
 
 class EtcdDB(object):

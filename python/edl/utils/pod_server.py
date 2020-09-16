@@ -20,12 +20,12 @@ from concurrent import futures
 from threading import Lock
 
 from . import common_pb2 as common_pb
+from . import constants
+from . import exceptions
 from . import pod_server_pb2 as pod_server_pb
 from . import pod_server_pb2_grpc as pod_server_pb_grpc
 from .etcd_db import EtcdDB
 from .log_utils import logger
-from . import exceptions
-from . import constants
 
 
 class PodServerServicer(pod_server_pb_grpc.PodServerServicer):

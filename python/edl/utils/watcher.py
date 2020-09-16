@@ -17,9 +17,9 @@ import time
 from edl.discovery.etcd_client import EtcdClient
 from threading import Lock, Thread, Event
 
+from . import constants
 from .cluster import Cluster
 from .log_utils import logger
-from . import constants
 
 
 class Watcher(object):

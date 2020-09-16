@@ -13,11 +13,11 @@
 # limitations under the License.
 import threading
 import time
+from edl.utils import cluster_generator
 
-from . import cluster
+from . import constants
 from .log_utils import logger
 from ..discovery.etcd_client import EtcdClient
-from . import constants
 
 
 class LeaderRegister(object):
@@ -25,7 +25,7 @@ class LeaderRegister(object):
         self._job_env = job_env
         self._is_leader = False
         self._pod_id = pod_id
-        self._generate_cluster = cluster.ClusterGenerator(job_env, pod_id)
+        self._generate_cluster = cluster_generator.ClusterGenerator(job_env, pod_id)
 
         self._stop = threading.Event()
         self._service_name = constants.ETCD_POD_RANK

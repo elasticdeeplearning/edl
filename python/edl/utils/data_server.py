@@ -14,19 +14,17 @@
 
 from __future__ import print_function
 
+import collections
+import copy
 import grpc
+import six
 import threading
 from concurrent import futures
-import collections
-import six
-import copy
-
-from edl.utils import data_server_pb2_grpc
+from edl.utils import common_pb2
 from edl.utils import data_server_pb2
+from edl.utils import data_server_pb2_grpc
 from edl.utils import error_utils
 from edl.utils import exceptions
-from edl.utils import common_pb2
-from edl.utils import log_utils
 from log_utils import logger
 
 

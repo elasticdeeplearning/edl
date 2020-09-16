@@ -13,11 +13,11 @@
 # limitations under the License.
 import json
 
+from . import constants
+from . import error_utils
 from . import exceptions
 from .log_utils import logger
 from ..discovery.etcd_client import EtcdClient
-from . import constants
-from . import error_utils
 
 
 class DistReader(object):

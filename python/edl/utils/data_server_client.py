@@ -14,13 +14,13 @@
 
 import grpc
 import threading
-
-from edl.utils import data_server_pb2_grpc
 from edl.utils import data_server_pb2
+from edl.utils import data_server_pb2_grpc
+from edl.utils import pb_utils
+
+from .error_utils import handle_errors_until_timeout
 from .exceptions import deserialize_exception
 from .log_utils import logger
-from .error_utils import handle_errors_until_timeout
-from edl.utils import pb_utils
 
 
 class Conn(object):

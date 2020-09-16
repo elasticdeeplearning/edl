@@ -14,10 +14,10 @@
 import threading
 import time
 
+from . import constants
 from .etcd_db import get_global_etcd
 from .log_utils import logger
 from ..discovery.etcd_client import EtcdClient
-from . import constants
 
 
 class Register(object):
