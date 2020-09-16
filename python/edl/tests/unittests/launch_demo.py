@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import os
+import sys
 
 exit_code = int(os.getenv("PADDLE_DEMO_EXIT_CODE"))
 print("exit code:", exit_code)

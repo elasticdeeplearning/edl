@@ -12,19 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-from paddle_edl.utils.data_server import DataServer
-from paddle_edl.utils.dataset import TxtDataSet
-import paddle_edl.utils.master_pb2_grpc as master_pb2_grpc
-import paddle_edl.utils.master_pb2 as master_pb2
-from paddle_edl.utils.utils import get_file_list, get_logger, logger
-from paddle_edl.utils.master_client import Client
-import time
-import threading
-import grpc
-import signal
-import paddle_edl.utils.common_pb2 as common_pb2
 import os
+import paddle_edl.utils.master_pb2 as master_pb2
+import unittest
+from paddle_edl.utils.master_client import Client
+from paddle_edl.utils.utils import get_file_list, get_logger
 
 os.environ["https_proxy"] = ""
 os.environ["http_proxy"] = ""

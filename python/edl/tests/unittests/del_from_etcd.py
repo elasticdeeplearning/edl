@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import edl.utils.constants as constants
-from edl.utils.etcd_db import get_global_etcd
 import os
+from edl.utils.etcd_db import get_global_etcd
 
 job_id = os.environ["PADDLE_JOB_ID"]
 etcd_endpoints = os.environ["PADDLE_ETCD_ENDPOINTS"]

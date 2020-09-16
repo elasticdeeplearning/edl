@@ -12,21 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import grpc
+import os
+import paddle_edl.utils.common_pb2 as common_pb2
+import paddle_edl.utils.data_server_pb2 as data_server_pb2
+import paddle_edl.utils.data_server_pb2_grpc as data_server_pb2_grpc
+import time
 import unittest
+from paddle_edl.utils import file_utils
+from paddle_edl.utils import log_utils
 from paddle_edl.utils.data_server import DataServer
 from paddle_edl.utils.dataset import TxtDataReader
-import paddle_edl.utils.data_server_pb2_grpc as data_server_pb2_grpc
-import paddle_edl.utils.data_server_pb2 as data_server_pb2
-from paddle_edl.utils.utils import *
-import time
-import threading
-import grpc
-import signal
-import paddle_edl.utils.common_pb2 as common_pb2
 from paddle_edl.utils.string_utils import bytes_to_string
-from paddle_edl.utils import log_utils
-from paddle_edl.utils import file_utils
-import os
+from paddle_edl.utils.utils import *
 
 os.environ["https_proxy"] = ""
 os.environ["http_proxy"] = ""

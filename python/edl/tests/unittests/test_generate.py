@@ -16,13 +16,10 @@ import unittest
 from edl.discovery.etcd_client import EtcdClient
 import time
 import threading
-import os
 import sys
 import copy
 import atexit
-from etcd3.events import PutEvent, DeleteEvent
 
-from edl.utils.edl_env import JobEnv
 from edl.collective.launch import _parse_args, _convert_args_to_dict
 from edl.utils.pod_server import PodServer
 from edl.utils.pod import Pod
