@@ -134,7 +134,7 @@ class Client(object):
             deserialize_exception(res.status)
 
         logger.debug("pod client get_balanced_batch_data meta:{}".format(
-            pb_utils.batch_data_meta_response_to_string(res.data)))
+            pb_utils.batch_data_meta_response_to_string(res)))
         return res.data
 
     @handle_errors_until_timeout

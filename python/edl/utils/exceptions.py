@@ -91,8 +91,11 @@ class EdlNotLeaderError(EdlException):
 
 def deserialize_exception(s):
     thismodule = sys.modules[__name__]
-    cls = getattr(thismodule, s.type)(s.detail)
-    print(type(cls))
+    try:
+        cls = getattr(thismodule, s.type)(s.detail)
+    except Exception as e:
+        raise Exception("type:{} detail:{}".format(s.type, s.detail))
+    #print(type(cls))
     raise cls
 
 
@@ -103,6 +106,9 @@ def serialize_exception(e):
     return s
 
 
-def serialize_exception(res, e):
+def serialize_exception(res, e, stack_info=None):
     res.status.type = e.__class__.__name__
-    res.status.detail = str(e)
+    if stack_info is not None:
+        res.status.detail = str(e) + stack_info
+    else:
+        res.status.detail = str(e)

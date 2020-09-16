@@ -19,7 +19,7 @@ def record_to_string(rec):
                                                len(rec.field_data))
 
 
-def batch_data_response_to_string(data):
+def batch_data_response_to_string(res):
     r = []
     for data in res.data:
         s = {}

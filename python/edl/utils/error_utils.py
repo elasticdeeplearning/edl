@@ -15,8 +15,8 @@
 import functools
 import time
 
-from . import exceptions
-from .log_utils import logger
+from edl.utils import exceptions
+from edl.utils.log_utils import logger
 
 
 def handle_errors_until_timeout(f):
@@ -29,7 +29,7 @@ def handle_errors_until_timeout(f):
                 return f(*args, **kwargs)
             except exceptions.EdlDataEndError as e:
                 raise exceptions.EdlDataEndError
-            except Exception as e:
+            except exceptions.EdlException as e:
                 if time.time() - begin >= timeout:
                     logger.warning("{} execute timeout:{}".format(f.__name__,
                                                                   timeout))
