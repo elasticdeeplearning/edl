@@ -82,17 +82,17 @@ class Client(object):
                                dataserver_endpoint,
                                batch_data_ids,
                                timeout=60):
-        conn = self.connect(reader_leader_endpoint, timeout=30)
+        conn = self._connect(reader_leader_endpoint, timeout=30)
 
-        req = data_server_pb2.BalanceBatchDataRequest()
+        req = data_server_pb2.ReportBatchDataMetaRequest()
         req.reader_name = reader_name
         req.pod_id = pod_id
         req.data_server_endpoint = dataserver_endpoint
-        for i in batch_data_ids:
-            req.batch_data_ids.append(b)
+        for batch_data_id in batch_data_ids:
+            req.batch_data_ids.append(batch_data_id)
 
         with conn.lock:
-            res = conn.stub.GetBatchData(req)
+            res = conn.stub.ReportBatchDataMeta(req)
 
         if res.status.type != "":
             deserialize_exception(res.status)
@@ -110,7 +110,7 @@ class Client(object):
         req.pod_id = pod_id
 
         with conn.lock:
-            res = conn.stub.GetBatchData(req)
+            res = conn.stub.ReachDataEnd(req)
 
         if res.status.type != "":
             deserialize_exception(res.status)
@@ -121,14 +121,14 @@ class Client(object):
                             reader_name,
                             pod_id,
                             timeout=60):
-        conn = self.connect(reader_leader_endpoint, timeout=30)
+        conn = self._connect(reader_leader_endpoint, timeout=30)
 
-        req = data_server_pb2.GetBalanceBatchDataRequest()
+        req = data_server_pb2.GetBatchDataMetaRequest()
         req.reader_name = reader_name
         req.pod_id = pod_id
 
         with conn.lock:
-            res = conn.stub.GetBalancedBatchData(req)
+            res = conn.stub.GetBatchDataMeta(req)
 
         if res.status.type != "":
             deserialize_exception(res.status)
@@ -142,7 +142,7 @@ class Client(object):
         """
         return BatchDataResponse
         """
-        conn = self.connect(reader_leader_endpoint, timeout=30)
+        conn = self._connect(reader_leader_endpoint, timeout=30)
 
         with conn.lock:
             res = conn.stub.GetBatchData(req)

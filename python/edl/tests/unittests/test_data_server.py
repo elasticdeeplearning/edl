@@ -59,8 +59,8 @@ class TestDataServer(unittest.TestCase):
         os.environ.update(self._old_environ)
 
     def test_get_file_list(self):
-        c = data_server_client.Client()
-        file_list = c.get_file_list(
+        client = data_server_client.Client()
+        file_list = client.get_file_list(
             self._data_server.endpoint,
             self._reader_name,
             self._pod_id,
@@ -71,11 +71,20 @@ class TestDataServer(unittest.TestCase):
         for ele in file_list:
             self.assertEqual(ele.path, self._file_list[ele.idx])
 
-    def test_report_batch_data_ids(self):
-        pass
-
-    def test_get_batch_data_ids(self):
-        pass
+    def test_batch_data_meta(self):
+        client = data_server_client.Client()
+        client.report_batch_data_meta(
+            reader_leader_endpoint=self._data_server.endpoint,
+            reader_name=self._reader_name,
+            pod_id=self._pod_id,
+            dataserver_endpoint=self._data_server.endpoint,
+            batch_data_ids=["0", "1"],
+            timeout=60)
+        res = client.get_batch_data_meta(
+            reader_leader_endpoint=self._data_server.endpoint,
+            reader_name=self._reader_name,
+            pod_id=self._pod_id,
+            timeout=60)
 
     #TODO(gongwb): add test_get_batch_data
     """
