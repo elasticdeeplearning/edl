@@ -32,12 +32,11 @@ from edl.utils.constants import *
 import edl.utils.cluster as cluster
 from edl.utils.etcd_db import get_global_etcd
 from edl.utils.leader_register import LeaderRegister
-from edl.tests.unittests.etcd_test_base import EtcdTestBase
-from threading import Thread
+from edl.tests.unittests import etcd_test_base
 from edl.utils import cluster_generator
 
 
-class TestGenerate(EtcdTestBase):
+class TestGenerate(etcd_test_base.EtcdTestBase):
     def setUp(self):
         super(TestGenerate, self).setUp("test_generate")
 
@@ -68,7 +67,8 @@ class TestGenerate(EtcdTestBase):
 
         pod_1, server_1 = self.register_pod(self._job_env)
 
-        generater = cluster_generator.ClusterGenerator(self._job_env, pod_0.get_id())
+        generater = cluster_generator.ClusterGenerator(self._job_env,
+                                                       pod_0.get_id())
         ret = generater.start()
 
         cluster_0 = None
