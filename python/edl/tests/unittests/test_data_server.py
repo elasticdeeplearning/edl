@@ -80,11 +80,16 @@ class TestDataServer(unittest.TestCase):
             dataserver_endpoint=self._data_server.endpoint,
             batch_data_ids=["0", "1"],
             timeout=60)
-        res = client.get_batch_data_meta(
+        data = client.get_batch_data_meta(
             reader_leader_endpoint=self._data_server.endpoint,
             reader_name=self._reader_name,
             pod_id=self._pod_id,
             timeout=60)
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(len(data[0].batch_data_ids), 2)
+        for batch_data_id in data[0].batch_data_ids:
+            self.assertTrue(batch_data_id in ["0", "1"])
 
     #TODO(gongwb): add test_get_batch_data
     """

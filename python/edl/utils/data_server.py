@@ -19,12 +19,15 @@ import threading
 from concurrent import futures
 import collections
 import six
+import copy
 
 from edl.utils import data_server_pb2_grpc
 from edl.utils import data_server_pb2
 from edl.utils import error_utils
 from edl.utils import exceptions
 from edl.utils import common_pb2
+from edl.utils import log_utils
+from log_utils import logger
 
 
 class PodData(object):
@@ -68,6 +71,8 @@ class PodData(object):
             else:
                 break
 
+        logger.debug("batch_data_ids:{}, queue:{}".format(
+            len(self._batch_data_ids), len(self._queue)))
         return a
 
     def put(self, data_server_endpoint, batch_data_ids):
@@ -77,6 +82,9 @@ class PodData(object):
                 continue
             self._queue.append(batch_data_id)
             self._batch_data_ids.add(batch_data_id)
+
+        logger.debug("batch_data_ids:{}, queue:{}".format(
+            len(self._batch_data_ids), len(self._queue)))
 
 
 class PodsData(object):
@@ -166,10 +174,13 @@ class PodsData(object):
                 total += pod_data.get_size()
 
             self._barrier_ids.add(pod_id)
-            if self._barrier_ids | self._reach_data_end_ids != self._pod_ids:
+            if (self._barrier_ids | self._reach_data_end_ids) != self._pod_ids:
+                logger.debug("barrier_ids:{} readch_data_end_ids:{}".format(
+                    len(self._barrier_ids), len(self._reach_data_end_ids)))
                 return
 
             avg_num = total / len(self._pod_ids)
+            logger.debug("total:{} avg_num:{}".format(total, avg_num))
             if avg_num < 1:
                 return
 
@@ -186,6 +197,8 @@ class PodsData(object):
                 if len(ids) >= avg_num:
                     dst.batch_data_ids.extend(ids)
                     self._balanced_batch_data[pod_id].append(dst)
+                    logger.debug("balance_data_ids:{}".format(
+                        len(self._balanced_batch_data[pod_id])))
                 else:
                     need_num = avg_num - len(ids)
                     ret = self._get_batch_data_id_from_others(avg_num,
@@ -193,6 +206,10 @@ class PodsData(object):
                     if len(ret) <= 0:
                         continue
                     self._balanced_batch_data[pod_id].extend(ret)
+                    logger.debug("balance_data_ids:{}".format(
+                        len(self._balanced_batch_data[pod_id])))
+
+            self._barrier_ids = set()
 
     def _is_all_reach_data_end(self):
         for _, pod_data in six.iteritems(self._pod_data):
@@ -208,7 +225,9 @@ class PodsData(object):
             balanced_data = self._balanced_batch_data[pod_id]
 
             if len(balanced_data) > 0:
-                return balanced_data
+                for data in balanced_data:
+                    ret.append(copy.copy(data))
+                return ret
 
             if self._is_all_reach_data_end():
                 return None
