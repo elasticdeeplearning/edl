@@ -16,7 +16,6 @@ import unittest
 from edl.discovery.etcd_client import EtcdClient
 import time
 import threading
-from etcd3.events import PutEvent, DeleteEvent
 
 from edl.utils import string_utils
 

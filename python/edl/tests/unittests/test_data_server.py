@@ -13,8 +13,6 @@
 # limitations under the License.
 
 import os
-import numpy as np
-from edl.collective.dataset import TxtFileSplitter
 
 import unittest
 from edl.utils import data_server

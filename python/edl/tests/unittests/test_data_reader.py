@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
+import unittest
 from edl.collective.data_reader import DistributedDataReader, FileMeta
 from edl.collective.dataset import TxtFileSplitter
-import unittest
 
 
 class TestDataReader(unittest.TestCase):

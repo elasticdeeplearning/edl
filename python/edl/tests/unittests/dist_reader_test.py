@@ -13,28 +13,12 @@
 # limitations under the License.
 
 import unittest
-from edl.discovery.etcd_client import EtcdClient
 import time
-import threading
 import os
-import sys
-import copy
 import atexit
-from etcd3.events import PutEvent, DeleteEvent
 
-from edl.utils.edl_env import JobEnv
-from edl.collective.launch import _parse_args, _convert_args_to_dict
-from edl.utils.pod_server import PodServer
-from edl.utils.pod import Pod
-from edl.utils.pod_client import PodServerClient
-from edl.utils.exceptions import EdlBarrierError
-import edl.utils.utils as utils
 from edl.utils.global_vars import *
-from edl.utils.generate_cluster import GenerateCluster
-from edl.utils.etcd_db import get_global_etcd
-from edl.utils.leader_register import LeaderRegister
 from edl.utils.etcd_test_base import EtcdTestBase
-from threading import Thread
 
 
 class TestDistReader(EtcdTestBase):
