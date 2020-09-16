@@ -24,11 +24,12 @@ from . import etcd_db
 from . import exceptions
 from .log_utils import logger
 from ..discovery import etcd_client
+from edl.utils import cluster as cluster_utils
 
 
 class ClusterGenerator(object):
     def __init__(self, job_env, pod_id):
-        self._cluster = Cluster()
+        self._cluster = cluster_utils.Cluster()
         self._service = constants.ETCD_CLUSTER
         self._server = constants.ETCD_CLUSTER
         self._stop = threading.Event()
@@ -100,7 +101,7 @@ class ClusterGenerator(object):
                 "leader error, leader:{} not in resource:{}".format(
                     leader_id, resource_pods.keys()))
 
-        new_cluster = Cluster()
+        new_cluster = cluster_utils.Cluster()
         pods = new_cluster.get_pods()
 
         rank = 0
