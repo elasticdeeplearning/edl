@@ -168,5 +168,3 @@ class Cluster(object):
     @status.setter
     def status(self, s):
         self._status = s
-
-

@@ -25,7 +25,8 @@ class LeaderRegister(object):
         self._job_env = job_env
         self._is_leader = False
         self._pod_id = pod_id
-        self._generate_cluster = cluster_generator.ClusterGenerator(job_env, pod_id)
+        self._generate_cluster = cluster_generator.ClusterGenerator(job_env,
+                                                                    pod_id)
 
         self._stop = threading.Event()
         self._service_name = constants.ETCD_POD_RANK
