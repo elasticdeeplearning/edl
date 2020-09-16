@@ -20,6 +20,8 @@ import unittest
 from edl.utils import data_server
 from edl.utils import data_server_client
 from edl.utils import edl_env
+from edl.utils import log_utils
+from edl.utils.log_utils import logger
 
 
 class TestDataServer(unittest.TestCase):
@@ -50,6 +52,7 @@ class TestDataServer(unittest.TestCase):
             file_list=self._file_list,
             local_reader=None)
         self._data_server.start(addr="127.0.0.1")
+        logger.info("start data server:{}".format(self._data_server.endpoint))
 
     def tearDown(self):
         os.environ.clear()
@@ -68,8 +71,6 @@ class TestDataServer(unittest.TestCase):
         for ele in file_list:
             self.assertEqual(ele.path, self._file_list[ele.idx])
 
-        self._data_server.wait()
-
     def test_report_batch_data_ids(self):
         pass
 
@@ -81,3 +82,8 @@ class TestDataServer(unittest.TestCase):
     def test_get_batch_data(self):
         pass
     """
+
+
+if __name__ == '__main__':
+    log_utils.get_logger(log_level=10)
+    unittest.main()
