@@ -14,7 +14,7 @@
 
 import grpc
 import threading
-from edl.util.log_utils import logger
+from edl.utils.log_utils import logger
 from edl.utils import data_server_pb2
 from edl.utils import data_server_pb2_grpc
 from edl.utils import error_utils

@@ -18,7 +18,7 @@ import concurrent
 import grpc
 import threading
 import traceback
-from edl.utils import cluster as  edl_cluster
+from edl.utils import cluster as edl_cluster
 from edl.utils import common_pb2
 from edl.utils import status as edl_status
 from edl.utils import etcd_db
@@ -40,7 +40,8 @@ class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
         self._pod_id = pod_id
         self._job_env = job_env
 
-        self._etcd = etcd_db.get_global_etcd()
+        self._etcd = etcd_db.get_global_etcd(self._job_env.etcd_endpoints,
+                                             self._job_env.job_id)
 
     def ScaleOut(self, request, context):
         status = common_pb2.Status()
@@ -68,17 +69,15 @@ class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
         try:
             cluster = edl_cluster.get_cluster(etcd)
             if cluster is None:
-                exceptions.serialize(
-                    res,
-                    exceptions.EdlBarrierError(
-                        "get current running cluster error"))
+                exceptions.serialize(res,
+                                     exceptions.EdlBarrierError(
+                                         "get current running cluster error"))
                 return res
 
             if cluster.status == edl_status.Status.FAILED:
-                exceptions.serialize(
-                    res,
-                    exceptions.EdlBarrierError(
-                        "cluster's status is status.Failed"))
+                exceptions.serialize(res,
+                                     exceptions.EdlBarrierError(
+                                         "cluster's status is status.Failed"))
                 return res
 
             ids = cluster.get_pods_ids_set()
@@ -107,8 +106,7 @@ class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
         except Exception as e:
             logger.debug("internal error:{} {}".format(e,
                                                        traceback.format_exc()))
-            exceptions.serialize(
-                res, exceptions.EdlInternalError(str(e)))
+            exceptions.serialize(res, exceptions.EdlInternalError(str(e)))
             return res
 
     def ShutDown(self, request, context):

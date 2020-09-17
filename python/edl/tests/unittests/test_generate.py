@@ -20,13 +20,13 @@ import sys
 import copy
 import atexit
 
-from edl.collective.launch import _parse_args, _convert_args_to_dict
 from edl.utils.pod_server import PodServer
 from edl.utils.pod import Pod
 from edl.utils.pod_server_client import PodServerClient
 from edl.utils.exceptions import EdlBarrierError
-from edl.utils.constants import *
-import edl.utils.cluster as cluster
+from edl.utils import status as edl_status
+from edl.utils import constants
+import edl.utils.cluster as edl_cluster
 from edl.utils.etcd_db import get_global_etcd
 from edl.utils.leader_register import LeaderRegister
 from edl.tests.unittests import etcd_test_base
@@ -42,30 +42,33 @@ class TestGenerate(etcd_test_base.EtcdTestBase):
         pod.from_env(job_env)
         s = PodServer(self._job_env, pod)
         s.start()
-        self._etcd.set_server_permanent(ETCD_POD_RESOURCE,
+        self._etcd.set_server_permanent(constants.ETCD_POD_RESOURCE,
                                         pod.get_id(), pod.to_json())
-        self._etcd.set_server_permanent(ETCD_POD_STATUS,
+        self._etcd.set_server_permanent(constants.ETCD_POD_STATUS,
                                         pod.get_id(), pod.to_json())
-        print("set permanent:", self._etcd.get_full_path(ETCD_POD_RESOURCE,
-                                                         pod.get_id()))
+        print("set permanent:",
+              self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
+                                       pod.get_id()))
 
-        self._db.set_pod_status(pod.get_id(), Status.INITIAL)
-        print("set permanent:", self._etcd.get_full_path(ETCD_POD_STATUS,
-                                                         pod.get_id()))
+        edl_status.save_pod_status_to_etcd(self._etcd,
+                                           pod.get_id(),
+                                           edl_status.Status.INITIAL)
+        print("set permanent:", self._etcd.get_full_path(
+            constants.ETCD_POD_STATUS, pod.get_id()))
 
         return pod, s
 
     def test_server(self):
         pod_0, server_0 = self.register_pod(self._job_env)
-        self._etcd.set_server_permanent(ETCD_POD_RANK, ETCD_POD_LEADER,
+        self._etcd.set_server_permanent(constants.ETCD_POD_RANK,
+                                        constants.ETCD_POD_LEADER,
                                         pod_0.get_id())
-        print("set permanent:", self._etcd.get_full_path(ETCD_POD_RANK,
-                                                         ETCD_POD_LEADER))
+        print("set permanent:", self._etcd.get_full_path(
+            constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER))
 
         pod_1, server_1 = self.register_pod(self._job_env)
 
-        generater = cluster_generator.ClusterGenerator(self._job_env,
-                                                       pod_0.get_id())
+        generater = cluster_generator.Generator(self._job_env, pod_0.get_id())
         ret = generater.start()
 
         cluster_0 = None

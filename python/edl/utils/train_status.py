@@ -12,15 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import enum
 from edl.utils import constants
 from edl.utils import error_utils
 
-class TrainStatus(IntEnum):
+
+class TrainStatus(enum.IntEnum):
     INITIAL = 0
     RUNNING = 1
     NEARTHEEND = 3
     SUCCEED = 3
     FAILED = 4
+
 
 @error_utils.handle_errors_until_timeout
 def save_to_etcd(etcd, pod_id, status, timeout=30):
@@ -29,10 +32,10 @@ def save_to_etcd(etcd, pod_id, status, timeout=30):
     info = json.dumps({"status": int(status)})
     etcd.set_server_permanent(service, server, info)
 
+
 @error_utils.handle_errors_until_timeout
 def load_from_etcd(etcd, pod_id, timeout=30):
-    value = self._etcd.get_value(constants.ETCD_TRAIN_STATUS,
-                                     pod_id)
+    value = self._etcd.get_value(constants.ETCD_TRAIN_STATUS, pod_id)
 
     if value is None:
         return None
