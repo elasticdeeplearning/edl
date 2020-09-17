@@ -18,18 +18,18 @@ import threading
 import time
 import traceback
 
-from . import constants
-from . import error_utils
-from . import etcd_db
-from . import exceptions
-from .log_utils import logger
-from ..discovery import etcd_client
-from edl.utils import cluster as cluster_utils
+from edl.utils import constants
+from edl.utils import error_utils
+from edl.utils import etcd_db
+from edl.utils import exceptions
+from edl.utils.log_utils import logger
+from edl.discovery import etcd_client
+from edl.utils import cluster as edl_cluster
 
 
 class Generator(object):
     def __init__(self, job_env, pod_id):
-        self._cluster = cluster_utils.Cluster()
+        self._cluster = edl_cluster.Cluster()
         self._service = constants.ETCD_CLUSTER
         self._server = constants.ETCD_CLUSTER
         self._stop = threading.Event()
@@ -101,7 +101,7 @@ class Generator(object):
                 "leader error, leader:{} not in resource:{}".format(
                     leader_id, resource_pods.keys()))
 
-        new_cluster = cluster_utils.Cluster()
+        new_cluster = edl_cluster.Cluster()
         pods = new_cluster.get_pods()
 
         rank = 0
@@ -145,7 +145,7 @@ class Generator(object):
         resource_pods = self._db.get_resource_pods_dict()
 
         if len(resource_pods) <= 0:
-            raise EdlTableError("resource pods key={}:{}".format(
+            raise exceptions.EdlTableError("resource pods key={}:{}".format(
                 self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
                                          self._pod_id), resource_pods))
 

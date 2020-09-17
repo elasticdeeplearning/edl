@@ -32,11 +32,11 @@ class TrainerProc(object):
 
 
 def start(job_env,
-                         cluster,
-                         pod,
-                         training_script,
-                         training_script_args,
-                         log_dir=None):
+         cluster,
+         pod,
+         training_script,
+         training_script_args,
+         log_dir=None):
     current_env = copy.copy(os.environ.copy())
     #paddle broadcast ncclUniqueId use socket, and
     #proxy maybe make trainers unreachable, so delete them.
@@ -92,7 +92,7 @@ def start(job_env,
     return procs
 
 
-def terminate_local_procs(procs):
+def terminate(procs):
     decents = []
     for child in psutil.Process(os.getpid()).children(recursive=True):
         decents.append(child)
@@ -133,7 +133,7 @@ def pull_worker_log(tp):
             tp.log_offset = fin.tell()
 
 
-def watch_local_procs(procs, nranks):
+def _watch_local_procs(procs, nranks):
     """
     If proc exit unnormally, this function will raise exception.
     """
@@ -175,12 +175,12 @@ def watch_local_procs(procs, nranks):
     return alive
 
 
-def watch_local_trainers(procs, nranks):
+def watch(procs, nranks):
     """
     return alive_or_not, ok_or_not
     """
     try:
-        alive = watch_local_procs(procs, nranks)
+        alive = _watch_local_procs(procs, nranks)
     except Exception as e:
         logger.warning("watch local trainers:{}".format(e))
         return False, False

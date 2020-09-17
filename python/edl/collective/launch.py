@@ -45,6 +45,7 @@ from edl.utils import exceptions
 from edl.utils import status as edl_status
 from edl.utils import train_process as edl_train_process
 from edl.utils import leader
+from edl.utils import args_utils
 
 def edl_barrier(job_env, pod, timeout):
     start = time.time()
@@ -232,7 +233,7 @@ def launch(args):
 
 def main():
     log_utils.get_logger(log_level=10)
-    args = _parse_args()
+    args = args_utils.parse_args()
     launch(args)
 
 

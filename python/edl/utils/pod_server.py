@@ -16,22 +16,25 @@ from __future__ import print_function
 
 import grpc
 import traceback
-from concurrent import futures
-from threading import Lock
+import concurrent
+import threading
 
-from . import common_pb2 as common_pb
-from . import constants
-from . import exceptions
-from . import pod_server_pb2 as pod_server_pb
-from . import pod_server_pb2_grpc as pod_server_pb_grpc
-from .etcd_db import EtcdDB
-from .log_utils import logger
+from edl.utils import common_pb2
+from edl.utils import constants
+from edl.utils import exceptions
+from edl.utils import pod_server_pb2
+from edl.utils import pod_server_pb2_grpc
+
+from edl.utils.log_utils import logger
+from edl.utils import cluster as  edl_cluster
+from edl.utils import etcd_db
+from edl.utils import leader as edl_leader
 
 
-class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
+class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
     def __init__(self, job_env, pod_id):
         # to control the cache size.
-        self._lock = Lock()
+        self._lock = threading.Lock()
 
         # stage => set(pod_id)
         self._barrier_in = {}
@@ -39,33 +42,33 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         self._pod_id = pod_id
         self._job_env = job_env
 
-        self._db = EtcdDB(job_env.etcd_endpoints, job_env.job_id)
+        self._etcd = etcd_db.get_global_etcd()
 
     def ScaleOut(self, request, context):
-        status = common_pb.Status()
-        pod = self._db.get_pod_leader()
+        status = common_pb2.Status()
+        pod = edl_leader.get_pod_leader(self._etcd)
         if pod.get_id != self._pod_id:
             status = exceptions.serialize(
-                EdlLeaderError("this pod is not the leader"))
+                exceptions.EdlLeaderError("this pod is not the leader"))
             return status
 
         return status
 
     def ScaleIn(self, request, context):
-        status = common_pb.Status()
-        pod = self._db.get_pod_leader()
+        status = common_pb2.Status()
+        pod = edl_leader.get_pod_leader(self._etcd)
         if pod.get_id != self._pod_id:
             status = exceptions.serialize(
-                EdlLeaderError("this pod is not the leader"))
+                exceptions.EdlLeaderError("this pod is not the leader"))
             return status
 
         return status
 
     def Barrier(self, request, context):
-        res = pod_server_pb.BarrierResponse()
+        res = pod_server_pb2.BarrierResponse()
 
         try:
-            cluster = self._db.get_cluster()
+            cluster = edl_cluster.get_cluster(etcd)
             if cluster is None:
                 exceptions.serialize(
                     res,
@@ -124,11 +127,11 @@ class PodServer(object):
 
     def start(self, concurrency=20, max_workers=100):
         server = grpc.server(
-            futures.ThreadPoolExecutor(max_workers=max_workers),
+            concurrent.futures.ThreadPoolExecutor(max_workers=max_workers),
             options=[('grpc.max_send_message_length', 1024 * 1024 * 1024),
                      ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
             maximum_concurrent_rpcs=concurrency)
-        pod_server_pb_grpc.add_PodServerServicer_to_server(
+        pod_server_pb2_grpc.add_PodServerServicer_to_server(
             PodServerServicer(self._job_env, self._pod.get_id()), server)
 
         self._port = server.add_insecure_port('{}:0'.format(self._pod.addr))

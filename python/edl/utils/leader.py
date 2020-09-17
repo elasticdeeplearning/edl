@@ -13,8 +13,8 @@ def get_pod_leader_id(etcd):
     return string_utils.bytes_to_string(value)
 
 def get_pod_leader(etcd):
-    leader_id = get_pod_leader_id()
-    cluster = edl_cluster.load_from_etcd()
+    leader_id = get_pod_leader_id(etcd)
+    cluster = edl_cluster.load_from_etcd(etcd)
 
     if leader_id is None:
         raise exceptions.EdlTableError("leader_id={}:{}".format(

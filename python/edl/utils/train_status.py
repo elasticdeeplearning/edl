@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from edl.utils import constants
+from edl.utils import error_utils
 
 class TrainStatus(IntEnum):
     INITIAL = 0
@@ -21,14 +22,15 @@ class TrainStatus(IntEnum):
     SUCCEED = 3
     FAILED = 4
 
-def save_to_etcd(etcd, pod_id, status):
+@error_utils.handle_errors_until_timeout
+def save_to_etcd(etcd, pod_id, status, timeout=30):
     service = constants.ETCD_TRAIN_STATUS
     server = pod_id
     info = json.dumps({"status": int(status)})
     etcd.set_server_permanent(service, server, info)
 
-
-def load_from_etcd(etcd, pod_id):
+@error_utils.handle_errors_until_timeout
+def load_from_etcd(etcd, pod_id, timeout=30):
     value = self._etcd.get_value(constants.ETCD_TRAIN_STATUS,
                                      pod_id)
 

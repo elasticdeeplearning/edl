@@ -18,9 +18,9 @@ import json
 import six
 import uuid
 
-from . import constants
-from . import exceptions
-from .pod import Pod
+from edl.utils import constants
+from edl.utils import exceptions
+from edl.utils import pod as edl_pod
 
 
 class Cluster(object):
@@ -114,7 +114,7 @@ class Cluster(object):
         self._stage = cluster._stage
         self._pods = []
         for pod in cluster:
-            p = Pod()
+            p = edl_pod.Pod()
             p.from_pb(pod)
             self._pods.append(p)
 
@@ -137,7 +137,7 @@ class Cluster(object):
         od = collections.OrderedDict(sorted(d["pods"].items()))
         pods = []
         for i, (key, value) in enumerate(six.iteritems(od)):
-            pod = Pod()
+            pod = edl_pod.Pod()
             if i != int(key):
                 raise exceptions.EdlRankError(
                     "rank:{} is not exists in {}".format(i, d))
@@ -169,8 +169,9 @@ class Cluster(object):
     def status(self, s):
         self._status = s
 
-def load_from_etcd(etcd):
-    etcd.get_value(constants.ETCD_CLUSTER,
+@error_utils.handle_errors_until_timeout
+def load_from_etcd(etcd, timeout=60):
+    value = etcd.get_value(constants.ETCD_CLUSTER,
                                      constants.ETCD_CLUSTER)
 
     if value is None:

@@ -15,7 +15,11 @@
 paddle.distributed.launch is a module that spawns multiple distributed
 process on each training node for gpu training.
 """
+from __future__ import print_function
+
 import six
+import argparse
+
 
 def _print_arguments(args):
     print("-----------  Configuration Arguments -----------")
@@ -29,7 +33,7 @@ def parse_args():
     Helper function parsing the command line options
     @retval ArgumentParser
     """
-    parser = ArgumentParser(
+    parser = argparse.ArgumentParser(
         description='''start paddle training using multi-process mode.''')
 
     parser.add_argument("--nodes_range", type=str, default=None, help="")
@@ -84,7 +88,7 @@ def parse_args():
              "training script")
 
     #rest from the training program
-    parser.add_argument('training_script_args', nargs=REMAINDER)
+    parser.add_argument('training_script_args', nargs=argparse.REMAINDER)
     return parser.parse_args()
 
 

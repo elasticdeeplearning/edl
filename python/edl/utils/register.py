@@ -14,10 +14,10 @@
 import threading
 import time
 
-from . import constants
-from .etcd_db import get_global_etcd
-from .log_utils import logger
-from ..discovery.etcd_client import EtcdClient
+from edl.utils import constants
+from edl.utils import etcd_db
+from edl.utils.log_utils import logger
+from edl.discovery import etcd_client
 
 
 class Register(object):
@@ -30,7 +30,7 @@ class Register(object):
         self._lock = threading.Lock()
         self._info = info
 
-        self._etcd = EtcdClient(
+        self._etcd = etcd_client.EtcdClient(
             endpoints=etcd_endpoints, root=job_id, timeout=6)
         self._etcd.init()
 
@@ -90,25 +90,5 @@ class PodResourceRegister(Register):
             server=server,
             info=value)
 
-        db = get_global_etcd()
+        db = etcd_db.get_global_etcd()
         db.get_resource_pods_dict()
-
-
-class DataReaderRegister(Register):
-    def __init__(self, etcd_endoints, job_id, pod_id, reader):
-        service = constants.ETCD_POD_DATA_READER
-        sever = pod_id
-        value = {
-            "id": reader.get_id(),
-            "name": reader.name,
-            "endpoint": reader.endpoint,
-        }
-
-        info = value.dumps(value)
-
-        super(DataReaderRegister, self).__init__(
-            etcd_endpoints=etcd_endpoints,
-            job_id=job_id,
-            service=service,
-            server=server,
-            info=value)

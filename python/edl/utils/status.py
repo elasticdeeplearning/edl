@@ -1,5 +1,7 @@
-from edl.utils import constants
+import IntEnum
 import json
+
+from edl.utils import constants
 from edl.utils.log_utils import logger
 
 class Status(IntEnum):
@@ -74,7 +76,7 @@ def load_pods_status_from_etcd(etcd):
 
 def save_pod_flag_to_etcd(etcd, pod_id, flag):
     if not flag:
-        self.set_pod_status(pod_id, edl_status.Status.FAILED)
+        save_pod_status_to_etcd(etcd, pod_id, edl_status.Status.FAILED)
         logger.fatal("local trainers meets error!")
         return
 

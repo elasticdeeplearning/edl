@@ -14,7 +14,6 @@
 
 import grpc
 
-
 class Client(object):
     def __init__(self, endpoint):
         self._endpoint = endpoint
