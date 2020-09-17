@@ -12,26 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# NOTE: 
-# This file is copied from paddle/python/distributed/utils.py
-# remove it when paddle's is ready.
-
-import functools
-import logging
-import time
-import os
-import signal
-import copy
-import sys
-import subprocess
-import uuid
 import json
-import collections
-from .exceptions import *
-from . import utils
-from enum import IntEnum
-from .utils import logger
-from .global_vars import TrainStatus
+import uuid
 
 
 class Trainer(object):

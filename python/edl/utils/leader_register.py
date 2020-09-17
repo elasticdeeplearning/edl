@@ -13,17 +13,11 @@
 # limitations under the License.
 import threading
 import time
-import json
-import uuid
-import copy
+from edl.utils import cluster_generator
 
-from .utils import logger
-from .pod import Pod
+from . import constants
+from .log_utils import logger
 from ..discovery.etcd_client import EtcdClient
-from .generate_cluster import GenerateCluster
-
-import etcd3
-from .global_vars import *
 
 
 class LeaderRegister(object):
@@ -31,10 +25,11 @@ class LeaderRegister(object):
         self._job_env = job_env
         self._is_leader = False
         self._pod_id = pod_id
-        self._generate_cluster = GenerateCluster(job_env, pod_id)
+        self._generate_cluster = cluster_generator.ClusterGenerator(job_env,
+                                                                    pod_id)
 
         self._stop = threading.Event()
-        self._service_name = ETCD_POD_RANK
+        self._service_name = constants.ETCD_POD_RANK
         self._server = "0"
         self._lock = threading.Lock()
 
@@ -45,7 +40,7 @@ class LeaderRegister(object):
         self._etcd = EtcdClient(
             self._job_env.etcd_endpoints,
             root=self._job_env.job_id,
-            timeout=ETCD_CONN_TIMEOUT)
+            timeout=constants.ETCD_CONN_TIMEOUT)
         self._etcd.init()
 
         self._seize_leader()
@@ -53,7 +48,7 @@ class LeaderRegister(object):
         self._t_register = threading.Thread(target=self._refresher)
         self._t_register.start()
 
-    def _seize_leader(self, timeout=ETCD_CONN_TIMEOUT):
+    def _seize_leader(self, timeout=constants.ETCD_CONN_TIMEOUT):
         begin = time.time()
         info = self._pod_id
 
@@ -61,8 +56,8 @@ class LeaderRegister(object):
                 self._service_name,
                 self._server,
                 info=info,
-                timeout=ETCD_CONN_TIMEOUT,
-                ttl=ETCD_TTL):
+                timeout=constants.ETCD_CONN_TIMEOUT,
+                ttl=constants.ETCD_TTL):
             logger.debug("Can't seize leader on etcd key:{}".format(
                 self._etcd.get_full_path(self._service_name, self._server)))
 
@@ -86,7 +81,8 @@ class LeaderRegister(object):
 
     def _refresh(self):
         try:
-            self._etcd.refresh(self._service_name, self._server, ttl=ETCD_TTL)
+            self._etcd.refresh(
+                self._service_name, self._server, ttl=constants.ETCD_TTL)
             return True
         except Exception as e:
             logger.warning("refresh error:{}".format(e))

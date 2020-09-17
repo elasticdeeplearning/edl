@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import copy
-import unittest
 import six
+import unittest
 from edl.discovery.consistent_hash import ConsistentHash
 
 

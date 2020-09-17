@@ -12,19 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import edl.utils.constants as constants
-import os
-from edl.utils.etcd_db import get_global_etcd
+import logging
 
-job_id = os.environ["PADDLE_JOB_ID"]
-etcd_endpoints = os.environ["PADDLE_ETCD_ENDPOINTS"]
+logger = logging.getLogger("root")
+logger.propagate = False
 
-db = get_global_etcd([etcd_endpoints], job_id)
-etcd = db._etcd
-etcd.remove_service(constants.ETCD_POD_RESOURCE)
-etcd.remove_service(constants.ETCD_POD_RANK)
-etcd.remove_service(constants.ETCD_POD_STATUS)
-etcd.remove_service(constants.ETCD_JOB_STATUS)
-etcd.remove_service(constants.ETCD_TRAIN_STATUS)
-etcd.remove_service(constants.ETCD_CLUSTER)
-etcd.remove_service(constants.ETCD_READER)
+
+def get_logger(log_level, name="root"):
+    logger = logging.getLogger(name)
+    logger.setLevel(log_level)
+
+    log_handler = logging.StreamHandler()
+    log_format = logging.Formatter(
+        '%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s')
+    log_handler.setFormatter(log_format)
+    logger.addHandler(log_handler)
+
+    return logger

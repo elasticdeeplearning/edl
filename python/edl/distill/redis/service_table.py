@@ -59,13 +59,13 @@ class ServiceTable(object):
             return new_version, None
 
     def get_servers(self, fd, num):
-        if fd not in self._fd_to_service_name:
+        service_name = self._fd_to_service_name.get(fd)
+        if service_name is None:
             # not register
             return []
-        service_name = self._fd_to_service_name[fd]
 
         if service_name not in self._service_name_to_servers or \
-           self._service_name_to_update[service_name] is True:
+                self._service_name_to_update.get(service_name, False):
             self._refresh_service(service_name)
 
         return list(self._fd_to_servers[fd])
@@ -85,11 +85,10 @@ class ServiceTable(object):
         self._service_name_to_update[service_name] = True
 
     def rm_service_name(self, fd):
-        # client maybe exit before register
-        if fd not in self._fd_to_service_name:
+        service_name = self._fd_to_service_name.get(fd)
+        if service_name is None:
+            # client maybe exit before register
             return
-
-        service_name = self._fd_to_service_name[fd]
 
         with self._mutex:
             if service_name in self._service_name_to_fds:
@@ -141,7 +140,7 @@ class ServiceTable(object):
 
         # no change
         if len(rm_servers) == 0 and len(add_servers) == 0 and \
-                self._service_name_to_update[service_name] is False:
+                not self._service_name_to_update.get(service_name, False):
             return
         self._service_name_to_update[service_name] = False
         update_fd = set()
@@ -182,7 +181,7 @@ class ServiceTable(object):
         # assign: {fd0:32, fd1:32, fd2:32}
         server_max_connect = int((fd_num + server_num - 1) / server_num)
         fd_max_connect = max(1, int(server_num / fd_num))
-        #fd_max_connect = int((server_num + fd_num - 1) / fd_num)
+        # fd_max_connect = int((server_num + fd_num - 1) / fd_num)
         print('fd_num={}, server_num={}, smax={}, mcon={}'.format(
             fd_num, server_num, server_max_connect, fd_max_connect))
 
@@ -253,9 +252,17 @@ class ServiceTable(object):
                 except KeyError:
                     pass
 
-            time.sleep(2)
+            time.sleep(3)
+
+    def refresh(self):
+        while True:
+            try:
+                self._refresh()
+            except Exception as e:
+                sys.stderr.write(str(e) + '\n')
+                time.sleep(6)
 
     def start(self):
-        self._thread = threading.Thread(target=self._refresh)
+        self._thread = threading.Thread(target=self.refresh)
         self._thread.daemon = True
         self._thread.start()

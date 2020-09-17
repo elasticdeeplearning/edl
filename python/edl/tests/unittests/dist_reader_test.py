@@ -13,12 +13,18 @@
 # limitations under the License.
 
 import unittest
-from edl.collective.data_reader import DistributedDataReader, FileMeta
-from edl.collective.dataset import TxtFileSplitter
+import time
+import os
+import atexit
+
+from edl.utils.global_vars import *
+from edl.utils.etcd_test_base import EtcdTestBase
 
 
-class TestDataReader(unittest.TestCase):
+class TestDistReader(EtcdTestBase):
     def setUp(self):
+        super(TestGenerate, self).__init__("test_dist_reader")
+
         self._file_list = ["./data_server/a.txt", "./data_server/b.txt"]
         self._data = {}
         for idx, p in enumerate(self._file_list):
@@ -31,36 +37,18 @@ class TestDataReader(unittest.TestCase):
                 self._data[idx].append(
                     d)  #[(path),(rec_no, splitted_fiels)]...
 
-    def test_data_reader(self):
+    # 1. start a server, load checkpoint from etcd
+    # 2. get records from it 
+    def test_base(self):
         reader1 = DistributedDataReader(
-            file_list=self._file_list,
+            file_list=["./data_server/a.txt"],
             file_splitter_cls=TxtFileSplitter,
             splitted_data_field=["line"],
             batch_size=1)
 
-        reader2 = DistributedDataReader(
-            file_list=self._file_list,
-            file_splitter_cls=TxtFileSplitter,
-            splitted_data_field=["line"],
-            batch_size=1)
+        pass
 
-        size1 = 0
-        for meta, batch in reader1:
-            self.assertTrue(meta._size, 1)
-            for k, v in meta._batch:
-                c = self._data[k._idx]
-                self.assertTrue(c[0][0], k._path)
-                size1 += 1
-
-        for meta, batch in reader2:
-            self.assertTrue(meta._size, 1)
-            for k, v in meta._batch:
-                c = self._data[k._idx]
-                self.assertTrue(c[0][0], k._path)
-                size2 += 1
-
-        self.assertTrue(size1, size2)
-
-
-if __name__ == '__main__':
-    unittest.main()
+    # 1. start two servers and read their file list and the leader loads checkpoint from etcd
+    # 2. leader can balance them 
+    def test_balance(self):
+        pass

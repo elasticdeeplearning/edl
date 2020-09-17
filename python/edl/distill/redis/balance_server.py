@@ -23,6 +23,19 @@ from six.moves.queue import Queue
 import time
 
 
+def set_keepalive_linux(sock, after_idle_sec=30, interval_sec=10, max_fails=6):
+    """Set TCP keepalive on an open socket.
+
+    It activates after 30 second (after_idle_sec) of idleness,
+    then sends a keepalive ping once every 10 seconds (interval_sec),
+    and closes the connection after 6 failed ping (max_fails), or 60 seconds
+    """
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, after_idle_sec)
+    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, interval_sec)
+    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, max_fails)
+
+
 class Server(object):
     _READ = select.EPOLLIN | select.EPOLLHUP | select.EPOLLERR
     _WRITE = select.EPOLLOUT | select.EPOLLHUP | select.EPOLLERR
@@ -116,6 +129,7 @@ class Server(object):
         # client.getpeername()
 
         client.setblocking(False)
+        set_keepalive_linux(client)
         fd = client.fileno()
         self._epoll.register(fd, self._READ)
         self._clients[fd] = client

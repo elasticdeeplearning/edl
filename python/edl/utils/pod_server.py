@@ -13,24 +13,19 @@
 # limitations under the License.
 
 from __future__ import print_function
-from concurrent import futures
+
 import grpc
-import sys
-import os
-import logging
-from threading import Thread, Lock
-from six.moves.queue import Queue
 import traceback
-import signal
-import threading
-import copy
+from concurrent import futures
+from threading import Lock
+
 from . import common_pb2 as common_pb
+from . import constants
+from . import exceptions
 from . import pod_server_pb2 as pod_server_pb
 from . import pod_server_pb2_grpc as pod_server_pb_grpc
 from .etcd_db import EtcdDB
-from .exceptions import *
-from .utils import logger
-from .global_vars import *
+from .log_utils import logger
 
 
 class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
@@ -50,7 +45,7 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         status = common_pb.Status()
         pod = self._db.get_pod_leader()
         if pod.get_id != self._pod_id:
-            status = serialize_exception(
+            status = exceptions.serialize_exception(
                 EdlLeaderError("this pod is not the leader"))
             return status
 
@@ -60,7 +55,7 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         status = common_pb.Status()
         pod = self._db.get_pod_leader()
         if pod.get_id != self._pod_id:
-            status = serialize_exception(
+            status = exceptions.serialize_exception(
                 EdlLeaderError("this pod is not the leader"))
             return status
 
@@ -72,13 +67,17 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         try:
             cluster = self._db.get_cluster()
             if cluster is None:
-                serialize_exception(
-                    res, EdlBarrierError("get current running cluster error"))
+                exceptions.serialize_exception(
+                    res,
+                    exceptions.EdlBarrierError(
+                        "get current running cluster error"))
                 return res
 
-            if cluster.status == Status.FAILED:
-                serialize_exception(
-                    res, EdlBarrierError("cluster's status is status.Failed"))
+            if cluster.status == constants.Status.FAILED:
+                exceptions.serialize_exception(
+                    res,
+                    exceptions.EdlBarrierError(
+                        "cluster's status is status.Failed"))
                 return res
 
             ids = cluster.get_pods_ids_set()
@@ -99,15 +98,16 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
                 res.cluster_json = cluster.to_json()
                 return res
 
-            serialize_exception(
+            exceptions.serialize_exception(
                 res,
-                EdlBarrierError("barrier's context:{}, now:{}".format(ids,
-                                                                      bd)))
+                exceptions.EdlBarrierError(
+                    "barrier's context:{}, now:{}".format(ids, bd)))
             return res
         except Exception as e:
             logger.debug("internal error:{} {}".format(e,
                                                        traceback.format_exc()))
-            serialize_exception(res, EdlInternalError(str(e)))
+            exceptions.serialize_exception(
+                res, exceptions.EdlInternalError(str(e)))
             return res
 
     def ShutDown(self, request, context):

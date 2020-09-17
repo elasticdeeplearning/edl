@@ -14,13 +14,9 @@
 
 import unittest
 from paddle_edl.discovery.etcd_client import EtcdClient
-import time
-import threading
-from etcd3.events import PutEvent, DeleteEvent
 
-from paddle_edl.utils.utils import bytes_to_string
-from paddle_edl.utils.register import PodRegister, MasterRegister
-from paddle_edl.utils.cluster import Pod, Trainer
+from paddle_edl.utils.register import PodRegister
+from paddle_edl.utils.cluster import Pod
 from paddle_edl.utils.edl_env import JobEnv
 from paddle_edl.utils.edl_launch import _parse_args
 

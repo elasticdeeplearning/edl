@@ -12,19 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import grpc
+import os
+import paddle_edl.utils.common_pb2 as common_pb2
+import paddle_edl.utils.data_server_pb2 as data_server_pb2
+import paddle_edl.utils.data_server_pb2_grpc as data_server_pb2_grpc
+import time
 import unittest
+from paddle_edl.utils import file_utils
+from paddle_edl.utils import log_utils
 from paddle_edl.utils.data_server import DataServer
 from paddle_edl.utils.dataset import TxtDataReader
-import paddle_edl.utils.data_server_pb2_grpc as data_server_pb2_grpc
-import paddle_edl.utils.data_server_pb2 as data_server_pb2
+from paddle_edl.utils.string_utils import bytes_to_string
 from paddle_edl.utils.utils import *
-import time
-import threading
-import grpc
-import signal
-import paddle_edl.utils.common_pb2 as common_pb2
-from paddle_edl.utils.utils import bytes_to_string
-import os
 
 os.environ["https_proxy"] = ""
 os.environ["http_proxy"] = ""
@@ -60,7 +60,7 @@ class TestDataServer(unittest.TestCase):
         a = ["a0", "a1", "a2"]
         b = ["b0", "b1", "b2"]
         request = data_server_pb2.DataRequest()
-        for t in get_file_list('./test_file_list.txt'):
+        for t in file_utils.read_txt_lines('./test_file_list.txt'):
             request.idx_in_list = t[1]
             request.file_path = t[0]
             chunk = common_pb2.Chunk()
@@ -92,7 +92,7 @@ class TestDataServer(unittest.TestCase):
         stub = data_server_pb2_grpc.DataServerStub(channel)
 
         request = data_server_pb2.DataRequest()
-        for t in get_file_list('./test_file_list.txt'):
+        for t in file_utils.read_txt_lines('./test_file_list.txt'):
             request.idx_in_list = t[1]
             request.file_path = t[0]
             chunk = common_pb2.Chunk()
@@ -113,5 +113,5 @@ class TestDataServer(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    logger = get_logger(10)
+    logger = log_utils.get_logger(10)
     unittest.main()

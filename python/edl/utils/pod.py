@@ -12,29 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# NOTE: 
-# This file is copied from paddle/python/distributed/utils.py
-# remove it when paddle's is ready.
-
-import functools
-import logging
-import time
-import os
-import signal
-import copy
-import sys
-import subprocess
-import uuid
-import six
-import json
 import collections
-from enum import IntEnum
+import json
+import six
+import uuid
 
-from .utils import logger
+from . import network_utils
+from .constants import Status
+from .log_utils import logger
 from .trainer import Trainer
-from .global_vars import Status
-from .exceptions import *
-from . import utils
 
 
 class Pod(object):
@@ -94,7 +80,7 @@ class Pod(object):
         self._gpus = job_env.gpus
 
         # hostname, ip
-        _, self._addr = utils.get_host_name_ip()
+        _, self._addr = network_utils.get_host_name_ip()
 
         # init trainers
         self._trainers = []

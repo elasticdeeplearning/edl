@@ -22,61 +22,79 @@ package data_server;
 message ShutDownRequest {}
 message EmptyRequest {}
 
-message Record {
-  int64 record_no = 1;
-  bytes data = 2;
-}
-
-message FileListRequest { string data_reader_id = 1; }
-
-message FileMeta {
+message FileListElement {
   int64 idx = 1;
   string path = 2;
 }
 
+message FileListRequest {
+  string pod_id = 1;
+  string reader_name = 2;
+  // used for verify
+  repeated FileListElement file_list = 3;
+}
+
 message FileListResponse {
-  common.Status ret = 1;
-  repeated FileMeta metas = 2;
+  common.Status status = 1;
+  repeated FileListElement file_list = 2;
 }
 
-message CheckpointRequest {
-  string data_path = 1;
-  string model_path = 2;
+message Record {
+  int64 record_no = 1;
+  repeated bytes field_data = 2;
 }
 
-message BatchDataMetaRequest {
-  string data_reader_id = 1;
-  // if batch_id == "" means there's no data local
-  string batch_id = 2;
+message BatchData {
+  string batch_data_id = 1;
+  repeated Record records = 2;
+}
+
+message BatchDataMeta {
+  string reader_name = 1;
+  string producer_pod_id = 2;
+  string consumer_pod_id = 3;
+  string data_server_endpoint = 4;
+
+  repeated string batch_data_ids = 5;
+}
+
+message ReportBatchDataMetaRequest {
+  string reader_name = 1;
+  string pod_id = 2;
+  string data_server_endpoint = 3;
+
+  repeated string batch_data_ids = 4;
+}
+
+message GetBatchDataMetaRequest {
+  string reader_name = 1;
+  string pod_id = 2;
+}
+
+message ReachDataEndRequest {
+  string reader_name = 1;
+  string pod_id = 2;
 }
 
 message BatchDataMetaResponse {
   common.Status status = 1;
-  string data_reader_id = 2;
-  string data_reader_endpoint = 3;
-  string batch_data_id = 4;
+  repeated BatchDataMeta data = 2;
 }
-
-message FileBatchData {
-  int64 idx = 1;
-  string path = 2;
-  repeated Record records = 3;
-}
-
-message BatchDataRequest { string batch_id = 1; }
 
 message BatchDataResponse {
   common.Status status = 1;
-  repeated FileBatchData batch = 2;
+  repeated BatchData data = 2;
 }
 
 service DataServer {
-  rpc GetFileList(FileListRequest) returns (FileListResponse) {}
-  rpc GetBatchDataMeta(BatchDataMetaRequest) returns (BatchDataMetaResponse) {}
-  rpc GetBatchData(BatchDataRequest) returns (BatchDataResponse) {}
-  rpc ShutDown(ShutDownRequest) returns (common.Status) {}
+  // only leader can do this
+  rpc ReportBatchDataMeta(ReportBatchDataMetaRequest)
+      returns (common.EmptyRet) {}
+  rpc ReachDataEnd(ReachDataEndRequest) returns (common.EmptyRet) {}
+  rpc GetBatchDataMeta(GetBatchDataMetaRequest)
+      returns (BatchDataMetaResponse) {}
 
-  // two step's to do it.
-  rpc PrePareSaveCheckpoint(CheckpointRequest) returns (common.Status) {}
-  rpc SaveCheckpoint(CheckpointRequest) returns (common.Status) {}
+  // all data servers can do this
+  rpc GetFileList(FileListRequest) returns (FileListResponse) {}
+  rpc GetBatchData(BatchDataMeta) returns (BatchDataResponse) {}
 }
