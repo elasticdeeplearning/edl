@@ -13,11 +13,12 @@
 # limitations under the License.
 import json
 
-from . import constants
-from . import error_utils
-from . import exceptions
-from .log_utils import logger
-from ..discovery.etcd_client import EtcdClient
+from edl.utils import constants
+from edl.utils import error_utils
+from edl.utils import exceptions
+from edl.utils.log_utils import logger
+from edl.discovery.etcd_client import EtcdClient
+from edl.utils import unique_name
 
 
 class DistReader(object):
@@ -45,10 +46,17 @@ class DistReader(object):
 
 
 class DataCheckpoint(object):
-    def __init__(self, reader_name, file_list, data_checkpoint):
+    def __init__(self, reader_name=None, file_list=None, data_checkpoint=None):
         self._reader_name = reader_name
         self._file_list = file_list
+        #file_idx_in_file_list:[(record_idx_begin, record_idx_end), ...]
         self._data_checkpoint = data_checkpoint
+
+    def to_json(self):
+        pass
+
+    def from_json(self):
+        pass
 
 
 class TrainStatusCheckpoint(object):
@@ -113,7 +121,7 @@ class State(object):
         self._adjust_func = []
 
         # internal
-        self._name = generator("_edl_state_")
+        self._name = unique_name.generator("_edl_state_")
         self._model_path = None
         self._data_checkpoint = DataCheckpoint()
         self._train_status = TrainStatusCheckpoint()
@@ -166,7 +174,7 @@ class State(object):
         d = json.loads(s)
 
         self._defaults = d["default"]
-        if self._user_defined and d["user_defined"] is not None:
+        if self._user_defined is not None and d["user_defined"] is not None:
             self._user_defined.from_json(d["user_defined"])
 
         self._name = d["name"]
@@ -175,57 +183,62 @@ class State(object):
         self._train_status.from_json(d["train_status"])
         return d
 
-    @staticmethod
-    @error_utils.handle_errors_until_timeout
-    def load_from_etcd(etcd_endpoints, job_id, name):
-        etcd = EtcdClient(
-            endpoints=etcd_endpoints,
-            root=job_id,
-            timeout=constants.EDL_CONN_TIMEOUT)
-        etcd.init()
 
-        value = etcd.get_value(constants.ETCD_DIST_READER, name)
+@error_utils.handle_errors_until_timeout
+def load_from_etcd(etcd_endpoints, job_id, state_name, timeout=60):
+    etcd = EtcdClient(
+        endpoints=etcd_endpoints,
+        root=job_id,
+        timeout=constants.EDL_CONN_TIMEOUT)
+    etcd.init()
 
-        if value is None:
-            raise exceptions.EdlTableError("key:value = {}:{}".format(
-                etcd.get_full_path(constants.ETCD_DIST_READER, name), value))
+    value = etcd.get_value(constants.ETCD_STATE, state_name)
 
-        c = State()
-        c.from_json(value)
-        return c
+    if value is None:
+        raise exceptions.EdlTableError("key:value = {}:{}".format(
+            etcd.get_full_path(constants.ETCD_DIST_READER, name), value))
 
-    @staticmethod
-    @error_utils.handle_errors_until_timeout
-    def save_to_etcd(etcd_endpoints, job_id, pod_id, name, mode_path,
-                     data_checkpoint, user_defined):
-        etcd = EtcdClient(
-            endpoints=etcd_endpoints,
-            root=job_id,
-            timeout=constants.EDL_CONN_TIMEOUT)
-        etcd.init()
+    s = State()
+    s.from_json(value)
+    return s
 
-        c = State()
-        c._name = name
-        c._data_checkpoint = data_checkpoint
-        c._model_path = model_path
-        c._user_defined = user_defined
 
-        leader_key = etcd.get_full_path(constants.ETCD_POD_RANK,
-                                        constants.ETCD_POD_LEADER)
-        state_key = etcd.get_full_path(constants.ETCD_STATE, name)
+@error_utils.error_utils.handle_errors_until_timeout
+def save_to_etcd(etcd_endpoints,
+                 job_id,
+                 pod_id,
+                 name,
+                 mode_path,
+                 data_checkpoint,
+                 user_defined,
+                 timeout=60):
+    etcd = EtcdClient(
+        endpoints=etcd_endpoints,
+        root=job_id,
+        timeout=constants.EDL_CONN_TIMEOUT)
+    etcd.init()
 
-        etcd = etcd._etcd
-        status, _ = etcd.transaction(
-            compare=[etcd.transactions.value(leader_key) == pod_id, ],
-            success=[etcd.transactions.put(state_key, c.to_json()), ],
-            failure=[])
+    s = State()
+    s._name = name
+    s._data_checkpoint = data_checkpoint
+    s._model_path = model_path
+    s._user_defined = user_defined
 
-        message = "pod_id:{} save_data_checkpoint status:{}".format(pod_id,
-                                                                    status)
-        if not status:
-            raise EdlEtcdIOError(message)
+    leader_key = etcd.get_full_path(constants.ETCD_POD_RANK,
+                                    constants.ETCD_POD_LEADER)
+    state_key = etcd.get_full_path(constants.ETCD_STATE, name)
 
-        return status
+    etcd = etcd._etcd
+    status, _ = etcd.transaction(
+        compare=[etcd.transactions.value(leader_key) == pod_id, ],
+        success=[etcd.transactions.put(state_key, c.to_json()), ],
+        failure=[])
+
+    message = "pod_id:{} save_data_checkpoint status:{}".format(pod_id, status)
+    if not status:
+        raise exceptions.EdlEtcdIOError(message)
+
+    return status
 
 
 class PaddleState(State):

@@ -27,6 +27,8 @@ from .etcd_db import get_global_etcd
 from .log_utils import logger
 from .unique_name import generator
 
+from edl.utils import state
+
 
 class DataGenerator(edl_process.ProcessWrapper):
     """
@@ -271,10 +273,16 @@ class Reader(object):
         # connections to data servers
         self._trainer_env = TrainerEnv()
 
+        self._state = state.load_from_etcd(
+            etcd_endpoints=self._trainer_env.etcd_endpoints,
+            job_id=self._trainer_env.job_id,
+            state_name=self._name,
+            timeout=60)
+
         self._db = get_global_etcd(self._trainer_env.endpoints,
                                    self._trainer_env.job_id)
-        self._wait_record_to_dist_reader_table()
-        self._wait_dist_reader_leader()
+        self._wait_record_to_dist_reader_table(timeout=60)
+        self._wait_dist_reader_leader(timeout=60)
 
         self._generater_out_queue = multiprocessing.Queue(self._cache_capcity)
         self._accesser_out_queue = multiprocessing.Queue(self._cache_capcity)
@@ -283,11 +291,11 @@ class Reader(object):
         self._accesser = None
 
     @handle_errors_until_timeout
-    def _wait_dist_reader_leader(self, timeout=120):
+    def _wait_dist_reader_leader(self, timeout=60):
         self._reader_leader = self._db.get_dist_reader_leader()
 
     @handle_errors_until_timeout
-    def _record_to_dist_reader_table(self, timeout=120):
+    def _wait_record_to_dist_reader_table(self, timeout=60):
         self._db.record_to_dist_reader_table(self._trainer_env.etcd_endpoint,
                                              self._name,
                                              self._trainer_env.pod_id)
