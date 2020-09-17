@@ -12,43 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-
-from . import constants
-from . import error_utils
-from . import exceptions
-from .log_utils import logger
-from ..discovery.etcd_client import EtcdClient
-
-
-class DistReader(object):
-    def __init__(self, pod_id, name, endpoint):
-        self._pod_id = pod_id
-        self._name = name
-        self._endpoint = endpoint
-
-    def to_json(self):
-        d = {
-            "pod_id": self._pod_id,
-            "endpoint": self._endpoint,
-            "name": self._name,
-        }
-        return json.dumps(d)
-
-    def from_json(self, s):
-        d = json.loads(s)
-        self._pod_id = d["pod_id"]
-        self._endpoint = d["endpoint"]
-        self._name = d["name"]
-
-    def __str_(self):
-        return self._to_json()
+from edl.discovery.etcd_client import EtcdClient
+from edl.utils import constants
+from edl.utils import error_utils
+from edl.utils import exceptions
+from edl.utils import unique_name
+from edl.utils.log_utils import logger
+from edl.utils import status as edl_status
 
 
 class DataCheckpoint(object):
-    def __init__(self, reader_name, file_list, data_checkpoint):
+    def __init__(self, reader_name=None, file_list=None, data_checkpoint=None):
         self._reader_name = reader_name
         self._file_list = file_list
+        #file_idx_in_file_list:[(record_idx_begin, record_idx_end), ...]
         self._data_checkpoint = data_checkpoint
+
+    def to_json(self):
+        pass
+
+    def from_json(self):
+        pass
 
 
 class TrainStatusCheckpoint(object):
@@ -56,7 +40,7 @@ class TrainStatusCheckpoint(object):
         self._max_epoch_num = max_epoch_num
         self._epoch_no = None
         self._epochs = {}
-        self._status = constants.TrainStatus.INITIAL
+        self._status = edl_train_status.TrainStatus.INITIAL
 
     def update_epoch(self, epoch_no, step_num, step_time):
         if epoch_no not in self._epoch:
@@ -70,9 +54,9 @@ class TrainStatusCheckpoint(object):
 
         left_time = (max_epoch_num - epoch_no) * step_num * step_time
         if left_time > 15 * 60:
-            self._status = constants.TrainStatus.RUNNING
+            self._status = edl_train_status.TrainStatus.RUNNING
         else:
-            self._status = constants.TrainStatus.NEARTHEEND
+            self._status = edl_train_status.TrainStatus.NEARTHEEND
 
         logger.debug("train status left_time is {} train status is {}".format(
             left_time))
@@ -113,7 +97,7 @@ class State(object):
         self._adjust_func = []
 
         # internal
-        self._name = generator("_edl_state_")
+        self._name = unique_name.generator("_edl_state_")
         self._model_path = None
         self._data_checkpoint = DataCheckpoint()
         self._train_status = TrainStatusCheckpoint()
@@ -166,7 +150,7 @@ class State(object):
         d = json.loads(s)
 
         self._defaults = d["default"]
-        if self._user_defined and d["user_defined"] is not None:
+        if self._user_defined is not None and d["user_defined"] is not None:
             self._user_defined.from_json(d["user_defined"])
 
         self._name = d["name"]
@@ -175,57 +159,56 @@ class State(object):
         self._train_status.from_json(d["train_status"])
         return d
 
-    @staticmethod
-    @error_utils.handle_errors_until_timeout
-    def load_from_etcd(etcd_endpoints, job_id, name):
-        etcd = EtcdClient(
-            endpoints=etcd_endpoints,
-            root=job_id,
-            timeout=constants.EDL_CONN_TIMEOUT)
-        etcd.init()
 
-        value = etcd.get_value(constants.ETCD_DIST_READER, name)
+@error_utils.handle_errors_until_timeout
+def load_from_etcd(etcd, state_name, timeout=60):
+    value = etcd.get_value(constants.ETCD_STATE, state_name)
 
-        if value is None:
-            raise exceptions.EdlTableError("key:value = {}:{}".format(
-                etcd.get_full_path(constants.ETCD_DIST_READER, name), value))
+    if value is None:
+        raise exceptions.EdlTableError("key:value = {}:{}".format(
+            etcd.get_full_path(constants.ETCD_DIST_READER, state_name), value))
 
-        c = State()
-        c.from_json(value)
-        return c
+    s = State()
+    s.from_json(value)
+    return s
 
-    @staticmethod
-    @error_utils.handle_errors_until_timeout
-    def save_to_etcd(etcd_endpoints, job_id, pod_id, name, mode_path,
-                     data_checkpoint, user_defined):
-        etcd = EtcdClient(
-            endpoints=etcd_endpoints,
-            root=job_id,
-            timeout=constants.EDL_CONN_TIMEOUT)
-        etcd.init()
 
-        c = State()
-        c._name = name
-        c._data_checkpoint = data_checkpoint
-        c._model_path = model_path
-        c._user_defined = user_defined
+@error_utils.error_utils.handle_errors_until_timeout
+def save_to_etcd(etcd_endpoints,
+                 job_id,
+                 pod_id,
+                 name,
+                 model_path,
+                 data_checkpoint,
+                 user_defined,
+                 timeout=60):
+    etcd = EtcdClient(
+        endpoints=etcd_endpoints,
+        root=job_id,
+        timeout=constants.EDL_CONN_TIMEOUT)
+    etcd.init()
 
-        leader_key = etcd.get_full_path(constants.ETCD_POD_RANK,
-                                        constants.ETCD_POD_LEADER)
-        state_key = etcd.get_full_path(constants.ETCD_STATE, name)
+    s = State()
+    s._name = name
+    s._data_checkpoint = data_checkpoint
+    s._model_path = model_path
+    s._user_defined = user_defined
 
-        etcd = etcd._etcd
-        status, _ = etcd.transaction(
-            compare=[etcd.transactions.value(leader_key) == pod_id, ],
-            success=[etcd.transactions.put(state_key, c.to_json()), ],
-            failure=[])
+    leader_key = etcd.get_full_path(constants.ETCD_POD_RANK,
+                                    constants.ETCD_POD_LEADER)
+    state_key = etcd.get_full_path(constants.ETCD_STATE, name)
 
-        message = "pod_id:{} save_data_checkpoint status:{}".format(pod_id,
-                                                                    status)
-        if not status:
-            raise EdlEtcdIOError(message)
+    etcd = etcd._etcd
+    status, _ = etcd.transaction(
+        compare=[etcd.transactions.value(leader_key) == pod_id, ],
+        success=[etcd.transactions.put(state_key, s.to_json()), ],
+        failure=[])
 
-        return status
+    message = "pod_id:{} save_data_checkpoint status:{}".format(pod_id, status)
+    if not status:
+        raise exceptions.EdlEtcdIOError(message)
+
+    return
 
 
 class PaddleState(State):

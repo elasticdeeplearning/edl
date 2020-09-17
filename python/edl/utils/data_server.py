@@ -268,7 +268,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
 
         except Exception as e:
             import traceback
-            exceptions.serialize_exception(res, e, traceback.format_exc())
+            exceptions.serialize(res, e, traceback.format_exc())
         return res
 
     def ReachDataEnd(self, request, context):
@@ -281,7 +281,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
             self._pod_data.set_data_end(request.pod_id)
         except Exception as e:
             import traceback
-            exceptions.serialize_exception(res, e, traceback.format_exc())
+            exceptions.serialize(res, e, traceback.format_exc())
         return res
 
     # only leader can do this
@@ -295,7 +295,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
             self._pod_data.pop(request.pod_id, res.data, timeout=60)
         except Exception as e:
             import traceback
-            exceptions.serialize_exception(res, e, traceback.format_exc())
+            exceptions.serialize(res, e, traceback.format_exc())
         return res
 
     def GetBatchData(self, request, context):
@@ -307,7 +307,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                 res.datas.append(b)
         except Exception as e:
             import traceback
-            exceptions.serialize_exception(res, e, traceback.format_exc())
+            exceptions.serialize(res, e, traceback.format_exc())
         return res
 
     def _check_file_list(self, file_list):
@@ -346,7 +346,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
 
             return res
         except exceptions.EdlException as e:
-            exceptions.serialize_exception(res, e)
+            exceptions.serialize(res, e)
             return res
 
 

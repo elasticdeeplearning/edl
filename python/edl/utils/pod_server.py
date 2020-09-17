@@ -14,24 +14,25 @@
 
 from __future__ import print_function
 
+import concurrent
 import grpc
+import threading
 import traceback
-from concurrent import futures
-from threading import Lock
+from edl.utils import cluster as edl_cluster
+from edl.utils import common_pb2
+from edl.utils import status as edl_status
+from edl.utils import etcd_db
+from edl.utils import exceptions
+from edl.utils import leader as edl_leader
+from edl.utils import pod_server_pb2
+from edl.utils import pod_server_pb2_grpc
+from edl.utils.log_utils import logger
 
-from . import common_pb2 as common_pb
-from . import constants
-from . import exceptions
-from . import pod_server_pb2 as pod_server_pb
-from . import pod_server_pb2_grpc as pod_server_pb_grpc
-from .etcd_db import EtcdDB
-from .log_utils import logger
 
-
-class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
+class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
     def __init__(self, job_env, pod_id):
         # to control the cache size.
-        self._lock = Lock()
+        self._lock = threading.Lock()
 
         # stage => set(pod_id)
         self._barrier_in = {}
@@ -39,45 +40,44 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         self._pod_id = pod_id
         self._job_env = job_env
 
-        self._db = EtcdDB(job_env.etcd_endpoints, job_env.job_id)
+        self._etcd = etcd_db.get_global_etcd(self._job_env.etcd_endpoints,
+                                             self._job_env.job_id)
 
     def ScaleOut(self, request, context):
-        status = common_pb.Status()
-        pod = self._db.get_pod_leader()
+        status = common_pb2.Status()
+        pod = edl_leader.get_pod_leader(self._etcd)
         if pod.get_id != self._pod_id:
-            status = exceptions.serialize_exception(
-                EdlLeaderError("this pod is not the leader"))
+            status = exceptions.serialize(
+                exceptions.EdlLeaderError("this pod is not the leader"))
             return status
 
         return status
 
     def ScaleIn(self, request, context):
-        status = common_pb.Status()
-        pod = self._db.get_pod_leader()
+        status = common_pb2.Status()
+        pod = edl_leader.get_pod_leader(self._etcd)
         if pod.get_id != self._pod_id:
-            status = exceptions.serialize_exception(
-                EdlLeaderError("this pod is not the leader"))
+            status = exceptions.serialize(
+                exceptions.EdlLeaderError("this pod is not the leader"))
             return status
 
         return status
 
     def Barrier(self, request, context):
-        res = pod_server_pb.BarrierResponse()
+        res = pod_server_pb2.BarrierResponse()
 
         try:
-            cluster = self._db.get_cluster()
+            cluster = edl_cluster.load_from_etcd(self._etcd, timeout=60)
             if cluster is None:
-                exceptions.serialize_exception(
-                    res,
-                    exceptions.EdlBarrierError(
-                        "get current running cluster error"))
+                exceptions.serialize(res,
+                                     exceptions.EdlBarrierError(
+                                         "get current running cluster error"))
                 return res
 
-            if cluster.status == constants.Status.FAILED:
-                exceptions.serialize_exception(
-                    res,
-                    exceptions.EdlBarrierError(
-                        "cluster's status is status.Failed"))
+            if cluster.status == edl_status.Status.FAILED:
+                exceptions.serialize(res,
+                                     exceptions.EdlBarrierError(
+                                         "cluster's status is status.Failed"))
                 return res
 
             ids = cluster.get_pods_ids_set()
@@ -98,7 +98,7 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
                 res.cluster_json = cluster.to_json()
                 return res
 
-            exceptions.serialize_exception(
+            exceptions.serialize(
                 res,
                 exceptions.EdlBarrierError(
                     "barrier's context:{}, now:{}".format(ids, bd)))
@@ -106,8 +106,7 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         except Exception as e:
             logger.debug("internal error:{} {}".format(e,
                                                        traceback.format_exc()))
-            exceptions.serialize_exception(
-                res, exceptions.EdlInternalError(str(e)))
+            exceptions.serialize(res, exceptions.EdlInternalError(str(e)))
             return res
 
     def ShutDown(self, request, context):
@@ -124,11 +123,11 @@ class PodServer(object):
 
     def start(self, concurrency=20, max_workers=100):
         server = grpc.server(
-            futures.ThreadPoolExecutor(max_workers=max_workers),
+            concurrent.futures.ThreadPoolExecutor(max_workers=max_workers),
             options=[('grpc.max_send_message_length', 1024 * 1024 * 1024),
                      ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
             maximum_concurrent_rpcs=concurrency)
-        pod_server_pb_grpc.add_PodServerServicer_to_server(
+        pod_server_pb2_grpc.add_PodServerServicer_to_server(
             PodServerServicer(self._job_env, self._pod.get_id()), server)
 
         self._port = server.add_insecure_port('{}:0'.format(self._pod.addr))

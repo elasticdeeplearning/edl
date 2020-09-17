@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from six.moves.queue import Queue
-import multiprocessing
-
 
 class FileSplitter(object):
     """
@@ -39,7 +36,7 @@ class TxtFileSplitter(FileSplitter):
 
     def __iter__(self):
         idx = 0
-        with open(self._data_file, "rb") as f:
+        with open(self._data_file, "r") as f:
             for line in f:
                 line = line.strip()
                 if len(line) <= 0:

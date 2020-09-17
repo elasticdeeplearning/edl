@@ -17,7 +17,7 @@ import os
 import unittest
 from edl.utils import data_server
 from edl.utils import data_server_client
-from edl.utils import edl_env
+from edl.utils import env as edl_env
 from edl.utils import log_utils
 from edl.utils.log_utils import logger
 
@@ -34,6 +34,7 @@ class TestDataServer(unittest.TestCase):
         proc_env = {
             "PADDLE_JOB_ID": self._job_id,
             "PADDLE_POD_ID": self._pod_id,
+            "EDL_POD_LEADER_ID": self._pod_id,
             "PADDLE_ETCD_ENDPOINTS": "127.0.0.1:2379",
             "PADDLE_TRAINER_ID": "0",
             "PADDLE_TRAINER_RANK_IN_POD": "0",
