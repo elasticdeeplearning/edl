@@ -67,7 +67,7 @@ class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
         res = pod_server_pb2.BarrierResponse()
 
         try:
-            cluster = edl_cluster.get_cluster(etcd)
+            cluster = edl_cluster.load_from_etcd(self._etcd, timeout=60)
             if cluster is None:
                 exceptions.serialize(res,
                                      exceptions.EdlBarrierError(
