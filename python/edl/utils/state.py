@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-
+from edl.discovery.etcd_client import EtcdClient
 from edl.utils import constants
 from edl.utils import error_utils
 from edl.utils import exceptions
-from edl.utils.log_utils import logger
-from edl.discovery.etcd_client import EtcdClient
 from edl.utils import unique_name
+from edl.utils.log_utils import logger
+
 
 class DataCheckpoint(object):
     def __init__(self, reader_name=None, file_list=None, data_checkpoint=None):

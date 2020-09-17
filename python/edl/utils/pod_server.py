@@ -14,21 +14,19 @@
 
 from __future__ import print_function
 
-import grpc
-import traceback
 import concurrent
+import grpc
 import threading
-
+import traceback
+from edl.utils import cluster as  edl_cluster
 from edl.utils import common_pb2
 from edl.utils import constants
+from edl.utils import etcd_db
 from edl.utils import exceptions
+from edl.utils import leader as edl_leader
 from edl.utils import pod_server_pb2
 from edl.utils import pod_server_pb2_grpc
-
 from edl.utils.log_utils import logger
-from edl.utils import cluster as  edl_cluster
-from edl.utils import etcd_db
-from edl.utils import leader as edl_leader
 
 
 class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):

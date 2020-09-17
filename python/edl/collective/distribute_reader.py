@@ -16,19 +16,18 @@ from __future__ import print_function
 import multiprocessing
 import sys
 import threading
+from edl.uitls import edl_reader
+from edl.utils import env as edl_env
+from edl.utils import state
 
 from . import data_server
 from . import data_server_pb2 as pb
 from . import edl_process
 from .data_server_client import DataServerClient
-from edl.utils import env as edl_env
 from .error_utils import handle_errors_until_timeout
 from .etcd_db import get_global_etcd
 from .log_utils import logger
 from .unique_name import generator
-
-from edl.utils import state
-from edl.uitls import edl_reader
 
 
 class DataGenerator(edl_process.ProcessWrapper):

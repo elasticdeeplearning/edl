@@ -17,8 +17,8 @@ process on each training node for gpu training.
 """
 from __future__ import print_function
 
-import six
 import argparse
+import six
 
 
 def _print_arguments(args):

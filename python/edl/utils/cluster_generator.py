@@ -17,14 +17,13 @@ import six
 import threading
 import time
 import traceback
-
+from edl.discovery import etcd_client
+from edl.utils import cluster as edl_cluster
 from edl.utils import constants
 from edl.utils import error_utils
 from edl.utils import etcd_db
 from edl.utils import exceptions
 from edl.utils.log_utils import logger
-from edl.discovery import etcd_client
-from edl.utils import cluster as edl_cluster
 
 
 class Generator(object):

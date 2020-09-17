@@ -17,35 +17,27 @@ process on each training node for gpu training.
 """
 
 from __future__ import print_function
-import sys
-from sys import version
-import subprocess
-import os
-import time
-import six
-import copy
-from argparse import ArgumentParser, REMAINDER
-import paddle.fluid as fluid
-from contextlib import closing
-import socket
-import traceback
 
-from edl.utils import edl_env
-from ..utils.pod import Pod
-from ..utils.register import PodResourceRegister
-from ..utils.leader_register import LeaderRegister
+import sys
+import time
+import traceback
+from edl.utils import args_utils
+from edl.utils import constants
+from edl.utils import env as edl_env
 from edl.utils import etcd_db
-from ..utils.watcher import Watcher
-from ..utils.pod_server import PodServer
-from ..utils.log_utils import logger
+from edl.utils import exceptions
 from edl.utils import log_utils
 from edl.utils import pod_server_client
-from edl.utils import constants
-from edl.utils import exceptions
 from edl.utils import status as edl_status
 from edl.utils import train_process as edl_train_process
-from edl.utils import leader
-from edl.utils import args_utils
+
+from ..utils.leader_register import LeaderRegister
+from ..utils.log_utils import logger
+from ..utils.pod import Pod
+from ..utils.pod_server import PodServer
+from ..utils.register import PodResourceRegister
+from ..utils.watcher import Watcher
+
 
 def edl_barrier(job_env, pod, timeout):
     start = time.time()
@@ -79,7 +71,7 @@ def edl_barrier(job_env, pod, timeout):
 
 
 def prepare(args):
-    args_dict = _convert_args_to_dict(args)
+    args_dict = args_utils.convert_args_to_dict(args)
 
     # job enviroment.
     job_env = edl_env.JobEnv(args_dict)
@@ -120,7 +112,7 @@ def job_exit(cluster,
              timeout=300):
     local_flag = trainer_flag & register_flag & barrier_flag
     etcd = etcd_db.get_global_etcd()
-    etcd_status.save_pod_flag_to_ecd(etcd, pod.get_id(), local_flag)
+    edl_status.save_pod_flag_to_ecd(etcd, pod.get_id(), local_flag)
 
     begin = time.time()
     while True:

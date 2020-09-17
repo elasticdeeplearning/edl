@@ -1,6 +1,7 @@
 from edl.utils import constants
-from edl.utils import pod
 from edl.utils import error_utils
+from edl.utils import pod
+
 
 def get_resource_pods_dict(etcd):
     servers = etcd.get_service(constants.ETCD_POD_RESOURCE)

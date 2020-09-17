@@ -13,11 +13,10 @@
 # limitations under the License.
 import threading
 import time
-
+from edl.discovery import etcd_client
 from edl.utils import constants
 from edl.utils import etcd_db
 from edl.utils.log_utils import logger
-from edl.discovery import etcd_client
 
 
 class Register(object):

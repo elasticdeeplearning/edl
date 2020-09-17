@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-
+from edl.utils import cluster as edl_cluster
 from edl.utils import constants
+from edl.utils import error_utils
 from edl.utils import exceptions
 from edl.utils.log_utils import logger
-from edl.utils import error_utils
-from edl.utils import cluster as edl_cluster
+
 
 class ReaderMeta(object):
     def __init__(self, name, pod_id, data_server_endpoint):
