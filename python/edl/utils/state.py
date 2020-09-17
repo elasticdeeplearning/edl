@@ -18,6 +18,7 @@ from edl.utils import error_utils
 from edl.utils import exceptions
 from edl.utils import unique_name
 from edl.utils.log_utils import logger
+from edl.utils improt status as edl_status
 
 
 class DataCheckpoint(object):
@@ -39,7 +40,7 @@ class TrainStatusCheckpoint(object):
         self._max_epoch_num = max_epoch_num
         self._epoch_no = None
         self._epochs = {}
-        self._status = constants.TrainStatus.INITIAL
+        self._status = edl_train_status.TrainStatus.INITIAL
 
     def update_epoch(self, epoch_no, step_num, step_time):
         if epoch_no not in self._epoch:
@@ -53,9 +54,9 @@ class TrainStatusCheckpoint(object):
 
         left_time = (max_epoch_num - epoch_no) * step_num * step_time
         if left_time > 15 * 60:
-            self._status = constants.TrainStatus.RUNNING
+            self._status = edl_train_status.TrainStatus.RUNNING
         else:
-            self._status = constants.TrainStatus.NEARTHEEND
+            self._status = edl_train_status.TrainStatus.NEARTHEEND
 
         logger.debug("train status left_time is {} train status is {}".format(
             left_time))

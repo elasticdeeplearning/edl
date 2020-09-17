@@ -21,13 +21,15 @@ import uuid
 from edl.utils import constants
 from edl.utils import exceptions
 from edl.utils import pod as edl_pod
+from edl.utils import error_utils
+from edl.utils import status as edl_status
 
 
 class Cluster(object):
     def __init__(self):
         self._pods = []
         self._stage = None
-        self._status = constants.Status.INITIAL
+        self._status = edl_status.Status.INITIAL
 
     def __str__(self):
         return "pods:{} job_stage:{} status:{}".format(

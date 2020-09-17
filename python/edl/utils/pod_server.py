@@ -20,7 +20,7 @@ import threading
 import traceback
 from edl.utils import cluster as  edl_cluster
 from edl.utils import common_pb2
-from edl.utils import constants
+from edl.utils import status as edl_status
 from edl.utils import etcd_db
 from edl.utils import exceptions
 from edl.utils import leader as edl_leader
@@ -74,7 +74,7 @@ class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
                         "get current running cluster error"))
                 return res
 
-            if cluster.status == constants.Status.FAILED:
+            if cluster.status == edl_status.Status.FAILED:
                 exceptions.serialize(
                     res,
                     exceptions.EdlBarrierError(

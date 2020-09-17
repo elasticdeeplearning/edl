@@ -24,6 +24,9 @@ from edl.utils import error_utils
 from edl.utils import etcd_db
 from edl.utils import exceptions
 from edl.utils.log_utils import logger
+from edl.utils import train_status as edl_train_status
+from edl.utils import leader as edl_leader
+from edl.utils import status as edl_status
 
 
 class Generator(object):
@@ -88,7 +91,7 @@ class Generator(object):
         self.stop()
 
     def _generate_cluster_from_resource(self, resource_pods):
-        leader_id = self._db.get_pod_leader_id()
+        leader_id = edl_leader.get_pod_leader_id(self._etcd)
         if leader_id is None:
             raise exceptions.EdlTableError("leader key={}:{}".format(
                 self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
@@ -129,7 +132,7 @@ class Generator(object):
 
         ids = current_cluster.get_pods_ids_set()
         for pod_id, pod in six.iteritems(resource_pods):
-            if pod.status == constants.Status.INITIAL \
+            if pod.status == edl_status.Status.INITIAL \
                     and pod.get_pod_id() not in ids \
                     and len(new_pods) < self._job_env.max_nodes:
                 pod.rank = rank
@@ -176,7 +179,7 @@ class Generator(object):
         if len(inited) > 0 and \
                 current_cluster.get_pods_nranks() < self._job_env.max_nodes:
             train_status = self._db.get_train_status()
-            if train_status == constants.TrainStatus.INITIAL or train_status == constants.TrainStatus.RUNNING:
+            if train_status == edl_train_status.TrainStatus.INITIAL or train_status == edl_train_status.TrainStatus.RUNNING:
                 logger.info("find running pods:{} and init pods{}".format(
                     inited, running))
                 self._append_inited_pods(current_cluster, resource_pods,
@@ -203,7 +206,7 @@ class Generator(object):
             failure=[])
 
         message = "pod_id:{} leader_id:{} _set_cluster_if_leader status:{}".format(
-            self._pod_id, self._db.get_pod_leader_id(), status)
+            self._pod_id, self.get_pod_leader_id(self._etcd), status)
 
         if not status:
             raise exceptions.EdlEtcdIOError(message)

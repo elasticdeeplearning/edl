@@ -11,13 +11,11 @@ class Status(IntEnum):
     SUCCEED = 3
     FAILED = 4
 
-    @staticmethod
-    def bool_to_status(b):
-        if b:
-            return Status.SUCCEED
+def bool_to_status(b):
+    if b:
+        return Status.SUCCEED
 
-        return Status.FAILED
-
+    return Status.FAILED
 
 def load_job_status_from_etcd(etcd):
     service = constants.ETCD_JOB_STATUS
@@ -39,7 +37,7 @@ def save_job_status_to_etcd(etcd, status):
 
 def save_job_flag_to_etcd(self, pod_id, flag):
     if flag:
-        save_job_status_to_etcd(pod_id, constants.Status.SUCCEED)
+        save_job_status_to_etcd(pod_id, Status.SUCCEED)
         logger.info("This job succeeded!")
         return
 
@@ -63,22 +61,22 @@ def load_pods_status_from_etcd(etcd):
     for server in servers:
         d = json.loads(server.info)
         status = d["status"]
-        if status == int(constants.Status.FAILED):
+        if status == int(Status.FAILED):
             failed.add(server.server)
-        elif status == int(constants.Status.SUCCEED):
+        elif status == int(Status.SUCCEED):
             succeed.add(server.server)
-        elif status == int(constants.Status.INITIAL):
+        elif status == int(Status.INITIAL):
             inited.add(server.server)
-        elif status == int(constants.Status.RUNNING):
+        elif status == int(Status.RUNNING):
             running.add(server.server)
 
     return inited, running, succeed, failed
 
 def save_pod_flag_to_etcd(etcd, pod_id, flag):
     if not flag:
-        save_pod_status_to_etcd(etcd, pod_id, edl_status.Status.FAILED)
+        save_pod_status_to_etcd(etcd, pod_id, Status.FAILED)
         logger.fatal("local trainers meets error!")
         return
 
-    save_pod_status_to_etcd(etcd, pod_id, edl_status.Status.SUCCEED)
+    save_pod_status_to_etcd(etcd, pod_id, Status.SUCCEED)
     logger.info("local trainers succeeded!")

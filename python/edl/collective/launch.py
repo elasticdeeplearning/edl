@@ -90,7 +90,7 @@ def prepare(args):
     pod.from_env(job_env)
 
     # update pod status
-    edl_status.save_pod_status_to_etcd(etcd, pod.get_id(), constants.Status.INITIAL)
+    edl_status.save_pod_status_to_etcd(etcd, pod.get_id(), edl_status.Status.INITIAL)
 
     # launch pod server
     pod_server = PodServer(job_env, pod.get_id())
@@ -158,7 +158,7 @@ def launch(args):
 
     # update pod status
     etcd = etcd_db.get_global_etcd()
-    edl_status.save_pod_status_to_etcd(etcd, pod.get_id(), constants.Status.RUNNING)
+    edl_status.save_pod_status_to_etcd(etcd, pod.get_id(), edl_status.Status.RUNNING)
 
     # watcher after barrier
     watcher = Watcher(job_env, cluster, pod)
