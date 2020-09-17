@@ -21,6 +21,7 @@ import sys
 
 from edl.utils.log_utils import logger
 
+
 class TrainerProc(object):
     def __init__(self):
         self.proc = None
@@ -32,11 +33,11 @@ class TrainerProc(object):
 
 
 def start(job_env,
-         cluster,
-         pod,
-         training_script,
-         training_script_args,
-         log_dir=None):
+          cluster,
+          pod,
+          training_script,
+          training_script_args,
+          log_dir=None):
     current_env = copy.copy(os.environ.copy())
     #paddle broadcast ncclUniqueId use socket, and
     #proxy maybe make trainers unreachable, so delete them.
@@ -57,7 +58,7 @@ def start(job_env,
             "PADDLE_CURRENT_ENDPOINT": "%s" % t.endpoint,
             "PADDLE_TRAINERS_NUM": "%d" % cluster.get_trainers_world_size(),
             "PADDLE_TRAINER_ENDPOINTS":
-                ",".join(cluster.get_trainers_endpoints()),
+            ",".join(cluster.get_trainers_endpoints()),
         }
 
         current_env.update(proc_env)
@@ -162,13 +163,13 @@ def _watch_local_procs(procs, nranks):
     except SystemExit:
         logger.error(
             "ABORT!!! Out of all {} trainers, the trainer process with rank={} was aborted. Please check its log.".
-                format(nranks, error_rank))
+            format(nranks, error_rank))
         terminate_local_procs(procs)
         raise
     except:
         logger.error(
             "ABORT!!! Out of all {} trainers, the trainer process with rank={} was aborted. Please check its log.".
-                format(nranks, error_rank))
+            format(nranks, error_rank))
         terminate_local_procs(procs)
         raise
 

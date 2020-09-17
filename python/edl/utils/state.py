@@ -18,7 +18,7 @@ from edl.utils import error_utils
 from edl.utils import exceptions
 from edl.utils import unique_name
 from edl.utils.log_utils import logger
-from edl.utils improt status as edl_status
+from edl.utils import status as edl_status
 
 
 class DataCheckpoint(object):
@@ -171,6 +171,7 @@ def load_from_etcd(etcd, state_name, timeout=60):
     s = State()
     s.from_json(value)
     return s
+
 
 @error_utils.error_utils.handle_errors_until_timeout
 def save_to_etcd(etcd_endpoints,

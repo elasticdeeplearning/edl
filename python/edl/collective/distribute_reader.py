@@ -108,8 +108,8 @@ class DataAccesser(object):
 
         self._reader_name = reader_name
         self._trainer_env = trainer_env
-        self._etcd = etcd_db.get_global_etcd(self._trainer_env.etcd_endpoint, job_id=self._trainer_env.job_id)
-
+        self._etcd = etcd_db.get_global_etcd(
+            self._trainer_env.etcd_endpoint, job_id=self._trainer_env.job_id)
 
         # BatchData
         self._input_queue = input_queue
@@ -122,9 +122,11 @@ class DataAccesser(object):
 
         self._data_server = data_server.DataServer(self)
         self._data_server.start()
-        edl_reader.save_to_etcd(self._etcd, reader_name=self._reader_name,
-                                pod_id=self._trainer_env.pod_id,
-                                data_server_endpoint=self._data_server.endpoint)
+        edl_reader.save_to_etcd(
+            self._etcd,
+            reader_name=self._reader_name,
+            pod_id=self._trainer_env.pod_id,
+            data_server_endpoint=self._data_server.endpoint)
 
         self._stop = threading.Event()
         self._t_reporter = threading.Thread(target=self.report)
@@ -285,25 +287,16 @@ class Reader(object):
             timeout=60)
 
         self._etcd = etcd_db.get_global_etcd(self._trainer_env.endpoints,
-                                   self._trainer_env.job_id)
+                                             self._trainer_env.job_id)
         # reader meta
-        self._reader_leader = edl_reader.load_from_ectd(self._etcd, self._trainer_env.pod_leader_id, timeout=60)
+        self._reader_leader = edl_reader.load_from_ectd(
+            self._etcd, self._trainer_env.pod_leader_id, timeout=60)
 
         self._generater_out_queue = multiprocessing.Queue(self._cache_capcity)
         self._accesser_out_queue = multiprocessing.Queue(self._cache_capcity)
 
         self._generater = None
         self._accesser = None
-
-    @handle_errors_until_timeout
-    def _wait_dist_reader_leader(self, timeout=60):
-
-
-    @handle_errors_until_timeout
-    def _wait_record_to_dist_reader_table(self, timeout=60):
-        self._db.record_to_dist_reader_table(self._trainer_env.etcd_endpoint,
-                                             self._name,
-                                             self._trainer_env.pod_id)
 
     def stop(self):
         if self._generater:

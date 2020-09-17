@@ -171,10 +171,10 @@ class Cluster(object):
     def status(self, s):
         self._status = s
 
+
 @error_utils.handle_errors_until_timeout
 def load_from_etcd(etcd, timeout=60):
-    value = etcd.get_value(constants.ETCD_CLUSTER,
-                                     constants.ETCD_CLUSTER)
+    value = etcd.get_value(constants.ETCD_CLUSTER, constants.ETCD_CLUSTER)
 
     if value is None:
         return None

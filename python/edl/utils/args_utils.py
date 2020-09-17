@@ -83,9 +83,9 @@ def parse_args():
         "training_script",
         type=str,
         help="The full path to the single GPU training "
-             "program/script to be launched in parallel, "
-             "followed by all the arguments for the "
-             "training script")
+        "program/script to be launched in parallel, "
+        "followed by all the arguments for the "
+        "training script")
 
     #rest from the training program
     parser.add_argument('training_script_args', nargs=argparse.REMAINDER)

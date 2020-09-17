@@ -15,12 +15,12 @@ from ..discovery.etcd_client import EtcdClient
 
 g_etcd = None
 
+
 def get_global_etcd(etcd_endpoints=None, job_id=None):
     global g_etcd
     if g_etcd is None:
         assert etcd_endpoints is not None and job_id is not None
-        g_etcd = EtcdClient(
-            endpoints=etcd_endpoints, root=job_id, timeout=6)
+        g_etcd = EtcdClient(endpoints=etcd_endpoints, root=job_id, timeout=6)
         g_etcd.init()
         return g_etcd
 

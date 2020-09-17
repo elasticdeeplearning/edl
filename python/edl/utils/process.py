@@ -17,6 +17,7 @@ import threading
 
 from edl.utils.log_utils import logger
 
+
 class ProcessWrapper(object):
     def __init__(self):
         self._stop = None
