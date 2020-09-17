@@ -170,12 +170,17 @@ class TrainerEnv(object):
     def __init__(self, args=None):
         self._job_id = os.environ["PADDLE_JOB_ID"]
         self._pod_id = os.environ["PADDLE_POD_ID"]
+        self._pod_leader_id = os.environ["EDL_POD_LEADER_ID"]
         self._etcd_endpoints = os.environ["PADDLE_ETCD_ENDPOINTS"]
 
         self._global_rank = int(os.environ["PADDLE_TRAINER_ID"])
         self._rank_in_pod = int(os.environ["PADDLE_TRAINER_RANK_IN_POD"])
         self._trainer_endpoints = os.environ["PADDLE_TRAINER_ENDPOINTS"]
         self._pod_ids = os.environ["EDL_POD_IDS"].split(",")
+
+    @property
+    def pod_leader_id(self):
+        return self._pod_leader_id
 
     @property
     def pod_ids(self):

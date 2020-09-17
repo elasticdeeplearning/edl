@@ -16,18 +16,18 @@ from __future__ import print_function
 import multiprocessing
 import sys
 import threading
-from edl.uitls import edl_reader
+from edl.uitls import reader as edl_reader
 from edl.utils import env as edl_env
-from edl.utils import state
+from edl.utils import state as edl_state
 
-from . import data_server
-from . import data_server_pb2 as pb
-from . import edl_process
-from .data_server_client import DataServerClient
-from .error_utils import handle_errors_until_timeout
-from .etcd_db import get_global_etcd
-from .log_utils import logger
-from .unique_name import generator
+from edl.utils import data_server
+from edl.utils import data_server_pb2
+from edl.utils import edl_process
+from edl.utils import data_server_client
+from edl.utils.error_utils import handle_errors_until_timeout
+from edl.utils import etcd_db
+from edl.utils.log_utils import logger
+from edl.utils import unique_name
 
 
 class DataGenerator(edl_process.ProcessWrapper):
@@ -53,7 +53,7 @@ class DataGenerator(edl_process.ProcessWrapper):
         self._data_queue = out_queue
 
     def _get_file_list(self, timeout=60):
-        client = DataServerClient()
+        client = data_server_client.DataServerClient()
         return client.get_file_list(
             leader_endpoint=self._leader_endpoint,
             reader_name=self._reader_name,
@@ -62,7 +62,7 @@ class DataGenerator(edl_process.ProcessWrapper):
 
     def _generate_batch_data(self):
         self._batch_data_id += 1
-        b = pb.BatchData()
+        b = data_server_pb2.BatchData()
         b.batch_data_id = self._batch_data_id
         b.data = None
 
@@ -79,7 +79,7 @@ class DataGenerator(edl_process.ProcessWrapper):
                 fields = record
 
                 assert fields[0] == m.idx
-                rec = pb.Record()
+                rec = data_server_pb2.Record()
                 rec.record_no = fields[0]
                 for field in fields[1:]:
                     rec.field_data.append(field)
@@ -105,9 +105,11 @@ class DataAccesser(object):
     def __init__(self, reader_leader_endpoint, reader_name, trainer_env,
                  input_queue, out_queue, queue_size):
         self._reader_leader_endpoint = reader_leader_endpoint
-        self._data_server_endpoint = data_server_endpoint
+
         self._reader_name = reader_name
         self._trainer_env = trainer_env
+        self._etcd = etcd_db.get_global_etcd(self._trainer_env.etcd_endpoint, job_id=self._trainer_env.job_id)
+
 
         # BatchData
         self._input_queue = input_queue
@@ -120,13 +122,16 @@ class DataAccesser(object):
 
         self._data_server = data_server.DataServer(self)
         self._data_server.start()
+        edl_reader.save_to_etcd(self._etcd, reader_name=self._reader_name,
+                                pod_id=self._trainer_env.pod_id,
+                                data_server_endpoint=self._data_server.endpoint)
 
         self._stop = threading.Event()
         self._t_reporter = threading.Thread(target=self.report)
         self._t_generater = threading.Thread(target=self.generate)
         self._t_accesser = threading.Thread(target=self.access)
 
-        self._client = DataServerClient()
+        self._client = data_server_client.DataServerClient()
 
     def start(self):
         self._client.connect(self._reader_leader_endpoint)
@@ -263,7 +268,7 @@ class Reader(object):
         self._file_list = file_list
         assert isinstance(self._file_list, list), "file_list must be a list"
 
-        self._name = generator("_dist_reader_")
+        self._name = unique_name.generator("_dist_reader_")
 
         self._cls = file_splitter_cls
         self._batch_size = batch_size
@@ -273,17 +278,16 @@ class Reader(object):
         # connections to data servers
         self._trainer_env = edl_env.TrainerEnv()
 
-        self._state = state.load_from_etcd(
+        self._state = edl_state.load_from_etcd(
             etcd_endpoints=self._trainer_env.etcd_endpoints,
             job_id=self._trainer_env.job_id,
             state_name=self._name,
             timeout=60)
 
-        self._db = get_global_etcd(self._trainer_env.endpoints,
+        self._etcd = etcd_db.get_global_etcd(self._trainer_env.endpoints,
                                    self._trainer_env.job_id)
         # reader meta
-        edl_reader.save_to_etcd()
-        self._reader_leader = edl_reader.load_from_ectd(self._db,)
+        self._reader_leader = edl_reader.load_from_ectd(self._etcd, self._trainer_env.pod_leader_id, timeout=60)
 
         self._generater_out_queue = multiprocessing.Queue(self._cache_capcity)
         self._accesser_out_queue = multiprocessing.Queue(self._cache_capcity)
