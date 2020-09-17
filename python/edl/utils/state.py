@@ -20,31 +20,6 @@ from edl.utils.log_utils import logger
 from edl.discovery.etcd_client import EtcdClient
 from edl.utils import unique_name
 
-
-class DistReader(object):
-    def __init__(self, pod_id, name, endpoint):
-        self._pod_id = pod_id
-        self._name = name
-        self._endpoint = endpoint
-
-    def to_json(self):
-        d = {
-            "pod_id": self._pod_id,
-            "endpoint": self._endpoint,
-            "name": self._name,
-        }
-        return json.dumps(d)
-
-    def from_json(self, s):
-        d = json.loads(s)
-        self._pod_id = d["pod_id"]
-        self._endpoint = d["endpoint"]
-        self._name = d["name"]
-
-    def __str_(self):
-        return self._to_json()
-
-
 class DataCheckpoint(object):
     def __init__(self, reader_name=None, file_list=None, data_checkpoint=None):
         self._reader_name = reader_name
@@ -185,30 +160,23 @@ class State(object):
 
 
 @error_utils.handle_errors_until_timeout
-def load_from_etcd(etcd_endpoints, job_id, state_name, timeout=60):
-    etcd = EtcdClient(
-        endpoints=etcd_endpoints,
-        root=job_id,
-        timeout=constants.EDL_CONN_TIMEOUT)
-    etcd.init()
-
+def load_from_etcd(etcd, state_name, timeout=60):
     value = etcd.get_value(constants.ETCD_STATE, state_name)
 
     if value is None:
         raise exceptions.EdlTableError("key:value = {}:{}".format(
-            etcd.get_full_path(constants.ETCD_DIST_READER, name), value))
+            etcd.get_full_path(constants.ETCD_DIST_READER, state_name), value))
 
     s = State()
     s.from_json(value)
     return s
-
 
 @error_utils.error_utils.handle_errors_until_timeout
 def save_to_etcd(etcd_endpoints,
                  job_id,
                  pod_id,
                  name,
-                 mode_path,
+                 model_path,
                  data_checkpoint,
                  user_defined,
                  timeout=60):
@@ -231,14 +199,14 @@ def save_to_etcd(etcd_endpoints,
     etcd = etcd._etcd
     status, _ = etcd.transaction(
         compare=[etcd.transactions.value(leader_key) == pod_id, ],
-        success=[etcd.transactions.put(state_key, c.to_json()), ],
+        success=[etcd.transactions.put(state_key, s.to_json()), ],
         failure=[])
 
     message = "pod_id:{} save_data_checkpoint status:{}".format(pod_id, status)
     if not status:
         raise exceptions.EdlEtcdIOError(message)
 
-    return status
+    return
 
 
 class PaddleState(State):

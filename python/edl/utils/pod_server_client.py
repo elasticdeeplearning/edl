@@ -18,7 +18,7 @@ from . import pod_server_pb2 as pb
 from . import pod_server_pb2_grpc as pb_grpc
 from .client import Client
 from .cluster import Cluster
-from .exceptions import deserialize_exception
+from .exceptions import deserialize
 from .log_utils import logger
 
 
@@ -58,7 +58,5 @@ class PodServerClient(Client):
                 message = "job_id:{} pod_id:{} barrier time out".format(job_id,
                                                                         pod_id)
                 logger.info(message)
-                deserialize_exception(res.status)
+                deserialize(res.status)
             time.sleep(1)
-
-        return None

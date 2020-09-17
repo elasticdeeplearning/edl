@@ -17,7 +17,6 @@ def record_to_string(rec):
     return "record_no:{} fields_len:{}".format(rec.record_no,
                                                len(rec.field_data))
 
-
 def batch_data_response_to_string(res):
     r = []
     for data in res.data:

@@ -18,9 +18,9 @@ from edl.utils import data_server_pb2
 from edl.utils import data_server_pb2_grpc
 from edl.utils import pb_utils
 
-from .error_utils import handle_errors_until_timeout
-from .exceptions import deserialize_exception
-from .log_utils import logger
+from edl.utils import error_utils
+from edl.utils import exceptions
+from edl.util.log_utils import logger
 
 
 class Conn(object):
@@ -36,7 +36,7 @@ class Client(object):
     def __init__(self):
         self._conn = {}  #endpoint=>(channel, stub)
 
-    @handle_errors_until_timeout
+    @error_utils.handle_errors_until_timeout
     def _connect(self, endpoint, timeout=30):
         if endpoint not in self._conn:
             c = grpc.insecure_channel(endpoint)
@@ -45,7 +45,7 @@ class Client(object):
 
         return self._conn[endpoint]
 
-    @handle_errors_until_timeout
+    @error_utils.handle_errors_until_timeout
     def get_file_list(self,
                       reader_leader_endpoint,
                       reader_name,
@@ -69,12 +69,12 @@ class Client(object):
         with conn.lock:
             res = conn.stub.GetFileList(req)
         if res.status.type != "":
-            deserialize_exception(res.status)
+            exceptions.deserialize(res.status)
 
         logger.debug("pod client get file_list:{}".format(res.file_list))
         return res.file_list
 
-    @handle_errors_until_timeout
+    @error_utils.handle_errors_until_timeout
     def report_batch_data_meta(self,
                                reader_leader_endpoint,
                                reader_name,
@@ -95,9 +95,9 @@ class Client(object):
             res = conn.stub.ReportBatchDataMeta(req)
 
         if res.status.type != "":
-            deserialize_exception(res.status)
+            exceptions.deserialize(res.status)
 
-    @handle_errors_until_timeout
+    @error_utils.handle_errors_until_timeout
     def reach_data_end(self,
                        reader_leader_endpoint,
                        reader_name,
@@ -113,9 +113,9 @@ class Client(object):
             res = conn.stub.ReachDataEnd(req)
 
         if res.status.type != "":
-            deserialize_exception(res.status)
+            exceptions.deserialize(res.status)
 
-    @handle_errors_until_timeout
+    @error_utils.handle_errors_until_timeout
     def get_batch_data_meta(self,
                             reader_leader_endpoint,
                             reader_name,
@@ -131,13 +131,13 @@ class Client(object):
             res = conn.stub.GetBatchDataMeta(req)
 
         if res.status.type != "":
-            deserialize_exception(res.status)
+            exceptions.deserialize(res.status)
 
         logger.debug("pod client get_balanced_batch_data meta:{}".format(
             pb_utils.batch_data_meta_response_to_string(res)))
         return res.data
 
-    @handle_errors_until_timeout
+    @error_utils.handle_errors_until_timeout
     def get_batch_data(self, req, timeout=60):
         """
         return BatchDataResponse
@@ -147,7 +147,7 @@ class Client(object):
         with conn.lock:
             res = conn.stub.GetBatchData(req)
         if res.status.type != "":
-            deserialize_exception(res.status)
+            exceptions.deserialize(res.status)
 
         logger.debug("pod client get batch_data meta:{}".format(
             pb_utils.batch_data_response_to_string(res)))

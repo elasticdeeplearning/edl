@@ -34,95 +34,17 @@ from ..utils.edl_env import JobEnv
 from ..utils.pod import Pod
 from ..utils.register import PodResourceRegister
 from ..utils.leader_register import LeaderRegister
-from ..utils.etcd_db import get_global_etcd
+from edl.utils import etcd_db
 from ..utils.watcher import Watcher
 from ..utils.pod_server import PodServer
 from ..utils.log_utils import logger
-from ..utils import log_utils
-from ..utils import pod_server_client
-from ..utils import constants
-from ..utils import exceptions
-from ..utils.edl_process import start_local_trainers, terminate_local_procs, watch_local_trainers
-
-
-def _print_arguments(args):
-    print("-----------  Configuration Arguments -----------")
-    for arg, value in sorted(six.iteritems(vars(args))):
-        print("%s: %s" % (arg, value))
-    print("------------------------------------------------")
-
-
-def _parse_args():
-    """
-    Helper function parsing the command line options
-    @retval ArgumentParser
-    """
-    parser = ArgumentParser(
-        description='''start paddle training using multi-process mode.''')
-
-    parser.add_argument("--nodes_range", type=str, default=None, help="")
-
-    parser.add_argument("--nproc_per_node", type=int, default=None, help="")
-
-    parser.add_argument(
-        "--etcd_endpoints", type=str, default=None, help="etcd endpoints")
-
-    parser.add_argument(
-        "--job_id", type=str, default=None, help="The identify id of this job")
-
-    parser.add_argument(
-        "--log_level",
-        type=int,
-        default=20,
-        help="Logging level, default is logging.INFO")
-
-    parser.add_argument(
-        "--log_dir",
-        type=str,
-        default="./log",
-        help="The path for each process's log.If it's not set, the log will printed to default pipe."
-    )
-
-    parser.add_argument(
-        "--hdfs_name",
-        type=str,
-        default=None,
-        help="The hdfs_name used for edl.")
-
-    parser.add_argument(
-        "--hdfs_ugi",
-        type=str,
-        default=None,
-        help="The hdfs_ugi used for edl.")
-
-    # checkpoint will saved here
-    parser.add_argument(
-        "--hdfs_path",
-        type=str,
-        default=None,
-        help="The hdfs_path used for edl.")
-
-    #positional
-    parser.add_argument(
-        "training_script",
-        type=str,
-        help="The full path to the single GPU training "
-        "program/script to be launched in parallel, "
-        "followed by all the arguments for the "
-        "training script")
-
-    #rest from the training program
-    parser.add_argument('training_script_args', nargs=REMAINDER)
-    return parser.parse_args()
-
-
-def _convert_args_to_dict(args):
-    d = {}
-    for k, v in six.iteritems(vars(args)):
-        if v is not None:
-            d[k] = v
-    return d
-
+from edl.utils import log_utils
+from edl.utils import pod_server_client
+from edl.utils import constants
+from edl.utils import exceptions
+from edl.utils import edl_status
+from edl.utils import edl_train_process
+from edl.utils import edl_leader
 
 def edl_barrier(job_env, pod, timeout):
     start = time.time()
@@ -130,8 +52,8 @@ def edl_barrier(job_env, pod, timeout):
     log_time = time.time()
     while True:
         try:
-            db = get_global_etcd()
-            leader = db.get_pod_leader()
+            etcd = etcd_db.get_global_etcd()
+            leader = etcd_leader.get_pod_leader(etcd)
             if leader is None:
                 raise exceptions.EdlNotFoundLeader("can't get leader")
 
@@ -166,7 +88,7 @@ def prepare(args):
     db = get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
 
     last_status = db.get_job_status()
-    if last_status == constants.Status.SUCCEED:
+    if last_status == edl_setatus.Status.SUCCEED:
         logger.info("job:{} has completed! Need't try!".format(job_env.job_id))
         sys.exit(0)
 
@@ -242,13 +164,13 @@ def launch(args):
     cluster = edl_barrier(job_env, pod, timeout=600)
 
     # update pod status
-    db = get_global_etcd()
-    db.set_pod_status(pod.get_id(), constants.Status.RUNNING)
+    etcd = get_global_etcd()
+    edl_status.save_pod_status_to_etcd(etcd, pod.get_id(), constants.Status.RUNNING)
 
     # watcher after barrier
     watcher = Watcher(job_env, cluster, pod)
 
-    procs = start_local_trainers(
+    procs = edl_train_process.start(
         cluster,
         pod,
         args.training_script,
@@ -260,12 +182,12 @@ def launch(args):
     barrier_flag = True
     while True:
         # check local status first
-        alive, trainer_flag = watch_local_trainers(procs, pod.trainers_num)
+        alive, trainer_flag = edl_train_process.watch(procs, pod.trainers_num)
         if not alive or not trainer_flag:
             break
 
         if resource_register.is_stopped() or leader_register.is_stopped():
-            terminate_local_procs()
+            edl_train_process.terminate()
             register_flag = False
             break
 
@@ -276,12 +198,12 @@ def launch(args):
                 barrier_flag = False
                 break
 
-            terminate_local_procs(procs)
+            edl_train_process.terminate(procs)
 
             cluster = new_cluster
             watcher = Watcher(job_env, cluster, pod)
 
-            procs = start_local_trainers(
+            procs = edl_train_process.start(
                 job_env,
                 cluster,
                 pod,
@@ -308,11 +230,11 @@ def launch(args):
         barrier_flag=barrier_flag)
 
 
-def run_commandline():
+def main():
     log_utils.get_logger(log_level=10)
     args = _parse_args()
     launch(args)
 
 
 if __name__ == '__main__':
-    run_commandline()
+    main()

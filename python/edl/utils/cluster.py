@@ -168,3 +168,14 @@ class Cluster(object):
     @status.setter
     def status(self, s):
         self._status = s
+
+def load_from_etcd(etcd):
+    etcd.get_value(constants.ETCD_CLUSTER,
+                                     constants.ETCD_CLUSTER)
+
+    if value is None:
+        return None
+
+    cluster = Cluster()
+    cluster.from_json(value)
+    return cluster

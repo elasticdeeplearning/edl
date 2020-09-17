@@ -27,7 +27,7 @@ from ..discovery import etcd_client
 from edl.utils import cluster as cluster_utils
 
 
-class ClusterGenerator(object):
+class Generator(object):
     def __init__(self, job_env, pod_id):
         self._cluster = cluster_utils.Cluster()
         self._service = constants.ETCD_CLUSTER

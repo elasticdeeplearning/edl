@@ -18,10 +18,8 @@ import psutil
 import signal
 import subprocess
 import sys
-import threading
 
-from .log_utils import logger
-
+from edl.utils.log_utils import logger
 
 class TrainerProc(object):
     def __init__(self):
@@ -33,7 +31,7 @@ class TrainerProc(object):
         self.local_rank = None
 
 
-def start_local_trainers(job_env,
+def start(job_env,
                          cluster,
                          pod,
                          training_script,
@@ -59,7 +57,7 @@ def start_local_trainers(job_env,
             "PADDLE_CURRENT_ENDPOINT": "%s" % t.endpoint,
             "PADDLE_TRAINERS_NUM": "%d" % cluster.get_trainers_world_size(),
             "PADDLE_TRAINER_ENDPOINTS":
-            ",".join(cluster.get_trainers_endpoints()),
+                ",".join(cluster.get_trainers_endpoints()),
         }
 
         current_env.update(proc_env)
@@ -164,13 +162,13 @@ def watch_local_procs(procs, nranks):
     except SystemExit:
         logger.error(
             "ABORT!!! Out of all {} trainers, the trainer process with rank={} was aborted. Please check its log.".
-            format(nranks, error_rank))
+                format(nranks, error_rank))
         terminate_local_procs(procs)
         raise
     except:
         logger.error(
             "ABORT!!! Out of all {} trainers, the trainer process with rank={} was aborted. Please check its log.".
-            format(nranks, error_rank))
+                format(nranks, error_rank))
         terminate_local_procs(procs)
         raise
 
@@ -188,36 +186,3 @@ def watch_local_trainers(procs, nranks):
         return False, False
 
     return alive, True
-
-
-class ProcessWrapper(object):
-    def __init__(self):
-        self._stop = None
-        self._lock = None
-        self._worker = None
-
-        self._stop = multiprocessing.Event()
-        self._lock = threading.Lock()
-        self._worker = multiprocessing.Process(target=self._worker_func)
-
-    def _worker_func(self):
-        raise NotImplementedError
-
-    def start(self):
-        self._worker.start()
-
-    def stop(self):
-        self._stop.set()
-        with self._lock:
-            if self._worker:
-                self._worker.join()
-                self._worker = None
-
-        logger.info("{} exit".format(self.__class__.__name__))
-
-    def is_stopped(self):
-        with self._lock:
-            return self._worker == None
-
-    def __exit__(self):
-        self.stop()

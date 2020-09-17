@@ -45,7 +45,7 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         status = common_pb.Status()
         pod = self._db.get_pod_leader()
         if pod.get_id != self._pod_id:
-            status = exceptions.serialize_exception(
+            status = exceptions.serialize(
                 EdlLeaderError("this pod is not the leader"))
             return status
 
@@ -55,7 +55,7 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         status = common_pb.Status()
         pod = self._db.get_pod_leader()
         if pod.get_id != self._pod_id:
-            status = exceptions.serialize_exception(
+            status = exceptions.serialize(
                 EdlLeaderError("this pod is not the leader"))
             return status
 
@@ -67,14 +67,14 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         try:
             cluster = self._db.get_cluster()
             if cluster is None:
-                exceptions.serialize_exception(
+                exceptions.serialize(
                     res,
                     exceptions.EdlBarrierError(
                         "get current running cluster error"))
                 return res
 
             if cluster.status == constants.Status.FAILED:
-                exceptions.serialize_exception(
+                exceptions.serialize(
                     res,
                     exceptions.EdlBarrierError(
                         "cluster's status is status.Failed"))
@@ -98,7 +98,7 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
                 res.cluster_json = cluster.to_json()
                 return res
 
-            exceptions.serialize_exception(
+            exceptions.serialize(
                 res,
                 exceptions.EdlBarrierError(
                     "barrier's context:{}, now:{}".format(ids, bd)))
@@ -106,7 +106,7 @@ class PodServerServicer(pod_server_pb_grpc.PodServerServicer):
         except Exception as e:
             logger.debug("internal error:{} {}".format(e,
                                                        traceback.format_exc()))
-            exceptions.serialize_exception(
+            exceptions.serialize(
                 res, exceptions.EdlInternalError(str(e)))
             return res
 

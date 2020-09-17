@@ -12,15 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ETCD_POD_RESOURCE = "pod_resource"
-ETCD_POD_RANK = "rank"
-ETCD_POD_STATUS = "pod_status"
-ETCD_JOB_STATUS = "job_status"
-ETCD_TRAIN_STATUS = "train_status"
-ETCD_CLUSTER = "cluster"
-ETCD_DIST_READER = "reader"
-ETCD_STATE = "state"
-ETCD_POD_LEADER = "0"
+from edl.utils import constants
 
-ETCD_CONN_TIMEOUT = 6
-ETCD_TTL = 15
+class TrainStatus(IntEnum):
+    INITIAL = 0
+    RUNNING = 1
+    NEARTHEEND = 3
+    SUCCEED = 3
+    FAILED = 4
+
+def save_to_etcd(etcd, pod_id, status):
+    service = constants.ETCD_TRAIN_STATUS
+    server = pod_id
+    info = json.dumps({"status": int(status)})
+    etcd.set_server_permanent(service, server, info)
+
+
+def load_from_etcd(etcd, pod_id):
+    value = self._etcd.get_value(constants.ETCD_TRAIN_STATUS,
+                                     pod_id)
+
+    if value is None:
+        return None
+
+    d = json.load(value)
+    return d["status"]

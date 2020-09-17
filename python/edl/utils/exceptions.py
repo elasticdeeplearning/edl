@@ -14,7 +14,7 @@
 
 import sys
 
-from ..utils import common_pb2 as common_pb
+from edl.utils import common_pb2
 
 
 class EdlException(Exception):
@@ -89,7 +89,7 @@ class EdlNotLeaderError(EdlException):
     pass
 
 
-def deserialize_exception(s):
+def deserialize(s):
     thismodule = sys.modules[__name__]
     try:
         cls = getattr(thismodule, s.type)(s.detail)
@@ -99,14 +99,14 @@ def deserialize_exception(s):
     raise cls
 
 
-def serialize_exception(e):
-    s = common_pb.Status()
+def serialize(e):
+    s = common_pb2.Status()
     s.type = e.__class__.__name__
     s.detail = str(e)
     return s
 
 
-def serialize_exception(res, e, stack_info=None):
+def serialize(res, e, stack_info=None):
     res.status.type = e.__class__.__name__
     if stack_info is not None:
         res.status.detail = str(e) + stack_info
