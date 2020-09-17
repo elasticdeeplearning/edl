@@ -17,6 +17,7 @@ from edl.utils import constants
 from edl.utils import exceptions
 from edl.utils.log_utils import logger
 from edl.utils import error_utils
+from edl.utils import cluster as edl_cluster
 
 class ReaderMeta(object):
     def __init__(self, name, pod_id, data_server_endpoint):
@@ -60,3 +61,30 @@ def load_from_etcd(self, etcd, reader_name, pod_id, timeout=60):
     meta.from_json(value)
     logger.debug("get reader:".format(meta))
     return meta
+
+def check_dist_readers(etcd):
+    servers = etcd.get_service(constants.ETCD_READER)
+
+    if len(servers) <= 0:
+        raise exceptions.EdlTableError("table:{} has no readers".format(
+            constants.ETCD_READER))
+
+    readers = {}
+    for s in servers:
+        r = ReaderMeta()
+        r.from_json(s.value)
+
+        readers[r.key] = r
+
+    cluster = edl_cluster.get_cluster(etcd)
+    if cluster is None:
+        raise exceptions.EdlTableError("table:{} has no readers".format(
+            constants.ETCD_CLUSTER))
+
+    if cluster.get_pods_ids_set() != set(readers.keys()):
+        raise exceptions.EdlTableError(
+            "reader_ids:{} != cluster_pod_ids:{}".format(reader_ids.keys(
+            ), cluster.get_pods_ids_set()))
+
+    logger.debug("get readers:{}".format(readers))
+    return readers

@@ -71,3 +71,12 @@ def load_pods_status_from_etcd(etcd):
             running.add(server.server)
 
     return inited, running, succeed, failed
+
+def save_pod_flag_to_etcd(etcd, pod_id, flag):
+    if not flag:
+        self.set_pod_status(pod_id, edl_status.Status.FAILED)
+        logger.fatal("local trainers meets error!")
+        return
+
+    save_pod_status_to_etcd(etcd, pod_id, edl_status.Status.SUCCEED)
+    logger.info("local trainers succeeded!")

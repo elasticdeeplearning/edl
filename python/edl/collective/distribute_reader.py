@@ -21,7 +21,7 @@ from . import data_server
 from . import data_server_pb2 as pb
 from . import edl_process
 from .data_server_client import DataServerClient
-from .edl_env import TrainerEnv
+from edl.utils import env as edl_env
 from .error_utils import handle_errors_until_timeout
 from .etcd_db import get_global_etcd
 from .log_utils import logger
@@ -272,7 +272,7 @@ class Reader(object):
         self._cache_capcity = cache_capcity
 
         # connections to data servers
-        self._trainer_env = TrainerEnv()
+        self._trainer_env = edl_env.TrainerEnv()
 
         self._state = state.load_from_etcd(
             etcd_endpoints=self._trainer_env.etcd_endpoints,

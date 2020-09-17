@@ -13,12 +13,12 @@
 # limitations under the License.
 
 import unittest
-from paddle_edl.discovery.etcd_client import EtcdClient
+from edl.discovery.etcd_client import EtcdClient
 
-from paddle_edl.utils.register import PodRegister
-from paddle_edl.utils.cluster import Pod
-from paddle_edl.utils.edl_env import JobEnv
-from paddle_edl.utils.edl_launch import _parse_args
+from edl.utils.register import PodRegister
+from edl.utils.cluster import Pod
+from edl.utils import env as edl_env
+from edl.utils.edl_launch import _parse_args
 
 
 class TestRegister(unittest.TestCase):
@@ -56,7 +56,7 @@ class TestRegister(unittest.TestCase):
         pod = Pod()
         pod.init_from_env()
 
-        job_env = JobEnv(self._args)
+        job_env = edl_env.JobEnv(self._args)
         pod_env = Pod(job_env)
 
         self._pod_register = PodRegister(job_env, pod_env)

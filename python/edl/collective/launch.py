@@ -30,7 +30,7 @@ from contextlib import closing
 import socket
 import traceback
 
-from ..utils.edl_env import JobEnv
+from edl.utils import edl_env
 from ..utils.pod import Pod
 from ..utils.register import PodResourceRegister
 from ..utils.leader_register import LeaderRegister
@@ -42,9 +42,9 @@ from edl.utils import log_utils
 from edl.utils import pod_server_client
 from edl.utils import constants
 from edl.utils import exceptions
-from edl.utils import edl_status
-from edl.utils import edl_train_process
-from edl.utils import edl_leader
+from edl.utils import status as edl_status
+from edl.utils import train_process as edl_train_process
+from edl.utils import leader
 
 def edl_barrier(job_env, pod, timeout):
     start = time.time()
@@ -72,7 +72,7 @@ def edl_barrier(job_env, pod, timeout):
         if time.time() - start > timeout:
             message = "wait to barrier with all error:{} leader:[{}] current pod:[{}]".format(
                 traceback.format_exc(), leader, pod)
-            raise EdlBarrierError(message)
+            raise exceptions.EdlBarrierError(message)
 
         time.sleep(3)
 
@@ -81,14 +81,14 @@ def prepare(args):
     args_dict = _convert_args_to_dict(args)
 
     # job enviroment.
-    job_env = JobEnv(args_dict)
+    job_env = edl_env.JobEnv(args_dict)
     logger.info("get job env:{}".format(str(job_env)))
 
     # get global etcd and lock
-    db = get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
+    etcd = etcd_db.get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
 
-    last_status = db.get_job_status()
-    if last_status == edl_setatus.Status.SUCCEED:
+    last_status = edl_status.load_job_status_from_etcd(etcd)
+    if last_status == edl_status.Status.SUCCEED:
         logger.info("job:{} has completed! Need't try!".format(job_env.job_id))
         sys.exit(0)
 
@@ -97,7 +97,7 @@ def prepare(args):
     pod.from_env(job_env)
 
     # update pod status
-    db.set_pod_status(pod.get_id(), constants.Status.INITIAL)
+    edl_status.save_pod_status_to_etcd(etcd, pod.get_id(), constants.Status.INITIAL)
 
     # launch pod server
     pod_server = PodServer(job_env, pod.get_id())
@@ -118,16 +118,16 @@ def job_exit(cluster,
              resource_flag,
              timeout=300):
     local_flag = trainer_flag & register_flag & barrier_flag
-    db = get_global_etcd()
-    db.set_pod_flag(pod.get_id(), local_flag)
+    etcd = etcd_db.get_global_etcd()
+    etcd_status.save_pod_flag_to_ecd(etcd, pod.get_id(), local_flag)
 
     begin = time.time()
     while True:
         try:
             if leader_register.is_leader():
-                if db.wait_resource(cluster, timeout=15):
+                if etcd.wait_resource(cluster, timeout=15):
                     job_flag = trainer_flag & register_flag & barrier_flag & resource_flag
-                    db.set_job_flag(job_flag)
+                    edl_status.save_job_flag_to_etcd(etcd, job_flag)
                     logger.info("set job status:{} ok!".format(job_flag))
                     break
                 raise exceptions.EdlWaitFollowersReleaseError(
@@ -164,7 +164,7 @@ def launch(args):
     cluster = edl_barrier(job_env, pod, timeout=600)
 
     # update pod status
-    etcd = get_global_etcd()
+    etcd = etcd_db.get_global_etcd()
     edl_status.save_pod_status_to_etcd(etcd, pod.get_id(), constants.Status.RUNNING)
 
     # watcher after barrier

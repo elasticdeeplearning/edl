@@ -17,7 +17,7 @@ import os
 import unittest
 from edl.utils import data_server
 from edl.utils import data_server_client
-from edl.utils import edl_env
+from edl.utils import env as edl_env
 from edl.utils import log_utils
 from edl.utils.log_utils import logger
 
