@@ -12,37 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# NOTE: 
-# This file is copied from paddle/python/distributed/utils.py
-# remove it when paddle's is ready.
-
-import functools
-import logging
-import time
-import os
-import signal
-import copy
-import sys
-import subprocess
-import json
-import uuid
-import six
 import collections
-from .exceptions import *
-from . import utils
-from enum import IntEnum
-from .utils import logger
+import copy
+import json
+import six
+import uuid
+
+from . import constants
+from . import exceptions
 from .pod import Pod
-from .trainer import Trainer
-from . import pod_server_pb2 as pod_server_pb
-from .global_vars import Status
 
 
 class Cluster(object):
     def __init__(self):
         self._pods = []
         self._stage = None
-        self._status = Status.INITIAL
+        self._status = constants.Status.INITIAL
 
     def __str__(self):
         return "pods:{} job_stage:{} status:{}".format(
@@ -154,7 +139,8 @@ class Cluster(object):
         for i, (key, value) in enumerate(six.iteritems(od)):
             pod = Pod()
             if i != int(key):
-                raise EdlRankError("rank:{} is not exists in {}".format(i, d))
+                raise exceptions.EdlRankError(
+                    "rank:{} is not exists in {}".format(i, d))
             pod.from_json(value)
             pods.append(pod)
 

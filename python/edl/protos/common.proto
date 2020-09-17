@@ -21,3 +21,5 @@ message Status {
   string type = 1;
   string detail = 2;
 }
+
+message EmptyRet { Status status = 1; }

@@ -16,74 +16,26 @@ import unittest
 from edl.discovery.etcd_client import EtcdClient
 import time
 import threading
-import os
 import sys
 import copy
 import atexit
-from etcd3.events import PutEvent, DeleteEvent
 
-from edl.utils.edl_env import JobEnv
 from edl.collective.launch import _parse_args, _convert_args_to_dict
 from edl.utils.pod_server import PodServer
 from edl.utils.pod import Pod
-from edl.utils.pod_client import PodServerClient
+from edl.utils.pod_server_client import PodServerClient
 from edl.utils.exceptions import EdlBarrierError
-import edl.utils.utils as utils
-from edl.utils.global_vars import *
-from edl.utils.generate_cluster import GenerateCluster
+from edl.utils.constants import *
+import edl.utils.cluster as cluster
 from edl.utils.etcd_db import get_global_etcd
 from edl.utils.leader_register import LeaderRegister
-from threading import Thread
-
-g_job_id = "test_barrier"
-g_etcd_endpoints = "127.0.0.1:2379"
+from edl.tests.unittests import etcd_test_base
+from edl.utils import cluster_generator
 
 
-class TestBarrier(unittest.TestCase):
+class TestGenerate(etcd_test_base.EtcdTestBase):
     def setUp(self):
-        utils.get_logger(log_level=10)
-        self._etcd = EtcdClient([g_etcd_endpoints], root=g_job_id)
-        self._etcd.init()
-        self._db = get_global_etcd([g_etcd_endpoints], g_job_id)
-
-        #self._args = _parse_args()
-        self._old_environ = copy.copy(dict(os.environ))
-        proc_env = {
-            "PADDLE_TRAINER_ID": "0",
-            "PADDLE_RUNNING_PLATFORM": "PADDLE_CLOUD",
-            "PADDLE_JOB_ID": g_job_id,
-            "PADDLE_EDL_HDFS_HOME": "/usr/local/hadoop-2.7.7",
-            "PADDLE_EDL_HDFS_NAME": "",
-            "PADDLE_EDL_HDFS_UGI": "",
-            "PADDLE_EDL_HDFS_PATH": "test_register_path",
-            "PADDLE_EDL_ONLY_FOR_CE_TEST": "1",
-            "PADDLE_EDL_FS_CACHE": ".test_register_cache",
-            "PADDLE_EDL_SAVE_CHECKPOINT_INTER": "0",
-            "PADDLE_EDL_NODES_RANGE": "1:4",
-            "PADDLE_EDL_NPROC_PERNODE": "1",
-            "PADDLE_ETCD_ENDPOINTS": "127.0.0.1:2379",
-            "PADDLE_EDLNODES_RANAGE": "2:2",
-            "CUDA_VISIBLE_DEVICES": "0",
-            "PADDLE_TRAINER_PORTS": "6670"
-        }
-        os.environ.pop("https_proxy", None)
-        os.environ.pop("http_proxy", None)
-        os.environ.update(proc_env)
-
-        #args_dict = _convert_args_to_dict(None)
-        self._job_env = JobEnv(None)
-
-        self._etcd.remove_service(ETCD_POD_RESOURCE)
-        self._etcd.remove_service(ETCD_POD_RANK)
-        self._etcd.remove_service(ETCD_POD_STATUS)
-        self._etcd.remove_service(ETCD_JOB_STATUS)
-        self._etcd.remove_service(ETCD_TRAIN_STATUS)
-        self._etcd.remove_service(ETCD_CLUSTER)
-        self._etcd.remove_service(ETCD_READER)
-
-    def tearDown(self):
-        os.environ.clear()
-        os.environ.update(self._old_environ)
+        super(TestGenerate, self).setUp("test_generate")
 
     def register_pod(self, job_env):
         pod = Pod()
@@ -112,7 +64,8 @@ class TestBarrier(unittest.TestCase):
 
         pod_1, server_1 = self.register_pod(self._job_env)
 
-        generater = GenerateCluster(self._job_env, pod_0.get_id())
+        generater = cluster_generator.ClusterGenerator(self._job_env,
+                                                       pod_0.get_id())
         ret = generater.start()
 
         cluster_0 = None

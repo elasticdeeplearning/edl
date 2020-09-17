@@ -37,11 +37,11 @@ from ..utils.leader_register import LeaderRegister
 from ..utils.etcd_db import get_global_etcd
 from ..utils.watcher import Watcher
 from ..utils.pod_server import PodServer
-from ..utils.utils import logger
-from ..utils import utils
-from ..utils.global_vars import *
-from ..utils.pod_client import PodServerClient
-from ..utils.exceptions import *
+from ..utils.log_utils import logger
+from ..utils import log_utils
+from ..utils import pod_server_client
+from ..utils import constants
+from ..utils import exceptions
 from ..utils.edl_process import start_local_trainers, terminate_local_procs, watch_local_trainers
 
 
@@ -133,11 +133,11 @@ def edl_barrier(job_env, pod, timeout):
             db = get_global_etcd()
             leader = db.get_pod_leader()
             if leader is None:
-                raise EdlNotFoundLeader("can't get leader")
+                raise exceptions.EdlNotFoundLeader("can't get leader")
 
             logger.debug("barrier on leader:{}".format(leader))
 
-            c = PodServerClient(leader.endpoint)
+            c = pod_server_client.PodServerClient(leader.endpoint)
             cluster = c.barrier(job_env.job_id, pod.get_id())
             return cluster
         except Exception as e:
@@ -150,12 +150,9 @@ def edl_barrier(job_env, pod, timeout):
         if time.time() - start > timeout:
             message = "wait to barrier with all error:{} leader:[{}] current pod:[{}]".format(
                 traceback.format_exc(), leader, pod)
-            logger.fatal(message)
-            #raise EdlBarrierError(message)
+            raise EdlBarrierError(message)
 
         time.sleep(3)
-
-    return None
 
 
 def prepare(args):
@@ -169,7 +166,7 @@ def prepare(args):
     db = get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
 
     last_status = db.get_job_status()
-    if last_status == Status.SUCCEED:
+    if last_status == constants.Status.SUCCEED:
         logger.info("job:{} has completed! Need't try!".format(job_env.job_id))
         sys.exit(0)
 
@@ -178,10 +175,9 @@ def prepare(args):
     pod.from_env(job_env)
 
     # update pod status
-    db.set_pod_status(pod.get_id(), Status.INITIAL)
+    db.set_pod_status(pod.get_id(), constants.Status.INITIAL)
 
     # launch pod server
-    pod_server = None
     pod_server = PodServer(job_env, pod.get_id())
     pod_server.start(job_env, pod)
     logger.info("pod server started:[{}]".format(pod))
@@ -189,7 +185,8 @@ def prepare(args):
     return job_env, pod, pod_server
 
 
-def job_exit(leader_register,
+def job_exit(cluster,
+             leader_register,
              resource_register,
              watcher,
              pod,
@@ -211,7 +208,8 @@ def job_exit(leader_register,
                     db.set_job_flag(job_flag)
                     logger.info("set job status:{} ok!".format(job_flag))
                     break
-                raise EdlWaitFollowersReleaseError("can't wait resource")
+                raise exceptions.EdlWaitFollowersReleaseError(
+                    "can't wait resource")
             else:
                 break
         except Exception as e:
@@ -245,7 +243,7 @@ def launch(args):
 
     # update pod status
     db = get_global_etcd()
-    db.set_pod_status(pod.get_id(), Status.RUNNING)
+    db.set_pod_status(pod.get_id(), constants.Status.RUNNING)
 
     # watcher after barrier
     watcher = Watcher(job_env, cluster, pod)
@@ -284,6 +282,7 @@ def launch(args):
             watcher = Watcher(job_env, cluster, pod)
 
             procs = start_local_trainers(
+                job_env,
                 cluster,
                 pod,
                 args.training_script,
@@ -299,6 +298,7 @@ def launch(args):
         leader_register.stop()
 
     job_exit(
+        cluster=cluster,
         leader_register=leader_register,
         resource_register=resource_register,
         watcher=watcher,
@@ -309,7 +309,7 @@ def launch(args):
 
 
 def run_commandline():
-    utils.get_logger(log_level=10)
+    log_utils.get_logger(log_level=10)
     args = _parse_args()
     launch(args)
 

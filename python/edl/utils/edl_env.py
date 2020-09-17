@@ -13,11 +13,21 @@
 # limitations under the License.
 
 import os
-import sys
-
-from . import utils
-from .utils import logger
 import six
+
+from . import network_utils
+from .log_utils import logger
+
+
+def get_gpus():
+    cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES")
+    if cuda_visible_devices is None or cuda_visible_devices == "":
+        selected_gpus = [x.strip() for x in selected_gpus.split(',')]
+    else:
+        selected_gpus = cuda_visible_devices.split(',')
+
+    logger.info("get selected_gpus:{}".format(selected_gpus))
+    return selected_gpus
 
 
 def get_from_dict_or_env(args, name, key):
@@ -39,7 +49,8 @@ class JobEnv(object):
         else:
             assert len(self._gpus) > 0, "gpus must be visible, now:{}".format(
                 self._gpus)
-            self._trainer_ports = list(utils.find_free_ports(len(self._gpus)))
+            self._trainer_ports = list(
+                network_utils.find_free_ports(len(self._gpus)))
             logger.info("get ports from unused:{} now gpus:{}".format(
                 self._trainer_ports, self._gpus))
 
@@ -67,7 +78,7 @@ class JobEnv(object):
 
     def _get_gpus(self, args):
         # selected gpus
-        self._gpus = utils.get_gpus()
+        self._gpus = get_gpus()
         assert self._gpus != None, "can't get gpu info of this machine"
 
         # proc per node
@@ -151,20 +162,32 @@ class JobEnv(object):
         return s
 
 
-class TrainerEnv(JobEnv):
+class TrainerEnv(object):
     """
-    Parse all envs when edl_launch starts a trainer.  """
+    Parse all envs when edl_launch starts a trainer. 
+    """
 
     def __init__(self, args=None):
-        super(TrainerEnv, self).__init__(args)
+        self._job_id = os.environ["PADDLE_JOB_ID"]
+        self._pod_id = os.environ["PADDLE_POD_ID"]
+        self._etcd_endpoints = os.environ["PADDLE_ETCD_ENDPOINTS"]
 
-        self._rank = os.environ["PADDLE_TRAINER_ID"]
-        self._rank_in_pod = os.environ["PADDLE_TRAINER_RANK_IN_POD"]
+        self._global_rank = int(os.environ["PADDLE_TRAINER_ID"])
+        self._rank_in_pod = int(os.environ["PADDLE_TRAINER_RANK_IN_POD"])
         self._trainer_endpoints = os.environ["PADDLE_TRAINER_ENDPOINTS"]
+        self._pod_ids = os.environ["EDL_POD_IDS"].split(",")
 
     @property
-    def rank(self):
-        return self._rank
+    def pod_ids(self):
+        return self._pod_ids
+
+    @property
+    def pod_id(self):
+        return self._pod_id
+
+    @property
+    def global_rank(self):
+        return self._global_rank
 
     @property
     def rank_in_pod(self):
@@ -177,3 +200,11 @@ class TrainerEnv(JobEnv):
     @property
     def size(self):
         return len(self._trainer_endpoints)
+
+    @property
+    def job_id(self):
+        return self._job_id
+
+    @property
+    def etcd_endpoints(self):
+        return self._etcd_endpoints

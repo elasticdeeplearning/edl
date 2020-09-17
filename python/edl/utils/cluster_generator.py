@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2019 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,40 +11,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import copy
+import six
 import threading
 import time
-import json
-import uuid
-import copy
 import traceback
-import six
 
-from .utils import logger
-from .pod import Pod
-from ..discovery.etcd_client import EtcdClient
-
-import etcd3
-from .global_vars import *
-from .cluster import Cluster
-from .exceptions import EdlGenerateClusterError, EdlTableError
-from .etcd_db import get_global_etcd
+from . import constants
+from . import error_utils
+from . import etcd_db
+from . import exceptions
+from .log_utils import logger
+from ..discovery import etcd_client
+from edl.utils import cluster as cluster_utils
 
 
-class GenerateCluster(object):
+class ClusterGenerator(object):
     def __init__(self, job_env, pod_id):
-        self._cluster = Cluster()
-        self._service = ETCD_CLUSTER
-        self._server = ETCD_CLUSTER
+        self._cluster = cluster_utils.Cluster()
+        self._service = constants.ETCD_CLUSTER
+        self._server = constants.ETCD_CLUSTER
         self._stop = threading.Event()
         self._etcd = None
         self._t_register = None
         self._lock = threading.Lock()
         self._job_env = job_env
-        self._db = get_global_etcd()
+        self._db = etcd_db.get_global_etcd()
         self._pod_id = pod_id
 
     def start(self):
-        self._etcd = EtcdClient(
+        self._etcd = etcd_client.EtcdClient(
             endpoints=self._job_env._etcd_endpoints,
             root=self._job_env.job_id,
             timeout=6)
@@ -94,16 +91,17 @@ class GenerateCluster(object):
     def _generate_cluster_from_resource(self, resource_pods):
         leader_id = self._db.get_pod_leader_id()
         if leader_id is None:
-            raise EdlTableError("leader key={}:{}".format(
-                self._etcd.get_full_path(ETCD_POD_RESOURCE, ETCD_POD_RANK),
-                leader_id))
+            raise exceptions.EdlTableError("leader key={}:{}".format(
+                self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
+                                         constants.ETCD_POD_RANK), leader_id))
 
         print(resource_pods)
         if leader_id not in resource_pods:
-            raise EdlTableError("leader error, leader:{} not in resource:{}".
-                                format(leader_id, resource_pods.keys()))
+            raise exceptions.EdlTableError(
+                "leader error, leader:{} not in resource:{}".format(
+                    leader_id, resource_pods.keys()))
 
-        new_cluster = Cluster()
+        new_cluster = cluster_utils.Cluster()
         pods = new_cluster.get_pods()
 
         rank = 0
@@ -132,7 +130,7 @@ class GenerateCluster(object):
 
         ids = current_cluster.get_pods_ids_set()
         for pod_id, pod in six.iteritems(resource_pods):
-            if pod.status == Status.INITIAL \
+            if pod.status == constants.Status.INITIAL \
                     and pod.get_pod_id() not in ids \
                     and len(new_pods) < self._job_env.max_nodes:
                 pod.rank = rank
@@ -148,8 +146,8 @@ class GenerateCluster(object):
 
         if len(resource_pods) <= 0:
             raise EdlTableError("resource pods key={}:{}".format(
-                self._etcd.get_full_path(ETCD_POD_RESOURCE, self._pod_id),
-                resource_pods))
+                self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
+                                         self._pod_id), resource_pods))
 
         if current_cluster is None:
             new_cluster = self._generate_cluster_from_resource(resource_pods)
@@ -157,7 +155,7 @@ class GenerateCluster(object):
 
         current_ids = current_cluster.get_pods_ids_set()
         resource_ids = set(resource_pods.keys())
-        all_inited, all_running, all_succeed, all_failed =\
+        all_inited, all_running, all_succeed, all_failed = \
             self._db.get_pods_status()
 
         disappeared = current_ids - resource_ids - all_inited - all_running - all_succeed - all_failed
@@ -179,7 +177,7 @@ class GenerateCluster(object):
         if len(inited) > 0 and \
                 current_cluster.get_pods_nranks() < self._job_env.max_nodes:
             train_status = self._db.get_train_status()
-            if train_status == TrainStatus.INITIAL or train_status == TrainStatus.RUNNING:
+            if train_status == constants.TrainStatus.INITIAL or train_status == constants.TrainStatus.RUNNING:
                 logger.info("find running pods:{} and init pods{}".format(
                     inited, running))
                 self._append_inited_pods(current_cluster, resource_pods,
@@ -192,9 +190,12 @@ class GenerateCluster(object):
         new_cluster = copy.copy(current_cluster)
         return current_cluster, new_cluster
 
-    def _set_cluster_if_leader(self, cluster):
-        leader_key = self._etcd.get_full_path(ETCD_POD_RANK, ETCD_POD_LEADER)
-        cluster_key = self._etcd.get_full_path(ETCD_CLUSTER, ETCD_CLUSTER)
+    @error_utils.handle_errors_until_timeout
+    def _set_cluster_if_leader(self, cluster, timeout=120):
+        leader_key = self._etcd.get_full_path(constants.ETCD_POD_RANK,
+                                              constants.ETCD_POD_LEADER)
+        cluster_key = self._etcd.get_full_path(constants.ETCD_CLUSTER,
+                                               constants.ETCD_CLUSTER)
 
         etcd = self._etcd._etcd
         status, _ = etcd.transaction(
@@ -202,9 +203,12 @@ class GenerateCluster(object):
             success=[etcd.transactions.put(cluster_key, cluster.to_json()), ],
             failure=[])
 
-        logger.debug(
-            "pod_id:{} leader_id:{} _set_cluster_if_leader status:{}".format(
-                self._pod_id, self._db.get_pod_leader_id(), status))
+        message = "pod_id:{} leader_id:{} _set_cluster_if_leader status:{}".format(
+            self._pod_id, self._db.get_pod_leader_id(), status)
+
+        if not status:
+            raise exceptions.EdlEtcdIOError(message)
+
         return status
 
     def _generate_cluster_and_check(self):
@@ -216,9 +220,9 @@ class GenerateCluster(object):
                 new_cluster.get_pods_ids_set(), self._job_env.min_nodes,
                 self._job_env.max_nodes)
             #new_cluster.status = Status.FAILED
-            raise EdlGenerateClusterError(message)
+            raise exceptions.EdlGenerateClusterError(message)
 
         if current_cluster is None or current_cluster.stage != new_cluster.stage:
             logger.info("current_cluster:{} to  new_cluster:{}".format(
                 current_cluster, new_cluster))
-            self._set_cluster_if_leader(new_cluster)
+            self._set_cluster_if_leader(new_cluster, timeout=120)

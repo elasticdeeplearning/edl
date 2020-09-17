@@ -13,13 +13,13 @@
 # limitations under the License.
 
 import time
+
 from . import pod_server_pb2 as pb
 from . import pod_server_pb2_grpc as pb_grpc
 from .client import Client
 from .cluster import Cluster
-from .exceptions import deserialize_exception, EdlBarrierError
-from .utils import logger
-from .etcd_db import get_global_etcd
+from .exceptions import deserialize_exception
+from .log_utils import logger
 
 
 class PodServerClient(Client):

@@ -16,9 +16,8 @@ import unittest
 from edl.discovery.etcd_client import EtcdClient
 import time
 import threading
-from etcd3.events import PutEvent, DeleteEvent
 
-from edl.utils.utils import bytes_to_string
+from edl.utils import string_utils
 
 
 class TestEtcd(unittest.TestCase):
@@ -36,8 +35,9 @@ class TestEtcd(unittest.TestCase):
         assert len(servers) == 2, "must two servers"
 
         for server_meta in servers:
-            value = local_servers[bytes_to_string(server_meta.server)]
-            assert value == bytes_to_string(server_meta.info)
+            value = local_servers[string_utils.bytes_to_string(
+                server_meta.server)]
+            assert value == string_utils.bytes_to_string(server_meta.info)
 
     def refresh(self):
         self.etcd.refresh("job_1", "127.0.0.1:1")
@@ -89,8 +89,8 @@ class TestEtcd(unittest.TestCase):
 
         print("events len:", len(events))
         assert len(events) == 1
-        assert bytes_to_string(events[0].server) == '127.0.0.1:1'
-        assert bytes_to_string(events[0].info) == 'first'
+        assert string_utils.bytes_to_string(events[0].server) == '127.0.0.1:1'
+        assert string_utils.bytes_to_string(events[0].info) == 'first'
 
     def test_lease(self):
         self.add()

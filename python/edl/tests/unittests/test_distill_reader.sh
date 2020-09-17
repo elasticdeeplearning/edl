@@ -13,10 +13,10 @@ etcd_pid=$!
 # wait etcd start
 sleep 10
 
-nohup python -m edl.discovery.register --service_name DistillReaderTest --server 127.0.0.1:2379 &
+nohup python -m edl.discovery.register --service_name DistillReaderTest --server 127.0.0.1:2379 > run_discovery_register.log 2>&1 &
 register_pid=$!
 
-nohup python -m edl.distill.discovery_server &
+nohup python -m edl.distill.discovery_server > run_discovery_server.log 2>&1 &
 discovery_pid=$!
 
 # wait discovery start
