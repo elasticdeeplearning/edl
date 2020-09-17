@@ -34,6 +34,7 @@ class TestDataServer(unittest.TestCase):
         proc_env = {
             "PADDLE_JOB_ID": self._job_id,
             "PADDLE_POD_ID": self._pod_id,
+            "EDL_POD_LEADER_ID": self._pod_id,
             "PADDLE_ETCD_ENDPOINTS": "127.0.0.1:2379",
             "PADDLE_TRAINER_ID": "0",
             "PADDLE_TRAINER_RANK_IN_POD": "0",
