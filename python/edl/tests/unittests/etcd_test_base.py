@@ -66,7 +66,7 @@ class EtcdTestBase(unittest.TestCase):
         self._etcd.remove_service(constants.ETCD_JOB_STATUS)
         self._etcd.remove_service(constants.ETCD_TRAIN_STATUS)
         self._etcd.remove_service(constants.ETCD_CLUSTER)
-        self._etcd.remove_service(constants.ETCD_DIST_READER)
+        self._etcd.remove_service(constants.ETCD_READER)
 
     def tearDown(self):
         os.environ.clear()
