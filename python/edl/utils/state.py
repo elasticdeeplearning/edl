@@ -21,14 +21,6 @@ from edl.utils import unique_name
 from edl.utils import json_serializable
 from edl.utils.log_utils import logger
 
-def _load_dict_of_cls_from_json(json_str, cls):
-    d = json.loads(json_str)
-    ret = {}
-    for k,v in six.iteritems(d):
-        ret[k] = cls().from_json(v)
-
-    return ret
-
 class DataCheckpoint(json_serializable.Serializable):
     def __init__(self, reader_name=None,
                  file_list=None, processed_data=None):

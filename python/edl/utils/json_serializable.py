@@ -38,7 +38,7 @@ def _compare_two_dict(dict1, dict2):
 
     return True
 
-class Serializable(SerializableBase):
+class Serializable(Base):
     def to_json(self):
         d = {}
         for k, v in six.iteritems(dict):
@@ -55,7 +55,7 @@ class Serializable(SerializableBase):
             if k not in d:
                 return
 
-            if v isinstance(Serializable):
+            if isinstance(v, Serializable):
                 v.from_json(d[k])
                 continue
 
