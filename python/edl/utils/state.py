@@ -20,14 +20,23 @@ from edl.utils import train_status as edl_train_status
 from edl.utils import unique_name
 from edl.utils import json_serializable
 from edl.utils.log_utils import logger
+from edl.utils import string_utils
+
 
 class DataCheckpoint(json_serializable.Serializable):
-    def __init__(self, reader_name=None,
-                 file_list=None, processed_data=None):
+    def __init__(self, reader_name=None, file_list=None, processed_data=None):
         self.reader_name = reader_name
         self.file_list = file_list
         #dict, file_idx_in_file_list=>[(record_idx_begin, record_idx_end), ...]
         self.processed_data = processed_data
+
+    def from_json(self, json_str):
+        d = json.loads(json_str)
+        self.reader_name = d["reader_name"]
+        self.file_list = d["file_list"]
+        self.processed_data = d["processed_data"]
+        return self
+
 
 class EpochAttr(json_serializable.Serializable):
     def __init__(self):
@@ -37,13 +46,43 @@ class EpochAttr(json_serializable.Serializable):
         self.avg_step_time = None
         self.step_no_of_epoch = None
 
+    def from_json(self, json_str):
+        d = json.loads(json_str)
+        self.epoch_no = d["epoch_no"]
+        self.world_size = d["world_size"]
+        self.step_num = d["step_num"]
+        self.avg_step_time = d["avg_step_time"]
+        self.step_no_of_epoch = d["step_no_of_epoch"]
+        return self
+
+
+def _load_dict_of_cls_from_json(json_str, cls):
+    print("json_str 2", json_str)
+    d = json.loads(json_str)
+
+    ret = {}
+    for k, v in six.iteritems(d):
+        print("v 2:", v, type(v))
+        ret[k] = cls().from_json(v)
+
+    return ret
+
+
 class TrainStatus(json_serializable.Serializable):
     def __init__(self):
-        self._epoch_no = None # current
-        self.global_step_no = None # current
+        self._epoch_no = None  # current
+        self.global_step_no = None  # current
 
-        self._epochs = {} # epoch_no => EpochAttr
+        self._epochs = {}  # epoch_no => EpochAttr
         self.status = edl_train_status.TrainStatus.INITIAL
+
+    def from_json(self, json_str):
+        d = json.loads(json_str)
+        self._epoch_no = d["_epoch_no"]
+        self.global_step_no = d["global_step_no"]
+        self.status = d["status"]
+
+        self._epochs = _load_dict_of_cls_from_json(d["_epochs"], EpochAttr)
 
     @property
     def epoch_no(self):
@@ -52,7 +91,7 @@ class TrainStatus(json_serializable.Serializable):
     @epoch_no.setter
     def epoch_no(self, epoch_no):
         assert epoch_no >= 0
-        if epoch_no not in self._epoch:
+        if epoch_no not in self._epochs:
             self._epochs[epoch_no] = {}
         self._epoch_no = epoch_no
 
@@ -70,11 +109,12 @@ class TrainStatus(json_serializable.Serializable):
     def update_current_epoch_attr(self, epoch_attr):
         return self._update_epoch_attr(self._epoch_no, epoch_attr)
 
+
 class State(json_serializable.Serializable):
     def __init__(self, total_batch_size, user_defined=None):
         # interface
         self._default = {
-            "total_batch_size": total_batch_size, # user inputs
+            "total_batch_size": total_batch_size,  # user inputs
         }
         self._user_defined = user_defined
         self._adjust_func = []
@@ -85,10 +125,26 @@ class State(json_serializable.Serializable):
         self._data_checkpoint = DataCheckpoint()
         self._train_status = TrainStatus()
 
+    def to_json(self):
+        return super(State, self).to_json(filter_names=["_adjust_func"])
+
+    def from_json(self, json_str):
+        d = json.loads(json_str)
+
+        self._default = d["_default"]
+        if self._user_defined is not None and d["_user_defined"] is not None:
+            self._user_defined.from_json(d["_user_defined"])
+
+        self._name = d["_name"]
+        self._model_path = d["_model_path"]
+        self._data_checkpoint.from_json(d["_data_checkpoint"])
+        self._train_status.from_json(d["_train_status"])
+        return d
+
     def register_adjust_function(self, f):
         self._adjust_func.append(f)
 
-    @propery
+    @property
     def name(self):
         return self._name
 
@@ -112,20 +168,22 @@ class State(json_serializable.Serializable):
     def total_batch_size(self, size):
         self._defaults["total_batch_size"] = size
 
+
 @error_utils.handle_errors_until_timeout
-def load_from_etcd(etcd, state_name, timeout=60):
+def load_from_etcd(etcd, state_name, user_defined=None, timeout=60):
     value = etcd.get_value(constants.ETCD_STATE, state_name)
 
     if value is None:
         raise exceptions.EdlTableError("key:value = {}:{}".format(
             etcd.get_full_path(constants.ETCD_READER, state_name), value))
 
-    state = State()
-    state.from_json(value)
+    print("json_value:", value)
+    state = State(total_batch_size=None, user_defined=user_defined)
+    state.from_json(string_utils.bytes_to_string(value))
     return state
 
 
-@error_utils.error_utils.handle_errors_until_timeout
+@error_utils.handle_errors_until_timeout
 def save_to_etcd(etcd, pod_id, state, timeout=60):
     leader_key = etcd.get_full_path(constants.ETCD_POD_RANK,
                                     constants.ETCD_POD_LEADER)
@@ -140,6 +198,7 @@ def save_to_etcd(etcd, pod_id, state, timeout=60):
     message = "pod_id:{} save_data_checkpoint status:{}".format(pod_id, status)
     if not status:
         raise exceptions.EdlEtcdIOError(message)
+
 
 class PaddleState(State):
     def __init__(self,

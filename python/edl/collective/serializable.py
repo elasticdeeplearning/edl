@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from edl_utils.json_serializable import SerializableBase
+from edl.utils.json_serializable import SerializableBase
 
 __all__ = ["SerializableBase"]

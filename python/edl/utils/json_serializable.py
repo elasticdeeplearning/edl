@@ -14,6 +14,7 @@
 import json
 import six
 
+
 class SerializableBase(object):
     def to_json(self):
         raise NotImplementedError
@@ -21,12 +22,16 @@ class SerializableBase(object):
     def from_json(self):
         raise NotImplementedError
 
+
 def _compare_two_dict(dict1, dict2):
-    if len(dict1) != dict2:
+    if len(dict1) != len(dict2):
+        print("len(dict1) != len(dict2)", dict1, dict2)
         return False
 
-    for k,v in six.iteritems(dict1):
-        if k not in dict1:
+    for k, v in six.iteritems(dict1):
+        if k not in dict2:
+            print("k not in dict2", k, dict1[k], type(dict1[k]))
+            print("dict2:", dict2)
             return False
 
         if isinstance(v, dict):
@@ -34,32 +39,42 @@ def _compare_two_dict(dict1, dict2):
                 return False
         else:
             if v != dict2[k]:
+                print("k not equal:", k, v, dict2[k])
                 return False
 
     return True
 
-class Serializable(Base):
-    def to_json(self):
+
+class Serializable(SerializableBase):
+    def _not_contain_custom_cls(self, dict_data):
+        for k, v in six.iteritems(dict_data):
+            if isinstance(v, SerializableBase):
+                return False
+
+        return True
+
+    def _dict_to_json(self, dict_data, filter_names=set()):
         d = {}
-        for k, v in six.iteritems(dict):
+        for k, v in six.iteritems(dict_data):
+            if k in filter_names:
+                continue
+
             if isinstance(v, SerializableBase):
                 d[k] = v.to_json()
+            elif isinstance(v, dict):
+                if self._not_contain_custom_cls(v):
+                    d[k] = v
+                    continue
+
+                d[k] = self._dict_to_json(v)
             else:
                 d[k] = v
 
         return json.dumps(d)
 
-    def from_json(self, json_str):
-        d = json.loads(json_str)
-        for k, v in self.__dict__:
-            if k not in d:
-                return
-
-            if isinstance(v, Serializable):
-                v.from_json(d[k])
-                continue
-
-            v = d[k]
+    def to_json(self, filter_names=set()):
+        json_str = self._dict_to_json(self.__dict__, filter_names=filter_names)
+        return json_str
 
     def __eq__(self, other):
         if other is None:
@@ -70,3 +85,5 @@ class Serializable(Base):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __str__(self):
+        return self.to_json()

@@ -12,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from edl.utils.etcd_test_base import EtcdTestBase
+import unittest
+
+from edl.tests.unittests import etcd_test_base
 from edl.utils import state as edl_state
 from edl.collective import serializable
 from edl.utils import constants
+
+import json
+
 
 class UserDefined(serializable.SerializableBase):
     def __init__(self):
@@ -26,13 +31,11 @@ class UserDefined(serializable.SerializableBase):
         self.learning_rate = d["learning_rate"]
 
     def to_json(self):
-        d ={
-            "learning_rate": self.learning_rate
-        }
+        d = {"learning_rate": self.learning_rate}
         return json.dumps(d)
 
 
-class TestState(EtcdTestBase):
+class TestState(etcd_test_base.EtcdTestBase):
     def setUp(self):
         super(TestState, self).setUp("test_state")
 
@@ -45,8 +48,8 @@ class TestState(EtcdTestBase):
         epoch_attr.epoch_no = 1
         epoch_attr.world_size = 1
         epoch_attr.step_num = 10
-        epoch_attr.avg_step_time=100
-        epoch_attr.step_no_of_epoch=5
+        epoch_attr.avg_step_time = 100
+        epoch_attr.step_no_of_epoch = 5
 
         train_status.update_epoch_attr(epoch_attr.epoch_no, epoch_attr)
 
@@ -54,28 +57,37 @@ class TestState(EtcdTestBase):
 
     def _generate_data_checkpoint(self):
         dp = edl_state.DataCheckpoint()
-        dp.reader_name="reader"
+        dp.reader_name = "reader"
         dp.file_list = ["0", "1"]
-        dp.processed_data = {
-            "0":[(0,1)(2,3)],
-            "1":[(4,5),(6,7)]
-        }
+        dp.processed_data = {"0": [[0, 1], [2, 3]], "1": [[4, 5], [6, 7]]}
 
         return dp
 
     def test_state(self):
-        user_defined =UserDefined()
+        user_defined = UserDefined()
 
-        state = edl_state.State(total_batch_size=1000, user_defined=user_defined)
+        state = edl_state.State(
+            total_batch_size=1000, user_defined=user_defined)
         state._model_path = "model_path"
-        state._data_checkpoint=self._generate_data_checkpoint()
+        state._data_checkpoint = self._generate_data_checkpoint()
         state._train_status = self._generate_train_status()
 
+        print("state", state)
+
         # save
-        pod_id="0"
-        self._etcd.set_server_permanent(constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER, pod_id)
-        edl_state.save_to_etcd(self._etcd, pod_id, state)
+        pod_id = "0"
+        self._etcd.set_server_permanent(constants.ETCD_POD_RANK,
+                                        constants.ETCD_POD_LEADER, pod_id)
+        edl_state.save_to_etcd(self._etcd, pod_id, state, timeout=10)
 
         # load
-        state2 = edl_state.load_from_etcd(self._etcd, state.name)
+        state2 = edl_state.load_from_etcd(
+            self._etcd, state.name, user_defined=user_defined, timeout=10)
+        print("state2", state2)
+
+        # compare
         self.assertEqual(state, state2)
+
+
+if __name__ == '__main__':
+    unittest.main()
