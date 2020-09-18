@@ -126,19 +126,6 @@ class State(json_serializable.Serializable):
         self._data_checkpoint = DataCheckpoint()
         self._train_status = TrainStatus()
 
-    def to_json(self):
-        d = {
-            "_default": self._default,
-            "_user_defined": self._user_defined.to_json()
-            if self._user_defined else None,
-            "_name": self._name,
-            "_model_path": self._model_path,
-            "_data_checkpoint": self._data_checkpoint.to_json(),
-            "_train_status": self._train_status.to_json(),
-        }
-
-        return json.dumps(d)
-
     def from_json(self, json_str):
         d = json.loads(json_str)
 

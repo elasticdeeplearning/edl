@@ -48,6 +48,10 @@ class Serializable(SerializableBase):
             if k in filter_names:
                 continue
 
+            if isinstance(v, SerializableBase):
+                d[k] = v.to_json()
+                continue
+
             d[k] = v
 
         return json.dumps(d)
