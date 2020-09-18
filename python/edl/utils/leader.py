@@ -44,4 +44,3 @@ def get_pod_leader(etcd):
             cluster.pods[0].get_id(), leader_id))
 
     return cluster.pods[0]
-
