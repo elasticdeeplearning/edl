@@ -18,16 +18,18 @@ import json
 import six
 import uuid
 
-from . import constants
-from . import exceptions
-from .pod import Pod
+from edl.utils import constants
+from edl.utils import exceptions
+from edl.utils import pod as edl_pod
+from edl.utils import error_utils
+from edl.utils import status as edl_status
 
 
 class Cluster(object):
     def __init__(self):
         self._pods = []
         self._stage = None
-        self._status = constants.Status.INITIAL
+        self._status = edl_status.Status.INITIAL
 
     def __str__(self):
         return "pods:{} job_stage:{} status:{}".format(
@@ -114,7 +116,7 @@ class Cluster(object):
         self._stage = cluster._stage
         self._pods = []
         for pod in cluster:
-            p = Pod()
+            p = edl_pod.Pod()
             p.from_pb(pod)
             self._pods.append(p)
 
@@ -137,7 +139,7 @@ class Cluster(object):
         od = collections.OrderedDict(sorted(d["pods"].items()))
         pods = []
         for i, (key, value) in enumerate(six.iteritems(od)):
-            pod = Pod()
+            pod = edl_pod.Pod()
             if i != int(key):
                 raise exceptions.EdlRankError(
                     "rank:{} is not exists in {}".format(i, d))
@@ -168,3 +170,15 @@ class Cluster(object):
     @status.setter
     def status(self, s):
         self._status = s
+
+
+@error_utils.handle_errors_until_timeout
+def load_from_etcd(etcd, timeout=60):
+    value = etcd.get_value(constants.ETCD_CLUSTER, constants.ETCD_CLUSTER)
+
+    if value is None:
+        return None
+
+    cluster = Cluster()
+    cluster.from_json(value)
+    return cluster

@@ -19,12 +19,12 @@ import paddle_edl.utils.data_server_pb2 as data_server_pb2
 import paddle_edl.utils.data_server_pb2_grpc as data_server_pb2_grpc
 import time
 import unittest
-from paddle_edl.utils import file_utils
-from paddle_edl.utils import log_utils
-from paddle_edl.utils.data_server import DataServer
-from paddle_edl.utils.dataset import TxtDataReader
-from paddle_edl.utils.string_utils import bytes_to_string
-from paddle_edl.utils.utils import *
+from edl.utils import file_utils
+from edl.utils import log_utils
+from edl.utils.data_server import DataServer
+from edl.utils.dataset import TxtDataReader
+from edl.utils.string_utils import bytes_to_string
+from edl.utils.utils import *
 
 os.environ["https_proxy"] = ""
 os.environ["http_proxy"] = ""

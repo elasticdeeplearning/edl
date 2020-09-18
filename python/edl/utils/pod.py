@@ -17,10 +17,10 @@ import json
 import six
 import uuid
 
-from . import network_utils
-from .constants import Status
-from .log_utils import logger
-from .trainer import Trainer
+from edl.utils import network_utils
+from edl.utils import status as edl_status
+from edl.utils.log_utils import logger
+from edl.utils import trainer as edl_trainer
 
 
 class Pod(object):
@@ -32,7 +32,7 @@ class Pod(object):
         self._gpus = None
         self._trainers = None
         self._port = None
-        self._status = Status.INITIAL  # status maybe changed
+        self._status = edl_status.Status.INITIAL  # status maybe changed
 
     def to_json(self):
         d = {
@@ -64,7 +64,7 @@ class Pod(object):
 
         od = collections.OrderedDict(sorted(d["trainers"].items()))
         for i, (key, value) in enumerate(six.iteritems(od)):
-            t = Trainer()
+            t = edl_trainer.Trainer()
             t.from_json(value)
 
             self._trainers.append(t)
@@ -97,7 +97,7 @@ class Pod(object):
             logger.debug("[b:e]=[{}:{}]".format(b, e))
             endpoint = "{}:{}".format(self._addr, job_env.trainer_ports[i])
 
-            t = Trainer()
+            t = edl_trainer.Trainer()
             t.from_pod(
                 endpoint=endpoint, rank_in_pod=i, gpus=job_env.gpus[b:e])
             self._trainers.append(t)
@@ -114,7 +114,7 @@ class Pod(object):
 
         self._trainers = []
         for trainer in pod._trainers:
-            t = Trainer()
+            t = edl_trainer.Trainer()
             t.from_pb(trainer)
 
             self._trainers.append(t)

@@ -15,8 +15,8 @@
 import os
 import paddle_edl.utils.master_pb2 as master_pb2
 import unittest
-from paddle_edl.utils.master_client import Client
-from paddle_edl.utils.utils import get_file_list, get_logger
+from edl.utils.master_client import Client
+from edl.utils.utils import get_file_list, get_logger
 
 os.environ["https_proxy"] = ""
 os.environ["http_proxy"] = ""

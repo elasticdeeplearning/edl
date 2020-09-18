@@ -11,17 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from ..discovery.etcd_client import EtcdClient
 
-g_etcd = None
+from edl.utils import constants
 
 
-def get_global_etcd(etcd_endpoints=None, job_id=None):
-    global g_etcd
-    if g_etcd is None:
-        assert etcd_endpoints is not None and job_id is not None
-        g_etcd = EtcdClient(endpoints=etcd_endpoints, root=job_id, timeout=6)
-        g_etcd.init()
-        return g_etcd
+def get_train_status_table_key(self, server_name):
+    return self._etcd.get_full_path(constants.ETCD_TRAIN_STATUS, server_name)
 
-    return g_etcd
+
+def get_cluster_table_key(self):
+    return self._etcd.get_full_path(constants.ETCD_CLUSTER,
+                                    constants.ETCD_CLUSTER)
+
+
+def get_rank_table_key(self):
+    return self._etcd.get_full_path(constants.ETCD_POD_RANK,
+                                    constants.ETCD_POD_LEADER)

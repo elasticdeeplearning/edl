@@ -18,9 +18,8 @@ import psutil
 import signal
 import subprocess
 import sys
-import threading
 
-from .log_utils import logger
+from edl.utils.log_utils import logger
 
 
 class TrainerProc(object):
@@ -33,12 +32,12 @@ class TrainerProc(object):
         self.local_rank = None
 
 
-def start_local_trainers(job_env,
-                         cluster,
-                         pod,
-                         training_script,
-                         training_script_args,
-                         log_dir=None):
+def start(job_env,
+          cluster,
+          pod,
+          training_script,
+          training_script_args,
+          log_dir=None):
     current_env = copy.copy(os.environ.copy())
     #paddle broadcast ncclUniqueId use socket, and
     #proxy maybe make trainers unreachable, so delete them.
@@ -94,7 +93,7 @@ def start_local_trainers(job_env,
     return procs
 
 
-def terminate_local_procs(procs):
+def terminate(procs):
     decents = []
     for child in psutil.Process(os.getpid()).children(recursive=True):
         decents.append(child)
@@ -135,7 +134,7 @@ def pull_worker_log(tp):
             tp.log_offset = fin.tell()
 
 
-def watch_local_procs(procs, nranks):
+def _watch_local_procs(procs, nranks):
     """
     If proc exit unnormally, this function will raise exception.
     """
@@ -177,47 +176,14 @@ def watch_local_procs(procs, nranks):
     return alive
 
 
-def watch_local_trainers(procs, nranks):
+def watch(procs, nranks):
     """
     return alive_or_not, ok_or_not
     """
     try:
-        alive = watch_local_procs(procs, nranks)
+        alive = _watch_local_procs(procs, nranks)
     except Exception as e:
         logger.warning("watch local trainers:{}".format(e))
         return False, False
 
     return alive, True
-
-
-class ProcessWrapper(object):
-    def __init__(self):
-        self._stop = None
-        self._lock = None
-        self._worker = None
-
-        self._stop = multiprocessing.Event()
-        self._lock = threading.Lock()
-        self._worker = multiprocessing.Process(target=self._worker_func)
-
-    def _worker_func(self):
-        raise NotImplementedError
-
-    def start(self):
-        self._worker.start()
-
-    def stop(self):
-        self._stop.set()
-        with self._lock:
-            if self._worker:
-                self._worker.join()
-                self._worker = None
-
-        logger.info("{} exit".format(self.__class__.__name__))
-
-    def is_stopped(self):
-        with self._lock:
-            return self._worker == None
-
-    def __exit__(self):
-        self.stop()

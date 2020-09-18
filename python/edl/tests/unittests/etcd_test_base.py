@@ -20,7 +20,7 @@ import sys
 import copy
 import atexit
 
-from edl.utils.edl_env import JobEnv
+from edl.utils import env as edl_env
 import edl.utils.log_utils as log_utils
 import edl.utils.constants as constants
 from edl.utils.etcd_db import get_global_etcd
@@ -34,7 +34,6 @@ class EtcdTestBase(unittest.TestCase):
         log_utils.get_logger(log_level=10)
         self._etcd = EtcdClient([g_etcd_endpoints], root=job_id)
         self._etcd.init()
-        self._db = get_global_etcd([g_etcd_endpoints], job_id)
 
         self._old_environ = copy.copy(dict(os.environ))
         proc_env = {
@@ -59,7 +58,7 @@ class EtcdTestBase(unittest.TestCase):
         os.environ.pop("http_proxy", None)
         os.environ.update(proc_env)
 
-        self._job_env = JobEnv(None)
+        self._job_env = edl_env.JobEnv(None)
 
         self._etcd.remove_service(constants.ETCD_POD_RESOURCE)
         self._etcd.remove_service(constants.ETCD_POD_RANK)

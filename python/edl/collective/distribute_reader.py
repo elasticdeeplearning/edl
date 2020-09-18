@@ -11,270 +11,340 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import print_function
 
-from six.moves.queue import Queue
-from threading import Lock, Thread
-import paddle.fluid as fluid
-from .dataset import FileSplitter
-from ..utils import data_server
-from ..utils.edl_env import TrainerEnv
-from ..utils import unique_name
-from ..utils.watcher import get_data_reader_leader
-import uuid
+import multiprocessing
+import sys
+import threading
+from edl.uitls import reader as edl_reader
+from edl.utils import env as edl_env
+from edl.utils import state as edl_state
 
-
-class Record(object):
-    def __init__(self, idx, data):
-        # idx in a file
-        self._idx = idx
-        self._data = data  # data is ()
-
-
-class FileMeta(object):
-    def __init__(self, idx, path):
-        self._idx = idx
-        self._path = path
+from edl.utils import data_server
+from edl.utils import data_server_pb2
+from edl.utils import edl_process
+from edl.utils import data_server_client
+from edl.utils.error_utils import handle_errors_until_timeout
+from edl.utils import etcd_db
+from edl.utils.log_utils import logger
+from edl.utils import unique_name
 
 
-class BatchData(object):
-    def __init__(self, data_reader_id, b_id):
-        self._data_reader_id = data_reader_id
-        self._id = b_id
-        # FileMeta->Records
-        self._batch = {}
-        self._size = None
+class DataGenerator(edl_process.ProcessWrapper):
+    """
+    1. get file_list from data_server_leader
+    2. parse files of file_list and put BatchData to out_quque
+       if reach data end, put None to out_queue.
+    3. program will exit if meets any error
+    """
 
-    def split_meta_and_data(object):
-        b = BatchData(self.data_reader_id, self._id)
-        b._size = self._size
+    def __init__(self, reader_leader_endpoint, reader_name, pod_id,
+                 all_files_list, splitter_cls, out_queue):
+        super(DataGenerator, self).__init__()
 
-        a = []
-        for fmeta, recs in self._batch:
-            rs = []
-            for rec in recs:
-                r = Record(rec._idx, None)
-                a.append(rec.data)
-                rs.append(r)
-            b._batch[fmeta] = rs
+        self._batch_data_id = 0
 
-        return b, a
+        self._leader_endpoint = reader_leader_endpoint
+        self._pod_id = pod_id
+        self._reader_name = reader_name
+
+        self._file_list = all_files_list
+        self._splitter_cls = splitter_cls
+        self._data_queue = out_queue
+
+    def _get_file_list(self, timeout=60):
+        client = data_server_client.DataServerClient()
+        return client.get_file_list(
+            leader_endpoint=self._leader_endpoint,
+            reader_name=self._reader_name,
+            pod_id=self._pod_id,
+            file_list=self._file_list)
+
+    def _generate_batch_data(self):
+        self._batch_data_id += 1
+        b = data_server_pb2.BatchData()
+        b.batch_data_id = self._batch_data_id
+        b.data = None
+
+        return b
+
+    def _read_batch_data(self):
+        b = self._generate_batch_data()
+        for m in self._get_file_list():
+            if self._stop.set():
+                break
+
+            assert self._file_list[m.idx] == m.path
+            for record in self._splitter_cls(m.path):
+                fields = record
+
+                assert fields[0] == m.idx
+                rec = data_server_pb2.Record()
+                rec.record_no = fields[0]
+                for field in fields[1:]:
+                    rec.field_data.append(field)
+
+                if len(b.records) >= self._batch_size:
+                    self._data_queue.put(b)
+                    b = self._generate_batch_data()
+
+        if len(b.records) > 0:
+            self._data_queue.put(b)
+
+        self._data_queue.put(None)
+
+    def _worker_func(self):
+        try:
+            self._read_batch_data()
+        except Exception as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
 
 
-class DataCheckpoint(object):
-    def __init__(self):
-        # file_idx=>set(record_idx)
-        self._restored_records = {}
-        #self._file_idxs = {}
-        self._restored_from = None
+class DataAccesser(object):
+    def __init__(self, reader_leader_endpoint, reader_name, trainer_env,
+                 input_queue, out_queue, queue_size):
+        self._reader_leader_endpoint = reader_leader_endpoint
 
-    def save_checkpoint(self, path, batch_datas):
-        pass
+        self._reader_name = reader_name
+        self._trainer_env = trainer_env
+        self._etcd = etcd_db.get_global_etcd(
+            self._trainer_env.etcd_endpoint, job_id=self._trainer_env.job_id)
 
-    def load_checkpoint(self, path):
-        pass
+        # BatchData
+        self._input_queue = input_queue
+        self._out_queue = out_queue
+        # batch_data_id => BatchData
+        self._cache = {}
 
-    def is_processed(self, file_idx, path, record_idx):
-        if file_idx not in self._restored_records:
-            return False
+        # pb.BatchDataRequest queue
+        self._req_queue = threading.Queue(queue_size)
 
-        rec_idxs = self._restored_records[file_idx]
-        if record_idx not in rec_idxs:
-            return False
+        self._data_server = data_server.DataServer(self)
+        self._data_server.start()
+        edl_reader.save_to_etcd(
+            self._etcd,
+            reader_name=self._reader_name,
+            pod_id=self._trainer_env.pod_id,
+            data_server_endpoint=self._data_server.endpoint)
 
-        return True
+        self._stop = threading.Event()
+        self._t_reporter = threading.Thread(target=self.report)
+        self._t_generater = threading.Thread(target=self.generate)
+        self._t_accesser = threading.Thread(target=self.access)
 
+        self._client = data_server_client.DataServerClient()
 
-class FileCache(object):
-    def __init__(self, capcity=100):
+    def start(self):
+        self._client.connect(self._reader_leader_endpoint)
+        self._t_reporter.start()
+        self._t_generater.start()
+        self._t_accesser.start()
+
+    def _report(self, report_size=10):
         """
-        capcity: GB
+        1. Report BatchData index to Leader
+        2. Get the BatchData index need to be processed
+            if there is no data, set None to req_queue
         """
+        batch_data_ids = []
+        while not self._stop.set():
+            while len(a) < report_size:
+                b = self._input_queue.pop()
+                if b is None:
+                    logger.info("data read to end!")
+                    break
+                batch_data_ids.append(b.batch_data_id)
+                with self._lock:
+                    self._cache[b.batch_data_id] = b
+
+            self._client.report_batch_data_meta(
+                reader_leader_endpoint=self._reader_leader_endpoint,
+                reader_name=self._name,
+                pod_id=self._trainer_env.pod_id,
+                dataserver_endpoint=self._data_server.endpoint,
+                batch_data_ids=batch_data_ids)
+
+            batch_data_ids = []
+
+        while not self._stop.set() and len(batch_data_ids) > 0:
+            self._client.report_batch_data_meta(
+                reader_leader_endpoint=self._reader_leader_endpoint,
+                reader_name=self._name,
+                pod_id=self._trainer_env.pod_id,
+                dataserver_endpoint=self._data_server.endpoint,
+                batch_data_ids=batch_data_ids)
+
+        self._client.reach_data_end(
+            reader_leader_endpoint=self._reader_leader_endpoint,
+            reader_name=self._name,
+            pod_id=self._trainer_env.pod_id)
+
+    def _access(self):
+        while not self._stop.set():
+            res = self._client.get_balanced_batch_data(
+                reader_leader_endpoint=self._reader_leader_endpoint,
+                reader_name=self._name,
+                pod_id=self._trainer_env.pod_id)
+
+            self._req_queue.put(res)
+
+            # data end
+            if res is None:
+                break
+
+    def _get_batch_data(self, req):
+        """
+        Read BatchData from local or remote by BatchDataRequest
+        """
+        if self._trainer_env.pod_id != req.producer_pod_id:
+            return (req, self._client.get_batch_data(req))
+
+        return (req, self.get_local_batch_data(req))
+
+    def get_local_batch_data(self, req):
+        ret = []
+        for batch_data_id in req.data.batch_data_ids:
+            with self._lock:
+                ret.append(self._cache.pop(batch_data_id))
+
+        return ret
+
+    def _generate(self):
+        while not self._stop.set():
+            req = self._req_queue.pop()
+            if req is None:
+                break
+
+            ret = self._get_batch_data(req)
+            for b in ret:
+                self._out_queue.put(b)
+
+        self._out_queue.put(None)
+
+    def report(self):
+        try:
+            self._report()
+        except Exception as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+
+    def access(self):
+        try:
+            self._access()
+        except Exception as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+
+    def generate(self):
+        try:
+            self._generate()
+        except Exception as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+
+
+def access_batch_data(reader_leader, reader_name, trainer_env, input_queue,
+                      out_queue, cache_capcity, error_queue):
+    """
+    Run DataAccesser in a seperated process
+    """
+    try:
+        a = DataAccesser(reader_leader, reader_name, trainer_env, input_queue,
+                         out_queue, cache_capcity)
+        a.start()
+    except KeyboardInterrupt:
         pass
-
-    def download(self, src_path, dst_path):
-        pass
-
-    def _clean_up(self):
-        pass
+    except Exception as e:
+        import traceback
+        error_queue.put(traceback.format_exc())
+        sys.exit(1)
 
 
-class DistributedDataReader(object):
+class Reader(object):
     def __init__(self,
                  file_list,
                  file_splitter_cls,
-                 splitted_data_field,
                  batch_size,
-                 capcity=100):
-        """
-        file_splitter_cls is the class name of dataset.See example in dataset.py
-        file_list is the input data file list and it should be get by loader.For example, all data
-        splitted_data_field: the  file_splitter_cls's result field name by order
-        file is on local or on hdfs.
-        This class:
-        1. get data file list from the leader.
-        2. parse records from reader_cls' object.
-        3. if there's no data local, try to pull data from other dataserver or raise StopIteration.
-
-        capcity: cached batch num
-
-        __next__: return meta, (splitted_data_field data)
-        """
-
-        self._id = str(uuid.uuid1())
-        self._name = unique_name.generate("_datareader_")
-
-        #BatchData
-        self._data_queue = Queue(capcity)
-
-        self._lock = Lock()
+                 cache_capcity=100):
         self._file_list = file_list
-        self._splitter_cls = file_splitter_cls
-        self._leader = get_data_reader_leader()
+        assert isinstance(self._file_list, list), "file_list must be a list"
 
-        self._data_checkpoint = DataCheckpoint()
-        self._data_checkpoint.load_checkpoint(checkpoint_path)
-        self._reach_end = False
-        self._cache = {}
-        self._file_cache = FileCache()
-        self._b_id = 0
-        self._env = TrainerEnv()
+        self._name = unique_name.generator("_dist_reader_")
 
-        assert type(file_splitter_cls) == FileSplitter
+        self._cls = file_splitter_cls
+        self._batch_size = batch_size
+        assert self._batch_size > 0, "batch size must > 0"
+        self._cache_capcity = cache_capcity
 
-        self._register = DataReaderRegister(
-            etcd_endoints=self._etcd_endpoints,
-            job_id=self._job_id,
-            rank=self._env.rank,
-            reader=self)
+        # connections to data servers
+        self._trainer_env = edl_env.TrainerEnv()
 
-        self._t_read_data = Thread(target=self._read_data)
-        self._t_read_data.start()
+        self._state = edl_state.load_from_etcd(
+            etcd_endpoints=self._trainer_env.etcd_endpoints,
+            job_id=self._trainer_env.job_id,
+            state_name=self._name,
+            timeout=60)
 
-        self._start_data_server()
+        self._etcd = etcd_db.get_global_etcd(self._trainer_env.endpoints,
+                                             self._trainer_env.job_id)
+        # reader meta
+        self._reader_leader = edl_reader.load_from_ectd(
+            self._etcd, self._trainer_env.pod_leader_id, timeout=60)
 
-    def get_port(self):
-        return self._data_server.port()
+        self._generater_out_queue = multiprocessing.Queue(self._cache_capcity)
+        self._accesser_out_queue = multiprocessing.Queue(self._cache_capcity)
 
-    def _start_data_server(self):
-        """
-        start and register the data server
-        """
-        self._data_server = data_server.DataServer(self._file_list,
-                                                   self._env.world_rank)
+        self._generater = None
+        self._accesser = None
 
-    def _shut_down(self):
-        self._data_server.wait()
-        pass
+    def stop(self):
+        if self._generater:
+            self._generater.stop()
+            self._generater = None
+
+        if self._accesser:
+            self._accesser.terminate()
+            self._accesser.join()
+            self._accesser = None
+
+    def __exit__(self):
+        self.stop()
+
+    def _check_accesser(self):
+        if self._accesser.is_alive():
+            return True
+
+        self._accesser.join()
+        exitcode = self._accesser.exitcode
+        if exitcode == 0:
+            return False
+
+        if len(self._error_queue) > 0:
+            raise exceptions.EdlAccessDataError(self.error_queue[0])
+        else:
+            raise exceptions.EdlAccessDataError(
+                "access process exit:{}".format(exitcode))
 
     def __iter__(self):
-        """
-        get data from queue
-        """
-        self._local_file_list = self._data_client._get_file_list()
-        self._reach_end = False
-        if self._t_read_data is None:
-            self._t_read_data = Thread(target=self._read_data)
-            self._t_read_data.start()
+        self._generater = DataGenerator()
+        self._generator.start()
 
-    def __next__(self):
+        self._accesser = multiprocessing.Process(
+            access_batch_data,
+            args=(self._reader_leader, self._name, self._trainer_env,
+                  self._generater_out_queue, self._accesser_out_queue,
+                  self._cache_capcity))
         while True:
-            b = self._data_queue.pop()
+            if not self._check_accesser():
+                break
+
+            try:
+                b = self._accesser_out_queue.pop(60)
+            except multiprocessing.Queue.Empty as e:
+                continue
+
             if b is None:
+                logger.debug("{} reach data end".format(self._name))
                 break
-            yield b.split_meta_and_data()  # meta, data
-
-        self._t_read_data.join()
-        self._t_read_data = None
-        self._reach_end = True
-        raise StopIteration
-
-    def _set_batch_data(self, meta):
-        """
-        get batch data meta
-        """
-        # reach end
-        if meta is None:
-            self._data_queue.put(None)
-            return False
-
-        if meta.is_local():
-            b = self._cache.pop(meta._id)
-        else:
-            b = self._data_client.get_batch_data(meta)
-        self._data_queue.put(b)
-        if b is None:
-            return False
-        return True
-
-    def _process_one_file(self, idx, file_path):
-        path = self._file_cache.download(file_path)
-        for r in enumerate(self._splitter_cls(path)):
-            rec_no = r[0]
-            data = r[1:]
-            if self._data_checkpoint.is_processed(idx, path, rec_no):
-                logger.debug(
-                    "idx:{} file:{} rec_no:{} data_len:{} already processed".
-                    format(idx, path, rec_no, len(data)))
-                continue
-
-            logger.debug("read idx:{} file:{} rec_no:{} data_len:{}".format(
-                idx, path, rec_no, len(data)))
-
-            yield Record(rec_no, (data))
-
-    def _new_batch_data(self):
-        self._b_id += 1
-        b = BatchData(self._id, self._b_id)
-        return b
-
-    def _process_file_list(self, metas):
-        rec_map = {}
-        b = self._new_batch_data()
-        size = 0
-        for m in metas:
-            for rec in self._process_one_file(m._idx, m._path):
-                if m not in b._batch:
-                    b._batch[m] = []
-                b._batch[m].append(rec)
-                size += 1
-                if size >= self._batch_size:
-                    b._batch._size = size
-                    yield b
-                    size = 0
-                else:
-                    continue
-
-        if size > 0:
-            yield b
-
-    def _read_data(self):
-        """
-        read data into queue
-        """
-        while True:
-            for batch_data in self._process_file_list(self._local_file_list):
-                self._cache[batch_data._id] = batch_data
-                # report and then get
-                meta = self._data_client.get_batch_data_meta()
-                if not self._set_batch_data(meta):
-                    break
-                continue
-
-            break
-
-        logger.info("local data process completed.")
-        while True:
-            meta = self._data_client.get_batch_data_meta()
-            if not self._set_batch_data(meta):
-                break
-
-    @property
-    def endpoint(self):
-        return "{}:{}".format(utils.get_extern_ip(), self._serer.port)
-
-    def get_id(self):
-        return self._id
-
-    @property
-    def name(self):
-        return self._name
+            yield {"meta": b[0], "data": b[1]}

@@ -15,11 +15,10 @@
 import copy
 import time
 from edl.discovery.etcd_client import EtcdClient
+from edl.utils import cluster as edl_cluster
+from edl.utils import constants
+from edl.utils.log_utils import logger
 from threading import Lock, Thread, Event
-
-from . import constants
-from .cluster import Cluster
-from .log_utils import logger
 
 
 class Watcher(object):
@@ -44,7 +43,7 @@ class Watcher(object):
         self._t_watcher = None
 
         # assign value
-        self._etcd = EtcdClient(etcd_endpoints, root=job_id)
+        self._etcd = EtcdClient(self._job_env.etcd_endpoints, root=job_id)
         self._etcd.init()
 
         self._t_watcher = Thread(target=self._watcher)
@@ -69,7 +68,7 @@ class Watcher(object):
             if value is None:
                 time.sleep(1)
                 continue
-            new_cluster = Cluster()
+            new_cluster = edl_cluster.Cluster()
             new_cluster.from_json(value)
 
             with self._lock:

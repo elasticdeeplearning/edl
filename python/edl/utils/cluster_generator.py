@@ -17,19 +17,22 @@ import six
 import threading
 import time
 import traceback
+from edl.discovery import etcd_client
+from edl.utils import cluster as edl_cluster
+from edl.utils import constants
+from edl.utils import error_utils
+from edl.utils import etcd_db
+from edl.utils import exceptions
+from edl.utils.log_utils import logger
+from edl.utils import train_status as edl_train_status
+from edl.utils import leader as edl_leader
+from edl.utils import status as edl_status
+from edl.utils import resource_pods as edl_resource_pods
 
-from . import constants
-from . import error_utils
-from . import etcd_db
-from . import exceptions
-from .log_utils import logger
-from ..discovery import etcd_client
-from edl.utils import cluster as cluster_utils
 
-
-class ClusterGenerator(object):
+class Generator(object):
     def __init__(self, job_env, pod_id):
-        self._cluster = cluster_utils.Cluster()
+        self._cluster = edl_cluster.Cluster()
         self._service = constants.ETCD_CLUSTER
         self._server = constants.ETCD_CLUSTER
         self._stop = threading.Event()
@@ -37,7 +40,6 @@ class ClusterGenerator(object):
         self._t_register = None
         self._lock = threading.Lock()
         self._job_env = job_env
-        self._db = etcd_db.get_global_etcd()
         self._pod_id = pod_id
 
     def start(self):
@@ -89,7 +91,7 @@ class ClusterGenerator(object):
         self.stop()
 
     def _generate_cluster_from_resource(self, resource_pods):
-        leader_id = self._db.get_pod_leader_id()
+        leader_id = edl_leader.get_pod_leader_id(self._etcd)
         if leader_id is None:
             raise exceptions.EdlTableError("leader key={}:{}".format(
                 self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
@@ -101,7 +103,7 @@ class ClusterGenerator(object):
                 "leader error, leader:{} not in resource:{}".format(
                     leader_id, resource_pods.keys()))
 
-        new_cluster = cluster_utils.Cluster()
+        new_cluster = edl_cluster.Cluster()
         pods = new_cluster.get_pods()
 
         rank = 0
@@ -130,7 +132,7 @@ class ClusterGenerator(object):
 
         ids = current_cluster.get_pods_ids_set()
         for pod_id, pod in six.iteritems(resource_pods):
-            if pod.status == constants.Status.INITIAL \
+            if pod.status == edl_status.Status.INITIAL \
                     and pod.get_pod_id() not in ids \
                     and len(new_pods) < self._job_env.max_nodes:
                 pod.rank = rank
@@ -141,11 +143,12 @@ class ClusterGenerator(object):
             new_cluster.new_stage()
 
     def _generate_cluster_once(self):
-        current_cluster = self._db.get_cluster()
-        resource_pods = self._db.get_resource_pods_dict()
+        current_cluster = edl_cluster.load_from_etcd(self._etcd, timeout=30)
+        resource_pods = edl_resource_pods.get_resource_pods_dict(
+            self._etcd, timeout=15)
 
         if len(resource_pods) <= 0:
-            raise EdlTableError("resource pods key={}:{}".format(
+            raise exceptions.EdlTableError("resource pods key={}:{}".format(
                 self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
                                          self._pod_id), resource_pods))
 
@@ -156,7 +159,7 @@ class ClusterGenerator(object):
         current_ids = current_cluster.get_pods_ids_set()
         resource_ids = set(resource_pods.keys())
         all_inited, all_running, all_succeed, all_failed = \
-            self._db.get_pods_status()
+            edl_train_status.load_pods_status_from_etcd(self._etcd)
 
         disappeared = current_ids - resource_ids - all_inited - all_running - all_succeed - all_failed
         failed = current_ids & all_failed
@@ -176,8 +179,9 @@ class ClusterGenerator(object):
         inited = current_ids & all_inited
         if len(inited) > 0 and \
                 current_cluster.get_pods_nranks() < self._job_env.max_nodes:
-            train_status = self._db.get_train_status()
-            if train_status == constants.TrainStatus.INITIAL or train_status == constants.TrainStatus.RUNNING:
+            train_status = edl_train_status.load_from_etcd(
+                self._etcd, timeout=30)
+            if train_status == edl_train_status.TrainStatus.INITIAL or train_status == edl_train_status.TrainStatus.RUNNING:
                 logger.info("find running pods:{} and init pods{}".format(
                     inited, running))
                 self._append_inited_pods(current_cluster, resource_pods,
@@ -204,7 +208,7 @@ class ClusterGenerator(object):
             failure=[])
 
         message = "pod_id:{} leader_id:{} _set_cluster_if_leader status:{}".format(
-            self._pod_id, self._db.get_pod_leader_id(), status)
+            self._pod_id, self.get_pod_leader_id(self._etcd), status)
 
         if not status:
             raise exceptions.EdlEtcdIOError(message)
