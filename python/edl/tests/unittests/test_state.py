@@ -88,6 +88,16 @@ class TestState(etcd_test_base.EtcdTestBase):
         # compare
         self.assertEqual(state, state2)
 
+        # only leader can write state
+        try:
+            pod_id = "1"
+            self._etcd.set_server_permanent(constants.ETCD_POD_RANK,
+                                            constants.ETCD_POD_LEADER, pod_id)
+            edl_state.save_to_etcd(self._etcd, pod_id, state, timeout=10)
+            self.assertFalse(True)
+        except:
+            pass
+
 
 if __name__ == '__main__':
     unittest.main()
