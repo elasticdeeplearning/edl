@@ -30,13 +30,6 @@ class DataCheckpoint(json_serializable.Serializable):
         #dict, file_idx_in_file_list=>[(record_idx_begin, record_idx_end), ...]
         self.processed_data = processed_data
 
-    def from_json(self, json_str):
-        d = json.loads(json_str)
-        self.reader_name = d["reader_name"]
-        self.file_list = d["file_list"]
-        self.processed_data = d["processed_data"]
-        return self
-
 
 class EpochAttr(json_serializable.Serializable):
     def __init__(self):
@@ -46,26 +39,23 @@ class EpochAttr(json_serializable.Serializable):
         self.avg_step_time = None
         self.step_no_of_epoch = None
 
-    def from_json(self, json_str):
-        d = json.loads(json_str)
-        self.epoch_no = d["epoch_no"]
-        self.world_size = d["world_size"]
-        self.step_num = d["step_num"]
-        self.avg_step_time = d["avg_step_time"]
-        self.step_no_of_epoch = d["step_no_of_epoch"]
-        return self
-
 
 def _load_dict_of_cls_from_json(json_str, cls):
-    print("json_str 2", json_str)
     d = json.loads(json_str)
 
     ret = {}
     for k, v in six.iteritems(d):
-        print("v 2:", v, type(v))
-        ret[k] = cls().from_json(v)
+        ret[int(k)] = cls().from_json(v)
 
     return ret
+
+
+def _dump_dict_to_json(d):
+    ret = {}
+    for k, v in six.iteritems(d):
+        ret[int(k)] = v.to_json()
+
+    return json.dumps(ret)
 
 
 class TrainStatus(json_serializable.Serializable):
@@ -76,12 +66,23 @@ class TrainStatus(json_serializable.Serializable):
         self._epochs = {}  # epoch_no => EpochAttr
         self.status = edl_train_status.TrainStatus.INITIAL
 
+    def to_json(self):
+        d = {
+            "_epoch_no": self._epoch_no,
+            "global_step_no": int(self.global_step_no),
+            "_epochs": _dump_dict_to_json(self._epochs),
+            "status": int(self.status),
+        }
+
+        return json.dumps(d)
+
     def from_json(self, json_str):
         d = json.loads(json_str)
         self._epoch_no = d["_epoch_no"]
         self.global_step_no = d["global_step_no"]
         self.status = d["status"]
 
+        print("d[epochs]", d["_epochs"])
         self._epochs = _load_dict_of_cls_from_json(d["_epochs"], EpochAttr)
 
     @property
@@ -126,7 +127,17 @@ class State(json_serializable.Serializable):
         self._train_status = TrainStatus()
 
     def to_json(self):
-        return super(State, self).to_json(filter_names=["_adjust_func"])
+        d = {
+            "_default": self._default,
+            "_user_defined": self._user_defined.to_json()
+            if self._user_defined else None,
+            "_name": self._name,
+            "_model_path": self._model_path,
+            "_data_checkpoint": self._data_checkpoint.to_json(),
+            "_train_status": self._train_status.to_json(),
+        }
+
+        return json.dumps(d)
 
     def from_json(self, json_str):
         d = json.loads(json_str)
@@ -177,7 +188,6 @@ def load_from_etcd(etcd, state_name, user_defined=None, timeout=60):
         raise exceptions.EdlTableError("key:value = {}:{}".format(
             etcd.get_full_path(constants.ETCD_READER, state_name), value))
 
-    print("json_value:", value)
     state = State(total_batch_size=None, user_defined=user_defined)
     state.from_json(string_utils.bytes_to_string(value))
     return state
