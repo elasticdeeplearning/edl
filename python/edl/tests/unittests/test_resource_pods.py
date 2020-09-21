@@ -34,9 +34,9 @@ class TestRegister(etcd_test_base.EtcdTestBase):
             pod1._id = "1"
 
             ttl = constants.ETCD_TTL
-            register1 = resource_pods.PodResourceRegister(
+            register1 = resource_pods.Register(
                 self._job_env, pod_id="0", pod_json=pod0.to_json(), ttl=ttl)
-            register2 = resource_pods.PodResourceRegister(
+            register2 = resource_pods.Register(
                 self._job_env, pod_id="1", pod_json=pod1.to_json(), ttl=ttl)
 
             # check if the ttl is valid

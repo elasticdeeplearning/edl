@@ -30,6 +30,7 @@ from edl.utils import log_utils
 from edl.utils import pod_server_client
 from edl.utils import status as edl_status
 from edl.utils import train_process as edl_train_process
+from edl.utils import resource_pods
 
 from edl.utils import leader_pod
 from ..utils.log_utils import logger
@@ -147,7 +148,7 @@ def launch(args):
 
     # register pod resource to tell others:
     # this resource can use to train
-    resource_register = PodResourceRegister(job_env, pod)
+    resource_register = resource_pods.Register(job_env, pod)
 
     # seize the leader
     leader_register = leader_pod.Register(job_env, pod.get_id())

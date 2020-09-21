@@ -17,6 +17,8 @@ import json
 
 from edl.utils import constants
 from edl.utils.log_utils import logger
+from edl.utils import status as edl_status
+from edl.utils import error_utils
 
 
 class Status(enum.IntEnum):
@@ -34,7 +36,8 @@ def bool_to_status(b):
     return Status.FAILED
 
 
-def load_job_status_from_etcd(etcd):
+@error_utils.handle_errors_until_timeout
+def load_job_status_from_etcd(etcd, timeout=15):
     service = constants.ETCD_JOB_STATUS
     servers = etcd.get_service(service)
 
@@ -47,14 +50,16 @@ def load_job_status_from_etcd(etcd):
     return d["status"]
 
 
-def save_job_status_to_etcd(etcd, status):
+@error_utils.handle_errors_until_timeout
+def save_job_status_to_etcd(etcd, status, timeout=15):
     service = constants.ETCD_JOB_STATUS
     server = "status"
     info = json.dumps({"status": int(status)})
     etcd.set_server_permanent(service, server, info)
 
 
-def save_job_flag_to_etcd(self, pod_id, flag):
+@error_utils.handle_errors_until_timeout
+def save_job_flag_to_etcd(self, pod_id, flag, timeout=15):
     if flag:
         save_job_status_to_etcd(pod_id, Status.SUCCEED)
         logger.info("This job succeeded!")
@@ -63,7 +68,8 @@ def save_job_flag_to_etcd(self, pod_id, flag):
     logger.fatal("This job meets error!")
 
 
-def save_pod_status_to_etcd(etcd, pod_id, status):
+@error_utils.handle_errors_until_timeout
+def save_pod_status_to_etcd(etcd, pod_id, status, timeout=15):
     service = constants.ETCD_POD_STATUS
     server = pod_id
     info = json.dumps({"status": int(status)})
@@ -71,7 +77,8 @@ def save_pod_status_to_etcd(etcd, pod_id, status):
     etcd.set_server_permanent(service, server, info)
 
 
-def load_pods_status_from_etcd(etcd):
+@error_utils.handle_errors_until_timeout
+def load_pods_status_from_etcd(etcd, timeout=15):
     service = constants.ETCD_POD_STATUS
     servers = etcd.get_service(service)
 
@@ -94,7 +101,8 @@ def load_pods_status_from_etcd(etcd):
     return inited, running, succeed, failed
 
 
-def save_pod_flag_to_etcd(etcd, pod_id, flag):
+@error_utils.handle_errors_until_timeout
+def save_pod_flag_to_etcd(etcd, pod_id, flag, timeout=15):
     if not flag:
         save_pod_status_to_etcd(etcd, pod_id, Status.FAILED)
         logger.fatal("local trainers meets error!")

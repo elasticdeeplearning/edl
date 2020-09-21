@@ -23,14 +23,17 @@ from edl.utils import resource_pods
 
 class TestLeaderPod(etcd_test_base.EtcdTestBase):
     def setUp(self):
-        super(TestGenerate, self).setUp("test_leader_pod")
+        super(TestLeaderPod, self).setUp("test_leader_pod")
 
     def _add_pod(self):
         pod = edl_pod.Pod()
         pod.from_env(self._job_env)
-        leader_register=leader_pod.Register(self._job_env, pod.pod_id)
-        resource_register=resource_pods.Register(self._job_env,
-                                                 pod_id=pod.pod_id, pod_json=pod.to_json(), ttl=constants.ETCD_TTL)
+        resource_register = resource_pods.Register(
+            self._job_env,
+            pod_id=pod.pod_id,
+            pod_json=pod.to_json(),
+            ttl=constants.ETCD_TTL)
+        leader_register = leader_pod.Register(self._job_env, pod.pod_id)
 
         return (pod, leader_register, resource_register)
 
@@ -39,13 +42,13 @@ class TestLeaderPod(etcd_test_base.EtcdTestBase):
         time.sleep(constants.ETCD_TTL)
         pod1, leader_register1, resource_register1 = self._add_pod()
 
-        leader_id = leader_pod.get_pod_leader_id()
+        leader_id = leader_pod.get_pod_leader_id(self._etcd, timeout=15)
         self.assertEqual(pod0.pod_id, leader_id)
 
         leader_register0.stop()
         time.sleep(constants.ETCD_TTL)
 
-        leader_id = leader_pod.get_pod_leader_id()
+        leader_id = leader_pod.get_pod_leader_id(self._etcd, timeout=15)
         self.assertEqual(pod1.pod_id, leader_id)
         leader_register1.stop()
 

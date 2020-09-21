@@ -24,8 +24,8 @@ from edl.discovery import etcd_client
 from edl.utils import cluster as edl_cluster
 from edl.utils import constants
 from edl.utils import error_utils
+from edl.utils import leader_pod
 from edl.utils import exceptions
-from edl.utils import leader as edl_leader
 from edl.utils import pod as edl_pod
 from edl.utils import resource_pods as edl_resource_pods
 from edl.utils import status as edl_status
@@ -227,13 +227,12 @@ class Generator(object):
         self.stop()
 
     def _generate_cluster_from_resource(self, resource_pods):
-        leader_id = edl_leader.get_pod_leader_id(self._etcd)
+        leader_id = leader_pod.get_pod_leader_id(self._etcd, timeout=15)
         if leader_id is None:
             raise exceptions.EdlTableError("leader key={}:{}".format(
                 self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
                                          constants.ETCD_POD_RANK), leader_id))
 
-        print(resource_pods)
         if leader_id not in resource_pods:
             raise exceptions.EdlTableError(
                 "leader error, leader:{} not in resource:{}".format(
@@ -279,14 +278,14 @@ class Generator(object):
             new_cluster.new_stage()
 
     def _generate_cluster_once(self):
-        current_cluster = edl_cluster.load_from_etcd(self._etcd, timeout=30)
+        current_cluster = edl_cluster.load_from_etcd(self._etcd, timeout=15)
         resource_pods = edl_resource_pods.load_from_etcd(
             self._etcd, timeout=15)
 
         if len(resource_pods) <= 0:
-            raise exceptions.EdlTableError("resource pods key={}:{}".format(
+            raise exceptions.EdlTableError("resource pods key={}:[]".format(
                 self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
-                                         self._pod_id), resource_pods))
+                                         self._pod_id)))
 
         if current_cluster is None:
             new_cluster = self._generate_cluster_from_resource(resource_pods)
@@ -295,7 +294,7 @@ class Generator(object):
         current_ids = current_cluster.get_pods_ids_set()
         resource_ids = set(resource_pods.keys())
         all_inited, all_running, all_succeed, all_failed = \
-            edl_train_status.load_pods_status_from_etcd(self._etcd)
+            edl_status.load_pods_status_from_etcd(self._etcd, timeout=15)
 
         disappeared = current_ids - resource_ids - all_inited - all_running - all_succeed - all_failed
         failed = current_ids & all_failed
@@ -344,7 +343,10 @@ class Generator(object):
             failure=[])
 
         message = "pod_id:{} leader_id:{} _set_cluster_if_leader status:{}".format(
-            self._pod_id, self.get_pod_leader_id(self._etcd), status)
+            self._pod_id,
+            leader_pod.get_pod_leader_id(
+                self._etcd, timeout=15),
+            status)
 
         if not status:
             raise exceptions.EdlEtcdIOError(message)

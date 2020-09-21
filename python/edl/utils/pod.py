@@ -159,3 +159,7 @@ class Pod(json_serializable.Serializable):
 
     def get_id(self):
         return self._id
+
+    @property
+    def pod_id(self):
+        return self._id

@@ -20,6 +20,7 @@ from edl.utils import etcd_utils
 from edl.utils import exceptions
 from edl.utils import string_utils
 from edl.utils import constants
+from edl.utils import cluster as edl_cluster
 
 from . import constants
 from .log_utils import logger
@@ -32,8 +33,7 @@ class Register(object):
         self._is_leader = False
         self._pod_id = pod_id
         self._ttl = ttl
-        self._generate_cluster = cluster_generator.ClusterGenerator(job_env,
-                                                                    pod_id)
+        self._generate_cluster = edl_cluster.Generator(job_env, pod_id)
 
         self._stop = threading.Event()
         self._service_name = constants.ETCD_POD_RANK
@@ -132,6 +132,7 @@ class Register(object):
         with self._lock:
             return self._t_register == None
 
+
 @error_utils.handle_errors_until_timeout
 def get_pod_leader_id(etcd, timeout=15):
     value = etcd.get_value(constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER)
@@ -139,6 +140,7 @@ def get_pod_leader_id(etcd, timeout=15):
         return None
 
     return string_utils.bytes_to_string(value)
+
 
 @error_utils.handle_errors_until_timeout
 def load_from_etcd(etcd, timeout=15):
@@ -150,6 +152,7 @@ def load_from_etcd(etcd, timeout=15):
 
     resource_pods = resource_pods.load_from_etcd(etcd, timeout=timeout)
     if leader_id not in resource_pods:
-        raise exceptions.EdlTableError("leader_id:{} not in resource pods".format(leader_id))
+        raise exceptions.EdlTableError(
+            "leader_id:{} not in resource pods".format(leader_id))
 
     return resource_pods[leader_id]
