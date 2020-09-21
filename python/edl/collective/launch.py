@@ -34,10 +34,9 @@ from edl.utils import resource_pods
 
 from edl.utils import leader_pod
 from ..utils.log_utils import logger
-from ..utils.pod import Pod
-from ..utils.pod_server import PodServer
-from ..utils.register import PodResourceRegister
-from ..utils.watcher import Watcher
+from ..utils import pod
+from ..utils import pod_server
+from ..utils import watcher
 
 
 def edl_barrier(job_env, pod, timeout):
@@ -53,7 +52,7 @@ def edl_barrier(job_env, pod, timeout):
 
             logger.debug("barrier on leader:{}".format(leader))
 
-            c = pod_server_client.PodServerClient(leader.endpoint)
+            c = pod_server_client.Client(leader.endpoint)
             cluster = c.barrier(job_env.job_id, pod.get_id())
             return cluster
         except Exception as e:
@@ -87,7 +86,7 @@ def prepare(args):
         sys.exit(0)
 
     # local pod, and the pod's id does't change.
-    pod = Pod()
+    pod = edl_pod.Pod()
     pod.from_env(job_env)
 
     # update pod status
@@ -164,7 +163,7 @@ def launch(args):
                                        pod.get_id(), edl_status.Status.RUNNING)
 
     # watcher after barrier
-    watcher = Watcher(job_env, cluster, pod)
+    watcher = watcher.Watcher(job_env, cluster, pod)
 
     procs = edl_train_process.start(
         cluster,
