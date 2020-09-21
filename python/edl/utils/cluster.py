@@ -21,7 +21,6 @@ import time
 import traceback
 import uuid
 from edl.discovery import etcd_client
-from edl.utils import cluster as edl_cluster
 from edl.utils import constants
 from edl.utils import error_utils
 from edl.utils import exceptions
@@ -168,7 +167,7 @@ def load_from_etcd(etcd, timeout=60):
 
 class Generator(object):
     def __init__(self, job_env, pod_id):
-        self._cluster = edl_cluster.Cluster()
+        self._cluster = Cluster()
         self._service = constants.ETCD_CLUSTER
         self._server = constants.ETCD_CLUSTER
         self._stop = threading.Event()
@@ -238,7 +237,7 @@ class Generator(object):
                 "leader error, leader:{} not in resource:{}".format(
                     leader_id, resource_pods.keys()))
 
-        new_cluster = edl_cluster.Cluster()
+        new_cluster = Cluster()
         pods = new_cluster.get_pods()
 
         rank = 0
@@ -278,7 +277,7 @@ class Generator(object):
             new_cluster.new_stage()
 
     def _generate_cluster_once(self):
-        current_cluster = edl_cluster.load_from_etcd(self._etcd, timeout=15)
+        current_cluster = load_from_etcd(self._etcd, timeout=15)
         resource_pods = edl_resource_pods.load_from_etcd(
             self._etcd, timeout=15)
 
