@@ -48,9 +48,8 @@ class TestCluster(etcd_test_base.EtcdTestBase):
               self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
                                        pod.get_id()))
 
-        edl_status.save_pod_status_to_etcd(self._etcd,
-                                           pod.get_id(),
-                                           edl_status.Status.INITIAL)
+        edl_status.save_pod_status_to_etcd(
+            self._etcd, pod.get_id(), edl_status.Status.INITIAL, timeout=15)
         print("set permanent:", self._etcd.get_full_path(
             constants.ETCD_POD_STATUS, pod.get_id()))
 
