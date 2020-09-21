@@ -17,6 +17,7 @@ import unittest
 from edl.utils import constants
 from edl.utils import resource_pods
 from edl.tests.unittests import etcd_test_base
+from edl.utils import pod
 
 
 class TestRegister(etcd_test_base.EtcdTestBase):
@@ -29,20 +30,30 @@ class TestRegister(etcd_test_base.EtcdTestBase):
             self._job_env, pod_id="0", pod_json="0.json", ttl=ttl)
         register2 = resource_pods.PodResourceRegister(
             self._job_env, pod_id="1", pod_json="1.json", ttl=ttl)
-        pods = resource_pods.get_resource_pods_dict()
-        self.assertEqual(len(pods_dict), 2)
-        for pod_id, pod_json in six.iteriterms(pods):
-            if pod_id == "0":
-                self.assertEqual(pod_json, "0.json")
 
-            if pod_id == "1":
-                self.assertEqual(pod_json, "1.json")
+        pod0 = pod.Pod()
+        pod0._id = "0"
 
-        register1.stop()
-        register2.stop()
+        pod1 = pod.Pod()
+        pod0._id = "1"
+
+        try:
+            pods = resource_pods.load_from_etcd(self._etcd, timeout=15)
+            self.assertEqual(len(pods_dict), 2)
+            for pod_id, pod in six.iteriterms(pods):
+                if pod_id == "0":
+                    self.assertEqual(pod, pod0)
+
+                if pod_id == "1":
+                    self.assertEqual(pod, pod1)
+        except Exception as e:
+            raise e
+        finally:
+            register1.stop()
+            register2.stop()
 
         time.sleep(ttl + 1)
-        pods_dict = resource_pods.get_resource_pods_dict()
+        pods_dict = resource_pods.load_from_etcd(self._etcd, timeout=15)
         self.assertEqual(len(pods_dict), 0)
 
 

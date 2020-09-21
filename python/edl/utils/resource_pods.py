@@ -34,7 +34,7 @@ class PodResourceRegister(register.Register):
 
 
 @error_utils.handle_errors_until_timeout
-def get_resource_pods_dict(etcd, timeout=15):
+def load_from_etcd(etcd, timeout=15):
     servers = etcd.get_service(constants.ETCD_POD_RESOURCE)
 
     pods = {}

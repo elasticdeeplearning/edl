@@ -23,6 +23,20 @@ class SerializableBase(object):
         raise NotImplementedError
 
 
+def _compare_two_list(list1, list2):
+    if not isinstance(list2, list):
+        return False
+
+    if len(list1) != len(list2):
+        return False
+
+    for i in range(len(list1)):
+        if list1[i] != list2[i]:
+            return False
+
+    return True
+
+
 def _compare_two_dict(dict1, dict2):
     if len(dict1) != len(dict2):
         return False
@@ -32,6 +46,9 @@ def _compare_two_dict(dict1, dict2):
             return False
 
         if isinstance(v, dict):
+            if not _compare_two_dict(v, dict2[k]):
+                return False
+        elif isinstance(v, list):
             if not _compare_two_dict(v, dict2[k]):
                 return False
         else:
