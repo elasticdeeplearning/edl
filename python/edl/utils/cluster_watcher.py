@@ -14,63 +14,43 @@
 
 import copy
 import time
-from edl.discovery.etcd_client import EtcdClient
+import threading
+
+from edl.discovery import etcd_client
 from edl.utils import cluster as edl_cluster
 from edl.utils import constants
 from edl.utils.log_utils import logger
-from threading import Lock, Thread, Event
 
 
 class Watcher(object):
-    def __init__(self, job_env, cluster, pod):
-        self._etcd = None
-
+    def __init__(self, job_env, cluster):
         self._job_id = job_env.job_id
 
         # current context
         self._cluster = copy.copy(cluster)
-        self._leader_id = cluster.get_pod_leader_id()
-        self._current_pod = pod
 
         self._new_cluster = None
-        self._new_leader_id = None
         self._changed = False
         logger.info("watcher gets the init cluster:{}".format(self._cluster))
 
-        self._lock = Lock()
-        self._stop = Event()
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
 
+        self._etcd = None
         self._t_watcher = None
 
+
         # assign value
-        self._etcd = EtcdClient(self._job_env.etcd_endpoints, root=job_id)
+        self._etcd = etcd_client.EtcdClient(self._job_env.etcd_endpoints, root=self._job_id)
         self._etcd.init()
 
-        self._t_watcher = Thread(target=self._watcher)
+        self._t_watcher = threading.Thread(target=self._watcher)
         self._t_watcher.start()
 
     def _watcher(self):
-        begin = time.time()
         while not self._stop.is_set():
-            # if leader_id changed?
-            servers = self._etcd.get_service(constants.ETCD_POD_RANK)
-            assert len(servers) <= 1
-            if len(servers) == 0:
-                time.sleep(1)
-                continue
-
-            with self._lock:
-                self._new_leader_id = s.info
-
             # if cluster changed?
-            value, _, _, _, _, = etcd._get_server(constants.ETCD_CLUSTER,
-                                                  self._new_leader_id)
-            if value is None:
-                time.sleep(1)
-                continue
-            new_cluster = edl_cluster.Cluster()
-            new_cluster.from_json(value)
-
+            new_cluster = edl_cluster.load_from_etcd(self._etcd)
             with self._lock:
                 self._new_cluster = new_cluster
 
