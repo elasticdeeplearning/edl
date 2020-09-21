@@ -31,8 +31,6 @@ class TestPod(etcd_test_base.EtcdTestBase):
 
         pod2 = edl_pod.Pod()
         pod2.from_json(pod.to_json())
-        print("pod1:", pod.to_json())
-        print("pod2:", pod2.to_json())
         self.assertEqual(pod, pod2)
 
 
