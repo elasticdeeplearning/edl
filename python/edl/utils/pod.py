@@ -31,7 +31,7 @@ class Pod(json_serializable.Serializable):
         self._trainer_ports = None
         self._addr = None
         self._gpus = None
-        self._trainers = None
+        self._trainers = []
         self._port = None
         self._status = edl_status.Status.INITIAL  # status maybe changed
 

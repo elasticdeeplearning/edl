@@ -16,6 +16,7 @@ from edl.utils import constants
 from edl.utils import register
 from edl.utils import error_utils
 from edl.utils import pod
+from edl.utils import string_utils
 
 
 class PodResourceRegister(register.Register):
@@ -40,7 +41,8 @@ def load_from_etcd(etcd, timeout=15):
     pods = {}
     for s in servers:
         p = pod.Pod()
-        p.from_json(s.info)
+        print("load info:", s.info)
+        p.from_json(string_utils.bytes_to_string(s.info))
         pods[p.get_id()] = p
 
     return pods

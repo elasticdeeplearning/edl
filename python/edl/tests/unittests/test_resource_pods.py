@@ -13,11 +13,12 @@
 # limitations under the License.
 import time
 import unittest
+import six
 
 from edl.utils import constants
 from edl.utils import resource_pods
 from edl.tests.unittests import etcd_test_base
-from edl.utils import pod
+from edl.utils import pod as edl_pod
 
 
 class TestRegister(etcd_test_base.EtcdTestBase):
@@ -25,27 +26,28 @@ class TestRegister(etcd_test_base.EtcdTestBase):
         super(TestRegister, self).setUp("test_register")
 
     def test_register_resource_pod(self):
-        ttl = constants.ETCD_TTL
-        register1 = resource_pods.PodResourceRegister(
-            self._job_env, pod_id="0", pod_json="0.json", ttl=ttl)
-        register2 = resource_pods.PodResourceRegister(
-            self._job_env, pod_id="1", pod_json="1.json", ttl=ttl)
-
-        pod0 = pod.Pod()
-        pod0._id = "0"
-
-        pod1 = pod.Pod()
-        pod0._id = "1"
-
         try:
+            pod0 = edl_pod.Pod()
+            pod0._id = "0"
+
+            pod1 = edl_pod.Pod()
+            pod1._id = "1"
+
+            ttl = constants.ETCD_TTL
+            register1 = resource_pods.PodResourceRegister(
+                self._job_env, pod_id="0", pod_json=pod0.to_json(), ttl=ttl)
+            register2 = resource_pods.PodResourceRegister(
+                self._job_env, pod_id="1", pod_json=pod1.to_json(), ttl=ttl)
+
             pods = resource_pods.load_from_etcd(self._etcd, timeout=15)
-            self.assertEqual(len(pods_dict), 2)
-            for pod_id, pod in six.iteriterms(pods):
+            self.assertEqual(len(pods), 2)
+            for pod_id, pod in six.iteritems(pods):
                 if pod_id == "0":
                     self.assertEqual(pod, pod0)
-
-                if pod_id == "1":
+                elif pod_id == "1":
                     self.assertEqual(pod, pod1)
+                else:
+                    raise Exception("not supported pod_id:{}".format(pod_id))
         except Exception as e:
             raise e
         finally:

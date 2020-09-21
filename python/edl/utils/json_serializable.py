@@ -24,6 +24,13 @@ class SerializableBase(object):
 
 
 def _compare_two_list(list1, list2):
+    if list1 is None:
+        if list2 is not None:
+            return False
+    else:
+        if list2 is None:
+            return False
+
     if not isinstance(list2, list):
         return False
 
@@ -38,21 +45,32 @@ def _compare_two_list(list1, list2):
 
 
 def _compare_two_dict(dict1, dict2):
+    if dict1 is None:
+        if dict2 is not None:
+            print("raise 1")
+            return False
+    else:
+        if dict2 is None:
+            print("raise 2")
+            return False
+
     if len(dict1) != len(dict2):
         return False
 
     for k, v in six.iteritems(dict1):
         if k not in dict2:
+            print("raise 3")
             return False
 
         if isinstance(v, dict):
             if not _compare_two_dict(v, dict2[k]):
                 return False
         elif isinstance(v, list):
-            if not _compare_two_dict(v, dict2[k]):
+            if not _compare_two_list(v, dict2[k]):
                 return False
         else:
             if v != dict2[k]:
+                print("raise 4")
                 return False
 
     return True
