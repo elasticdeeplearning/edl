@@ -41,7 +41,6 @@ def load_from_etcd(etcd, timeout=15):
     pods = {}
     for s in servers:
         p = pod.Pod()
-        print("load info:", s.info)
         p.from_json(string_utils.bytes_to_string(s.info))
         pods[p.get_id()] = p
 
