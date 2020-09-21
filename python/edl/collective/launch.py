@@ -36,7 +36,7 @@ from edl.utils import leader_pod
 from ..utils.log_utils import logger
 from ..utils import pod
 from ..utils import pod_server
-from ..utils import watcher
+from ..utils import cluster_watcher
 
 
 def edl_barrier(job_env, pod, timeout):
@@ -163,7 +163,7 @@ def launch(args):
                                        pod.get_id(), edl_status.Status.RUNNING)
 
     # watcher after barrier
-    watcher = watcher.Watcher(job_env, cluster, pod)
+    watcher = cluster_watcher.Watcher(job_env, cluster, pod)
 
     procs = edl_train_process.start(
         cluster,
@@ -196,7 +196,7 @@ def launch(args):
             edl_train_process.terminate(procs)
 
             cluster = new_cluster
-            watcher = Watcher(job_env, cluster, pod)
+            watcher = cluster_watcher.Watcher(job_env, cluster, pod)
 
             procs = edl_train_process.start(
                 job_env,
