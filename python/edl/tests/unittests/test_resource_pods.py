@@ -39,6 +39,9 @@ class TestRegister(etcd_test_base.EtcdTestBase):
             register2 = resource_pods.PodResourceRegister(
                 self._job_env, pod_id="1", pod_json=pod1.to_json(), ttl=ttl)
 
+            # check if the ttl is valid
+            time.sleep(ttl + 2)
+
             pods = resource_pods.load_from_etcd(self._etcd, timeout=15)
             self.assertEqual(len(pods), 2)
             for pod_id, pod in six.iteritems(pods):
