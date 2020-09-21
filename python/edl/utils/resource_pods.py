@@ -14,19 +14,24 @@
 
 from edl.utils import constants
 from edl.utils import register
+from edl.utils import error_utils
+from edl.utils import pod
+
 
 class PodResourceRegister(register.Register):
-    def __init__(self, job_env, pod):
+    def __init__(self, job_env, pod_id, pod_json, ttl=constants.ETCD_TTL):
         service = constants.ETCD_POD_RESOURCE
-        server = "{}".format(pod.get_id())
-        value = pod.to_json()
+        server = "{}".format(pod_id)
+        value = pod_json
 
         super(PodResourceRegister, self).__init__(
             etcd_endpoints=job_env.etcd_endpoints,
             job_id=job_env.job_id,
             service=service,
             server=server,
-            info=value)
+            info=value,
+            ttl=ttl)
+
 
 @error_utils.handle_errors_until_timeout
 def get_resource_pods_dict(etcd, timeout=15):
@@ -39,6 +44,7 @@ def get_resource_pods_dict(etcd, timeout=15):
         pods[p.get_id()] = p
 
     return pods
+
 
 @error_utils.handle_errors_until_timeout
 def wait_resource(pod_id, timeout=15):

@@ -19,7 +19,13 @@ from edl.utils.log_utils import logger
 
 
 class Register(object):
-    def __init__(self, etcd_endpoints, job_id, service, server, info, ttl=constants.ETCD_TTL):
+    def __init__(self,
+                 etcd_endpoints,
+                 job_id,
+                 service,
+                 server,
+                 info,
+                 ttl=constants.ETCD_TTL):
         self._service = service
         self._server = server
         self._stop = threading.Event()
@@ -27,7 +33,7 @@ class Register(object):
         self._t_register = None
         self._lock = threading.Lock()
         self._info = info
-        self._ttl=ttl
+        self._ttl = ttl
 
         self._etcd = etcd_client.EtcdClient(
             endpoints=etcd_endpoints, root=job_id, timeout=ttl)
@@ -51,7 +57,7 @@ class Register(object):
         while not self._stop.is_set():
             try:
                 self._etcd.refresh(self._service, self._server)
-                time.sleep(self._ttl/2)
+                time.sleep(self._ttl / 2)
             except Exception as e:
                 logger.fatal("register meet error and exit! class:{} error:{}".
                              format(self.__class__.__name__, e))
@@ -75,6 +81,3 @@ class Register(object):
 
     def __exit__(self):
         self.stop()
-
-
-
