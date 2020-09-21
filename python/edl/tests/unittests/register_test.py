@@ -14,11 +14,10 @@
 
 import unittest
 from edl.discovery.etcd_client import EtcdClient
-
-from edl.utils.register import PodRegister
-from edl.utils.cluster import Pod
 from edl.utils import env as edl_env
+from edl.utils.cluster import Pod
 from edl.utils.edl_launch import _parse_args
+from edl.utils.register import PodRegister
 
 
 class TestRegister(unittest.TestCase):

@@ -12,25 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-from edl.discovery.etcd_client import EtcdClient
-import time
-import threading
 import sys
-import copy
-import atexit
-
-from edl.utils.pod_server import PodServer
-from edl.utils.pod import Pod
-from edl.utils.pod_server_client import PodServerClient
-from edl.utils.exceptions import EdlBarrierError
-from edl.utils import status as edl_status
-from edl.utils import constants
-import edl.utils.cluster as edl_cluster
-from edl.utils.etcd_db import get_global_etcd
-from edl.utils.leader_register import LeaderRegister
+import unittest
 from edl.tests.unittests import etcd_test_base
-from edl.utils import cluster_generator
+from edl.utils import cluster as edl_cluster
+from edl.utils import constants
+from edl.utils import status as edl_status
+from edl.utils.exceptions import EdlBarrierError
+from edl.utils.pod import Pod
+from edl.utils.pod_server import PodServer
+from edl.utils.pod_server_client import PodServerClient
 
 
 class TestGenerate(etcd_test_base.EtcdTestBase):
@@ -68,7 +59,7 @@ class TestGenerate(etcd_test_base.EtcdTestBase):
 
         pod_1, server_1 = self.register_pod(self._job_env)
 
-        generater = cluster_generator.Generator(self._job_env, pod_0.get_id())
+        generater = edl_cluster.Generator(self._job_env, pod_0.get_id())
         ret = generater.start()
 
         cluster_0 = None

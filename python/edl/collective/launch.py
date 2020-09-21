@@ -31,7 +31,7 @@ from edl.utils import pod_server_client
 from edl.utils import status as edl_status
 from edl.utils import train_process as edl_train_process
 
-from ..utils.leader_register import LeaderRegister
+from edl.utils import leader_pod
 from ..utils.log_utils import logger
 from ..utils.pod import Pod
 from ..utils.pod_server import PodServer
@@ -46,7 +46,7 @@ def edl_barrier(job_env, pod, timeout):
     while True:
         try:
             etcd = etcd_db.get_global_etcd()
-            leader = etcd_leader.get_pod_leader(etcd)
+            leader = leader_pod.load_from_etcd(etcd)
             if leader is None:
                 raise exceptions.EdlNotFoundLeader("can't get leader")
 
@@ -150,7 +150,7 @@ def launch(args):
     resource_register = PodResourceRegister(job_env, pod)
 
     # seize the leader
-    leader_register = LeaderRegister(job_env, pod.get_id())
+    leader_register = leader_pod.Register(job_env, pod.get_id())
 
     # register rank and watch the rank
     # if the rank changed, the pods should restart the training proc.

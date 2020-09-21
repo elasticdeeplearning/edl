@@ -16,11 +16,10 @@ import collections
 import json
 import six
 import uuid
-
 from edl.utils import network_utils
 from edl.utils import status as edl_status
-from edl.utils.log_utils import logger
 from edl.utils import trainer as edl_trainer
+from edl.utils.log_utils import logger
 
 
 class Pod(object):
