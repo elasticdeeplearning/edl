@@ -71,8 +71,6 @@ class Pod(json_serializable.Serializable):
             self._trainers.append(t)
 
     def from_env(self, job_env):
-        self._job_env = job_env
-
         # uuid
         self._id = str(uuid.uuid1())
         self._trainer_ports = job_env.trainer_ports
