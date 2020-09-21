@@ -46,13 +46,13 @@ class ReaderMeta(object):
 @error_utils.handle_errors_until_timeout
 def save_to_etcd(etcd, reader_name, pod_id, data_server_endpoint, timeout=60):
     meta = ReaderMeta(reader_name, pod_id, data_server_endpoint)
-    path = constants.ETCD_DIST_READER + "/" + reader_name
+    path = constants.ETCD_READER + "/" + reader_name
     etcd.set_server_permanent(path, pod_id, meta.to_json())
 
 
 @error_utils.handle_errors_until_timeout
 def load_from_etcd(self, etcd, reader_name, pod_id, timeout=60):
-    path = constants.ETCD_DIST_READER + "/" + reader_name
+    path = constants.ETCD_READER + "/" + reader_name
     with self._lock:
         value = etcd.get_value(path, pod_id)
 

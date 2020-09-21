@@ -12,16 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ETCD_POD_RESOURCE = "pod_resource"
-ETCD_POD_RANK = "rank"
-ETCD_POD_STATUS = "pod_status"
-ETCD_JOB_STATUS = "job_status"
-ETCD_TRAIN_STATUS = "train_status"
-ETCD_CLUSTER = "cluster"
-ETCD_READER = "reader"
-ETCD_STATE = "state"
-ETCD_POD_LEADER = "0"
+from edl.utils.json_serializable import SerializableBase
 
-ETCD_CONN_TIMEOUT = 6
-ETCD_TTL = 15
-ETCD_OPERATION_TIMEOUT = 60
+__all__ = ["SerializableBase"]
