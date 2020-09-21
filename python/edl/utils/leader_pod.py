@@ -19,6 +19,7 @@ from edl.utils import error_utils
 from edl.utils import etcd_utils
 from edl.utils import exceptions
 from edl.utils import string_utils
+from edl.utils import constants
 
 from . import constants
 from .log_utils import logger
@@ -26,10 +27,11 @@ from ..discovery.etcd_client import EtcdClient
 
 
 class Register(object):
-    def __init__(self, job_env, pod_id):
+    def __init__(self, job_env, pod_id, ttl=constants.ETCD_TTL):
         self._job_env = job_env
         self._is_leader = False
         self._pod_id = pod_id
+        self._ttl = ttl
         self._generate_cluster = cluster_generator.ClusterGenerator(job_env,
                                                                     pod_id)
 
@@ -62,7 +64,7 @@ class Register(object):
                 self._server,
                 info=info,
                 timeout=constants.ETCD_CONN_TIMEOUT,
-                ttl=constants.ETCD_TTL):
+                ttl=self._ttl):
             logger.debug("Can't seize leader on etcd key:{}".format(
                 self._etcd.get_full_path(self._service_name, self._server)))
 

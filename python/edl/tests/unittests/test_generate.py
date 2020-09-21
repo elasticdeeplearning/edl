@@ -28,11 +28,11 @@ class TestGenerate(etcd_test_base.EtcdTestBase):
     def setUp(self):
         super(TestGenerate, self).setUp("test_generate")
 
-    def register_pod(self, job_env):
+    def _register_pod(self, job_env):
         pod = Pod()
         pod.from_env(job_env)
-        s = PodServer(self._job_env, pod)
-        s.start()
+        server = PodServer(self._job_env, pod)
+        server.start()
         self._etcd.set_server_permanent(constants.ETCD_POD_RESOURCE,
                                         pod.get_id(), pod.to_json())
         self._etcd.set_server_permanent(constants.ETCD_POD_STATUS,
@@ -47,9 +47,9 @@ class TestGenerate(etcd_test_base.EtcdTestBase):
         print("set permanent:", self._etcd.get_full_path(
             constants.ETCD_POD_STATUS, pod.get_id()))
 
-        return pod, s
+        return pod, server
 
-    def test_server(self):
+    def test_barrier(self):
         pod_0, server_0 = self.register_pod(self._job_env)
         self._etcd.set_server_permanent(constants.ETCD_POD_RANK,
                                         constants.ETCD_POD_LEADER,
@@ -60,13 +60,11 @@ class TestGenerate(etcd_test_base.EtcdTestBase):
         pod_1, server_1 = self.register_pod(self._job_env)
 
         generater = edl_cluster.Generator(self._job_env, pod_0.get_id())
-        ret = generater.start()
+        generater.start()
 
-        cluster_0 = None
-        clsuter_1 = None
         try:
-            c = PodServerClient(pod_0.endpoint)
-            cluster_0 = c.barrier(
+            client = PodServerClient(pod_0.endpoint)
+            cluster_0 = client.barrier(
                 self._job_env.job_id, pod_0.get_id(), timeout=0)
 
             self.assertNotEqual(cluster_0, None)
