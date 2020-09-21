@@ -15,12 +15,11 @@ import threading
 import time
 from edl.discovery import etcd_client
 from edl.utils import constants
-from edl.utils import etcd_db
 from edl.utils.log_utils import logger
 
 
 class Register(object):
-    def __init__(self, etcd_endpoints, job_id, service, server, info):
+    def __init__(self, etcd_endpoints, job_id, service, server, info, ttl=constants.ETCD_TTL):
         self._service = service
         self._server = server
         self._stop = threading.Event()
@@ -28,14 +27,15 @@ class Register(object):
         self._t_register = None
         self._lock = threading.Lock()
         self._info = info
+        self._ttl=ttl
 
         self._etcd = etcd_client.EtcdClient(
-            endpoints=etcd_endpoints, root=job_id, timeout=6)
+            endpoints=etcd_endpoints, root=job_id, timeout=ttl)
         self._etcd.init()
 
         try:
             self._etcd.set_server_not_exists(
-                service, server, self._info, ttl=constants.ETCD_TTL)
+                service, server, self._info, ttl=ttl)
             logger.info("register pod:{} in etcd path:{}".format(
                 info, self._etcd.get_full_path(service, server)))
         except Exception as e:
@@ -51,10 +51,11 @@ class Register(object):
         while not self._stop.is_set():
             try:
                 self._etcd.refresh(self._service, self._server)
-                time.sleep(3)
+                time.sleep(self._ttl/2)
             except Exception as e:
                 logger.fatal("register meet error and exit! class:{} error:{}".
                              format(self.__class__.__name__, e))
+                # if refresher stopped, the pod will exit from the cluster
                 break
 
     def stop(self):
@@ -76,18 +77,4 @@ class Register(object):
         self.stop()
 
 
-class PodResourceRegister(Register):
-    def __init__(self, job_env, pod):
-        service = constants.ETCD_POD_RESOURCE
-        server = "{}".format(pod.get_id())
-        value = pod.to_json()
 
-        super(PodResourceRegister, self).__init__(
-            etcd_endpoints=job_env.etcd_endpoints,
-            job_id=job_env.job_id,
-            service=service,
-            server=server,
-            info=value)
-
-        db = etcd_db.get_global_etcd()
-        db.get_resource_pods_dict()

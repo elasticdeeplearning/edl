@@ -13,9 +13,20 @@
 # limitations under the License.
 
 from edl.utils import constants
-from edl.utils import error_utils
-from edl.utils import pod
+from edl.utils import register
 
+class PodResourceRegister(register.Register):
+    def __init__(self, job_env, pod):
+        service = constants.ETCD_POD_RESOURCE
+        server = "{}".format(pod.get_id())
+        value = pod.to_json()
+
+        super(PodResourceRegister, self).__init__(
+            etcd_endpoints=job_env.etcd_endpoints,
+            job_id=job_env.job_id,
+            service=service,
+            server=server,
+            info=value)
 
 @error_utils.handle_errors_until_timeout
 def get_resource_pods_dict(etcd, timeout=15):
@@ -29,12 +40,11 @@ def get_resource_pods_dict(etcd, timeout=15):
 
     return pods
 
-
 @error_utils.handle_errors_until_timeout
-def wait_resource(self, pod, timeout=15):
+def wait_resource(pod_id, timeout=15):
     pods = get_resource_pods_dict(timeout=timeout)
     if len(pods) == 1:
-        if pod.get_id() in pods:
+        if pod_id in pods:
             return True
 
     if len(pods) == 0:
