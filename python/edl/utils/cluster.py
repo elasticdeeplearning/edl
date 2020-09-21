@@ -23,9 +23,10 @@ from edl.utils import exceptions
 from edl.utils import pod as edl_pod
 from edl.utils import error_utils
 from edl.utils import status as edl_status
+from edl.utils import json_serializable
 
 
-class Cluster(object):
+class Cluster(json_serializable.Serializable):
     def __init__(self):
         self._pods = []
         self._stage = None
@@ -38,25 +39,6 @@ class Cluster(object):
     def details(self):
         return "pods:{} job_stage:{} status:{}".format(
             [pod.details() for pod in self._pods], self._stage, self._status)
-
-    def __eq__(self, cluster):
-        if cluster is None:
-            return False
-
-        if self._stage != cluster._stage:
-            return False
-
-        if len(self._pods) != len(cluster.pods):
-            return False
-
-        for a, b in zip(self._pods, cluster.pods):
-            if a != b:
-                return False
-
-        return True
-
-    def __ne__(self, cluster):
-        return not self.__eq__(cluster)
 
     def update_pods(cluster):
         self._pods = copy.copy(cluster.pods)
@@ -111,14 +93,6 @@ class Cluster(object):
             ids.add(pod._id)
 
         return ids
-
-    def from_pb(self, cluster):
-        self._stage = cluster._stage
-        self._pods = []
-        for pod in cluster:
-            p = edl_pod.Pod()
-            p.from_pb(pod)
-            self._pods.append(p)
 
     # FIXME(gongwb): use from_pb, to_pb later
     def to_json(self):
