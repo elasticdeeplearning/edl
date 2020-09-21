@@ -13,9 +13,9 @@
 # limitations under the License.
 
 from edl.utils import constants
-from edl.utils import register
 from edl.utils import error_utils
 from edl.utils import pod
+from edl.utils import register
 from edl.utils import string_utils
 
 

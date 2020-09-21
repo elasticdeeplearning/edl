@@ -14,13 +14,12 @@
 
 import threading
 import time
+from edl.utils import cluster as edl_cluster
 from edl.utils import constants
 from edl.utils import error_utils
 from edl.utils import etcd_utils
 from edl.utils import exceptions
 from edl.utils import string_utils
-from edl.utils import constants
-from edl.utils import cluster as edl_cluster
 
 from . import constants
 from .log_utils import logger

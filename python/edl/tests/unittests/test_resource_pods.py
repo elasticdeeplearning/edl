@@ -11,14 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import six
 import time
 import unittest
-import six
-
-from edl.utils import constants
-from edl.utils import resource_pods
 from edl.tests.unittests import etcd_test_base
+from edl.utils import constants
 from edl.utils import pod as edl_pod
+from edl.utils import resource_pods
 
 
 class TestRegister(etcd_test_base.EtcdTestBase):

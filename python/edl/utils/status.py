@@ -14,11 +14,9 @@
 
 import enum
 import json
-
 from edl.utils import constants
-from edl.utils.log_utils import logger
-from edl.utils import status as edl_status
 from edl.utils import error_utils
+from edl.utils.log_utils import logger
 
 
 class Status(enum.IntEnum):
