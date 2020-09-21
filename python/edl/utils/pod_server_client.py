@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import time
-from edl.utils import client
+from edl.utils import client as client_base
 from edl.utils import cluster as edl_cluster
 from edl.utils import exceptions
 from edl.utils import pod_server_pb2
@@ -21,7 +21,7 @@ from edl.utils import pod_server_pb2_grpc
 from edl.utils.log_utils import logger
 
 
-class Client(client.Client):
+class Client(client_base.Client):
     def __init__(self, endpoint):
         super(Client, self).__init__(endpoint)
 
