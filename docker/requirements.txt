@@ -10,3 +10,4 @@ paddle-serving-client
 paddle-serving-server-gpu
 paddle-serving-app
 paddlepaddle-gpu==1.8.0.post107
+psutil
