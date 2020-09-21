@@ -26,7 +26,7 @@ from edl.utils.pod_server_client import PodServerClient
 
 class TestCluster(etcd_test_base.EtcdTestBase):
     def setUp(self):
-        super(TestPod, self).setUp("test_cluster")
+        super(TestCluster, self).setUp("test_cluster")
 
     def test_cluster_basic(self):
         cluster = edl_cluster.Cluster()
