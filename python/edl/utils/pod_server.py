@@ -22,7 +22,7 @@ from edl.utils import cluster as edl_cluster
 from edl.utils import common_pb2
 from edl.utils import etcd_db
 from edl.utils import exceptions
-from edl.utils import leader as leader_pod
+from edl.utils import leader_pod
 from edl.utils import pod_server_pb2
 from edl.utils import pod_server_pb2_grpc
 from edl.utils import status as edl_status
