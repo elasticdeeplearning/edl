@@ -16,12 +16,6 @@ import sys
 import unittest
 from edl.tests.unittests import etcd_test_base
 from edl.utils import cluster as edl_cluster
-from edl.utils import constants
-from edl.utils import status as edl_status
-from edl.utils.exceptions import EdlBarrierError
-from edl.utils.pod import Pod
-from edl.utils.pod_server import PodServer
-from edl.utils.pod_server_client import PodServerClient
 
 
 class TestCluster(etcd_test_base.EtcdTestBase):
