@@ -144,7 +144,7 @@ class Generator(object):
 
     def _generate_cluster_once(self):
         current_cluster = edl_cluster.load_from_etcd(self._etcd, timeout=30)
-        resource_pods = edl_resource_pods.get_resource_pods_dict(
+        resource_pods = edl_resource_pods.load_from_etcd(
             self._etcd, timeout=15)
 
         if len(resource_pods) <= 0:
