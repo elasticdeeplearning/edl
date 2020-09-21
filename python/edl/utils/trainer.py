@@ -14,9 +14,10 @@
 
 import json
 import uuid
+from edl.utils import json_serializable
 
 
-class Trainer(object):
+class Trainer(json_serializable.Serializable):
     def __init__(self):
         self._id = None
         self._rank_in_pod = None
@@ -24,47 +25,12 @@ class Trainer(object):
         self._endpoint = None
         self._global_rank = None
 
-    def to_json(self):
-        d = {
-            "id": self._id,
-            "rank_in_pod": self._rank_in_pod,
-            "gpus": self._gpus,
-            "endpoint": self._endpoint,
-            "global_rank": self._global_rank,
-        }
-
-        return json.dumps(d)
-
-    def from_json(self, s):
-        d = json.loads(s)
-
-        self._id = d["id"]
-        self._rank_in_pod = d["rank_in_pod"]
-        self._gpus = d["gpus"]
-        self._endpoint = d["endpoint"]
-        self._global_rank = d["global_rank"]
-
     def __str__(self):
         s = "id:{} rank_in_pod:{} gpus:{} endpoint:{} global_rank:{}".format(
             self._ids, self._rank_in_pod, self._gpus, self._endpoint,
             self._global_rank)
 
         return s
-
-    def __eq__(self, t):
-        if self._id != self._id:
-            return False
-
-        if self._gpus != t._gpus or \
-            self._endpoint != t._endpoint or \
-            self._rank_in_pod != t._rank_in_pod or \
-            self._global_rank != t._global_rank :
-            return False
-
-        return True
-
-    def __ne__(self, t):
-        return not self == t
 
     @property
     def global_rank(self):
@@ -88,12 +54,3 @@ class Trainer(object):
         self._rank_in_pod = rank_in_pod
         self._endpoint = endpoint
         self._gpus = gpus
-
-    def from_pb(self, t):
-        self._id = t._id
-        self._global_rank = t.global_rank
-        self._rank_in_pod = t.rank_in_pod
-        self._endpoint = t.endpoint
-        self._gpus = []
-        for g in pod.gpus:
-            self.gpus.append(g)
