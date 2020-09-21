@@ -34,7 +34,6 @@ class TestLeaderPod(etcd_test_base.EtcdTestBase):
 
         return (pod, leader_register, resource_register)
 
-
     def test_seize_leader(self):
         pod0, leader_register0, resource_register0 = self._add_pod()
         time.sleep(constants.ETCD_TTL)
@@ -49,6 +48,9 @@ class TestLeaderPod(etcd_test_base.EtcdTestBase):
         leader_id = leader_pod.get_pod_leader_id()
         self.assertEqual(pod1.pod_id, leader_id)
         leader_register1.stop()
+
+        resource_register0.stop()
+        resource_register1.stop()
 
 
 if __name__ == '__main__':
