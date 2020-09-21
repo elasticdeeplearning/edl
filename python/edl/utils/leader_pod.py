@@ -14,7 +14,6 @@
 
 import threading
 import time
-from edl.utils import cluster as edl_cluster
 from edl.utils import constants
 from edl.utils import error_utils
 from edl.utils import etcd_utils
@@ -27,12 +26,16 @@ from ..discovery.etcd_client import EtcdClient
 
 
 class Register(object):
-    def __init__(self, job_env, pod_id, ttl=constants.ETCD_TTL):
+    def __init__(self,
+                 job_env,
+                 pod_id,
+                 cluster_generator,
+                 ttl=constants.ETCD_TTL):
         self._job_env = job_env
         self._is_leader = False
         self._pod_id = pod_id
         self._ttl = ttl
-        self._generate_cluster = edl_cluster.Generator(job_env, pod_id)
+        self._generate_cluster = cluster_generator
 
         self._stop = threading.Event()
         self._service_name = constants.ETCD_POD_RANK

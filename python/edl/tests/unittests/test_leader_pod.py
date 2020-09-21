@@ -19,6 +19,7 @@ from edl.utils import constants
 from edl.utils import leader_pod
 from edl.utils import pod as edl_pod
 from edl.utils import resource_pods
+from edl.utils import cluster as edl_cluster
 
 
 class TestLeaderPod(etcd_test_base.EtcdTestBase):
@@ -33,7 +34,9 @@ class TestLeaderPod(etcd_test_base.EtcdTestBase):
             pod_id=pod.pod_id,
             pod_json=pod.to_json(),
             ttl=constants.ETCD_TTL)
-        leader_register = leader_pod.Register(self._job_env, pod.pod_id)
+        generator = edl_cluster.Generator(self._job_env, pod.pod_id)
+        leader_register = leader_pod.Register(
+            self._job_env, pod.pod_id, cluster_generator=generator)
 
         return (pod, leader_register, resource_register)
 
