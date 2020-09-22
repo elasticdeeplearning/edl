@@ -30,6 +30,7 @@ from edl.utils.log_utils import logger
 from edl.utils import pod_server
 from edl.utils import resource_pods
 from edl.utils import cluster_watcher
+from edl.utils import error_utils
 
 
 class Launcher(object):
@@ -95,35 +96,34 @@ class Launcher(object):
 
             time.sleep(3)
 
-    def _job_exit(self):
+    @error_utils.handle_errors_until_timeout
+    def _exit(self, timeout=60):
         local_flag = self._trainer_flag & self._register_flag & self._barrier_flag
         edl_status.save_pod_flag_to_ecd(self._etcd, self._pod.get_id(), local_flag)
 
-        begin = time.time()
-        while True:
-            try:
-                if self._leader_register.is_leader():
-                    if self._etcd.wait_resource(self._cluster, timeout=15):
-                        job_flag = self._trainer_flag & self._register_flag & self._barrier_flag & self._resource_flag
-                        edl_status.save_job_flag_to_etcd(self._etcd, job_flag)
-                        logger.info("set job status:{} ok!".format(job_flag))
-                        break
-                    raise exceptions.EdlWaitFollowersReleaseError(
-                        "can't wait resource")
-                else:
-                    break
-            except Exception as e:
-                logger.warning("prepare job_exit meets error:{}".format(e))
-                if time.time() - begin >= timeout:
-                    logger.warning("wait resource error")
-                    break
-
-                time.sleep(3)
-                continue
+        if self._leader_register is not None and self._leader_register.is_leader():
+            if resource_pods.wait_resource(self._cluster, timeout=15):
+                job_flag = self._trainer_flag & self._register_flag & self._barrier_flag & self._resource_flag
+                edl_status.save_job_flag_to_etcd(self._etcd, job_flag)
+                logger.info("set job status:{} ok!".format(job_flag))
+            raise exceptions.EdlWaitFollowersReleaseError(
+                "can't wait resource")
 
     def launch(self):
-        self._resource_register = PodResourceRegister(self._job_env, self._pod)
-        self._leader_register = LeaderRegister(self._job_env, self._pod.get_id())
+        """
+        let this program can exit normallly
+        """
+        try:
+            self._launch()
+            self._exit(timeout=30)
+        except Exceptions as e:
+            raise e
+        finally:
+            self.__exit__()
+
+    def _launch(self):
+        self._resource_register = resource_pods.Register(self._job_env, self._pod)
+        self._leader_register = leader_pod.Register(self._job_env, self._pod.get_id())
         self._cluster = self._edl_barrier(self._job_env, self._pod, timeout=600)
 
         # update pod status
@@ -131,14 +131,14 @@ class Launcher(object):
                                            self._pod.get_id(), edl_status.Status.RUNNING)
 
         # watcher after barrier
-        self._watcher = Watcher(self._job_env, self._cluster, self._pod)
+        self._watcher = cluster_watcher.Watcher(self._job_env, self._cluster, self._pod)
 
         self._procs = edl_train_process.start(
             self._cluster,
             self._pod,
-            args.training_script,
-            args.training_script_args,
-            log_dir=args.log_dir)
+            self._args.training_script,
+            self._args.training_script_args,
+            log_dir=self._args.log_dir)
 
         self._trainer_flag = True
         self._register_flag = True
@@ -176,7 +176,7 @@ class Launcher(object):
 
             time.sleep(3)
 
-        self._job_exit()
+
 
     def __exit__(self):
         if not self._leader_register_flag:

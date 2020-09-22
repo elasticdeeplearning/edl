@@ -29,7 +29,6 @@ from edl.utils import status as edl_status
 from edl.utils.log_utils import logger
 from edl.utils import pod as edl_pod
 
-
 def main():
     log_utils.get_logger(log_level=10)
     args = args_utils.parse_args()
