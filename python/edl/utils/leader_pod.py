@@ -11,22 +11,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import threading
 import time
-from edl.utils import cluster_generator
+from edl.utils import constants
+from edl.utils import error_utils
+from edl.utils import etcd_utils
+from edl.utils import exceptions
+from edl.utils import string_utils
 
 from . import constants
 from .log_utils import logger
 from ..discovery.etcd_client import EtcdClient
 
 
-class LeaderRegister(object):
-    def __init__(self, job_env, pod_id):
+class Register(object):
+    def __init__(self,
+                 job_env,
+                 pod_id,
+                 cluster_generator,
+                 ttl=constants.ETCD_TTL):
         self._job_env = job_env
         self._is_leader = False
         self._pod_id = pod_id
-        self._generate_cluster = cluster_generator.ClusterGenerator(job_env,
-                                                                    pod_id)
+        self._ttl = ttl
+        self._generate_cluster = cluster_generator
 
         self._stop = threading.Event()
         self._service_name = constants.ETCD_POD_RANK
@@ -57,7 +66,7 @@ class LeaderRegister(object):
                 self._server,
                 info=info,
                 timeout=constants.ETCD_CONN_TIMEOUT,
-                ttl=constants.ETCD_TTL):
+                ttl=self._ttl):
             logger.debug("Can't seize leader on etcd key:{}".format(
                 self._etcd.get_full_path(self._service_name, self._server)))
 
@@ -124,3 +133,28 @@ class LeaderRegister(object):
     def is_stopped(self):
         with self._lock:
             return self._t_register == None
+
+
+@error_utils.handle_errors_until_timeout
+def get_pod_leader_id(etcd, timeout=15):
+    value = etcd.get_value(constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER)
+    if value is None:
+        return None
+
+    return string_utils.bytes_to_string(value)
+
+
+@error_utils.handle_errors_until_timeout
+def load_from_etcd(etcd, timeout=15):
+    leader_id = get_pod_leader_id(etcd, timeout=timeout)
+
+    if leader_id is None:
+        raise exceptions.EdlTableError("leader_id={}:{}".format(
+            etcd_utils.get_rank_table_key(), leader_id))
+
+    resource_pods = resource_pods.load_from_etcd(etcd, timeout=timeout)
+    if leader_id not in resource_pods:
+        raise exceptions.EdlTableError(
+            "leader_id:{} not in resource pods".format(leader_id))
+
+    return resource_pods[leader_id]

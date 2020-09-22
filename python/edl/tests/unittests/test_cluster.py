@@ -11,21 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import time
-import unittest
-import six
 
-from edl.utils import constants
-from edl.utils import resource_pods
+import sys
+import unittest
 from edl.tests.unittests import etcd_test_base
 from edl.utils import cluster as edl_cluster
 
 
-class TestPod(etcd_test_base.EtcdTestBase):
+class TestCluster(etcd_test_base.EtcdTestBase):
     def setUp(self):
-        super(TestPod, self).setUp("test_cluster")
+        super(TestCluster, self).setUp("test_cluster")
 
-    def test_pod(self):
+    def test_cluster_basic(self):
         cluster = edl_cluster.Cluster()
 
         cluster2 = edl_cluster.Cluster()

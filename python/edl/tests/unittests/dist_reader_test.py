@@ -12,13 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-import time
-import os
-import atexit
-
-from edl.utils.global_vars import *
 from edl.utils.etcd_test_base import EtcdTestBase
+from edl.utils.global_vars import *
 
 
 class TestDistReader(EtcdTestBase):
