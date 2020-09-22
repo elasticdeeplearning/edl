@@ -170,5 +170,4 @@ def wait_to_load_from_etcd(etcd, timeout=60):
                 etcd.get_full_path(constants.ETCD_CLUSTER,
                                    constants.ETCD_CLUSTER)))
 
-    print("wait to load cluster:", cluster.to_json())
     return cluster
