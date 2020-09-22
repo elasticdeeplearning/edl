@@ -23,24 +23,6 @@ class SerializableBase(object):
         raise NotImplementedError
 
 
-def _compare_two_dict(dict1, dict2):
-    if len(dict1) != len(dict2):
-        return False
-
-    for k, v in six.iteritems(dict1):
-        if k not in dict2:
-            return False
-
-        if isinstance(v, dict):
-            if not _compare_two_dict(v, dict2[k]):
-                return False
-        else:
-            if v != dict2[k]:
-                return False
-
-    return True
-
-
 class Serializable(SerializableBase):
     def to_json(self, filter_names=set()):
         d = {}
@@ -70,7 +52,7 @@ class Serializable(SerializableBase):
         if other is None:
             return False
 
-        return _compare_two_dict(self.__dict__, other.__dict__)
+        return self.__dict__ == other.__dict__
 
     def __ne__(self, other):
         return not self.__eq__(other)
