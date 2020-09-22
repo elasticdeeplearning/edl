@@ -81,6 +81,7 @@ LIST(REMOVE_ITEM TEST_OPS test_resource_pods)
 LIST(REMOVE_ITEM TEST_OPS test_state)
 LIST(REMOVE_ITEM TEST_OPS test_pod)
 LIST(REMOVE_ITEM TEST_OPS test_cluster)
+LIST(REMOVE_ITEM TEST_OPS test_cluster_watcher)
 foreach(TEST_OP ${TEST_OPS})
     py_test_modules(${TEST_OP} MODULES ${TEST_OP})
 endforeach(TEST_OP)
@@ -90,6 +91,7 @@ bash_test_modules(test_resource_pods START_BASH etcd_test.sh ENVS "PYTHON_EXECUT
 bash_test_modules(test_state START_BASH etcd_test.sh ENVS "PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}")
 bash_test_modules(test_pod START_BASH etcd_test.sh ENVS "PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}")
 bash_test_modules(test_cluster START_BASH etcd_test.sh ENVS "PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}")
+bash_test_modules(test_cluster_watcher START_BASH etcd_test.sh ENVS "PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}")
 
 # bash unit test
 file(GLOB TEST_OPS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "test_*.sh")

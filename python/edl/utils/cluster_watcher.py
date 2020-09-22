@@ -36,10 +36,11 @@ class Watcher(object):
 
         self._etcd = None
         self._t_watcher = None
-
+        self._job_env = job_env
 
         # assign value
-        self._etcd = etcd_client.EtcdClient(self._job_env.etcd_endpoints, root=self._job_id)
+        self._etcd = etcd_client.EtcdClient(
+            self._job_env.etcd_endpoints, root=self._job_id)
         self._etcd.init()
 
         self._t_watcher = threading.Thread(target=self._watcher)
@@ -48,7 +49,8 @@ class Watcher(object):
     def _watcher(self):
         while not self._stop.is_set():
             # if cluster changed?
-            new_cluster = edl_cluster.wait_to_load_from_etcd(self._etcd,timeout=60)
+            new_cluster = edl_cluster.wait_to_load_from_etcd(
+                self._etcd, timeout=60)
             with self._lock:
                 self._new_cluster = new_cluster
 
@@ -72,7 +74,6 @@ class Watcher(object):
         """
 
         with self._lock:
-            if self._new_cluster is None
             old_stage = self._cluster.stage
             new_stage = self._new_cluster.stage
 

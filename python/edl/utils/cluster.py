@@ -156,12 +156,15 @@ def load_from_etcd(etcd, timeout=60):
     cluster.from_json(value)
     return cluster
 
+
 @error_utils.handle_errors_until_timeout
 def wait_to_load_from_etcd(etcd, timeout=60):
     cluster = load_from_etcd(etcd, timeout=60)
     if cluster is None:
-        raise exceptions.EdlTableError("can't load cluster from etcd path:{}".format(
-            etcd.get_full_path(constants.ETCD_CLUSTER, constants.ETCD_CLUSTER)))
+        raise exceptions.EdlTableError(
+            "can't load cluster from etcd path:{}".format(
+                etcd.get_full_path(constants.ETCD_CLUSTER,
+                                   constants.ETCD_CLUSTER)))
 
+    print("wait to load cluster:", cluster.to_json())
     return cluster
-
