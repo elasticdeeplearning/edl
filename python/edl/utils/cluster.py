@@ -17,13 +17,12 @@ import copy
 import json
 import six
 import uuid
-
 from edl.utils import constants
-from edl.utils import exceptions
-from edl.utils import pod as edl_pod
 from edl.utils import error_utils
-from edl.utils import status as edl_status
+from edl.utils import exceptions
 from edl.utils import json_serializable
+from edl.utils import pod as edl_pod
+from edl.utils import status as edl_status
 
 
 class Cluster(json_serializable.Serializable):
@@ -156,3 +155,13 @@ def load_from_etcd(etcd, timeout=60):
     cluster = Cluster()
     cluster.from_json(value)
     return cluster
+
+@error_utils.handle_errors_until_timeout
+def wait_to_load_from_etcd(etcd, timeout=60):
+    cluster = load_from_etcd(etcd, timeout=60)
+    if cluster is None:
+        raise exceptions.EdlTableError("can't load cluster from etcd path:{}".format(
+            etcd.get_full_path(constants.ETCD_CLUSTER, constants.ETCD_CLUSTER)))
+
+    return cluster
+

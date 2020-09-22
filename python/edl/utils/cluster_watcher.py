@@ -13,12 +13,10 @@
 # limitations under the License.
 
 import copy
-import time
 import threading
-
+import time
 from edl.discovery import etcd_client
 from edl.utils import cluster as edl_cluster
-from edl.utils import constants
 from edl.utils.log_utils import logger
 
 
@@ -29,7 +27,7 @@ class Watcher(object):
         # current context
         self._cluster = copy.copy(cluster)
 
-        self._new_cluster = None
+        self._new_cluster = cluster
         self._changed = False
         logger.info("watcher gets the init cluster:{}".format(self._cluster))
 
@@ -50,7 +48,7 @@ class Watcher(object):
     def _watcher(self):
         while not self._stop.is_set():
             # if cluster changed?
-            new_cluster = edl_cluster.load_from_etcd(self._etcd)
+            new_cluster = edl_cluster.wait_to_load_from_etcd(self._etcd,timeout=60)
             with self._lock:
                 self._new_cluster = new_cluster
 
@@ -74,6 +72,7 @@ class Watcher(object):
         """
 
         with self._lock:
+            if self._new_cluster is None
             old_stage = self._cluster.stage
             new_stage = self._new_cluster.stage
 
