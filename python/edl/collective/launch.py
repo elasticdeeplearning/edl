@@ -30,13 +30,13 @@ from edl.utils import log_utils
 from edl.utils import pod_server_client
 from edl.utils import status as edl_status
 from edl.utils import train_process as edl_train_process
+from edl.utils import resource_pods
 
-from ..utils.leader_register import LeaderRegister
+from edl.utils import leader_pod
 from ..utils.log_utils import logger
-from ..utils.pod import Pod
-from ..utils.pod_server import PodServer
-from ..utils.register import PodResourceRegister
-from ..utils.watcher import Watcher
+from ..utils import pod
+from ..utils import pod_server
+from ..utils import cluster_watcher
 
 
 def edl_barrier(job_env, pod, timeout):
@@ -46,13 +46,13 @@ def edl_barrier(job_env, pod, timeout):
     while True:
         try:
             etcd = etcd_db.get_global_etcd()
-            leader = etcd_leader.get_pod_leader(etcd)
+            leader = leader_pod.load_from_etcd(etcd)
             if leader is None:
                 raise exceptions.EdlNotFoundLeader("can't get leader")
 
             logger.debug("barrier on leader:{}".format(leader))
 
-            c = pod_server_client.PodServerClient(leader.endpoint)
+            c = pod_server_client.Client(leader.endpoint)
             cluster = c.barrier(job_env.job_id, pod.get_id())
             return cluster
         except Exception as e:
@@ -86,7 +86,7 @@ def prepare(args):
         sys.exit(0)
 
     # local pod, and the pod's id does't change.
-    pod = Pod()
+    pod = edl_pod.Pod()
     pod.from_env(job_env)
 
     # update pod status
@@ -147,10 +147,10 @@ def launch(args):
 
     # register pod resource to tell others:
     # this resource can use to train
-    resource_register = PodResourceRegister(job_env, pod)
+    resource_register = resource_pods.Register(job_env, pod)
 
     # seize the leader
-    leader_register = LeaderRegister(job_env, pod.get_id())
+    leader_register = leader_pod.Register(job_env, pod.get_id())
 
     # register rank and watch the rank
     # if the rank changed, the pods should restart the training proc.
@@ -163,7 +163,7 @@ def launch(args):
                                        pod.get_id(), edl_status.Status.RUNNING)
 
     # watcher after barrier
-    watcher = Watcher(job_env, cluster, pod)
+    watcher = cluster_watcher.Watcher(job_env, cluster, pod)
 
     procs = edl_train_process.start(
         cluster,
@@ -196,7 +196,7 @@ def launch(args):
             edl_train_process.terminate(procs)
 
             cluster = new_cluster
-            watcher = Watcher(job_env, cluster, pod)
+            watcher = cluster_watcher.Watcher(job_env, cluster, pod)
 
             procs = edl_train_process.start(
                 job_env,

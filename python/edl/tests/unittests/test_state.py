@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-
-from edl.tests.unittests import etcd_test_base
-from edl.utils import state as edl_state
-from edl.collective import serializable
-from edl.utils import constants
-
 import json
+import unittest
+from edl.collective import serializable
+from edl.tests.unittests import etcd_test_base
+from edl.utils import constants
+from edl.utils import state as edl_state
 
 
 class UserDefined(serializable.SerializableBase):

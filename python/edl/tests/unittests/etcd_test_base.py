@@ -12,19 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-import time
-import threading
-import os
-import sys
 import copy
-import atexit
-
-from edl.utils import env as edl_env
-import edl.utils.log_utils as log_utils
 import edl.utils.constants as constants
-from edl.utils.etcd_db import get_global_etcd
+import edl.utils.log_utils as log_utils
+import os
+import unittest
 from edl.discovery.etcd_client import EtcdClient
+from edl.utils import env as edl_env
 
 g_etcd_endpoints = "127.0.0.1:2379"
 
