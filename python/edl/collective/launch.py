@@ -25,6 +25,8 @@ from edl.utils import etcd_db
 from edl.utils import launcher as edl_launcher
 from edl.utils import log_utils
 from edl.utils import status as edl_status
+from edl.utils.logg_utils import logger
+from edl.utils import pod as edl_pod
 
 def main():
     log_utils.get_logger(log_level=10)

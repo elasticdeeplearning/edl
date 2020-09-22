@@ -71,6 +71,7 @@ class Launcher(object):
     def _barrier(self, timeout):
         log_time = time.time()
         start = log_time
+        leader=None
         while True:
             try:
                 leader = leader_pod.get_pod_leader(self._etcd)
@@ -79,8 +80,8 @@ class Launcher(object):
 
                 logger.debug("barrier on leader:{}".format(leader))
 
-                c = pod_server_client.PodServerClient(leader.endpoint)
-                cluster = c.barrier(self._job_env.job_id, self._pod.get_id())
+                client = pod_server_client.Client(leader.endpoint)
+                cluster = client.barrier(self._job_env.job_id, self._pod.get_id())
                 return cluster
             except Exception as e:
                 if time.time() - log_time > 30:
@@ -91,7 +92,7 @@ class Launcher(object):
 
             if time.time() - start > timeout:
                 message = "wait to barrier with all error:{} leader:[{}] current pod:[{}]".format(
-                    traceback.format_exc(), leader, pod)
+                    traceback.format_exc(), leader, self._pod.pod_id)
                 raise exceptions.EdlBarrierError(message)
 
             time.sleep(3)
