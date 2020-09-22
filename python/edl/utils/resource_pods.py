@@ -17,6 +17,7 @@ from edl.utils import register
 from edl.utils import error_utils
 from edl.utils import pod
 from edl.utils import string_utils
+from edl.utils import exceptions
 
 
 class PodResourceRegister(register.Register):
@@ -49,12 +50,15 @@ def load_from_etcd(etcd, timeout=15):
 
 @error_utils.handle_errors_until_timeout
 def wait_resource(pod_id, timeout=15):
-    pods = get_resource_pods_dict(timeout=timeout)
+    pods = load_from_etcd(timeout=timeout)
     if len(pods) == 1:
         if pod_id in pods:
             return True
 
     if len(pods) == 0:
         return True
+
+    raise exceptions.EdlWaitFollowersReleaseError(
+        "can't wait all resource exit:{}".format(pods.keys()))
 
     return False

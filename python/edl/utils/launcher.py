@@ -106,8 +106,15 @@ class Launcher(object):
                 job_flag = self._trainer_flag & self._register_flag & self._barrier_flag & self._resource_flag
                 edl_status.save_job_flag_to_etcd(self._etcd, job_flag)
                 logger.info("set job status:{} ok!".format(job_flag))
-            raise exceptions.EdlWaitFollowersReleaseError(
-                "can't wait resource")
+
+        if not self._leader_register_flag:
+            logger.fatal("leader_register meets error and local pod exit!")
+
+        if not self._resource_register:
+            logger.fatal("resource_register meets error and local pod exit!")
+
+        if not self._trainer_flag:
+            logger.fatal("local_trainers meets error and local pod exit!")
 
     def launch(self):
         """
@@ -149,9 +156,14 @@ class Launcher(object):
             if not alive or not self._trainer_flag:
                 break
 
-            if self._resource_register.is_stopped() or self._leader_register.is_stopped():
+            if self._resource_register.is_stopped():
                 edl_train_process.terminate(self._procs)
-                self._register_flag = False
+                self._resource_register_flag = False
+                break
+
+            if self._leader_register.is_stopped():
+                edl_train_process.terminate(self._procs)
+                self._leader_register_flag = False
                 break
 
             # check job status second
@@ -179,23 +191,14 @@ class Launcher(object):
 
 
     def __exit__(self):
-        if not self._leader_register_flag:
-            logger.fatal("leader_register meets error and local pod exit!")
-
         if self._leader_register is not None:
             self._leader_register.stop()
-
-        if not self._resource_register:
-            logger.fatal("resource_register meets error and local pod exit!")
 
         if self._resource_register is not None:
             self._resource_register.stop()
 
         if self._watcher is not None:
             self._watcher.stop()
-
-        if not self._trainer_flag:
-            logger.fatal("local trainers meets error and local pod exit!")
 
         if self._procs:
             edl_train_process.terminate(self._procs)
