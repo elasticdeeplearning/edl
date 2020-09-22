@@ -13,20 +13,20 @@
 # limitations under the License.
 
 from edl.utils import constants
-from edl.utils import register
 from edl.utils import error_utils
 from edl.utils import pod
+from edl.utils import register
 from edl.utils import string_utils
 from edl.utils import exceptions
 
 
-class PodResourceRegister(register.Register):
+class Register(register.Register):
     def __init__(self, job_env, pod_id, pod_json, ttl=constants.ETCD_TTL):
         service = constants.ETCD_POD_RESOURCE
         server = "{}".format(pod_id)
         value = pod_json
 
-        super(PodResourceRegister, self).__init__(
+        super(Register, self).__init__(
             etcd_endpoints=job_env.etcd_endpoints,
             job_id=job_env.job_id,
             service=service,

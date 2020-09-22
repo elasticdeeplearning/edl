@@ -16,12 +16,11 @@ import collections
 import json
 import six
 import uuid
-
+from edl.utils import json_serializable
 from edl.utils import network_utils
 from edl.utils import status as edl_status
-from edl.utils.log_utils import logger
 from edl.utils import trainer as edl_trainer
-from edl.utils import json_serializable
+from edl.utils.log_utils import logger
 
 
 class Pod(json_serializable.Serializable):
@@ -159,4 +158,8 @@ class Pod(json_serializable.Serializable):
         return len(self._trainers)
 
     def get_id(self):
+        return self._id
+
+    @property
+    def pod_id(self):
         return self._id
