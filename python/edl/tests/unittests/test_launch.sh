@@ -26,7 +26,7 @@ export PADDLE_JOB_ID="test_success_job"
 export PADDLE_ETCD_ENDPOINTS="127.0.0.1:2379"
 export PADDLE_EDLNODES_RANAGE="2:2"
 export PADDLE_EDL_ONLY_FOR_CE_TEST="1"
-export PADDLE_EDL_HDFS_CHECKPOINT_PATH="./success_job"
+export PADDLE_EDL_HDFS_PATH="./success_job"
 export PADDLE_EDL_HDFS_HOME="./hadoop"
 
 #clean keys

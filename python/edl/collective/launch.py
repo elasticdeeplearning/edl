@@ -25,8 +25,9 @@ from edl.utils import etcd_db
 from edl.utils import launcher as edl_launcher
 from edl.utils import log_utils
 from edl.utils import status as edl_status
-from edl.utils.logg_utils import logger
+from edl.utils.log_utils import logger
 from edl.utils import pod as edl_pod
+
 
 def main():
     log_utils.get_logger(log_level=10)
@@ -40,7 +41,7 @@ def main():
     # get global etcd and lock
     etcd = etcd_db.get_global_etcd(job_env.etcd_endpoints, job_env.job_id)
 
-    last_status = edl_status.load_job_status_from_etcd(etcd)
+    last_status = edl_status.load_job_status_from_etcd(etcd, timeout=30)
     if last_status == edl_status.Status.SUCCEED:
         logger.info("job:{} has completed! Need't try!".format(job_env.job_id))
         sys.exit(0)
@@ -49,9 +50,11 @@ def main():
     pod = edl_pod.Pod()
     pod.from_env(job_env)
 
-    launcher = edl_launcher(job_env, pod, etcd, args)
+    launcher = edl_launcher.Launcher(
+        job_env=job_env, pod=pod, etcd=etcd, args=args)
     launcher.init()
     launcher.launch()
+
 
 if __name__ == '__main__':
     main()

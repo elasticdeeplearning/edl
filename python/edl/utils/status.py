@@ -106,5 +106,5 @@ def save_pod_flag_to_etcd(etcd, pod_id, flag, timeout=15):
         logger.fatal("local trainers meets error!")
         return
 
-    save_pod_status_to_etcd(etcd, pod_id, Status.SUCCEED)
+    save_pod_status_to_etcd(etcd, pod_id, Status.SUCCEED, timeout=timeout)
     logger.info("local trainers succeeded!")

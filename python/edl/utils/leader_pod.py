@@ -20,9 +20,10 @@ from edl.utils import etcd_utils
 from edl.utils import exceptions
 from edl.utils import string_utils
 
-from . import constants
-from .log_utils import logger
-from ..discovery.etcd_client import EtcdClient
+from edl.utils import constants
+from edl.utils.log_utils import logger
+from edl.discovery import etcd_client
+from edl.utils import resource_pods
 
 
 class Register(object):
@@ -46,7 +47,7 @@ class Register(object):
         self._t_register = None
 
         # assign value
-        self._etcd = EtcdClient(
+        self._etcd = etcd_client.EtcdClient(
             self._job_env.etcd_endpoints,
             root=self._job_env.job_id,
             timeout=constants.ETCD_CONN_TIMEOUT)
@@ -152,9 +153,9 @@ def load_from_etcd(etcd, timeout=15):
         raise exceptions.EdlTableError("leader_id={}:{}".format(
             etcd_utils.get_rank_table_key(), leader_id))
 
-    resource_pods = resource_pods.load_from_etcd(etcd, timeout=timeout)
-    if leader_id not in resource_pods:
+    pods = resource_pods.load_from_etcd(etcd, timeout=timeout)
+    if leader_id not in pods:
         raise exceptions.EdlTableError(
             "leader_id:{} not in resource pods".format(leader_id))
 
-    return resource_pods[leader_id]
+    return pods[leader_id]

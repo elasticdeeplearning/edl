@@ -31,6 +31,7 @@ from edl.utils import pod_server
 from edl.utils import resource_pods
 from edl.utils import cluster_watcher
 from edl.utils import error_utils
+from edl.utils import cluster_generator
 
 
 class Launcher(object):
@@ -50,45 +51,48 @@ class Launcher(object):
         self._resource_register = None
         self._watcher = None
         self._etcd = None
-        self._procs=None
+        self._procs = None
 
-        self._trainer_flag  = True
+        self._trainer_flag = True
         self._register_flag = True
-        self._barrier_flag  = True
+        self._barrier_flag = True
         self._args = None
-
 
     def init(self):
         # update pod status
-        edl_status.save_pod_status_to_etcd(self._etcd,
-                                           self._pod.get_id(), edl_status.Status.INITIAL)
+        edl_status.save_pod_status_to_etcd(
+            self._etcd,
+            self._pod.get_id(),
+            edl_status.Status.INITIAL,
+            timeout=30)
 
         # launch pod server
-        self._pod_server = pod_server.PodServer(self._job_env, self._pod.get_id())
-        self._pod_server.start(self._job_env, self._pod)
+        self._pod_server = pod_server.PodServer(self._job_env, self._pod)
+        self._pod_server.start()
         logger.info("pod server started:[{}]".format(self._pod))
 
     def _barrier(self, timeout):
         log_time = time.time()
         start = log_time
-        leader=None
+        leader = None
         while True:
             try:
-                leader = leader_pod.get_pod_leader(self._etcd)
+                leader = leader_pod.load_from_etcd(self._etcd, timeout=15)
                 if leader is None:
                     raise exceptions.EdlNotFoundLeader("can't get leader")
 
                 logger.debug("barrier on leader:{}".format(leader))
 
                 client = pod_server_client.Client(leader.endpoint)
-                cluster = client.barrier(self._job_env.job_id, self._pod.get_id())
+                cluster = client.barrier(self._job_env.job_id,
+                                         self._pod.get_id())
                 return cluster
             except Exception as e:
                 if time.time() - log_time > 30:
                     logger.info("wait to barrier now!")
                     log_time = time.time()
-                logger.debug("barrier error:{} {}".format(e,
-                                                          traceback.format_exc()))
+                logger.debug("barrier error:{} {}".format(
+                    e, traceback.format_exc()))
 
             if time.time() - start > timeout:
                 message = "wait to barrier with all error:{} leader:[{}] current pod:[{}]".format(
@@ -100,9 +104,14 @@ class Launcher(object):
     @error_utils.handle_errors_until_timeout
     def _exit(self, timeout=60):
         local_flag = self._trainer_flag & self._register_flag & self._barrier_flag
-        edl_status.save_pod_flag_to_ecd(self._etcd, self._pod.get_id(), local_flag)
+        edl_status.save_pod_flag_to_etcd(
+            etcd=self._etcd,
+            pod_id=self._pod.get_id(),
+            flag=local_flag,
+            timeout=15)
 
-        if self._leader_register is not None and self._leader_register.is_leader():
+        if self._leader_register is not None and self._leader_register.is_leader(
+        ):
             if resource_pods.wait_resource(self._cluster, timeout=15):
                 job_flag = self._trainer_flag & self._register_flag & self._barrier_flag & self._resource_flag
                 edl_status.save_job_flag_to_etcd(self._etcd, job_flag)
@@ -124,28 +133,56 @@ class Launcher(object):
         try:
             self._launch()
             self._exit(timeout=30)
-        except Exceptions as e:
-            raise e
         finally:
             self.__exit__()
 
+    def _check_and_update_local_pod(self):
+        pods_ids = self._cluster.get_pods_ids_set()
+        if self._pod.pod_id not in pods_ids:
+            logger.info("self pod_id:{} not in cluster, so this pod exit!".
+                        format(self._pod.pod_id, pods_ids))
+            return False
+        self._pod = self._cluster.get_pod_by_id(self._pod.pod_id)
+        logger.info("self pod:{}".format(self._pod))
+
+        return True
+
     def _launch(self):
-        self._resource_register = resource_pods.Register(self._job_env, self._pod)
-        self._leader_register = leader_pod.Register(self._job_env, self._pod.get_id())
-        self._cluster = self._edl_barrier(self._job_env, self._pod, timeout=600)
+        self._resource_register = resource_pods.Register(
+            job_env=self._job_env,
+            pod_id=self._pod.pod_id,
+            pod_json=self._pod.to_json())
+
+        generator = cluster_generator.Generator(
+            job_env=self._job_env, pod_id=self._pod.get_id())
+
+        self._leader_register = leader_pod.Register(
+            job_env=self._job_env,
+            pod_id=self._pod.get_id(),
+            cluster_generator=generator)
+
+        self._cluster = self._barrier(timeout=600)
+
+        if not self._check_and_update_local_pod():
+            return
 
         # update pod status
-        edl_status.save_pod_status_to_etcd(self._etcd,
-                                           self._pod.get_id(), edl_status.Status.RUNNING)
+        edl_status.save_pod_status_to_etcd(
+            self._etcd,
+            self._pod.get_id(),
+            edl_status.Status.RUNNING,
+            timeout=15)
 
         # watcher after barrier
-        self._watcher = cluster_watcher.Watcher(self._job_env, self._cluster, self._pod)
+        self._watcher = cluster_watcher.Watcher(
+            job_env=self._job_env, cluster=self._cluster)
 
         self._procs = edl_train_process.start(
-            self._cluster,
-            self._pod,
-            self._args.training_script,
-            self._args.training_script_args,
+            job_env=self._job_env,
+            cluster=self._cluster,
+            pod=self._pod,
+            training_script=self._args.training_script,
+            training_script_args=self._args.training_script_args,
             log_dir=self._args.log_dir)
 
         self._trainer_flag = True
@@ -153,7 +190,8 @@ class Launcher(object):
         self._barrier_flag = True
         while True:
             # check local status first
-            alive, self._trainer_flag = edl_train_process.watch(self._procs, self._pod.trainers_num)
+            alive, self._trainer_flag = edl_train_process.watch(
+                self._procs, self._pod.trainers_num)
             if not alive or not self._trainer_flag:
                 break
 
@@ -169,7 +207,7 @@ class Launcher(object):
 
             # check job status second
             if self._watcher.changed:
-                new_cluster = self._edl_barrier(self._job_env, self._pod, timeout=60)
+                new_cluster = self._barrier(timeout=60)
                 if not new_cluster:
                     self._barrier_flag = False
                     break
@@ -177,19 +215,22 @@ class Launcher(object):
                 edl_train_process.terminate(self._procs)
 
                 self._cluster = new_cluster
-                self._watcher = cluster_watcher.Watcher(self._job_env, self._cluster, self._pod)
+
+                if not self._check_and_update_local_pod():
+                    return
+
+                self._watcher = cluster_watcher.Watcher(
+                    job_env=self._job_env, cluster=self._cluster)
 
                 self._procs = edl_train_process.start(
-                    self._job_env,
-                    self._cluster,
-                    self._pod,
-                    self._args.training_script,
-                    self._args.training_script_args,
+                    job_env=self._job_env,
+                    cluster=self._cluster,
+                    pod=self._pod,
+                    training_script=self._args.training_script,
+                    training_script_args=self._args.training_script_args,
                     log_dir=self._args.log_dir)
 
             time.sleep(3)
-
-
 
     def __exit__(self):
         if self._leader_register is not None:
@@ -205,4 +246,3 @@ class Launcher(object):
             edl_train_process.terminate(self._procs)
 
         self.__initial__()
-

@@ -50,7 +50,7 @@ def load_from_etcd(etcd, timeout=15):
 
 @error_utils.handle_errors_until_timeout
 def wait_resource(pod_id, timeout=15):
-    pods = load_from_etcd(timeout=timeout)
+    pods = load_from_etcd(etcd, timeout=timeout)
     if len(pods) == 1:
         if pod_id in pods:
             return True
