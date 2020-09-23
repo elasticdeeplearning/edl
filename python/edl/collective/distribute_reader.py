@@ -280,14 +280,14 @@ class Reader(object):
         # connections to data servers
         self._trainer_env = edl_env.TrainerEnv()
 
+        self._etcd = etcd_db.get_global_etcd(self._trainer_env.endpoints,
+                                             self._trainer_env.job_id)
+
         self._state = edl_state.load_from_etcd(
-            etcd_endpoints=self._trainer_env.etcd_endpoints,
-            job_id=self._trainer_env.job_id,
+            etcd=self._etcd,
             state_name=self._name,
             timeout=60)
 
-        self._etcd = etcd_db.get_global_etcd(self._trainer_env.endpoints,
-                                             self._trainer_env.job_id)
         # reader meta
         self._reader_leader = edl_reader.load_from_ectd(
             self._etcd, self._trainer_env.pod_leader_id, timeout=60)

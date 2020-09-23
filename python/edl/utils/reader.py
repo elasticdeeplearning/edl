@@ -66,7 +66,7 @@ def load_from_etcd(self, etcd, reader_name, pod_id, timeout=60):
     return meta
 
 
-def check_dist_readers(etcd):
+def check_readers(etcd):
     servers = etcd.get_service(constants.ETCD_READER)
 
     if len(servers) <= 0:
