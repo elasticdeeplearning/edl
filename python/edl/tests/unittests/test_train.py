@@ -13,22 +13,14 @@
 # limitations under the License.
 
 import unittest
-from edl.collective.data_reader import DistributedDataReader, FileMeta
-from edl.collective.dataset import TxtFileSplitter
-from paddle.fluid.incubate.fleet.collective import fleet
-
-learning_rate = 1.0
-start_program = None
-main_program = None
-exe = None
-
+import edl
+from edl.utils.log_utils import logger
 
 def adjust():
     learing_rate = learning_rate * edl.size()
 
-
-class TestDataReader(unittest.TestCase):
-    def setUp(self):
+class TestDataReader(etcd_test_base.EtcdTestBase):
+    def _read_data(self):
         self._file_list = ["./data_server/a.txt", "./data_server/b.txt"]
         self._data = {}
         for idx, p in enumerate(self._file_list):
@@ -42,26 +34,30 @@ class TestDataReader(unittest.TestCase):
                     record)  #[(path),(rec_no, splitted_fiels)]...
 
     def _train(self, state):
-        print("learning_rate:", learning_rate)
-        reader = DistributedDataReader(
+        learning_rate = 1.0
+        start_program = None
+        main_program = None
+        exe = None
+
+        reader = edl.DistributeReader(
+            state=state,
             file_list=self._file_list,
             file_splitter_cls=TxtFileSplitter,
-            splitted_data_field=["line"],
-            batch_size=1,
-            trainer_rank=0)
+            batch_size=1)
 
         for epoch in range(state.epoch, 5):
             for meta, batch in reader:
+                print("epoch_no:",epoch)
                 edl.notify_end_one_batch(meta, state)
             edl.notify_end_one_epoch(state)
 
     def test_data_reader(self):
-        fleet.init()
         state = edl.PaddleState(
-            exe, start_program, main_program, optimizer, batch=0, epoch=0)
+            exe, start_program, main_program, optimizer, max_epoch_num=5)
         state.register_adjust_function([adjust])
-        train(state)
+        self._train(state)
 
 
 if __name__ == '__main__':
+
     unittest.main()

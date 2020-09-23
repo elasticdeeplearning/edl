@@ -16,9 +16,14 @@ import logging
 
 logger = logging.getLogger("root")
 logger.propagate = False
-
+g_logger_set=False
 
 def get_logger(log_level, name="root"):
+    global g_logger_set
+    if g_logger_set:
+        return logger
+    g_logger_set = True
+
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
 

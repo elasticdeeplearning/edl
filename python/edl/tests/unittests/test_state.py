@@ -17,7 +17,7 @@ import unittest
 from edl.collective import serializable
 from edl.tests.unittests import etcd_test_base
 from edl.utils import constants
-from edl.utils import state as edl_state
+from edl.collective import state as edl_state
 
 
 class UserDefined(serializable.SerializableBase):
