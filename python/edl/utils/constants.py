@@ -25,3 +25,16 @@ ETCD_POD_LEADER = "0"
 ETCD_CONN_TIMEOUT = 6
 ETCD_TTL = 15
 ETCD_OPERATION_TIMEOUT = 60
+
+def clean_etcd(etcd):
+    etcd.remove_service(ETCD_POD_RESOURCE)
+    etcd.remove_service(ETCD_POD_RANK)
+    etcd.remove_service(ETCD_POD_STATUS)
+    etcd.remove_service(ETCD_JOB_STATUS)
+    etcd.remove_service(ETCD_TRAIN_STATUS)
+    etcd.remove_service(ETCD_CLUSTER)
+    etcd.remove_service(ETCD_READER)
+    etcd.remove_service(ETCD_STATE)
+    etcd.remove_service(ETCD_POD_LEADER)
+
+

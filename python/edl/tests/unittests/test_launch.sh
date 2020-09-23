@@ -43,7 +43,7 @@ export PADDLE_DEMO_EXIT_CODE=0
 timeout -s SIGKILL ${run_time} python -m edl.collective.launch --log_dir 01 launch_demo.py > ${name}_run_01.log 2>&1 &
 pid_01=$!
 
-key="/${PADDLE_JOB_ID}/job_flag/nodes/complete"
+key="/${PADDLE_JOB_ID}/job_flag/nodes/job_status"
 value=`etcdctl get ${key}`
 echo "job complete flag:${value}"
 
