@@ -57,9 +57,10 @@ def save_job_status_to_etcd(etcd, status, timeout=15):
 
 
 @error_utils.handle_errors_until_timeout
-def save_job_flag_to_etcd(self, pod_id, flag, timeout=15):
+def save_job_flag_to_etcd(etcd, pod_id, flag, timeout=15):
     if flag:
-        save_job_status_to_etcd(pod_id, Status.SUCCEED)
+        save_job_status_to_etcd(
+            etcd=etcd, status=Status.SUCCEED, timeout=timeout)
         logger.info("This job succeeded!")
         return
 

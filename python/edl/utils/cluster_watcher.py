@@ -101,11 +101,13 @@ class Watcher(object):
 
     def stop(self):
         self._stop.set()
-        with self._lock:
-            if self._t_watcher:
-                self._t_watcher.join()
+        if self._t_watcher:
+            self._t_watcher.join()
+
+            with self._lock:
                 self._t_watcher = None
-        logger.debug("watcher stopped")
+
+            logger.info("watcher stopped")
 
     def is_stopped(self):
         with self._lock:

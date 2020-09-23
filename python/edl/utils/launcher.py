@@ -54,7 +54,8 @@ class Launcher(object):
         self._procs = None
 
         self._trainer_flag = True
-        self._register_flag = True
+        self._resource_register_flag = True
+        self._leader_register_flag = True
         self._barrier_flag = True
         self._args = None
 
@@ -103,20 +104,6 @@ class Launcher(object):
 
     @error_utils.handle_errors_until_timeout
     def _exit(self, timeout=60):
-        local_flag = self._trainer_flag & self._register_flag & self._barrier_flag
-        edl_status.save_pod_flag_to_etcd(
-            etcd=self._etcd,
-            pod_id=self._pod.get_id(),
-            flag=local_flag,
-            timeout=15)
-
-        if self._leader_register is not None and self._leader_register.is_leader(
-        ):
-            if resource_pods.wait_resource(self._cluster, timeout=15):
-                job_flag = self._trainer_flag & self._register_flag & self._barrier_flag & self._resource_flag
-                edl_status.save_job_flag_to_etcd(self._etcd, job_flag)
-                logger.info("set job status:{} ok!".format(job_flag))
-
         if not self._leader_register_flag:
             logger.fatal("leader_register meets error and local pod exit!")
 
@@ -125,6 +112,27 @@ class Launcher(object):
 
         if not self._trainer_flag:
             logger.fatal("local_trainers meets error and local pod exit!")
+
+        local_flag = self._trainer_flag & self._leader_register_flag & self._barrier_flag & self._resource_register_flag
+        edl_status.save_pod_flag_to_etcd(
+            etcd=self._etcd,
+            pod_id=self._pod.get_id(),
+            flag=local_flag,
+            timeout=15)
+
+        if self._leader_register is not None and self._leader_register.is_leader(
+        ):
+            if resource_pods.wait_resource(
+                    etcd=self._etcd, pod_id=self._pod.pod_id, timeout=60):
+                job_flag = local_flag & self._barrier_flag
+                edl_status.save_job_flag_to_etcd(
+                    etcd=self._etcd,
+                    pod_id=self._pod.pod_id,
+                    flag=job_flag,
+                    timeout=15)
+                logger.info("set job status:{} ok!".format(job_flag))
+
+        logger.info("end _exit")
 
     def launch(self):
         """
@@ -143,9 +151,13 @@ class Launcher(object):
                         format(self._pod.pod_id, pods_ids))
             return False
         self._pod = self._cluster.get_pod_by_id(self._pod.pod_id)
-        logger.info("self pod:{}".format(self._pod))
+        logger.info("update local pod:{}".format(self._pod))
 
         return True
+
+    def _terminate_local_procs(self):
+        edl_train_process.terminate(self._procs)
+        self._procs = None
 
     def _launch(self):
         self._resource_register = resource_pods.Register(
@@ -196,12 +208,12 @@ class Launcher(object):
                 break
 
             if self._resource_register.is_stopped():
-                edl_train_process.terminate(self._procs)
+                self._terminate_local_procs()
                 self._resource_register_flag = False
                 break
 
             if self._leader_register.is_stopped():
-                edl_train_process.terminate(self._procs)
+                self._terminate_local_procs()
                 self._leader_register_flag = False
                 break
 
@@ -212,10 +224,9 @@ class Launcher(object):
                     self._barrier_flag = False
                     break
 
-                edl_train_process.terminate(self._procs)
+                self._terminate_local_procs()
 
                 self._cluster = new_cluster
-
                 if not self._check_and_update_local_pod():
                     return
 

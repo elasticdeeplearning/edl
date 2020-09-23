@@ -118,15 +118,15 @@ class Register(object):
 
     def stop(self):
         self._stop.set()
-        with self._lock:
-            if self._t_register:
-                self._t_register.join()
+        if self._t_register:
+            self._t_register.join()
+
+            with self._lock:
                 self._t_register = None
-                self._etcd.remove_server(self._service_name, self._server)
 
-                self._generate_cluster.stop()
-
-        logger.info("pod_register stopped")
+            self._etcd.remove_server(self._service_name, self._server)
+            self._generate_cluster.stop()
+            logger.info("pod:{} leader_register stopped".format(self._pod_id))
 
     def __exit__(self):
         self.stop()
