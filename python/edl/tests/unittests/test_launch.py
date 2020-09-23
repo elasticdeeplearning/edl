@@ -35,10 +35,7 @@ class TestLauncher(etcd_test_base.EtcdTestBase):
 
         last_status = edl_status.load_job_status_from_etcd(self._etcd)
         if last_status == edl_status.Status.SUCCEED:
-            logger.info("job:{} has completed! Need't try!".format(self._job_env.job_id))
+            logger.info("job:{} has completed! Need't try!".format(
+                self._job_env.job_id))
             return
         self.assertFalse(True)
-
-
-
-
