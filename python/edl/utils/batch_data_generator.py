@@ -135,7 +135,7 @@ class Generator(edl_process.ProcessWrapper):
             pod_id=self._trainer_env.pod_id)
 
 def generate(args)
-    log_file_name = "edl_{}_{}.log".format(self._class.__name__, os.getpid().log)
+    log_file_name = "edl_data_generator_{}.log".format(os.getpid())
     global logger
     logger = log_utils.get_logger(log_level=20, log_file_name=log_file_name)
 

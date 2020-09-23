@@ -19,8 +19,18 @@ from edl.uitls import reader as edl_reader
 from edl.utils import data_server
 from edl.utils import data_server_client
 from edl.utils import etcd_db
-from edl.utils.log_utils import logger
+from edl.utils import log_utils
 
+logger = None
+
+class Args(object):
+    def __init__(self):
+        self.reader_leader_endpoint= None
+        self.reader_name= None
+        self.trainer_env= None
+        self.input_queue= None
+        self.out_queue= None
+        self.queue_size= None
 
 class Accesser(object):
     """
@@ -63,16 +73,12 @@ class Accesser(object):
             self.__exit__()
 
     def __exit__(self):
-        if self._t_reporter is None:
-            self._t_reporter.join()
-
         if self._t_generater is None:
             self._t_generater.join()
 
         if self._t_accesser is None:
             self._t_accesser.join()
 
-        self._t_reporter=None
         self._t_accesser=None
         self._t_generater=None
 
@@ -140,18 +146,15 @@ class Accesser(object):
         self._out_queue.put(None)
 
 
-def access(reader_leader, reader_name, trainer_env, input_queue,
-                      out_queue, cache_capcity, error_queue):
-    """
-    Run DataAccesser in a seperated process
-    """
+def generate(args):
+    log_file_name = "edl_data_generator_{}.log".format(os.getpid())
+    global logger
+    logger = log_utils.get_logger(log_level=20, log_file_name=log_file_name)
+
     try:
         a = Accesser(reader_leader, reader_name, trainer_env, input_queue,
                          out_queue, cache_capcity)
         a.start()
-    except KeyboardInterrupt:
-        pass
     except:
         import traceback
-        error_queue.put(traceback.format_exc())
-        sys.exit(1)
+        args.error_queue.put(traceback.format_exc())

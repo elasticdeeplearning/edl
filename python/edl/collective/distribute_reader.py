@@ -14,12 +14,11 @@
 from __future__ import print_function
 
 import multiprocessing
-import sys
 from edl.uitls import reader as edl_reader
+from edl.utils import batch_data_generator
 from edl.utils import exceptions
 from edl.utils import unique_name
 from edl.utils.log_utils import logger
-from edl.utils import batch_data_generator
 
 
 class Reader(object):
