@@ -16,36 +16,33 @@ import multiprocessing
 import threading
 
 from edl.utils.log_utils import logger
+from edl.utils import log_utils
 
 
 class ProcessWrapper(object):
-    def __init__(self):
+    def __init__(self, worker_func, args):
         self._stop = None
-        self._lock = None
         self._worker = None
 
+        self._lock = multiprocessing.Lock()
         self._stop = multiprocessing.Event()
-        self._lock = threading.Lock()
-        self._worker = multiprocessing.Process(target=self._worker_func)
-
-    def _worker_func(self):
-        raise NotImplementedError
+        self._worker = multiprocessing.Process(target=worker_func, args=args)
 
     def start(self):
+        log_file_name = "edl_{}_{}.log".format(self._class.__name__, os.getpid().log)
+        log_utils.get_logger(log_level=20, log_file_name=log_file_name)
         self._worker.start()
 
     def stop(self):
         self._stop.set()
-        with self._lock:
-            if self._worker:
-                self._worker.join()
-                self._worker = None
+        if self._worker:
+            self._worker.join()
+            self._worker = None
 
         logger.info("{} exit".format(self.__class__.__name__))
 
     def is_stopped(self):
-        with self._lock:
-            return self._worker == None
+        return self._worker is None or not self._worker.is_alive()
 
     def __exit__(self):
         self.stop()

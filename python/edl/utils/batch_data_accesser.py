@@ -35,8 +35,7 @@ class Accesser(object):
 
         self._reader_name = reader_name
         self._trainer_env = trainer_env
-        self._etcd = etcd_db.get_global_etcd(
-            self._trainer_env.etcd_endpoint, job_id=self._trainer_env.job_id)
+        self._etcd = None
 
         # BatchData
         self._input_queue = input_queue
@@ -47,65 +46,56 @@ class Accesser(object):
         # pb.BatchDataRequest queue
         self._req_queue = threading.Queue(queue_size)
 
-        self._data_server = data_server.DataServer(self)
-        self._data_server.start()
-        edl_reader.save_to_etcd(
-            self._etcd,
-            reader_name=self._reader_name,
-            pod_id=self._trainer_env.pod_id,
-            data_server_endpoint=self._data_server.endpoint)
+        self._data_server = None
 
         self._stop = threading.Event()
         self._t_reporter = threading.Thread(target=self.report)
         self._t_generater = threading.Thread(target=self.generate)
         self._t_accesser = threading.Thread(target=self.access)
 
-        self._client = data_server_client.DataServerClient()
+        self._client = data_server_client.Client()
 
     def start(self):
+        try:
+            self._start()
+        finally:
+            self._stop.set()
+            self.__exit__()
+
+    def __exit__(self):
+        if self._t_reporter is None:
+            self._t_reporter.join()
+
+        if self._t_generater is None:
+            self._t_generater.join()
+
+        if self._t_accesser is None:
+            self._t_accesser.join()
+
+        self._t_reporter=None
+        self._t_accesser=None
+        self._t_generater=None
+
+    def _start(self):
+        self._data_server = data_server.Server(self)
+        self._data_server.start()
+
+        self._etcd = etcd_db.get_global_etcd(
+            self._trainer_env.etcd_endpoint, job_id=self._trainer_env.job_id)
+
+        edl_reader.save_to_etcd(
+            self._etcd,
+            reader_name=self._reader_name,
+            pod_id=self._trainer_env.pod_id,
+            data_server_endpoint=self._data_server.endpoint,
+            timeout=30)
+
         self._client.connect(self._reader_leader_endpoint)
         self._t_reporter.start()
         self._t_generater.start()
         self._t_accesser.start()
 
-    def _report(self, report_size=10):
-        """
-        1. Report BatchData index to Leader
-        2. Get the BatchData index need to be processed
-            if there is no data, set None to req_queue
-        """
-        batch_data_ids = []
-        while not self._stop.set():
-            while len(a) < report_size:
-                b = self._input_queue.pop()
-                if b is None:
-                    logger.info("data read to end!")
-                    break
-                batch_data_ids.append(b.batch_data_id)
-                with self._lock:
-                    self._cache[b.batch_data_id] = b
 
-            self._client.report_batch_data_meta(
-                reader_leader_endpoint=self._reader_leader_endpoint,
-                reader_name=self._name,
-                pod_id=self._trainer_env.pod_id,
-                dataserver_endpoint=self._data_server.endpoint,
-                batch_data_ids=batch_data_ids)
-
-            batch_data_ids = []
-
-        while not self._stop.set() and len(batch_data_ids) > 0:
-            self._client.report_batch_data_meta(
-                reader_leader_endpoint=self._reader_leader_endpoint,
-                reader_name=self._name,
-                pod_id=self._trainer_env.pod_id,
-                dataserver_endpoint=self._data_server.endpoint,
-                batch_data_ids=batch_data_ids)
-
-        self._client.reach_data_end(
-            reader_leader_endpoint=self._reader_leader_endpoint,
-            reader_name=self._name,
-            pod_id=self._trainer_env.pod_id)
 
     def _access(self):
         while not self._stop.set():
@@ -149,27 +139,6 @@ class Accesser(object):
 
         self._out_queue.put(None)
 
-    def report(self):
-        try:
-            self._report()
-        except Exception as e:
-            print(e, file=sys.stderr)
-            sys.exit(1)
-
-    def access(self):
-        try:
-            self._access()
-        except Exception as e:
-            print(e, file=sys.stderr)
-            sys.exit(1)
-
-    def generate(self):
-        try:
-            self._generate()
-        except Exception as e:
-            print(e, file=sys.stderr)
-            sys.exit(1)
-
 
 def access(reader_leader, reader_name, trainer_env, input_queue,
                       out_queue, cache_capcity, error_queue):
@@ -177,12 +146,12 @@ def access(reader_leader, reader_name, trainer_env, input_queue,
     Run DataAccesser in a seperated process
     """
     try:
-        a = DataAccesser(reader_leader, reader_name, trainer_env, input_queue,
+        a = Accesser(reader_leader, reader_name, trainer_env, input_queue,
                          out_queue, cache_capcity)
         a.start()
     except KeyboardInterrupt:
         pass
-    except Exception as e:
+    except:
         import traceback
         error_queue.put(traceback.format_exc())
         sys.exit(1)

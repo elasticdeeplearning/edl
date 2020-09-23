@@ -19,6 +19,7 @@ from edl.uitls import reader as edl_reader
 from edl.utils import exceptions
 from edl.utils import unique_name
 from edl.utils.log_utils import logger
+from edl.utils import batch_data_generator
 
 
 class Reader(object):
@@ -79,7 +80,7 @@ class Reader(object):
                 "access process exit:{}".format(exitcode))
 
     def __iter__(self):
-        self._generater = DataGenerator()
+        self._generater = multiprocessing.Process(target=batch_data_generator.generate, args=args)
         self._generator.start()
 
         self._accesser = multiprocessing.Process(
