@@ -12,33 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-import time
-import threading
-import os
-import sys
 import copy
-import atexit
-
-from edl.utils import env as edl_env
-import edl.utils.log_utils as log_utils
 import edl.utils.constants as constants
-from edl.utils.etcd_db import get_global_etcd
+import edl.utils.log_utils as log_utils
+import os
+import unittest
 from edl.discovery.etcd_client import EtcdClient
+from edl.utils import env as edl_env
 
 g_etcd_endpoints = "127.0.0.1:2379"
 
 
 class EtcdTestBase(unittest.TestCase):
-    def _clean_etcd(self):
-        self._etcd.remove_service(constants.ETCD_POD_RESOURCE)
-        self._etcd.remove_service(constants.ETCD_POD_RANK)
-        self._etcd.remove_service(constants.ETCD_POD_STATUS)
-        self._etcd.remove_service(constants.ETCD_JOB_STATUS)
-        self._etcd.remove_service(constants.ETCD_TRAIN_STATUS)
-        self._etcd.remove_service(constants.ETCD_CLUSTER)
-        self._etcd.remove_service(constants.ETCD_READER)
-
     def setUp(self, job_id):
         log_utils.get_logger(log_level=10)
         self._etcd = EtcdClient([g_etcd_endpoints], root=job_id)
@@ -68,9 +53,9 @@ class EtcdTestBase(unittest.TestCase):
         os.environ.update(proc_env)
 
         self._job_env = edl_env.JobEnv(None)
-        self._clean_etcd()
+        constants.clean_etcd(self._etcd)
 
     def tearDown(self):
         os.environ.clear()
         os.environ.update(self._old_environ)
-        self._clean_etcd()
+        constants.clean_etcd(self._etcd)

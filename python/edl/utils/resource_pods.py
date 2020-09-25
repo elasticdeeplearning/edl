@@ -13,25 +13,31 @@
 # limitations under the License.
 
 from edl.utils import constants
-from edl.utils import register
 from edl.utils import error_utils
 from edl.utils import pod
+from edl.utils import register
 from edl.utils import string_utils
+from edl.utils import exceptions
+from edl.utils.log_utils import logger
 
 
-class PodResourceRegister(register.Register):
+class Register(register.Register):
     def __init__(self, job_env, pod_id, pod_json, ttl=constants.ETCD_TTL):
         service = constants.ETCD_POD_RESOURCE
         server = "{}".format(pod_id)
         value = pod_json
 
-        super(PodResourceRegister, self).__init__(
+        super(Register, self).__init__(
             etcd_endpoints=job_env.etcd_endpoints,
             job_id=job_env.job_id,
             service=service,
             server=server,
             info=value,
             ttl=ttl)
+
+    def stop(self):
+        super(Register, self).stop()
+        logger.info("pod:{} resource_register stopped")
 
 
 @error_utils.handle_errors_until_timeout
@@ -48,13 +54,16 @@ def load_from_etcd(etcd, timeout=15):
 
 
 @error_utils.handle_errors_until_timeout
-def wait_resource(pod_id, timeout=15):
-    pods = get_resource_pods_dict(timeout=timeout)
+def wait_resource(etcd, pod_id, timeout=15):
+    pods = load_from_etcd(etcd, timeout=timeout)
     if len(pods) == 1:
         if pod_id in pods:
             return True
 
     if len(pods) == 0:
         return True
+
+    raise exceptions.EdlWaitFollowersReleaseError(
+        "can't wait all resource exit:{}".format(pods.keys()))
 
     return False

@@ -66,14 +66,13 @@ class Register(object):
 
     def stop(self):
         self._stop.set()
-        with self._lock:
-            if self._t_register:
-                self._t_register.join()
+        if self._t_register:
+            self._t_register.join()
+
+            with self._lock:
                 self._t_register = None
 
-                self._etcd.remove_server(self._service, self._server)
-
-        logger.info("{} exit".format(self.__class__.__name__))
+            self._etcd.remove_server(self._service, self._server)
 
     def is_stopped(self):
         with self._lock:

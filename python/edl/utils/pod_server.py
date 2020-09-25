@@ -20,12 +20,12 @@ import threading
 import traceback
 from edl.utils import cluster as edl_cluster
 from edl.utils import common_pb2
-from edl.utils import status as edl_status
 from edl.utils import etcd_db
 from edl.utils import exceptions
-from edl.utils import leader as edl_leader
+from edl.utils import leader_pod
 from edl.utils import pod_server_pb2
 from edl.utils import pod_server_pb2_grpc
+from edl.utils import status as edl_status
 from edl.utils.log_utils import logger
 
 
@@ -45,7 +45,7 @@ class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
 
     def ScaleOut(self, request, context):
         status = common_pb2.Status()
-        pod = edl_leader.get_pod_leader(self._etcd)
+        pod = leader_pod.load_from_etcd(self._etcd)
         if pod.get_id != self._pod_id:
             status = exceptions.serialize(
                 exceptions.EdlLeaderError("this pod is not the leader"))
@@ -55,7 +55,7 @@ class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
 
     def ScaleIn(self, request, context):
         status = common_pb2.Status()
-        pod = edl_leader.get_pod_leader(self._etcd)
+        pod = leader_pod.load_from_etcd(self._etcd)
         if pod.get_id != self._pod_id:
             status = exceptions.serialize(
                 exceptions.EdlLeaderError("this pod is not the leader"))
@@ -128,7 +128,7 @@ class PodServer(object):
                      ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
             maximum_concurrent_rpcs=concurrency)
         pod_server_pb2_grpc.add_PodServerServicer_to_server(
-            PodServerServicer(self._job_env, self._pod.get_id()), server)
+            PodServerServicer(self._job_env, self._pod.pod_id), server)
 
         self._port = server.add_insecure_port('{}:0'.format(self._pod.addr))
         assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(

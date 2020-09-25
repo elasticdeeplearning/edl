@@ -12,36 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-from edl.discovery.etcd_client import EtcdClient
-import time
-import threading
 import sys
-import copy
-import atexit
-
-from edl.utils.pod_server import PodServer
-from edl.utils.pod import Pod
-from edl.utils.pod_server_client import PodServerClient
-from edl.utils.exceptions import EdlBarrierError
-from edl.utils import status as edl_status
-from edl.utils import constants
-import edl.utils.cluster as edl_cluster
-from edl.utils.etcd_db import get_global_etcd
-from edl.utils.leader_register import LeaderRegister
+import unittest
 from edl.tests.unittests import etcd_test_base
+from edl.utils import constants
+from edl.utils import status as edl_status
+from edl.utils.exceptions import EdlBarrierError
+from edl.utils import pod as edl_pod
+from edl.utils import pod_server
+from edl.utils import pod_server_client
 from edl.utils import cluster_generator
 
 
-class TestGenerate(etcd_test_base.EtcdTestBase):
+class TestClusterGenerator(etcd_test_base.EtcdTestBase):
     def setUp(self):
-        super(TestGenerate, self).setUp("test_generate")
+        super(TestClusterGenerator, self).setUp("test_cluster_generator")
 
-    def register_pod(self, job_env):
-        pod = Pod()
+    def _register_pod(self, job_env):
+        pod = edl_pod.Pod()
         pod.from_env(job_env)
-        s = PodServer(self._job_env, pod)
-        s.start()
+        server = pod_server.PodServer(self._job_env, pod)
+        server.start()
         self._etcd.set_server_permanent(constants.ETCD_POD_RESOURCE,
                                         pod.get_id(), pod.to_json())
         self._etcd.set_server_permanent(constants.ETCD_POD_STATUS,
@@ -50,32 +41,29 @@ class TestGenerate(etcd_test_base.EtcdTestBase):
               self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
                                        pod.get_id()))
 
-        edl_status.save_pod_status_to_etcd(self._etcd,
-                                           pod.get_id(),
-                                           edl_status.Status.INITIAL)
+        edl_status.save_pod_status_to_etcd(
+            self._etcd, pod.get_id(), edl_status.Status.INITIAL, timeout=15)
         print("set permanent:", self._etcd.get_full_path(
             constants.ETCD_POD_STATUS, pod.get_id()))
 
-        return pod, s
+        return pod, server
 
-    def test_server(self):
-        pod_0, server_0 = self.register_pod(self._job_env)
+    def test_barrier(self):
+        pod_0, server_0 = self._register_pod(self._job_env)
         self._etcd.set_server_permanent(constants.ETCD_POD_RANK,
                                         constants.ETCD_POD_LEADER,
                                         pod_0.get_id())
         print("set permanent:", self._etcd.get_full_path(
             constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER))
 
-        pod_1, server_1 = self.register_pod(self._job_env)
+        pod_1, server_1 = self._register_pod(self._job_env)
 
         generater = cluster_generator.Generator(self._job_env, pod_0.get_id())
-        ret = generater.start()
+        generater.start()
 
-        cluster_0 = None
-        clsuter_1 = None
         try:
-            c = PodServerClient(pod_0.endpoint)
-            cluster_0 = c.barrier(
+            client = pod_server_client.Client(pod_0.endpoint)
+            cluster_0 = client.barrier(
                 self._job_env.job_id, pod_0.get_id(), timeout=0)
 
             self.assertNotEqual(cluster_0, None)
@@ -83,16 +71,17 @@ class TestGenerate(etcd_test_base.EtcdTestBase):
             pass
         except:
             sys.exit(1)
+        finally:
             generater.stop()
 
         try:
-            cluster_1 = c.barrier(
+            cluster_1 = client.barrier(
                 self._job_env.job_id, pod_1.get_id(), timeout=15)
         except:
-            generater.stop()
             sys.exit(1)
+        finally:
+            generater.stop()
 
-        generater.stop()
         self.assertNotEqual(cluster_1, None)
 
 

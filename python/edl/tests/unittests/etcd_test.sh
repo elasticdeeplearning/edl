@@ -15,17 +15,12 @@ fi
 # rm flag file
 rm -f ${name}_*.log
 
-nohup etcd > ${name}_etcd.log 2>&1 &
-etcd_pid=$!
-
 # start the unit test
 run_time=$(( $TEST_TIMEOUT - 10 ))
 echo "run_time: ${run_time}"
 
 timeout -s SIGKILL ${run_time} ${PYTHON_EXECUTABLE} -u ${name}.py > ${name}_run.log 2>&1
 exit_code=$?
-
-kill -9 $etcd_pid
 
 echo "${name} faild with ${exit_code}"
 if [[ $exit_code -eq 0 ]]; then
