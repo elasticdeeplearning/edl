@@ -26,7 +26,7 @@ export PADDLE_JOB_ID="test_success_job"
 export PADDLE_ETCD_ENDPOINTS="127.0.0.1:2379"
 export PADDLE_EDLNODES_RANAGE="2:2"
 export PADDLE_EDL_ONLY_FOR_CE_TEST="1"
-export PADDLE_EDL_HDFS_CHECKPOINT_PATH="./success_job"
+export PADDLE_EDL_HDFS_PATH="./success_job"
 export PADDLE_EDL_HDFS_HOME="./hadoop"
 
 #clean keys
@@ -43,7 +43,7 @@ export PADDLE_DEMO_EXIT_CODE=0
 timeout -s SIGKILL ${run_time} python -m edl.collective.launch --log_dir 01 launch_demo.py > ${name}_run_01.log 2>&1 &
 pid_01=$!
 
-key="/${PADDLE_JOB_ID}/job_flag/nodes/complete"
+key="/${PADDLE_JOB_ID}/job_flag/nodes/job_status"
 value=`etcdctl get ${key}`
 echo "job complete flag:${value}"
 

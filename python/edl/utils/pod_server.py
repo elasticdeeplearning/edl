@@ -128,7 +128,7 @@ class PodServer(object):
                      ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
             maximum_concurrent_rpcs=concurrency)
         pod_server_pb2_grpc.add_PodServerServicer_to_server(
-            PodServerServicer(self._job_env, self._pod.get_id()), server)
+            PodServerServicer(self._job_env, self._pod.pod_id), server)
 
         self._port = server.add_insecure_port('{}:0'.format(self._pod.addr))
         assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(
