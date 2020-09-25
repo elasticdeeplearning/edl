@@ -1,5 +1,6 @@
 #!/bin/bash
 trap 'kill -9 $(jobs -p)' EXIT
+unset https_proxy http_proxy
 
 set -e
 if [[ $# != 1 ]] ; then
