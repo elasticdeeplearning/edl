@@ -1,4 +1,6 @@
 #!/bin/bash
+trap 'kill -9 $(jobs -p)' EXIT
+
 set -e
 if [[ $# != 1 ]] ; then
     echo "must set  python version"
@@ -47,6 +49,9 @@ mkdir -p ${build_dir}/cmd/master/
 # TODO(gongwb): add them on async training
 # go
 #go build   -o build/cmd/master/master cmd/master/master.go
+
+nohup etcd > ${name}_etcd.log 2>&1 &
+etcd_pid=$!
 
 #build python
 pushd ${build_dir}
