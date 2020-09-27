@@ -12,19 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import edl.utils.constants as constants
 import os
-from edl.utils.etcd_db import get_global_etcd
+from edl.utils import constants
+from edl.discovery import etcd_client
+
+g_etcd_endpoints = "127.0.0.1:2379"
 
 job_id = os.environ["PADDLE_JOB_ID"]
 etcd_endpoints = os.environ["PADDLE_ETCD_ENDPOINTS"]
-
-db = get_global_etcd([etcd_endpoints], job_id)
-etcd = db._etcd
-etcd.remove_service(constants.ETCD_POD_RESOURCE)
-etcd.remove_service(constants.ETCD_POD_RANK)
-etcd.remove_service(constants.ETCD_POD_STATUS)
-etcd.remove_service(constants.ETCD_JOB_STATUS)
-etcd.remove_service(constants.ETCD_TRAIN_STATUS)
-etcd.remove_service(constants.ETCD_CLUSTER)
-etcd.remove_service(constants.ETCD_READER)
+etcd = etcd_client.EtcdClient([g_etcd_endpoints], root=job_id)
+etcd.init()
+constants.clean_etcd(etcd)
