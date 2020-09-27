@@ -50,13 +50,13 @@ def start(job_env,
     for idx, t in enumerate(pod.trainers):
         proc_env = {
             "PADDLE_JOB_ID": "%s" % job_env.job_id,
-            "PADDLE_POD_ID": "%s" % job_env.pod_id,
+            "PADDLE_POD_ID": "%s" % pod.pod_id,
             "PADDLE_ETCD_ENDPOINTS": "%s" % job_env.etcd_endpoints,
             "PADDLE_TRAINER_ID": "%d" % t.global_rank,  # global rank
             "PADDLE_TRAINER_RANK_IN_POD": "%d" % t.rank_in_pod,
             "FLAGS_selected_gpus": "%s" % ",".join([str(g) for g in t.gpus]),
             "PADDLE_CURRENT_ENDPOINT": "%s" % t.endpoint,
-            "PADDLE_TRAINERS_NUM": "%d" % cluster.get_trainers_world_size(),
+            "PADDLE_TRAINERS_NUM": "%d" % cluster.get_trainers_nranks(),
             "PADDLE_TRAINER_ENDPOINTS":
             ",".join(cluster.get_trainers_endpoints()),
         }

@@ -80,9 +80,10 @@ class Generator(object):
 
     def stop(self):
         self._stop.set()
-        with self._lock:
-            if self._t_register:
-                self._t_register.join()
+        if self._t_register:
+            self._t_register.join()
+
+            with self._lock:
                 self._t_register = None
 
         logger.debug("{} exit".format(self.__class__.__name__))
