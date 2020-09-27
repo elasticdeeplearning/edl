@@ -16,7 +16,7 @@ import os
 from edl.utils import data_server_client
 from edl.utils import data_server_pb2
 from edl.utils import edl_process
-from edl.utils import log_utils
+
 
 logger = None
 
@@ -39,19 +39,18 @@ class Generator(edl_process.ProcessWrapper):
     3. program will exit if meets any error
     """
 
-    def __init__(self, state, reader_leader_endpoint, reader_name, pod_id,
-                 all_files_list, splitter_cls, out_queue, error_queue):
-        self._state = state
+    def __init__(self, args):
+        self._state = args.state
         self._batch_data_id = 0
 
-        self._leader_endpoint = reader_leader_endpoint
-        self._reader_name = reader_name
-        self._pod_id = pod_id
+        self._leader_endpoint = args.reader_leader_endpoint
+        self._reader_name = args.reader_name
+        self._pod_id = args.pod_id
 
-        self._file_list = all_files_list
-        self._splitter_cls = splitter_cls
-        self._data_queue = out_queue
-        self._error_queue = error_queue
+        self._file_list = args.all_files_list
+        self._splitter_cls = args.splitter_cls
+        self._data_queue = args.out_queue
+        self._error_queue = args.error_queue
         self._batch_data_ids = []
 
     def _get_file_list(self, timeout=60):
@@ -136,12 +135,14 @@ class Generator(edl_process.ProcessWrapper):
 
 def generate(args)
     log_file_name = "edl_data_generator_{}.log".format(os.getpid())
+    from edl.utils import log_utils
     global logger
     logger = log_utils.get_logger(log_level=20, log_file_name=log_file_name)
+    logger.info("args:{}".format(args))
 
-    cls = Generator()
     try:
-        cls.read_batch_data()
+        generator = Generator(args)
+        generator.read_batch_data()
     except:
         import traceback
         args.error_queue.put(traceback.format_exc())

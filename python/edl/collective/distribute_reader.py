@@ -16,10 +16,10 @@ from __future__ import print_function
 import multiprocessing
 from edl.uitls import reader as edl_reader
 from edl.utils import batch_data_generator
+from edl.utils import batch_data_accesser
 from edl.utils import exceptions
 from edl.utils import unique_name
 from edl.utils.log_utils import logger
-
 
 class Reader(object):
     def __init__(self,
@@ -31,6 +31,7 @@ class Reader(object):
                  cache_capcity=100):
         self._file_list = file_list
         assert isinstance(self._file_list, list), "file_list must be a list"
+        self._state = state
 
         self._name = unique_name.generator("_dist_reader_")
 
@@ -52,7 +53,8 @@ class Reader(object):
 
     def stop(self):
         if self._generater:
-            self._generater.stop()
+            self._generater.terminate()
+            self._generater.join()
             self._generater = None
 
         if self._accesser:
@@ -63,12 +65,12 @@ class Reader(object):
     def __exit__(self):
         self.stop()
 
-    def _check_accesser(self):
-        if self._accesser.is_alive():
+    def _check(self, proc):
+        if self.proc.is_alive():
             return True
 
-        self._accesser.join()
-        exitcode = self._accesser.exitcode
+        self.proc.join()
+        exitcode = self.proc.exitcode
         if exitcode == 0:
             return False
 
@@ -78,21 +80,30 @@ class Reader(object):
             raise exceptions.EdlAccessDataError(
                 "access process exit:{}".format(exitcode))
 
-    def __iter__(self):
-        self._generater = multiprocessing.Process(target=batch_data_generator.generate, args=args)
+    def _start_generator(self):
+        args = batch_data_generator.Args()
+        self._generator = multiprocessing.Process(target=batch_data_generator.generate, args=args)
         self._generator.start()
 
+    def _start_accesser(self):
+        args=batch_data_accessor.Args()
         self._accesser = multiprocessing.Process(
-            access_batch_data,
-            args=(self._reader_leader, self._name, self._trainer_env,
-                  self._generater_out_queue, self._accesser_out_queue,
-                  self._cache_capcity))
+            batch_data_accesser.generate,
+            args=(args))
+
+    def __iter__(self):
+        self._start_generator()
+        self._start_accesser()
+
         while True:
-            if not self._check_accesser():
+            if not self._check(self._accesser):
+                break
+
+            if not self._check(self._generator):
                 break
 
             try:
-                b = self._accesser_out_queue.pop(60)
+                b = self._accesser_out_queue.pop(10)
             except multiprocessing.Queue.Empty as e:
                 continue
 
