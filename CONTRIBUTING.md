@@ -124,7 +124,7 @@ Our build process helps to check the code style.
 
 ### Unit Tests
 
-Please remember to add related unit tests.
+Please remember to add related unit tests as part of your contribution.
 
 - For C/C++ code, please follow [`google-test` Primer](https://github.com/google/googletest/blob/master/googletest/docs/primer.md) .
 
