@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+
 
 def record_to_string(rec):
     return "record_no:{} fields_len:{}".format(rec.record_no,
@@ -29,7 +31,7 @@ def batch_data_response_to_string(res):
         for rec in data.records:
             records_str.append(record_to_string(rec))
 
-        s["records"] = ",".join(record_str)
+        s["records"] = ",".join(records_str)
         r.append(json.dumps(s))
 
     return ";".jion(r)

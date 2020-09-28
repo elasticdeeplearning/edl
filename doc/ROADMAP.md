@@ -1,6 +1,6 @@
 ## 2020-03 Release 0.2.0
 
-### Elastic Inference 
+### Elastic Inference
 - Release features for inference with paddle serving on EDL
 
 ### Elastic Training with Checkpoint

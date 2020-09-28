@@ -33,7 +33,7 @@ class TestDistReader(EtcdTestBase):
                     d)  #[(path),(rec_no, splitted_fiels)]...
 
     # 1. start a server, load checkpoint from etcd
-    # 2. get records from it 
+    # 2. get records from it
     def test_base(self):
         reader1 = DistributedDataReader(
             file_list=["./data_server/a.txt"],
@@ -44,6 +44,6 @@ class TestDistReader(EtcdTestBase):
         pass
 
     # 1. start two servers and read their file list and the leader loads checkpoint from etcd
-    # 2. leader can balance them 
+    # 2. leader can balance them
     def test_balance(self):
         pass

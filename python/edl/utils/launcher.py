@@ -92,7 +92,8 @@ class Launcher(object):
                     e, traceback.format_exc()))
 
             if time.time() - start > timeout:
-                message = "wait to barrier with all error:{} leader:[{}] current pod:[{}]".format(
+                message = "wait to barrier with all error:{} \
+                    leader:[{}] current pod:[{}]".format(
                     traceback.format_exc(), leader, self._pod.pod_id)
                 raise exceptions.EdlBarrierError(message)
 
@@ -109,15 +110,16 @@ class Launcher(object):
         if not self._trainer_flag:
             logger.fatal("local_trainers meets error and local pod exit!")
 
-        local_flag = self._trainer_flag & self._leader_register_flag & self._barrier_flag & self._resource_register_flag
+        local_flag = self._trainer_flag & self._leader_register_flag \
+            & self._barrier_flag & self._resource_register_flag
         edl_status.save_pod_flag_to_etcd(
             etcd=self._etcd,
             pod_id=self._pod.get_id(),
             flag=local_flag,
             timeout=15)
 
-        if self._leader_register is not None and self._leader_register.is_leader(
-        ):
+        if self._leader_register is not None and \
+                self._leader_register.is_leader():
             if resource_pods.wait_resource(
                     etcd=self._etcd, pod_id=self._pod.pod_id, timeout=60):
                 job_flag = local_flag & self._barrier_flag
@@ -143,7 +145,7 @@ class Launcher(object):
     def _check_and_update_local_pod(self):
         pods_ids = self._cluster.get_pods_ids_set()
         if self._pod.pod_id not in pods_ids:
-            logger.info("self pod_id:{} not in cluster, so this pod exit!".
+            logger.info("self pod_id:{} not in cluster:{}, so this pod exit!".
                         format(self._pod.pod_id, pods_ids))
             return False
         self._pod = self._cluster.get_pod_by_id(self._pod.pod_id)

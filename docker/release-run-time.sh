@@ -21,7 +21,7 @@ while : ; do
         exit 0
     fi
 done
-        
+
 echo -e "\n${GREEN} Begin to release ${RED} edl docker ${version} ${NC}\n"
 
 unset GREP_OPTIONS

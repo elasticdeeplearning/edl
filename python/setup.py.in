@@ -24,7 +24,7 @@ from setuptools import find_packages
 from setuptools import setup
 from pkg_resources import DistributionNotFound, get_distribution
 
-        
+
 def python_version():
     return [int(v) for v in platform.python_version().split(".")]
 
@@ -44,9 +44,9 @@ REQUIRED_PACKAGES = [
     'six >= 1.10.0', 'protobuf >= 3.1.0', "pathlib2"
 ]
 
-packages=['edl', 
-          'edl.collective', 
-          'edl.utils', 
+packages=['edl',
+          'edl.collective',
+          'edl.utils',
           'edl.discovery',
           'edl.distill',
           'edl.distill.redis',

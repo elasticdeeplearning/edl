@@ -26,7 +26,8 @@ class DataCheckpoint(json_serializable.Serializable):
     def __init__(self, reader_name=None, file_list=None, processed_data=None):
         self.reader_name = reader_name
         self.file_list = file_list
-        #dict, file_idx_in_file_list=>[(record_idx_begin, record_idx_end), ...]
+        # dict, file_idx_in_file_list => \
+        # [(record_idx_begin, record_idx_end), ...]
         self.processed_data = processed_data
 
 
@@ -104,7 +105,7 @@ class TrainStatus(json_serializable.Serializable):
         self._epochs[epoch_no] = epoch_attr
 
     def get_current_epoch_attr(self):
-        return get_epoch_attr(self._epoch_no)
+        return self.get_epoch_attr(self._epoch_no)
 
     def update_current_epoch_attr(self, epoch_attr):
         return self._update_epoch_attr(self._epoch_no, epoch_attr)

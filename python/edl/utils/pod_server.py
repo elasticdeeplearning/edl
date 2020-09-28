@@ -131,8 +131,9 @@ class PodServer(object):
             PodServerServicer(self._job_env, self._pod.pod_id), server)
 
         self._port = server.add_insecure_port('{}:0'.format(self._pod.addr))
-        assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(
-            self._pod.addr, self._port)
+        assert self._port > 0, "data server start on endpoint:{} error, \
+            selected port is {}".format(self._pod.addr, self._port)
+
         self._endpoint = "{}:{}".format(self._pod.addr, self._port)
 
         server.start()

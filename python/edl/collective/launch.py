@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-paddle.distributed.launch is a module that spawns multiple distributed 
+paddle.distributed.launch is a module that spawns multiple distributed
 process on each training node for gpu training.
 """
 

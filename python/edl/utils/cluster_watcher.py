@@ -111,7 +111,7 @@ class Watcher(object):
 
     def is_stopped(self):
         with self._lock:
-            return self._t_watcher == None
+            return self._t_watcher is None
 
     def __exit__(self):
         self.stop()

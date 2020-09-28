@@ -95,7 +95,7 @@ spec:
                   value: PSERVER
                 - name: TRAINING_ROLE
                   value: PSERVER
-          restartPolicy: OnFailure 
+          restartPolicy: OnFailure
     - name: model-out-trainer
       replicas: 1
       policies:

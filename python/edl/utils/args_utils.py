@@ -78,7 +78,7 @@ def parse_args():
         default=None,
         help="The hdfs_path used for edl.")
 
-    #positional
+    # positional
     parser.add_argument(
         "training_script",
         type=str,
@@ -87,7 +87,7 @@ def parse_args():
         "followed by all the arguments for the "
         "training script")
 
-    #rest from the training program
+    # rest from the training program
     parser.add_argument('training_script_args', nargs=argparse.REMAINDER)
     return parser.parse_args()
 

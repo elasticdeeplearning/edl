@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 function:
-    utils for kv data reading which dependents nothing else 
+    utils for kv data reading which dependents nothing else
 author:
     wanglong03,shikuan
 date:

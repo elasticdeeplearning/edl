@@ -22,7 +22,7 @@ from .log_utils import logger
 def get_gpus():
     cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES")
     if cuda_visible_devices is None or cuda_visible_devices == "":
-        selected_gpus = [x.strip() for x in selected_gpus.split(',')]
+        selected_gpus = [x.strip() for x in cuda_visible_devices.split(',')]
     else:
         selected_gpus = cuda_visible_devices.split(',')
 
@@ -44,7 +44,8 @@ class JobEnv(object):
             self._trainer_ports = ports.split(",")
 
             assert len(ports) >= len(self._gpus), \
-                "port num:{} must large than gpus:{}".format(len(self._trainer_ports), len(self._gpus))
+                "port num:{} must large than gpus:{}".format(
+                    len(self._trainer_ports), len(self._gpus))
             logger.info("get ports from env:{}".format(self._trainer_ports))
         else:
             assert len(self._gpus) > 0, "gpus must be visible, now:{}".format(
@@ -79,7 +80,7 @@ class JobEnv(object):
     def _get_gpus(self, args):
         # selected gpus
         self._gpus = get_gpus()
-        assert self._gpus != None, "can't get gpu info of this machine"
+        assert self._gpus is not None, "can't get gpu info of this machine"
 
         # proc per node
         nproc_per_node = get_from_dict_or_env(args, "nproc_per_node",
@@ -89,9 +90,8 @@ class JobEnv(object):
         else:
             self._nproc_per_node = int(nproc_per_node)
 
-        assert len(
-            self._gpus
-        ) >= self._nproc_per_node, "gpu's num must larger than procs need to run"
+        assert len(self._gpus) >= self._nproc_per_node, \
+            "gpu's num must larger than procs need to run"
 
     def __init__(self, args):
         # run platform
@@ -113,8 +113,8 @@ class JobEnv(object):
         self._get_gpus(args)
         self._get_ports(args)
 
-        #self._up_limit_nodes = int(
-        #    os.getenv("PADDLE_EDL_UP_LIMIT_NODES", 1024))
+        # self._up_limit_nodes = int(
+        #     os.getenv("PADDLE_EDL_UP_LIMIT_NODES", 1024))
 
         # assert hdfs value
         if not self._ce_test:
@@ -155,7 +155,6 @@ class JobEnv(object):
         return self._max_nodes
 
     def __str__(self):
-        d = vars(self)
         s = ""
         for k, v in six.iteritems(vars(self)):
             s += "{}:{} ".format(k, v)
@@ -164,7 +163,7 @@ class JobEnv(object):
 
 class TrainerEnv(object):
     """
-    Parse all envs when edl_launch starts a trainer. 
+    Parse all envs when edl_launch starts a trainer.
     """
 
     def __init__(self, args=None):

@@ -62,7 +62,7 @@ def load_from_etcd(self, etcd, reader_name, pod_id, timeout=60):
 
     meta = ReaderMeta()
     meta.from_json(value)
-    logger.debug("get reader:".format(meta))
+    logger.debug("get reader:{}".format(meta))
     return meta
 
 
@@ -87,7 +87,7 @@ def check_dist_readers(etcd):
 
     if cluster.get_pods_ids_set() != set(readers.keys()):
         raise exceptions.EdlTableError(
-            "reader_ids:{} != cluster_pod_ids:{}".format(reader_ids.keys(
+            "reader_ids:{} != cluster_pod_ids:{}".format(readers.keys(
             ), cluster.get_pods_ids_set()))
 
     logger.debug("get readers:{}".format(readers))

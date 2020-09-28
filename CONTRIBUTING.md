@@ -1,6 +1,6 @@
 # Contribute Code
 
-You are welcome to contribute to project PaddlePaddle EDL. To contribute to EDL, you have to agree with the 
+You are welcome to contribute to project PaddlePaddle EDL. To contribute to EDL, you have to agree with the
 [PaddlePaddle EDL Contributor License Agreement](https://gist.github.com/guru4elephant/d0207d374c0ddfa11b70751dca97703b).
 
 We sincerely appreciate your contribution.  This document explains our workflow and work style.
@@ -120,7 +120,7 @@ Our C/C++ code follows the [Google style guide](http://google.github.io/stylegui
 
 Our Python code follows the [PEP8 style guide](https://www.python.org/dev/peps/pep-0008/).
 
-Our build process helps to check the code style. 
+Our build process helps to check the code style.
 
 ### Unit Tests
 

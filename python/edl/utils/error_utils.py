@@ -22,7 +22,6 @@ from edl.utils.log_utils import logger
 def handle_errors_until_timeout(f):
     def handler(*args, **kwargs):
         begin = time.time()
-        #print(f.__name__, "args:", args, "kwargs:", kwargs)
         timeout = kwargs['timeout']
         while True:
             try:

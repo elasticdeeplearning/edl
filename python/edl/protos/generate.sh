@@ -2,7 +2,7 @@
 set -xe
 
 #TODO(gongwb): reopen them then async trainning
-#pushd /tmp/ 
+#pushd /tmp/
 #go get -u -v github.com/golang/protobuf/protoc-gen-go@v1.3.0
 #popd
 

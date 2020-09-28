@@ -154,7 +154,7 @@ spec:
     workingDir: /serving
     command: ['/bin/bash']
     args: ['run.sh']
-    ports: 
+    ports:
     - containerPort: 8010
       name: serving
 
@@ -178,7 +178,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: pdservingclient
-  labels: 
+  labels:
     app: pdservingclient
 spec:
   containers:
@@ -288,7 +288,7 @@ spec:
                   value: PSERVER
                 - name: TRAINING_ROLE
                   value: PSERVER
-          restartPolicy: OnFailure 
+          restartPolicy: OnFailure
     - name: model-out-trainer
       replicas: 1
       policies:

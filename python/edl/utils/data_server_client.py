@@ -33,7 +33,7 @@ class Conn(object):
 # https://medium.com/kuranda-labs-engineering/gracefully-handling-grpc-errors-in-a-go-server-python-client-setup-9805a5464692
 class Client(object):
     def __init__(self):
-        self._conn = {}  #endpoint=>(channel, stub)
+        self._conn = {}  # endpoint=>(channel, stub)
 
     @error_utils.handle_errors_until_timeout
     def _connect(self, endpoint, timeout=30):
@@ -137,7 +137,7 @@ class Client(object):
         return res.data
 
     @error_utils.handle_errors_until_timeout
-    def get_batch_data(self, req, timeout=60):
+    def get_batch_data(self, reader_leader_endpoint, req, timeout=60):
         """
         return BatchDataResponse
         """

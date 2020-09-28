@@ -379,8 +379,8 @@ class DataServer(object):
 
         self._addr = addr
         self._port = server.add_insecure_port('{}:0'.format(addr))
-        assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(
-            endpoint, self._port)
+        assert self._port > 0,
+            "data server start on endpoint:{} error, selected port is {}".format(endpoint, self._port)
         self._endpoint = "{}:{}".format(self._addr, self._port)
 
         server.start()

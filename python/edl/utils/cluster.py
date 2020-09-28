@@ -16,9 +16,6 @@ import collections
 import copy
 import json
 import six
-import threading
-import time
-import traceback
 import uuid
 
 from edl.utils import constants
@@ -43,7 +40,7 @@ class Cluster(json_serializable.Serializable):
         return "pods:{} job_stage:{} status:{}".format(
             [pod.details() for pod in self._pods], self._stage, self._status)
 
-    def update_pods(cluster):
+    def update_pods(self, cluster):
         self._pods = copy.copy(cluster.pods)
 
     def get_trainers_nranks(self):
@@ -70,8 +67,8 @@ class Cluster(json_serializable.Serializable):
         r = []
         for pod in self._pods:
             ep = "{}:{}".format(pod.addr, pod.port)
-            assert pod.port != None and pod.addr != None, "{} not a valid endpoint".format(
-                ep)
+            assert pod.port is not None and  pod.addr is not None, \
+                "{} not a valid endpoint".format(ep)
             r.append(ep)
 
         return r

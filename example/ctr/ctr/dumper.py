@@ -4,7 +4,7 @@
 # Name: dumper.py
 #
 # Author: wangguibao (wangguibao@baidu.com)
-# 
+#
 # Usage: python dumper.py --model_path /path/to/model
 #
 # Dumps CTR model SparseFeatFactors embedding as key-value pairs, then

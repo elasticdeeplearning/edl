@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import enum
+import json
 from edl.utils import constants
 from edl.utils import error_utils
 
@@ -35,7 +36,7 @@ def save_to_etcd(etcd, pod_id, status, timeout=30):
 
 @error_utils.handle_errors_until_timeout
 def load_from_etcd(etcd, pod_id, timeout=30):
-    value = self._etcd.get_value(constants.ETCD_TRAIN_STATUS, pod_id)
+    value = etcd.get_value(constants.ETCD_TRAIN_STATUS, pod_id)
 
     if value is None:
         return None

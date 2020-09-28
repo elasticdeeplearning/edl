@@ -39,10 +39,10 @@ def start(job_env,
           training_script_args,
           log_dir=None):
     current_env = copy.copy(os.environ.copy())
-    #paddle broadcast ncclUniqueId use socket, and
-    #proxy maybe make trainers unreachable, so delete them.
-    #if we set them to "", grpc will log error message "bad uri"
-    #so just delete them.
+    # paddle broadcast ncclUniqueId use socket, and
+    # proxy maybe make trainers unreachable, so delete them.
+    # if we set them to "", grpc will log error message "bad uri"
+    # so just delete them.
     current_env.pop("http_proxy", None)
     current_env.pop("https_proxy", None)
 
@@ -63,7 +63,7 @@ def start(job_env,
 
         current_env.update(proc_env)
 
-        #logger.debug("trainer proc env:{}".format(current_env))
+        # logger.debug("trainer proc env:{}".format(current_env))
 
         cmd = [sys.executable, "-u", training_script] + training_script_args
 
@@ -158,19 +158,19 @@ def _watch_local_procs(procs, nranks):
             raise
     except KeyboardInterrupt:
         logger.warning("KeyboardInterrupt, exit")
-        terminate_local_procs(procs)
+        terminate(procs)
         raise
     except SystemExit:
-        logger.error(
-            "ABORT!!! Out of all {} trainers, the trainer process with rank={} was aborted. Please check its log.".
-            format(nranks, error_rank))
-        terminate_local_procs(procs)
+        logger.error("ABORT!!! Out of all {} trainers, \
+            the trainer process with rank={} was aborted. Please check its log."
+                     .format(nranks, error_rank))
+        terminate(procs)
         raise
-    except:
-        logger.error(
-            "ABORT!!! Out of all {} trainers, the trainer process with rank={} was aborted. Please check its log.".
-            format(nranks, error_rank))
-        terminate_local_procs(procs)
+    except Exception as e:
+        logger.error("ABORT!!! Out of all {} trainers, \
+            the trainer process with rank={} was aborted:{}. Please check its log."
+                     .format(nranks, error_rank, str(e)))
+        terminate(procs)
         raise
 
     return alive

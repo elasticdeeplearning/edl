@@ -7,7 +7,7 @@ fixed_teacher="127.0.0.1:19290,127.0.0.1:19291,127.0.0.1:19292,127.0.0.1:19293,1
 
 for w in {1..10}
 do
-    for T in {1..20} 
+    for T in {1..20}
     do
         wf=$((echo scale=1 ; echo $w / 10 ) | bc )
         Tf=$((echo scale=1 ; echo $T ) | bc )

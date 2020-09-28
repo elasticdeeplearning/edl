@@ -8,9 +8,9 @@ spec:
   replicas: 1
   template:
     metadata:
-      name: student 
+      name: student
       labels:
-        app: student 
+        app: student
     spec:
       hostNetwork: true
       containers:

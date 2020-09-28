@@ -16,14 +16,14 @@ Before a training job is launched, the user should specify the range of the trai
 However keep the same total batch size will meet the problem of expansion efficiency: if batch size decreases on a single node, the training performance will decreases.
 Consider the above problem, the user should decide his policy of batch size.
 
-3. How to reduce the user program changes of transform.   
+3. How to reduce the user program changes of transform.  
 `stop-resume` method needs `save_checkpoint` and `load_checkpoint` interface and it's hard to hide these actions under the other training interfaces. So the user should call them explicitly.
 And there are no additional changes that should be thought about.
 
-4. How to adapt to multiple clusters.   
+4. How to adapt to multiple clusters.  
 There are still many online or offline cluster systems in production although the Kubernetes are widely used now. To adapt to these, we implement a middle layer: Jobserver. EDL uses it to connect to the multiple clusters.
 
-5. How to prevent meaningless scaling.   
+5. How to prevent meaningless scaling.  
   - When a training job is nearing its end, it's meaningless to scale it(scale_in or scale_out). It will decrease the job's efficiency.
   - In most scenes, it's better to scale_out jobs with high resource utilization instead of the lowers.
 So Paddle should report its job performance information to the scheduler and then the scheduler can adjust its scheduling strategy.

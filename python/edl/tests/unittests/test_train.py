@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+import edl
 from edl.collective.data_reader import DistributedDataReader, FileMeta
 from edl.collective.dataset import TxtFileSplitter
 from paddle.fluid.incubate.fleet.collective import fleet
@@ -58,9 +59,9 @@ class TestDataReader(unittest.TestCase):
     def test_data_reader(self):
         fleet.init()
         state = edl.PaddleState(
-            exe, start_program, main_program, optimizer, batch=0, epoch=0)
+            exe, start_program, main_program, optimizer=None, batch=0, epoch=0)
         state.register_adjust_function([adjust])
-        train(state)
+        self._train(state)
 
 
 if __name__ == '__main__':

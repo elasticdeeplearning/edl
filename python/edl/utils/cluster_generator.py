@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import copy
-import json
 import six
 import threading
 import time
 import traceback
-import uuid
 from edl.discovery import etcd_client
 from edl.utils import constants
 from edl.utils import error_utils
@@ -90,7 +87,7 @@ class Generator(object):
 
     def is_stopped(self):
         with self._lock:
-            return self._t_register == None
+            return self._t_register is None
 
     def __exit__(self):
         self.stop()
@@ -165,7 +162,8 @@ class Generator(object):
         all_inited, all_running, all_succeed, all_failed = \
             edl_status.load_pods_status_from_etcd(self._etcd, timeout=15)
 
-        disappeared = current_ids - resource_ids - all_inited - all_running - all_succeed - all_failed
+        disappeared = current_ids - resource_ids - \
+            all_inited - all_running - all_succeed - all_failed
         failed = current_ids & all_failed
         if len(disappeared) > 0 or len(failed) > 0:
             logger.warning("find disappeard pods:{} failed_pods:{}".format(
@@ -185,7 +183,8 @@ class Generator(object):
                 current_cluster.get_pods_nranks() < self._job_env.max_nodes:
             train_status = edl_train_status.load_from_etcd(
                 self._etcd, timeout=30)
-            if train_status == edl_train_status.TrainStatus.INITIAL or train_status == edl_train_status.TrainStatus.RUNNING:
+            if train_status == edl_train_status.TrainStatus.INITIAL or \
+                    train_status == edl_train_status.TrainStatus.RUNNING:
                 logger.info("find running pods:{} and init pods{}".format(
                     inited, running))
                 self._append_inited_pods(current_cluster, resource_pods,
@@ -226,14 +225,16 @@ class Generator(object):
         current_cluster, new_cluster = self._generate_cluster_once()
 
         if new_cluster.get_pods_nranks() < self._job_env.min_nodes:
-            message = "new cluster pods size:{} ids:{} wait job_env range:[{}:{}]".format(
+            message = "new cluster pods size:{} ids:{} \
+                wait job_env range:[{}:{}]".format(
                 new_cluster.get_pods_nranks(),
                 new_cluster.get_pods_ids_set(), self._job_env.min_nodes,
                 self._job_env.max_nodes)
-            #new_cluster.status = Status.FAILED
+            # new_cluster.status = Status.FAILED
             raise exceptions.EdlGenerateClusterError(message)
 
-        if current_cluster is None or current_cluster.stage != new_cluster.stage:
+        if current_cluster is None or \
+                current_cluster.stage != new_cluster.stage:
             logger.info("current_cluster:{} to  new_cluster:{}".format(
                 current_cluster, new_cluster))
             self._set_cluster_if_leader(new_cluster, timeout=120)

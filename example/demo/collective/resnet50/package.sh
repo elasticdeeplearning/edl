@@ -4,12 +4,12 @@ set -xe
 while true ; do
   case "$1" in
     -pod_id) pod_id="$2" ; shift 2 ;;
-    *) 
+    *)
        if [[ ${#1} > 0 ]]; then
           echo "not supported arugments ${1}" ; exit 1 ;
        else
            break
-       fi 
+       fi
        ;;
   esac
 done

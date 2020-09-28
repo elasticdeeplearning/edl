@@ -24,10 +24,10 @@ from edl.utils import data_server
 from edl.utils import data_server_pb2
 from edl.utils import edl_process
 from edl.utils import data_server_client
-from edl.utils.error_utils import handle_errors_until_timeout
 from edl.utils import etcd_db
 from edl.utils.log_utils import logger
 from edl.utils import unique_name
+from edl.utils import exceptions
 
 
 class DataGenerator(edl_process.ProcessWrapper):
@@ -149,7 +149,7 @@ class DataAccesser(object):
         """
         batch_data_ids = []
         while not self._stop.set():
-            while len(a) < report_size:
+            while len(batch_dat_ids) < report_size:
                 b = self._input_queue.pop()
                 if b is None:
                     logger.info("data read to end!")

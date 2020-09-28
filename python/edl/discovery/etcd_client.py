@@ -15,9 +15,7 @@
 import etcd3 as etcd
 import etcd3.exceptions as exceptions
 import functools
-import json
 import random
-import logging
 import time
 
 

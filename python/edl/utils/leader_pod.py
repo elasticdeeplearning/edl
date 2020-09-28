@@ -20,7 +20,6 @@ from edl.utils import etcd_utils
 from edl.utils import exceptions
 from edl.utils import string_utils
 
-from edl.utils import constants
 from edl.utils.log_utils import logger
 from edl.discovery import etcd_client
 from edl.utils import resource_pods
@@ -59,7 +58,6 @@ class Register(object):
         self._t_register.start()
 
     def _seize_leader(self, timeout=constants.ETCD_CONN_TIMEOUT):
-        begin = time.time()
         info = self._pod_id
 
         if not self._etcd.set_server_not_exists(
@@ -112,6 +110,7 @@ class Register(object):
                     self._seize_leader()
             except Exception as e:
                 # exit when error ocurred
+                logger.fatal(str(e))
                 break
 
             time.sleep(3)
@@ -133,7 +132,7 @@ class Register(object):
 
     def is_stopped(self):
         with self._lock:
-            return self._t_register == None
+            return self._t_register is None
 
 
 @error_utils.handle_errors_until_timeout
