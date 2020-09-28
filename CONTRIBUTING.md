@@ -129,3 +129,11 @@ Please remember to add related unit tests.
 - For C/C++ code, please follow [`google-test` Primer](https://github.com/google/googletest/blob/master/googletest/docs/primer.md) .
 
 - For Python code, please use [Python's standard `unittest` package](http://pythontesting.net/framework/unittest/unittest-introduction/).
+
+
+## Vulnerability reporting (security issues)
+If you find a significant vulnerability, or evidence of one, please send an email to the security contacts that you have such information, and we'll tell you the next steps. For now, the security contacts are: DongDaxiang dongdaxiang@baidu.com, GongWeibao gongweibao@baidu.com, and WangXi wangxi16@baidu.com
+
+Please use an email system (like Gmail) that supports hop-to-hop encryption using STARTTLS when reporting vulnerabilities. Examples of such systems include Gmail, Outlook.com, and runbox.com. See STARTTLS Everywhere if you wish to learn more about efforts to encourage the use of STARTTLS. Your email client should use encryption to communicate with your email system (i.e., if you use a web-based email client then use HTTPS, and if you use email client software then configure it to use encryption). Hop-to-hop encryption isn't as strong as end-to-end encryption, but we've decided that it's strong enough for this purpose and it's much easier to get everyone to use it.
+
+We will gladly give credit to anyone who reports a vulnerability so that we can fix it. If you want to remain anonymous or pseudonymous instead, please let us know that; we will gladly respect your wishes.
