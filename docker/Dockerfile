@@ -53,3 +53,5 @@ RUN rm -f /usr/bin/python /usr/bin/pip /usr/local/bin/pip && \
     ln -s /usr/local/bin/python3.7 /usr/bin/python && \
     ln -s /usr/local/bin/pip3.7 /usr/bin/pip && \
     ln -s /usr/local/bin/pip3.7 /usr/local/bin/pip
+
+RUN apt-get update && apt-get install shellcheck
