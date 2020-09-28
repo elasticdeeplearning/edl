@@ -17,11 +17,12 @@ ENV PATH=$PATH:${GOROOT}/bin:${GOPATH}/bin
 
 # python
 ADD ./docker/requirements.txt /root/paddle_edl/requirements.txt
-RUN python -m pip install pip==20.1.1
 RUN python3.7 -m pip install pip==20.1.1
 RUN python3.7 -m pip install --upgrade setuptools
-RUN python -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 RUN python3.7 -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+# python 2.7 is deprecated
+# RUN python -m pip install pip==20.1.1
+# RUN python -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 #etcd
 ENV HOME /root
