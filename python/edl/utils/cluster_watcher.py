@@ -82,7 +82,8 @@ class Watcher(object):
 
         if old_stage != new_stage or old_ids != new_ids:
             logger.info(
-                "_is_world_changed find changed, old_stage:{} new_stage:{} old_ids:{} new_ids:{}".format(
+                "_is_world_changed find changed, \
+                old_stage:{} new_stage:{} old_ids:{} new_ids:{}".format(
                     old_stage, new_stage, old_ids, new_ids
                 )
             )

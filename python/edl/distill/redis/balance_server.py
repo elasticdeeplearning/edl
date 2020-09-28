@@ -83,7 +83,7 @@ class Server(object):
                 )
                 self.close_conn(fd)
                 continue
-            msg = json.loads(msg[self.HEAD_SIZE :].decode())
+            msg = json.loads(msg[self.HEAD_SIZE:].decode())
             self._process_msg(fd, msg)
 
     def _enqueue_request(self, fd):
