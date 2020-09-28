@@ -6,7 +6,8 @@ BASEDIR=$(dirname $(readlink -f $0))
 echo ${BASEDIR}
 cd ${BASEDIR}
 
-./build.sh 2.7
+# 2.7 is deprecated
+# ./build.sh 2.7
 
-python3.6 -m pip install pip==20.1.1
-./build.sh 3.6
+python3.7 -m pip install pip==20.1.1
+./build.sh 3.7

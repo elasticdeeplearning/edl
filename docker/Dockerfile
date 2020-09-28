@@ -2,8 +2,8 @@ FROM hub.baidubce.com/paddlepaddle/paddle:<baseimg>
 
 # gcc 5
 RUN ln -sf /usr/bin/gcc-5 /usr/bin/gcc
-# python3 default use python3.6
-RUN ln -sf /usr/local/bin/python3.6 /usr/local/bin/python3
+# python3 default use python3.7
+RUN ln -sf /usr/local/bin/python3.7 /usr/local/bin/python3
 
 # Install Go
 RUN rm -rf /usr/local/go && wget -qO- https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz | \
@@ -18,10 +18,10 @@ ENV PATH=$PATH:${GOROOT}/bin:${GOPATH}/bin
 # python
 ADD ./docker/requirements.txt /root/paddle_edl/requirements.txt
 RUN python -m pip install pip==20.1.1
-RUN python3.6 -m pip install pip==20.1.1
-RUN python3.6 -m pip install --upgrade setuptools
+RUN python3.7 -m pip install pip==20.1.1
+RUN python3.7 -m pip install --upgrade setuptools
 RUN python -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-RUN python3.6 -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN python3.7 -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 #etcd
 ENV HOME /root
@@ -47,3 +47,8 @@ RUN echo "export PATH=$PATH:${GOROOT}/bin:${GOPATH}/bin" >> /root/.bashrc
 RUN echo "go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.io,direct" >> /root/.bashrc
 ENV GO111MODULE=on
 ENV GOPROXY=https://goproxy.io,direct
+
+RUN rm -f /usr/bin/python /usr/bin/pip /usr/local/bin/pip && \
+    ln -s /usr/local/bin/python3.7 /usr/bin/python && \
+    ln -s /usr/local/bin/pip3.7 /usr/bin/pip && \
+    ln -s /usr/local/bin/pip3.7 /usr/local/bin/pip
