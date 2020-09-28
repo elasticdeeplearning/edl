@@ -13,7 +13,7 @@ repos:
     rev: v3.2.0
     hooks:
     -   id: trailing-whitespace
-        exclude: \.(md|rst)$
+        files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|py|sh)$
     -   id: check-docstring-first
     -   id: check-json
     -   id: check-added-large-files
