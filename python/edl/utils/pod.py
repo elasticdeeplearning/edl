@@ -83,9 +83,11 @@ class Pod(json_serializable.Serializable):
         # init trainers
         self._trainers = []
         n = int(job_env.nproc_per_node / len(job_env.gpus))
-        assert n >= 1, \
-            "self.nproc_per_node:{} / len(self._gpus):{} must large than 1".format(
-                job_env.nproc_per_node,len(job_env.gpus))
+        assert (
+            n >= 1
+        ), "self.nproc_per_node:{} / len(self._gpus):{} must large than 1".format(
+            job_env.nproc_per_node, len(job_env.gpus)
+        )
 
         for i in range(job_env.nproc_per_node):
             b = i * n
@@ -97,22 +99,32 @@ class Pod(json_serializable.Serializable):
             endpoint = "{}:{}".format(self._addr, job_env.trainer_ports[i])
 
             t = edl_trainer.Trainer()
-            t.from_pod(
-                endpoint=endpoint, rank_in_pod=i, gpus=job_env.gpus[b:e])
+            t.from_pod(endpoint=endpoint, rank_in_pod=i, gpus=job_env.gpus[b:e])
             self._trainers.append(t)
 
     def __str__(self):
         return "rank:{} id:{} addr:{} port:{} gpus:{} \
-            status:{} trainers_num:{}".format(self._rank, self._id, self._addr,
-                                              self._port, self._gpus,
-                                              self._status,
-                                              len(self._trainers))
+            status:{} trainers_num:{}".format(
+            self._rank,
+            self._id,
+            self._addr,
+            self._port,
+            self._gpus,
+            self._status,
+            len(self._trainers),
+        )
 
     def details(self):
         return "rank:{} id:{} addr:{} port:{} visible_gpu:{} \
-            status:{} trainers:{}".format(self._rank, self._id, self._addr,
-                                          self._port, self._gpus, self._status,
-                                          [str(t) for t in self.trainers])
+            status:{} trainers:{}".format(
+            self._rank,
+            self._id,
+            self._addr,
+            self._port,
+            self._gpus,
+            self._status,
+            [str(t) for t in self.trainers],
+        )
 
     @property
     def gpus(self):

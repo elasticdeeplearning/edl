@@ -25,7 +25,7 @@ exe = None
 
 
 def adjust():
-    learing_rate = learning_rate * edl.size()
+    learing_rate = learning_rate * edl.size()  # noqa: F841
 
 
 class TestDataReader(unittest.TestCase):
@@ -36,11 +36,10 @@ class TestDataReader(unittest.TestCase):
             s = TxtFileSplitter(p)
             m = FileMeta()
             for r in s:
-                if idx not in d:
+                if idx not in m:
                     self._data[idx] = []
                 record = ((p), (r[0], r[1:]))
-                self._data[idx].append(
-                    record)  #[(path),(rec_no, splitted_fiels)]...
+                self._data[idx].append(record)  # [(path),(rec_no, splitted_fiels)]...
 
     def _train(self, state):
         print("learning_rate:", learning_rate)
@@ -49,7 +48,8 @@ class TestDataReader(unittest.TestCase):
             file_splitter_cls=TxtFileSplitter,
             splitted_data_field=["line"],
             batch_size=1,
-            trainer_rank=0)
+            trainer_rank=0,
+        )
 
         for epoch in range(state.epoch, 5):
             for meta, batch in reader:
@@ -59,10 +59,11 @@ class TestDataReader(unittest.TestCase):
     def test_data_reader(self):
         fleet.init()
         state = edl.PaddleState(
-            exe, start_program, main_program, optimizer=None, batch=0, epoch=0)
+            exe, start_program, main_program, optimizer=None, batch=0, epoch=0
+        )
         state.register_adjust_function([adjust])
         self._train(state)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

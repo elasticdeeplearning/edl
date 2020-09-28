@@ -33,7 +33,8 @@ class Register(register.Register):
             service=service,
             server=server,
             info=value,
-            ttl=ttl)
+            ttl=ttl,
+        )
 
     def stop(self):
         super(Register, self).stop()
@@ -64,6 +65,7 @@ def wait_resource(etcd, pod_id, timeout=15):
         return True
 
     raise exceptions.EdlWaitFollowersReleaseError(
-        "can't wait all resource exit:{}".format(pods.keys()))
+        "can't wait all resource exit:{}".format(pods.keys())
+    )
 
     return False

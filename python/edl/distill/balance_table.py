@@ -27,7 +27,8 @@ from weakref import WeakValueDictionary
 
 logging.basicConfig(
     level=logging.DEBUG,
-    format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
+    format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s",
+)
 
 
 class Service(object):
@@ -37,8 +38,7 @@ class Service(object):
         """
         # TODO. write this to db?
         self.name = name
-        self.update_event_callback = functools.partial(update_event_callback,
-                                                       name)
+        self.update_event_callback = functools.partial(update_event_callback, name)
 
         self.reference_count = 0
         self.service_mutex = threading.Lock()  # mutex
@@ -71,13 +71,15 @@ class Service(object):
         self.update_event_callback()
 
     def inc_ref(self):
-        assert self.reference_count >= 0, \
-            'reference count of service={} must >= 0'.format(self.name)
+        assert (
+            self.reference_count >= 0
+        ), "reference count of service={} must >= 0".format(self.name)
         self.reference_count += 1
 
     def dec_ref(self):
-        assert self.reference_count > 0, \
-            'when decrease, reference count of service={} must > 0'.format(self.name)
+        assert (
+            self.reference_count > 0
+        ), "when decrease, reference count of service={} must > 0".format(self.name)
         self.reference_count -= 1
         return self.reference_count
 
@@ -182,8 +184,11 @@ class Service(object):
 
         with self.service_mutex:
             # no change
-            if len(rm_servers) == 0 and len(add_servers) == 0 and \
-                    self.client_update is False:
+            if (
+                len(rm_servers) == 0
+                and len(add_servers) == 0
+                and self.client_update is False
+            ):
                 return
 
             self.client_update = False
@@ -195,8 +200,10 @@ class Service(object):
             for server in rm_servers:
                 if server not in self.server_to_clients:
                     logging.warning(
-                        'service={}, when remove server, server={} not in server_to_clients'.
-                        format(self.name, server))
+                        "service={}, when remove server, server={} not in server_to_clients".format(
+                            self.name, server
+                        )
+                    )
                     continue
                 # remove servers which connected by client
                 for client in self.server_to_clients[server]:
@@ -208,8 +215,10 @@ class Service(object):
                         logging.critical(
                             "service={} when remove server, server={} in server_to_clients, "
                             "but not in client_to_servers with client={}, it's "
-                            'must be impossible, something maybe wrong?'.
-                            format(self.name, server, client))
+                            "must be impossible, something maybe wrong?".format(
+                                self.name, server, client
+                            )
+                        )
                 # remove server from server_to_clients
                 self.server_to_clients.pop(server)
 
@@ -219,12 +228,13 @@ class Service(object):
             # all client may be unregister, but client_to_service or
             # name_to_service hasn't clean yet
             if client_num == 0:
-                assert len(update_client) == 0, "if all client unregister, len of" \
-                                                "update_client must == 0"
+                assert len(update_client) == 0, (
+                    "if all client unregister, len of" "update_client must == 0"
+                )
                 return
             # no servers in service =.=
             if server_num == 0:
-                logging.warning('service={} have no servers'.format(self.name))
+                logging.warning("service={} have no servers".format(self.name))
                 for client in update_client:
                     self.client_to_version[client] += 1
                 return
@@ -242,13 +252,19 @@ class Service(object):
             # each client can connect max=1 servers
             # assign: {server0:33, server1:33, server2:31)
             max_conn_provided_by_server = int(
-                (client_num + server_num - 1) / server_num)
+                (client_num + server_num - 1) / server_num
+            )
             max_servers_client_can_conn = max(1, int(server_num / client_num))
             logging.info(
-                '<Global> service={}, client_num={}, server_num={}, '
-                'server_provided_conn={}, client_can_conn={}'.format(
-                    self.name, client_num, server_num,
-                    max_conn_provided_by_server, max_servers_client_can_conn))
+                "<Global> service={}, client_num={}, server_num={}, "
+                "server_provided_conn={}, client_can_conn={}".format(
+                    self.name,
+                    client_num,
+                    server_num,
+                    max_conn_provided_by_server,
+                    max_servers_client_can_conn,
+                )
+            )
 
             # limit connect provided by server
             for server in servers:
@@ -261,15 +277,21 @@ class Service(object):
                     # client conn is update
                     update_client.add(client)
                     logging.info(
-                        'service={} break link with server={} -> client={}'.
-                        format(self.name, server, client))
+                        "service={} break link with server={} -> client={}".format(
+                            self.name, server, client
+                        )
+                    )
 
             # client greedy connect with server
             for client in self.clients:
-                max_connect = min(max_servers_client_can_conn,
-                                  self.client_to_maxn[client])
-                logging.info('<Client> service={} client={} max_connect={}'.
-                             format(self.name, client, max_connect))
+                max_connect = min(
+                    max_servers_client_can_conn, self.client_to_maxn[client]
+                )
+                logging.info(
+                    "<Client> service={} client={} max_connect={}".format(
+                        self.name, client, max_connect
+                    )
+                )
 
                 conn_servers = self.client_to_servers[client]
                 # limit servers connected by client
@@ -281,8 +303,10 @@ class Service(object):
                     # client conn is update
                     update_client.add(client)
                     logging.info(
-                        '<Breaking> service={} client-/->server {} -/-> {}'.
-                        format(self.name, client, server))
+                        "<Breaking> service={} client-/->server {} -/-> {}".format(
+                            self.name, client, server
+                        )
+                    )
 
                 # TODO. need optimize
                 for server in servers:
@@ -293,8 +317,10 @@ class Service(object):
                     if server in conn_servers:
                         continue
                     # server already provided max conn
-                    if len(self.server_to_clients[
-                            server]) >= max_conn_provided_by_server:
+                    if (
+                        len(self.server_to_clients[server])
+                        >= max_conn_provided_by_server
+                    ):
                         continue
 
                     conn_servers.add(server)
@@ -303,8 +329,10 @@ class Service(object):
                     # client conn is update
                     update_client.add(client)
                     logging.info(
-                        '<Linking> service={} client-->server {} --> {}'.
-                        format(self.name, client, server))
+                        "<Linking> service={} client-->server {} --> {}".format(
+                            self.name, client, server
+                        )
+                    )
 
             for client in update_client:
                 self.client_to_version[client] += 1
@@ -329,12 +357,14 @@ class Entry(object):
 
 
 class BalanceTable(object):
-    def __init__(self,
-                 discovery_server,
-                 db_endpoints,
-                 db_passwd=None,
-                 db_type='etcd',
-                 idle_seconds=7):
+    def __init__(
+        self,
+        discovery_server,
+        db_endpoints,
+        db_passwd=None,
+        db_type="etcd",
+        idle_seconds=7,
+    ):
         self._discovery_server = discovery_server
         self._db = EtcdClient(db_endpoints, db_passwd)
         self._is_db_connect = False
@@ -364,26 +394,29 @@ class BalanceTable(object):
         all_time = ttl
         while not is_server_alive(self._discovery_server)[0] and ttl > 0:
             logging.warning(
-                'start to register discovery server, but server is not start, ttl={}'.
-                format(ttl))
+                "start to register discovery server, but server is not start, ttl={}".format(
+                    ttl
+                )
+            )
             ttl -= 2
             time.sleep(2)
 
         if ttl <= 0:
-            logging.error('discovery is not up in time={}s'.format(all_time))
-            raise Exception('server up timeout')
+            logging.error("discovery is not up in time={}s".format(all_time))
+            raise Exception("server up timeout")
 
-        service_name = '__balance__'
+        service_name = "__balance__"
 
         # register discovery server with balance to /service/__balance__/nodes/addr = ''
-        self._db.set_server_not_exists(service_name, self._discovery_server,
-                                       '')
-        logging.info('register discovery server={} success'.format(
-            self._discovery_server))
+        self._db.set_server_not_exists(service_name, self._discovery_server, "")
+        logging.info(
+            "register discovery server={} success".format(self._discovery_server)
+        )
 
         servers_meta = self._db.get_service(service_name)
-        logging.info('discovery service={}'.format((
-            [str(server) for server in servers_meta])))
+        logging.info(
+            "discovery service={}".format(([str(server) for server in servers_meta]))
+        )
 
         servers = [meta.server for meta in servers_meta]
         assert self._discovery_server in servers  # must in discovery server
@@ -399,11 +432,11 @@ class BalanceTable(object):
 
             watch_queue.put((add_servers, rm_servers))
 
-        self._db.refresh(service_name,
-                         self._discovery_server)  # before watch, refresh
+        self._db.refresh(service_name, self._discovery_server)  # before watch, refresh
         # NOTE. start from revision + 1, that is after get_service
-        watch_id = self._db.watch_service(
-            service_name, call_back, start_revision=revision + 1)
+        watch_id = self._db.watch_service(  # noqa: F841
+            service_name, call_back, start_revision=revision + 1
+        )
 
         period = 2  # 2 seconds refresh
         while True:
@@ -416,12 +449,10 @@ class BalanceTable(object):
                     add_servers, rm_servers = server_change
 
                     for server_meta in rm_servers:
-                        logging.info('Remove discovery server={}'.format(
-                            server_meta))
+                        logging.info("Remove discovery server={}".format(server_meta))
                         self._consistent_hash.remove_node(server_meta.server)
                     for server_meta in add_servers:
-                        logging.info('Add discovery server={}'.format(
-                            server_meta))
+                        logging.info("Add discovery server={}".format(server_meta))
                         self._consistent_hash.add_new_node(server_meta.server)
 
                     timeout = end_time - time.time()
@@ -434,6 +465,7 @@ class BalanceTable(object):
 
     def _update_service_worker(self, timing_wheel=1):
         import gc
+
         while True:
             try:
                 timeout = timing_wheel
@@ -465,15 +497,18 @@ class BalanceTable(object):
 
     def _get_service_from_db(self, service):
         # even if no server in service, revision will also return
-        servers_meta, revision = self._db.get_service_with_revision(
-            service.name)
-        logging.info('get_service={}, servers={}, revision={}'.format(
-            service.name, servers_meta, revision))
+        servers_meta, revision = self._db.get_service_with_revision(service.name)
+        logging.info(
+            "get_service={}, servers={}, revision={}".format(
+                service.name, servers_meta, revision
+            )
+        )
         if len(servers_meta) != 0:
             service.set_servers(servers_meta)
         # save watch_id into service. NOTE, watch from revision + 1
         service.watch_id = self._db.watch_service(
-            service.name, service.watch_call_back, start_revision=revision + 1)
+            service.name, service.watch_call_back, start_revision=revision + 1
+        )
 
     def register_client(self, client, service_name, require_num, token=None):
         if self._consistent_hash is None:
@@ -482,16 +517,21 @@ class BalanceTable(object):
             return discovery.Response(status=status)
 
         # All discovery requests with the same service name are sent to the same server
-        discovery_server, discovery_servers, discovery_version = \
-            self._consistent_hash.get_node_nodes(service_name)
+        (
+            discovery_server,
+            discovery_servers,
+            discovery_version,
+        ) = self._consistent_hash.get_node_nodes(service_name)
         if discovery_server != self._discovery_server:
             # request need sent to another discovery server
             status = discovery.Status(
-                code=discovery.Code.REDIRECT, message=discovery_server)
+                code=discovery.Code.REDIRECT, message=discovery_server
+            )
             redirect_response = discovery.Response(
                 status=status,
                 discovery_version=discovery_version,
-                discovery_servers=discovery_servers)
+                discovery_servers=discovery_servers,
+            )
             return redirect_response
 
         is_new_service = False
@@ -499,18 +539,22 @@ class BalanceTable(object):
             if client in self._client_to_service:
                 # already registered
                 if self._client_to_service[client].name == service_name:
-                    status = discovery.Status(
-                        code=discovery.Code.ALREADY_REGISTER)
+                    status = discovery.Status(code=discovery.Code.ALREADY_REGISTER)
                     return discovery.Response(
                         status=status,
                         discovery_version=discovery_version,
-                        discovery_servers=discovery_servers)
+                        discovery_servers=discovery_servers,
+                    )
                 else:  # NOTE. This must be impossible
                     logging.critical(
-                        'client={} register new service_name={} require_num={}, this is impossible'
-                        .format(client, service_name, require_num))
+                        "client={} register new service_name={} require_num={}, \
+                        this is impossible".format(
+                            client, service_name, require_num
+                        )
+                    )
                     status = discovery.Status(
-                        code=discovery.Code.REGISTER_OTHER_SERVICE)
+                        code=discovery.Code.REGISTER_OTHER_SERVICE
+                    )
                     return discovery.Response(status=status)
 
             if service_name in self._name_to_service:
@@ -534,14 +578,18 @@ class BalanceTable(object):
         self._client_timing_buckets[-1].append(entry)
         self._client_weak_entrys[client] = entry
 
-        logging.info('register client={} service_name={} require_num={}'.
-                     format(client, service_name, require_num))
+        logging.info(
+            "register client={} service_name={} require_num={}".format(
+                client, service_name, require_num
+            )
+        )
 
         status = discovery.Status(code=discovery.Code.OK)
         return discovery.Response(
             status=status,
             discovery_version=discovery_version,
-            discovery_servers=discovery_servers)
+            discovery_servers=discovery_servers,
+        )
 
     def unregister_client(self, client):
         # timing wheel maybe unregister again
@@ -555,24 +603,26 @@ class BalanceTable(object):
             self._client_to_service.pop(client)
 
             service_ref_count = service.dec_ref()
-            assert service_ref_count >= 0, \
-                'service_ref_count must >=0, but true value={}'.format(service_ref_count)
+            assert (
+                service_ref_count >= 0
+            ), "service_ref_count must >=0, but true value={}".format(service_ref_count)
 
             if service_ref_count == 0:  # remove service monitor
                 self._unregister_watch_service(service.watch_id)
                 self._name_to_service.pop(service.name)
 
-        logging.info('unregister client={} service_name={}'.format(
-            client, service.name))
+        logging.info(
+            "unregister client={} service_name={}".format(client, service.name)
+        )
 
         if service_ref_count == 0:
-            logging.info('remove service_name={} monitor'.format(service.name))
+            logging.info("remove service_name={} monitor".format(service.name))
 
     def get_servers(self, client, version):
         # timing wheel
         entry = self._client_weak_entrys.get(client)
         if entry is None:
-            logging.warning('client={} timeout or unregister'.format(client))
+            logging.warning("client={} timeout or unregister".format(client))
             status = discovery.Status(code=discovery.Code.UNREGISTERED)
             return discovery.Response(status=status)
         else:
@@ -587,22 +637,30 @@ class BalanceTable(object):
             return discovery.Response(status=status)
 
         # All discovery requests with the same service name are sent to the same server
-        discovery_server, discovery_servers, discovery_version = \
-            self._consistent_hash.get_node_nodes(service_name)
+        (
+            discovery_server,
+            discovery_servers,
+            discovery_version,
+        ) = self._consistent_hash.get_node_nodes(service_name)
         if discovery_server != self._discovery_server:
             # request need sent to another discovery server
             status = discovery.Status(
-                code=discovery.Code.REDIRECT, message=discovery_server)
+                code=discovery.Code.REDIRECT, message=discovery_server
+            )
             redirect_response = discovery.Response(
                 status=status,
                 discovery_version=discovery_version,
-                discovery_servers=discovery_servers)
+                discovery_servers=discovery_servers,
+            )
             return redirect_response
 
         new_version, servers = service.get_servers(client, version)
         if new_version > version:
-            logging.info('client={} new_version={}, servers={}'.format(
-                client, new_version, servers))
+            logging.info(
+                "client={} new_version={}, servers={}".format(
+                    client, new_version, servers
+                )
+            )
 
         status = discovery.Status(code=discovery.Code.OK)
         return discovery.Response(
@@ -610,18 +668,21 @@ class BalanceTable(object):
             version=new_version,
             servers=servers,
             discovery_version=discovery_version,
-            discovery_servers=discovery_servers)
+            discovery_servers=discovery_servers,
+        )
 
     def start(self):
         # start db
         self._db.init()
 
         self._consistent_hash_thread = threading.Thread(
-            target=self._consistent_hash_worker)
+            target=self._consistent_hash_worker
+        )
         self._consistent_hash_thread.daemon = True
         self._consistent_hash_thread.start()
 
         self._update_service_thread = threading.Thread(
-            target=self._update_service_worker)
+            target=self._update_service_worker
+        )
         self._update_service_thread.daemon = True
         self._update_service_thread.start()

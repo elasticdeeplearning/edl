@@ -21,13 +21,13 @@ Thank you for contributing to EDL.
 Before submitting the issue, you could search the issue in the GitHub in case that there was a similar issue submitted or resolved before.
 If there is no solution, please make sure that this is a training issue including the following details:
 
-- System information:  
+- System information:
   - PaddlePaddle version （eg.1.8）or commit
   - EDL version （eg.0.3）or commit
   - CPU: including CPUMKL/OpenBlas/MKLDNN version
   - GPU: including CUDA/CUDNN version
   - OS Platform (eg.Mac OS 10.14)
-- To Reproduce:  
+- To Reproduce:
    - steps to reproduce the behavior
    - Describe your current behavior
    - Code to reproduce the issue

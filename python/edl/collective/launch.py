@@ -50,11 +50,10 @@ def main():
     pod = edl_pod.Pod()
     pod.from_env(job_env)
 
-    launcher = edl_launcher.Launcher(
-        job_env=job_env, pod=pod, etcd=etcd, args=args)
+    launcher = edl_launcher.Launcher(job_env=job_env, pod=pod, etcd=etcd, args=args)
     launcher.init()
     launcher.launch()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

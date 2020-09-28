@@ -33,10 +33,12 @@ class TestLeaderPod(etcd_test_base.EtcdTestBase):
             self._job_env,
             pod_id=pod.pod_id,
             pod_json=pod.to_json(),
-            ttl=constants.ETCD_TTL)
+            ttl=constants.ETCD_TTL,
+        )
         generator = cluster_generator.Generator(self._job_env, pod.pod_id)
         leader_register = leader_pod.Register(
-            self._job_env, pod.pod_id, cluster_generator=generator)
+            self._job_env, pod.pod_id, cluster_generator=generator
+        )
 
         return (pod, leader_register, resource_register)
 
@@ -59,5 +61,5 @@ class TestLeaderPod(etcd_test_base.EtcdTestBase):
         resource_register1.stop()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -47,4 +47,3 @@ RUN echo "export PATH=$PATH:${GOROOT}/bin:${GOPATH}/bin" >> /root/.bashrc
 RUN echo "go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.io,direct" >> /root/.bashrc
 ENV GO111MODULE=on
 ENV GOPROXY=https://goproxy.io,direct
-

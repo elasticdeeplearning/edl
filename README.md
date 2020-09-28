@@ -19,7 +19,7 @@ EDL package support python2.7/3.6/3.7. You can install with ```pip install paddl
 ```
 docker pull hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda9.0-cudnn7
 nvidia-docker run -name paddle_edl hub.baidubce.com/paddle-edl/paddle_edl:latest-cuda9.0-cudnn7 /bin/bash
-```  
+```
 
 <h2 align="center">Latest Release(0.3.1)</h2>
 
@@ -81,7 +81,7 @@ python -m paddle.distributed.launch --selected_gpus 0 \
     - Offline GPU cluster has limited resources but some online GPU resources can be used during training.
     - Heterogenous teacher models can improve student model's performance but are hard to deploy on a single GPU card due to memory limitation.
     - Computation burden of teacher models and student models is hard to balance to maximize the training throughputs.
-- Solution:  
+- Solution:
     - Deploy teacher models as online inference service through [Paddle Serving](https://github.com/PaddlePaddle/Serving)
     - Online inference services are elastic and are registered to EDL service management modules.
     - Dynamical adaptation of teacher models' online instance to maximize students' training throughputs and resource utilization.

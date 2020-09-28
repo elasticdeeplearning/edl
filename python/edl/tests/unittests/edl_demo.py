@@ -12,5 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+
 pod_id = os.getenv("PADDLE_POD_ID", "")
 print(pod_id + "__edl_demo__")

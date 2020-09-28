@@ -100,10 +100,10 @@ ELASTIC CTR
 * 注意： 本操作指南给出的操作步骤都是基于linux操作环境的。
 
 
-* 
+*
   首先请参考\ `官方安装说明 <https://kubernetes.io/docs/tasks/tools/install-kubectl/>`_\ ，安装和百度云kubernetes版本对应的的kubectl。
 
-* 
+*
   配置kubectl，下载集群凭证。在集群界面下载集群配置文件，放在kubectl的默认配置路径（请检查~/.kube目录是否存在，若没有请创建）
 
 .. code-block:: bash
@@ -399,8 +399,8 @@ pserver日志示例：
 
    $ docker build -t ${DOCKER_IMAGE_NAME} .
    $ docker push  ${DOCKER_IMAGE_NAME}
-   
-推荐使用百度云提供的镜像仓库，这里是说明文档\ `推送镜像到镜像仓库 <https://cloud.baidu.com/doc/CCE/s/Yjxppt74z/#%E6%8E%A8%E9%80%81%E9%95%9C%E5%83%8F%E5%88%B0%E9%95%9C%E5%83%8F%E4%BB%93%E5%BA%93>`_\ 
+
+推荐使用百度云提供的镜像仓库，这里是说明文档\ `推送镜像到镜像仓库 <https://cloud.baidu.com/doc/CCE/s/Yjxppt74z/#%E6%8E%A8%E9%80%81%E9%95%9C%E5%83%8F%E5%88%B0%E9%95%9C%E5%83%8F%E4%BB%93%E5%BA%93>`_\
 
 5.2 指定训练规模
 ----------------
@@ -520,7 +520,7 @@ Cube测试环境
      - 1000
      - 2602
      - 12298
-     
+
 
 Redis测试环境
 ^^^^^^^^^^^^^

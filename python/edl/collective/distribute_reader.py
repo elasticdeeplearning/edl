@@ -38,8 +38,15 @@ class DataGenerator(edl_process.ProcessWrapper):
     3. program will exit if meets any error
     """
 
-    def __init__(self, reader_leader_endpoint, reader_name, pod_id,
-                 all_files_list, splitter_cls, out_queue):
+    def __init__(
+        self,
+        reader_leader_endpoint,
+        reader_name,
+        pod_id,
+        all_files_list,
+        splitter_cls,
+        out_queue,
+    ):
         super(DataGenerator, self).__init__()
 
         self._batch_data_id = 0
@@ -58,7 +65,8 @@ class DataGenerator(edl_process.ProcessWrapper):
             leader_endpoint=self._leader_endpoint,
             reader_name=self._reader_name,
             pod_id=self._pod_id,
-            file_list=self._file_list)
+            file_list=self._file_list,
+        )
 
     def _generate_batch_data(self):
         self._batch_data_id += 1
@@ -102,14 +110,22 @@ class DataGenerator(edl_process.ProcessWrapper):
 
 
 class DataAccesser(object):
-    def __init__(self, reader_leader_endpoint, reader_name, trainer_env,
-                 input_queue, out_queue, queue_size):
+    def __init__(
+        self,
+        reader_leader_endpoint,
+        reader_name,
+        trainer_env,
+        input_queue,
+        out_queue,
+        queue_size,
+    ):
         self._reader_leader_endpoint = reader_leader_endpoint
 
         self._reader_name = reader_name
         self._trainer_env = trainer_env
         self._etcd = etcd_db.get_global_etcd(
-            self._trainer_env.etcd_endpoint, job_id=self._trainer_env.job_id)
+            self._trainer_env.etcd_endpoint, job_id=self._trainer_env.job_id
+        )
 
         # BatchData
         self._input_queue = input_queue
@@ -126,7 +142,8 @@ class DataAccesser(object):
             self._etcd,
             reader_name=self._reader_name,
             pod_id=self._trainer_env.pod_id,
-            data_server_endpoint=self._data_server.endpoint)
+            data_server_endpoint=self._data_server.endpoint,
+        )
 
         self._stop = threading.Event()
         self._t_reporter = threading.Thread(target=self.report)
@@ -149,7 +166,7 @@ class DataAccesser(object):
         """
         batch_data_ids = []
         while not self._stop.set():
-            while len(batch_dat_ids) < report_size:
+            while len(batch_data_ids) < report_size:
                 b = self._input_queue.pop()
                 if b is None:
                     logger.info("data read to end!")
@@ -163,7 +180,8 @@ class DataAccesser(object):
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
                 dataserver_endpoint=self._data_server.endpoint,
-                batch_data_ids=batch_data_ids)
+                batch_data_ids=batch_data_ids,
+            )
 
             batch_data_ids = []
 
@@ -173,19 +191,22 @@ class DataAccesser(object):
                 reader_name=self._name,
                 pod_id=self._trainer_env.pod_id,
                 dataserver_endpoint=self._data_server.endpoint,
-                batch_data_ids=batch_data_ids)
+                batch_data_ids=batch_data_ids,
+            )
 
         self._client.reach_data_end(
             reader_leader_endpoint=self._reader_leader_endpoint,
             reader_name=self._name,
-            pod_id=self._trainer_env.pod_id)
+            pod_id=self._trainer_env.pod_id,
+        )
 
     def _access(self):
         while not self._stop.set():
             res = self._client.get_balanced_batch_data(
                 reader_leader_endpoint=self._reader_leader_endpoint,
                 reader_name=self._name,
-                pod_id=self._trainer_env.pod_id)
+                pod_id=self._trainer_env.pod_id,
+            )
 
             self._req_queue.put(res)
 
@@ -244,29 +265,39 @@ class DataAccesser(object):
             sys.exit(1)
 
 
-def access_batch_data(reader_leader, reader_name, trainer_env, input_queue,
-                      out_queue, cache_capcity, error_queue):
+def access_batch_data(
+    reader_leader,
+    reader_name,
+    trainer_env,
+    input_queue,
+    out_queue,
+    cache_capcity,
+    error_queue,
+):
     """
     Run DataAccesser in a seperated process
     """
     try:
-        a = DataAccesser(reader_leader, reader_name, trainer_env, input_queue,
-                         out_queue, cache_capcity)
+        a = DataAccesser(
+            reader_leader,
+            reader_name,
+            trainer_env,
+            input_queue,
+            out_queue,
+            cache_capcity,
+        )
         a.start()
     except KeyboardInterrupt:
         pass
-    except Exception as e:
+    except Exception:
         import traceback
+
         error_queue.put(traceback.format_exc())
         sys.exit(1)
 
 
 class Reader(object):
-    def __init__(self,
-                 file_list,
-                 file_splitter_cls,
-                 batch_size,
-                 cache_capcity=100):
+    def __init__(self, file_list, file_splitter_cls, batch_size, cache_capcity=100):
         self._file_list = file_list
         assert isinstance(self._file_list, list), "file_list must be a list"
 
@@ -284,13 +315,16 @@ class Reader(object):
             etcd_endpoints=self._trainer_env.etcd_endpoints,
             job_id=self._trainer_env.job_id,
             state_name=self._name,
-            timeout=60)
+            timeout=60,
+        )
 
-        self._etcd = etcd_db.get_global_etcd(self._trainer_env.endpoints,
-                                             self._trainer_env.job_id)
+        self._etcd = etcd_db.get_global_etcd(
+            self._trainer_env.endpoints, self._trainer_env.job_id
+        )
         # reader meta
         self._reader_leader = edl_reader.load_from_ectd(
-            self._etcd, self._trainer_env.pod_leader_id, timeout=60)
+            self._etcd, self._trainer_env.pod_leader_id, timeout=60
+        )
 
         self._generater_out_queue = multiprocessing.Queue(self._cache_capcity)
         self._accesser_out_queue = multiprocessing.Queue(self._cache_capcity)
@@ -324,7 +358,8 @@ class Reader(object):
             raise exceptions.EdlAccessDataError(self.error_queue[0])
         else:
             raise exceptions.EdlAccessDataError(
-                "access process exit:{}".format(exitcode))
+                "access process exit:{}".format(exitcode)
+            )
 
     def __iter__(self):
         self._generater = DataGenerator()
@@ -332,16 +367,22 @@ class Reader(object):
 
         self._accesser = multiprocessing.Process(
             access_batch_data,
-            args=(self._reader_leader, self._name, self._trainer_env,
-                  self._generater_out_queue, self._accesser_out_queue,
-                  self._cache_capcity))
+            args=(
+                self._reader_leader,
+                self._name,
+                self._trainer_env,
+                self._generater_out_queue,
+                self._accesser_out_queue,
+                self._cache_capcity,
+            ),
+        )
         while True:
             if not self._check_accesser():
                 break
 
             try:
                 b = self._accesser_out_queue.pop(60)
-            except multiprocessing.Queue.Empty as e:
+            except multiprocessing.Queue.Empty:
                 continue
 
             if b is None:

@@ -45,12 +45,9 @@ class Client(object):
         return self._conn[endpoint]
 
     @error_utils.handle_errors_until_timeout
-    def get_file_list(self,
-                      reader_leader_endpoint,
-                      reader_name,
-                      pod_id,
-                      file_list,
-                      timeout=60):
+    def get_file_list(
+        self, reader_leader_endpoint, reader_name, pod_id, file_list, timeout=60
+    ):
         """
         Return list[(idx,path)...] for pod
         """
@@ -74,13 +71,15 @@ class Client(object):
         return res.file_list
 
     @error_utils.handle_errors_until_timeout
-    def report_batch_data_meta(self,
-                               reader_leader_endpoint,
-                               reader_name,
-                               pod_id,
-                               dataserver_endpoint,
-                               batch_data_ids,
-                               timeout=60):
+    def report_batch_data_meta(
+        self,
+        reader_leader_endpoint,
+        reader_name,
+        pod_id,
+        dataserver_endpoint,
+        batch_data_ids,
+        timeout=60,
+    ):
         conn = self._connect(reader_leader_endpoint, timeout=30)
 
         req = data_server_pb2.ReportBatchDataMetaRequest()
@@ -97,11 +96,7 @@ class Client(object):
             exceptions.deserialize(res.status)
 
     @error_utils.handle_errors_until_timeout
-    def reach_data_end(self,
-                       reader_leader_endpoint,
-                       reader_name,
-                       pod_id,
-                       timeout=60):
+    def reach_data_end(self, reader_leader_endpoint, reader_name, pod_id, timeout=60):
         conn = self.connect(reader_leader_endpoint, timeout=30)
 
         req = data_server_pb2.ReachDataEndRequest()
@@ -115,11 +110,9 @@ class Client(object):
             exceptions.deserialize(res.status)
 
     @error_utils.handle_errors_until_timeout
-    def get_batch_data_meta(self,
-                            reader_leader_endpoint,
-                            reader_name,
-                            pod_id,
-                            timeout=60):
+    def get_batch_data_meta(
+        self, reader_leader_endpoint, reader_name, pod_id, timeout=60
+    ):
         conn = self._connect(reader_leader_endpoint, timeout=30)
 
         req = data_server_pb2.GetBatchDataMetaRequest()
@@ -132,8 +125,11 @@ class Client(object):
         if res.status.type != "":
             exceptions.deserialize(res.status)
 
-        logger.debug("pod client get_balanced_batch_data meta:{}".format(
-            pb_utils.batch_data_meta_response_to_string(res)))
+        logger.debug(
+            "pod client get_balanced_batch_data meta:{}".format(
+                pb_utils.batch_data_meta_response_to_string(res)
+            )
+        )
         return res.data
 
     @error_utils.handle_errors_until_timeout
@@ -148,6 +144,9 @@ class Client(object):
         if res.status.type != "":
             exceptions.deserialize(res.status)
 
-        logger.debug("pod client get batch_data meta:{}".format(
-            pb_utils.batch_data_response_to_string(res)))
+        logger.debug(
+            "pod client get batch_data meta:{}".format(
+                pb_utils.batch_data_response_to_string(res)
+            )
+        )
         return res.data

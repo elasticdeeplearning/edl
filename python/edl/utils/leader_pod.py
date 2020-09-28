@@ -26,11 +26,7 @@ from edl.utils import resource_pods
 
 
 class Register(object):
-    def __init__(self,
-                 job_env,
-                 pod_id,
-                 cluster_generator,
-                 ttl=constants.ETCD_TTL):
+    def __init__(self, job_env, pod_id, cluster_generator, ttl=constants.ETCD_TTL):
         self._job_env = job_env
         self._is_leader = False
         self._pod_id = pod_id
@@ -49,7 +45,8 @@ class Register(object):
         self._etcd = etcd_client.EtcdClient(
             self._job_env.etcd_endpoints,
             root=self._job_env.job_id,
-            timeout=constants.ETCD_CONN_TIMEOUT)
+            timeout=constants.ETCD_CONN_TIMEOUT,
+        )
         self._etcd.init()
 
         self._seize_leader()
@@ -61,13 +58,17 @@ class Register(object):
         info = self._pod_id
 
         if not self._etcd.set_server_not_exists(
-                self._service_name,
-                self._server,
-                info=info,
-                timeout=constants.ETCD_CONN_TIMEOUT,
-                ttl=self._ttl):
-            logger.debug("Can't seize leader on etcd key:{}".format(
-                self._etcd.get_full_path(self._service_name, self._server)))
+            self._service_name,
+            self._server,
+            info=info,
+            timeout=constants.ETCD_CONN_TIMEOUT,
+            ttl=self._ttl,
+        ):
+            logger.debug(
+                "Can't seize leader on etcd key:{}".format(
+                    self._etcd.get_full_path(self._service_name, self._server)
+                )
+            )
 
             with self._lock:
                 self._is_leader = False
@@ -79,8 +80,11 @@ class Register(object):
             self._is_leader = True
 
         self._generate_cluster.start()
-        logger.info("register leader:{} on etcd key:{}".format(
-            info, self._etcd.get_full_path(self._service_name, self._server)))
+        logger.info(
+            "register leader:{} on etcd key:{}".format(
+                info, self._etcd.get_full_path(self._service_name, self._server)
+            )
+        )
         return True
 
     def is_leader(self):
@@ -89,8 +93,7 @@ class Register(object):
 
     def _refresh(self):
         try:
-            self._etcd.refresh(
-                self._service_name, self._server, ttl=constants.ETCD_TTL)
+            self._etcd.refresh(self._service_name, self._server, ttl=constants.ETCD_TTL)
             return True
         except Exception as e:
             logger.warning("refresh error:{}".format(e))
@@ -149,12 +152,14 @@ def load_from_etcd(etcd, timeout=15):
     leader_id = get_pod_leader_id(etcd, timeout=timeout)
 
     if leader_id is None:
-        raise exceptions.EdlTableError("leader_id={}:{}".format(
-            etcd_utils.get_rank_table_key(), leader_id))
+        raise exceptions.EdlTableError(
+            "leader_id={}:{}".format(etcd_utils.get_rank_table_key(), leader_id)
+        )
 
     pods = resource_pods.load_from_etcd(etcd, timeout=timeout)
     if leader_id not in pods:
         raise exceptions.EdlTableError(
-            "leader_id:{} not in resource pods".format(leader_id))
+            "leader_id:{} not in resource pods".format(leader_id)
+        )
 
     return pods[leader_id]

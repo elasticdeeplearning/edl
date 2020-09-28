@@ -15,7 +15,6 @@
 from __future__ import print_function
 
 from edl.tests.unittests import etcd_test_base
-from edl.utils import env as edl_env
 from edl.utils import status as edl_status
 from edl.utils.log_utils import logger
 from edl.utils import launcher as edl_launcher
@@ -32,7 +31,8 @@ class TestLauncher(etcd_test_base.EtcdTestBase):
 
         last_status = edl_status.load_job_status_from_etcd(self._etcd)
         if last_status == edl_status.Status.SUCCEED:
-            logger.info("job:{} has completed! Need't try!".format(
-                self._job_env.job_id))
+            logger.info(
+                "job:{} has completed! Need't try!".format(self._job_env.job_id)
+            )
             return
         self.assertFalse(True)

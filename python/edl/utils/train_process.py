@@ -32,12 +32,7 @@ class TrainerProc(object):
         self.local_rank = None
 
 
-def start(job_env,
-          cluster,
-          pod,
-          training_script,
-          training_script_args,
-          log_dir=None):
+def start(job_env, cluster, pod, training_script, training_script_args, log_dir=None):
     current_env = copy.copy(os.environ.copy())
     # paddle broadcast ncclUniqueId use socket, and
     # proxy maybe make trainers unreachable, so delete them.
@@ -57,8 +52,7 @@ def start(job_env,
             "FLAGS_selected_gpus": "%s" % ",".join([str(g) for g in t.gpus]),
             "PADDLE_CURRENT_ENDPOINT": "%s" % t.endpoint,
             "PADDLE_TRAINERS_NUM": "%d" % cluster.get_trainers_nranks(),
-            "PADDLE_TRAINER_ENDPOINTS":
-            ",".join(cluster.get_trainers_endpoints()),
+            "PADDLE_TRAINER_ENDPOINTS": ",".join(cluster.get_trainers_endpoints()),
         }
 
         current_env.update(proc_env)
@@ -88,8 +82,7 @@ def start(job_env,
 
         procs.append(tp)
 
-    logger.info("all cluster trainers:{}".format(
-        cluster.get_trainers_endpoints()))
+    logger.info("all cluster trainers:{}".format(cluster.get_trainers_endpoints()))
     return procs
 
 
@@ -121,16 +114,16 @@ def terminate(procs):
 
 def pull_worker_log(tp):
     if tp.log_fn:
-        with open(tp.log_fn.name, 'r') as fin:
+        with open(tp.log_fn.name, "r") as fin:
             fin.seek(tp.log_offset, 0)
             for line in fin:
                 try:
                     sys.stdout.write(line)
                 except UnicodeEncodeError:
                     sys.stdout.write(
-                        'UnicodeEncodeError occurs at this line. '
-                        'Please refer to the original log file "%s"\n' %
-                        tp.log_fn.name)
+                        "UnicodeEncodeError occurs at this line. "
+                        'Please refer to the original log file "%s"\n' % tp.log_fn.name
+                    )
             tp.log_offset = fin.tell()
 
 
@@ -161,15 +154,21 @@ def _watch_local_procs(procs, nranks):
         terminate(procs)
         raise
     except SystemExit:
-        logger.error("ABORT!!! Out of all {} trainers, \
-            the trainer process with rank={} was aborted. Please check its log."
-                     .format(nranks, error_rank))
+        logger.error(
+            "ABORT!!! Out of all {} trainers, \
+            the trainer process with rank={} was aborted. Please check its log.".format(
+                nranks, error_rank
+            )
+        )
         terminate(procs)
         raise
     except Exception as e:
-        logger.error("ABORT!!! Out of all {} trainers, \
-            the trainer process with rank={} was aborted:{}. Please check its log."
-                     .format(nranks, error_rank, str(e)))
+        logger.error(
+            "ABORT!!! Out of all {} trainers, \
+            the trainer process with rank={} was aborted:{}. Please check its log.".format(
+                nranks, error_rank, str(e)
+            )
+        )
         terminate(procs)
         raise
 

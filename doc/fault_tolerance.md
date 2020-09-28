@@ -1,23 +1,23 @@
 # Fault tolerance for sync training
 ## Design
-In the process of training, we may meet that one or more trainers crash. We use checkpoints to continue training.  
+In the process of training, we may meet that one or more trainers crash. We use checkpoints to continue training.
 
 There may be several design-tricks for it:
 
-1. How does Paddle save checkpoint itself?  
+1. How does Paddle save checkpoint itself?
 Paddle implements `save_persistables` to save all persistable variables.
 
-2. How to save user's Python frontend logic?  
+2. How to save user's Python frontend logic?
 Such as current epoch number, step number in an epoch, and the data slice and offset and so on.
 
 3. How to save checkpoints?
-  - Which trainer saves the checkpoint?  
+  - Which trainer saves the checkpoint?
     If there are many trainers, the trainer who `rank`==0 will do it.
 
-  - Where do we save the checkpoint?  
+  - Where do we save the checkpoint?
     It can be saved to the local file system, but eventually, it should be saved to a file-system that can be seen by all trainers such as a distributed HDFS.
 
-  - How to guarantee the checkpoint's integrity and correctness?  
+  - How to guarantee the checkpoint's integrity and correctness?
     It's a process to save a file and it's not an atomic action but `rm` `rename` `mv` and others should be.
     We can use it and don't change any checkpoint when it's written with a version number. All checkpoints will be saved to the file system with an increment version number. The interface generates a temporary checkpoint file and then `rename` it to valid when it has done.
 
@@ -28,11 +28,11 @@ Such as current epoch number, step number in an epoch, and the data slice and of
 There are two interfaces `save_check_point` and `load_check_point` to save/load a checkpoint.
 There are two arguments should be careful:
 
-1. fs:  
+1. fs:
 It's an abstract interface to file system and there are two implementations: local file system and HDFS.
 You can implement the member function of this class to use the checkpoint interface.
 
-2. train_status:  
+2. train_status:
 Now there is only one member variable `epoch_no` and there will be more variables here after 0.2 version.
 
 ## Example

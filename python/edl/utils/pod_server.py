@@ -40,15 +40,17 @@ class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
         self._pod_id = pod_id
         self._job_env = job_env
 
-        self._etcd = etcd_db.get_global_etcd(self._job_env.etcd_endpoints,
-                                             self._job_env.job_id)
+        self._etcd = etcd_db.get_global_etcd(
+            self._job_env.etcd_endpoints, self._job_env.job_id
+        )
 
     def ScaleOut(self, request, context):
         status = common_pb2.Status()
         pod = leader_pod.load_from_etcd(self._etcd)
         if pod.get_id != self._pod_id:
             status = exceptions.serialize(
-                exceptions.EdlLeaderError("this pod is not the leader"))
+                exceptions.EdlLeaderError("this pod is not the leader")
+            )
             return status
 
         return status
@@ -58,7 +60,8 @@ class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
         pod = leader_pod.load_from_etcd(self._etcd)
         if pod.get_id != self._pod_id:
             status = exceptions.serialize(
-                exceptions.EdlLeaderError("this pod is not the leader"))
+                exceptions.EdlLeaderError("this pod is not the leader")
+            )
             return status
 
         return status
@@ -69,21 +72,23 @@ class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
         try:
             cluster = edl_cluster.load_from_etcd(self._etcd, timeout=60)
             if cluster is None:
-                exceptions.serialize(res,
-                                     exceptions.EdlBarrierError(
-                                         "get current running cluster error"))
+                exceptions.serialize(
+                    res, exceptions.EdlBarrierError("get current running cluster error")
+                )
                 return res
 
             if cluster.status == edl_status.Status.FAILED:
-                exceptions.serialize(res,
-                                     exceptions.EdlBarrierError(
-                                         "cluster's status is status.Failed"))
+                exceptions.serialize(
+                    res, exceptions.EdlBarrierError("cluster's status is status.Failed")
+                )
                 return res
 
             ids = cluster.get_pods_ids_set()
             logger.debug(
-                "get barrier request from job_id:{} pod_id:{} cluster table ids is {}".
-                format(request.job_id, request.pod_id, ids))
+                "get barrier request from job_id:{} pod_id:{} cluster table ids is {}".format(
+                    request.job_id, request.pod_id, ids
+                )
+            )
 
             key = cluster.stage
 
@@ -101,11 +106,12 @@ class PodServerServicer(pod_server_pb2_grpc.PodServerServicer):
             exceptions.serialize(
                 res,
                 exceptions.EdlBarrierError(
-                    "barrier's context:{}, now:{}".format(ids, bd)))
+                    "barrier's context:{}, now:{}".format(ids, bd)
+                ),
+            )
             return res
         except Exception as e:
-            logger.debug("internal error:{} {}".format(e,
-                                                       traceback.format_exc()))
+            logger.debug("internal error:{} {}".format(e, traceback.format_exc()))
             exceptions.serialize(res, exceptions.EdlInternalError(str(e)))
             return res
 
@@ -124,15 +130,23 @@ class PodServer(object):
     def start(self, concurrency=20, max_workers=100):
         server = grpc.server(
             concurrent.futures.ThreadPoolExecutor(max_workers=max_workers),
-            options=[('grpc.max_send_message_length', 1024 * 1024 * 1024),
-                     ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
-            maximum_concurrent_rpcs=concurrency)
+            options=[
+                ("grpc.max_send_message_length", 1024 * 1024 * 1024),
+                ("grpc.max_receive_message_length", 1024 * 1024 * 1024),
+            ],
+            maximum_concurrent_rpcs=concurrency,
+        )
         pod_server_pb2_grpc.add_PodServerServicer_to_server(
-            PodServerServicer(self._job_env, self._pod.pod_id), server)
+            PodServerServicer(self._job_env, self._pod.pod_id), server
+        )
 
-        self._port = server.add_insecure_port('{}:0'.format(self._pod.addr))
-        assert self._port > 0, "data server start on endpoint:{} error, \
-            selected port is {}".format(self._pod.addr, self._port)
+        self._port = server.add_insecure_port("{}:0".format(self._pod.addr))
+        assert (
+            self._port > 0
+        ), "data server start on endpoint:{} error, \
+            selected port is {}".format(
+            self._pod.addr, self._port
+        )
 
         self._endpoint = "{}:{}".format(self._pod.addr, self._port)
 

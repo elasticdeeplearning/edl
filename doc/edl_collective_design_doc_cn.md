@@ -3,21 +3,21 @@ Collective通信（同步）模式的训练因为其精度稳定、好复现的�
 本文将阐述Collective通信模式下的EDL的设计思路和方法
 
 # 难点
-当用户把自己的单机程序改成多机程序，他的程序需要增加的唯一的超参是节点的个数，由此带来的程序的改动可能会有几个，如：数据如何切分；batchsize、learning rate类的调整。  
+当用户把自己的单机程序改成多机程序，他的程序需要增加的唯一的超参是节点的个数，由此带来的程序的改动可能会有几个，如：数据如何切分；batchsize、learning rate类的调整。
 当用户把多机程序改成可以适应EDL的程序，需要在节点个数的基础上增加另外一个考虑：数据的一致性的问题。需要保证各处的跟节点数目相关的参数在节点变化的时候多个节点间数据是一致的。我们需要在框架端把这个考虑带来的影响减少到最小。
 
 这带来几个难点问题：
 
-1. 如何保存Python端的用户逻辑.  
-如数据如何切分、 文件的位置、及其他的Paddle框架之外的参数等。  
+1. 如何保存Python端的用户逻辑.
+如数据如何切分、 文件的位置、及其他的Paddle框架之外的参数等。
 这些参数是比较自由的、用户自定义的，我们在训练引擎端无法控制的。所以我们采用stop-resume的方式解决，用户程序面对新的超参只有节点个数一个。
 
-2. 如何尽可能的保证精度、结果可复现。  
+2. 如何尽可能的保证精度、结果可复现。
 训练的任务提交之前，用户需要指定自己的训练节点的最小和最大的节点的个数，同时需要指定batchsize是保持不变还是随着节点数目线性增长，因为batchsize是精度相关的超参，有些模型超过了一定阈值就需要做额外的调整，如Resnet50 total batchsize 超过8K的时候需要对学习率做额外的调整。
 但是，保持总的batchsize不变也会带来扩展的效率问题：单卡batchsize减少，训练的性能可能会降低。
 考虑到上述两个问题，这个地方需要用户自己根据节点的个数和自己的模型的特点做决定。
 
-3. 如何让用户的程序改动少。  
+3. 如何让用户的程序改动少。
 stop-resume的方式是需要`save_checkpoint`和`load_checkpoint`的时机。因为需要用户在Python端的显示调用，这部分很难隐藏到接口里边去。
 除了这个之外，其他无改动。
 
@@ -40,9 +40,9 @@ Kubernetes虽然用的越来越多，但是实际生产中会有多种类型的�
 <img src="images/edl-arch.png" width="750">
 
 ## Launcher module
-<img src="images/launcher.png" width="450">  
+<img src="images/launcher.png" width="450">
 Launcher模块主要负责多个trainer端的协调
 
 ## Trainer module
-<img src="images/trainer.png" width="320">.  
+<img src="images/trainer.png" width="320">.
 Trainer模块主要负责EDL功能里边的`save_checkpoint` `load_checkpoint`

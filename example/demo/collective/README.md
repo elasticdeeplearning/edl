@@ -6,7 +6,7 @@ This article illustrates how to change the train program to an EDL program, and 
 The main changes are:
 
 - `load_checkpoint`  should be added at the beginning of training and
-- `save_checkpoint` added at the end of every epoch.  
+- `save_checkpoint` added at the end of every epoch.
    the checkpoint should be on a distributed file system such as HDFS so all trainers can download from it. A complete example is [here](https://github.com/elasticdeeplearning/edl/tree/develop/example/collective/resnet50)
 
 ```
@@ -21,7 +21,7 @@ for pass_id in range(train_status.next(), params["num_epochs"]):
     train()
 
     if trainer_id == 0:
-        saved_status = TrainStatus(pass_id)  
+        saved_status = TrainStatus(pass_id)
         fleet.save_checkpoint(exe, train_status=saved_status,
             path=args.checkpoint, fs=fs)
 ```

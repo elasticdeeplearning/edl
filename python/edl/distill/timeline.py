@@ -32,13 +32,16 @@ class _RealTimeLine(object):
 
     def record(self, name):
         new_time = time.time()
-        sys.stderr.write('pid={} op={} time={}ms\n'.format(self.pid, name, (
-            new_time - self.time) * 1000))
+        sys.stderr.write(
+            "pid={} op={} time={}ms\n".format(
+                self.pid, name, (new_time - self.time) * 1000
+            )
+        )
         self.time = new_time
 
     def reset(self):
         self.time = time.time()
 
 
-_is_profile = int(os.environ.get('DISTILL_READER_PROFILE', 0))
+_is_profile = int(os.environ.get("DISTILL_READER_PROFILE", 0))
 _TimeLine = _RealTimeLine if _is_profile else _NopTimeLine

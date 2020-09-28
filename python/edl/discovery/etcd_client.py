@@ -31,15 +31,16 @@ class ServerMeta(object):
         self.revision = revision  # etcd global revision
 
     def __str__(self):
-        return 'server={}, info={}, mod_revision={}, revision={}'.\
-            format(self.server, self.info, self.mod_revision, self.revision)
+        return "server={}, info={}, mod_revision={}, revision={}".format(
+            self.server, self.info, self.mod_revision, self.revision
+        )
 
 
 def _handle_errors(f):
     def handler(*args, **kwargs):
         try:
             return f(*args, **kwargs)
-        except exceptions.Etcd3Exception as e:
+        except exceptions.Etcd3Exception:
             args[0]._connect(args[0]._endpoints)
 
         return f(*args, **kwargs)
@@ -48,11 +49,9 @@ def _handle_errors(f):
 
 
 class EtcdClient(object):
-    def __init__(self,
-                 endpoints=['127.0.0.1:2379'],
-                 passwd=None,
-                 root="service",
-                 timeout=6):
+    def __init__(
+        self, endpoints=["127.0.0.1:2379"], passwd=None, root="service", timeout=6
+    ):
         assert isinstance(endpoints, list), "endpoints must be list"
         self._endpoints = set(endpoints)
         self._passwd = passwd
@@ -80,7 +79,7 @@ class EtcdClient(object):
             self._etcd = conn
             return
 
-        if self._etcd == None:
+        if self._etcd is None:
             raise NoValidEndpoint()
 
     def init(self):
@@ -89,19 +88,22 @@ class EtcdClient(object):
     @_handle_errors
     def get_service(self, service_name):
         servers = []
-        d = '/{}/{}/nodes/'.format(self._root, service_name)
+        d = "/{}/{}/nodes/".format(self._root, service_name)
         for value, meta in self._etcd.get_prefix(d):
             servers.append(
                 ServerMeta(
-                    self.get_server_name_from_full_path(
-                        meta.key, service_name), value, meta.mod_revision,
-                    meta.response_header.revision))
+                    self.get_server_name_from_full_path(meta.key, service_name),
+                    value,
+                    meta.mod_revision,
+                    meta.response_header.revision,
+                )
+            )
         return servers
 
     @_handle_errors
     def get_service_with_revision(self, service_name):
         servers = []
-        d = '/{}/{}/nodes/'.format(self._root, service_name)
+        d = "/{}/{}/nodes/".format(self._root, service_name)
 
         key_prefix = d
         range_response = self._etcd.get_prefix_response(key_prefix)
@@ -109,7 +111,11 @@ class EtcdClient(object):
             servers.append(
                 ServerMeta(
                     self.get_server_name_from_full_path(kv.key, service_name),
-                    kv.value, kv.mod_revision, range_response.header.revision))
+                    kv.value,
+                    kv.mod_revision,
+                    range_response.header.revision,
+                )
+            )
 
         return servers, range_response.header.revision
 
@@ -122,10 +128,10 @@ class EtcdClient(object):
             add_servers = dict()
             rm_servers = dict()
             for event in response.events:
-                key = self.get_server_name_from_full_path(event.key,
-                                                          service_name)
-                server = ServerMeta(key, event.value, event.mod_revision,
-                                    response.header.revision)
+                key = self.get_server_name_from_full_path(event.key, service_name)
+                server = ServerMeta(
+                    key, event.value, event.mod_revision, response.header.revision
+                )
 
                 if isinstance(event, etcd.events.PutEvent):
                     if key in rm_servers:
@@ -138,23 +144,22 @@ class EtcdClient(object):
                         add_servers.pop(key)
                     rm_servers[key] = server
                 else:
-                    raise TypeError('ectd event type is not put or delete!')
+                    raise TypeError("ectd event type is not put or delete!")
 
             if len(add_servers) == 0 and len(rm_servers) == 0:
                 return
 
             call_back(add_servers.values(), rm_servers.values())
 
-        d = '/{}/{}/'.format(self._root, service_name)
-        return self._etcd.add_watch_prefix_callback(d, services_change,
-                                                    **kwargs)
+        d = "/{}/{}/".format(self._root, service_name)
+        return self._etcd.add_watch_prefix_callback(d, services_change, **kwargs)
 
     def cancel_watch(self, watch_id):
         return self._etcd.cancel_watch(watch_id)
 
     @_handle_errors
     def remove_service(self, service_name):
-        d = '/{}/{}/'.format(self._root, service_name)
+        d = "/{}/{}/".format(self._root, service_name)
         servers = self.get_service(service_name)
         for s in servers:
             self.remove_server(service_name, s.server)
@@ -169,17 +174,12 @@ class EtcdClient(object):
         return self._leases[key]
 
     @_handle_errors
-    def set_server_not_exists(self,
-                              service_name,
-                              server,
-                              info,
-                              ttl=10,
-                              timeout=6):
+    def set_server_not_exists(self, service_name, server, info, ttl=10, timeout=6):
         """
         :returns: state of transaction, ``True`` if the put was successful,
                   ``False`` otherwise
         """
-        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        key = "/{}/{}/nodes/{}".format(self._root, service_name, server)
         lease = self._get_lease(key, ttl)
         begin = time.time()
         while True:
@@ -190,7 +190,7 @@ class EtcdClient(object):
             for r in self._etcd.refresh_lease(lease.id):
                 pass
 
-            if (time.time() - begin > timeout):
+            if time.time() - begin > timeout:
                 break
 
             time.sleep(1)
@@ -198,35 +198,34 @@ class EtcdClient(object):
 
     @_handle_errors
     def _set_server(self, service_name, server, info, ttl=10):
-        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        key = "/{}/{}/nodes/{}".format(self._root, service_name, server)
         lease = self._get_lease(key, ttl)
         return self._etcd.put(key=key, value=info, lease=lease)
 
     @_handle_errors
     def set_server_permanent(self, service_name, server, info):
-        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        key = "/{}/{}/nodes/{}".format(self._root, service_name, server)
         self._etcd.put(key=key, value=info)
         if key in self._leases:
-            lease = self._leases[key]
             self._leases.pop(key)
 
     @_handle_errors
     def _get_server(self, service_name, server):
         # for debug
-        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        key = "/{}/{}/nodes/{}".format(self._root, service_name, server)
         value, meta = self._etcd.get(key=key)
         return value, meta.key, meta.version, meta.create_revision, meta.mod_revision
 
     @_handle_errors
     def get_value(self, service_name, server):
         # for debug
-        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        key = "/{}/{}/nodes/{}".format(self._root, service_name, server)
         value = self._etcd.get(key=key)
         return value[0]
 
     @_handle_errors
     def remove_server(self, service_name, server):
-        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        key = "/{}/{}/nodes/{}".format(self._root, service_name, server)
         self._etcd.delete(key)
         if key in self._leases:
             lease = self._leases[key]
@@ -240,7 +239,7 @@ class EtcdClient(object):
             self._set_server(service_name, server, info, ttl)
             return
 
-        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        key = "/{}/{}/nodes/{}".format(self._root, service_name, server)
         lease = self._get_lease(key, ttl)
 
         for r in self._etcd.refresh_lease(lease.id):
@@ -248,12 +247,12 @@ class EtcdClient(object):
         return
 
     def get_server_name_from_full_path(self, path, service_name):
-        d = '/{}/{}/nodes/'.format(self._root, service_name)
-        return path[len(d):]
+        d = "/{}/{}/nodes/".format(self._root, service_name)
+        return path[len(d) :]
 
     @_handle_errors
     def lock(self, service_name, server, ttl=10):
-        key = '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        key = "/{}/{}/nodes/{}".format(self._root, service_name, server)
         return self._etcd.lock(key, ttl=ttl)
 
     @_handle_errors
@@ -261,4 +260,4 @@ class EtcdClient(object):
         return self._etcd.get(key)
 
     def get_full_path(self, service_name, server):
-        return '/{}/{}/nodes/{}'.format(self._root, service_name, server)
+        return "/{}/{}/nodes/{}".format(self._root, service_name, server)

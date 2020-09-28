@@ -172,8 +172,11 @@ def load_from_etcd(etcd, state_name, user_defined=None, timeout=60):
     value = etcd.get_value(constants.ETCD_STATE, state_name)
 
     if value is None:
-        raise exceptions.EdlTableError("key:value = {}:{}".format(
-            etcd.get_full_path(constants.ETCD_READER, state_name), value))
+        raise exceptions.EdlTableError(
+            "key:value = {}:{}".format(
+                etcd.get_full_path(constants.ETCD_READER, state_name), value
+            )
+        )
 
     state = State(total_batch_size=None, user_defined=user_defined)
     state.from_json(string_utils.bytes_to_string(value))
@@ -182,15 +185,15 @@ def load_from_etcd(etcd, state_name, user_defined=None, timeout=60):
 
 @error_utils.handle_errors_until_timeout
 def save_to_etcd(etcd, pod_id, state, timeout=60):
-    leader_key = etcd.get_full_path(constants.ETCD_POD_RANK,
-                                    constants.ETCD_POD_LEADER)
+    leader_key = etcd.get_full_path(constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER)
     state_key = etcd.get_full_path(constants.ETCD_STATE, state.name)
 
     etcd = etcd._etcd
     status, _ = etcd.transaction(
-        compare=[etcd.transactions.value(leader_key) == pod_id, ],
-        success=[etcd.transactions.put(state_key, state.to_json()), ],
-        failure=[])
+        compare=[etcd.transactions.value(leader_key) == pod_id,],  # noqa: E231
+        success=[etcd.transactions.put(state_key, state.to_json()),],  # noqa: E231
+        failure=[],
+    )
 
     message = "pod_id:{} save_data_checkpoint status:{}".format(pod_id, status)
     if not status:
@@ -198,14 +201,17 @@ def save_to_etcd(etcd, pod_id, state, timeout=60):
 
 
 class PaddleState(State):
-    def __init__(self,
-                 total_batch_size,
-                 user_defined=None,
-                 optimizer=None,
-                 exe=None,
-                 program=None):
+    def __init__(
+        self,
+        total_batch_size,
+        user_defined=None,
+        optimizer=None,
+        exe=None,
+        program=None,
+    ):
         super(PaddleState, self).__init__(
-            total_batch_size=total_batch_size, user_defined=user_defined)
+            total_batch_size=total_batch_size, user_defined=user_defined
+        )
         self._exe = exe
         self._program = program
         self._optimizer = optimizer

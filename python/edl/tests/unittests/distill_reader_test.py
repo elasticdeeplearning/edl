@@ -25,17 +25,16 @@ class TestDistillReader(unittest.TestCase):
         # test mnist distill reader
         def _reader():
             img = np.array(
-                [(i + 1) / 28.0 for i in range(28)] * 28,
-                dtype=np.float32).reshape((1, 28, 28))
+                [(i + 1) / 28.0 for i in range(28)] * 28, dtype=np.float32
+            ).reshape((1, 28, 28))
             label = np.array([100], dtype=np.int64)
             for i in range(24):
                 yield 8 * [(img, label)]
             yield 2 * [(img, label)]
 
-        dr = distill_reader.DistillReader(
-            ins=['img', 'label'], predicts=['prediction'])
+        dr = distill_reader.DistillReader(ins=["img", "label"], predicts=["prediction"])
         dr.set_teacher_batch_size(4)
-        dr.set_fixed_teacher(['127.0.0.1:9292', '127.0.0.1:9293'])
+        dr.set_fixed_teacher(["127.0.0.1:9292", "127.0.0.1:9293"])
         # dr.set_dynamic_teacher(['127.0.0.1:7001'], 'DistillReaderTest', 3)
 
         train_reader = dr.set_sample_list_generator(_reader)
@@ -46,9 +45,12 @@ class TestDistillReader(unittest.TestCase):
                 if epoch == 0 and step == 0:
                     dr.print_config()
             if epoch % 10 == 0:
-                print('^^^^^^^^^^^^^ epoch={} predict[0][0]={}^^^^^^^^^^^^^^'.
-                      format(epoch, batch[-1][-1][0]))
+                print(
+                    "^^^^^^^^^^^^^ epoch={} predict[0][0]={}^^^^^^^^^^^^^^".format(
+                        epoch, batch[-1][-1][0]
+                    )
+                )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

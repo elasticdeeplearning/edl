@@ -33,7 +33,7 @@ def find_free_ports(num):
 
     def __free_port():
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            s.bind(('', 0))
+            s.bind(("", 0))
             return s.getsockname()[1]
 
     port_set = set()
@@ -48,9 +48,7 @@ def find_free_ports(num):
 
         step += 1
         if step > 100:
-            print(
-                "can't find avilable port and use the specified static port now!"
-            )
+            print("can't find avilable port and use the specified static port now!")
             return None
 
     return None

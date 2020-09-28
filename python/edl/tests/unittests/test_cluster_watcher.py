@@ -29,49 +29,48 @@ class TestWatcher(etcd_test_base.EtcdTestBase):
         cluster = edl_cluster.Cluster()
         cluster._stage = "0"
         print("cluster 0 ids:", cluster.to_json(), cluster.get_pods_ids_list())
-        self._etcd.set_server_permanent(constants.ETCD_CLUSTER,
-                                        constants.ETCD_CLUSTER,
-                                        cluster.to_json())
+        self._etcd.set_server_permanent(
+            constants.ETCD_CLUSTER, constants.ETCD_CLUSTER, cluster.to_json()
+        )
         watcher = cluster_watcher.Watcher(self._job_env, cluster)
 
         cluster._stage = "1"
         print("cluster 1 ids:", cluster.to_json(), cluster.get_pods_ids_list())
-        self._etcd.set_server_permanent(constants.ETCD_CLUSTER,
-                                        constants.ETCD_CLUSTER,
-                                        cluster.to_json())
+        self._etcd.set_server_permanent(
+            constants.ETCD_CLUSTER, constants.ETCD_CLUSTER, cluster.to_json()
+        )
         time.sleep(constants.ETCD_TTL)
         self.assertTrue(watcher.changed)
 
     def test_watch_valid(self):
         try:
             cluster = edl_cluster.Cluster()
-            self._etcd.set_server_permanent(constants.ETCD_CLUSTER,
-                                            constants.ETCD_CLUSTER,
-                                            cluster.to_json())
-            watcher = cluster_watcher.Watcher(self._job_env, cluster)
-            self._etcd.remove_server(constants.ETCD_CLUSTER,
-                                     constants.ETCD_CLUSTER)
+            self._etcd.set_server_permanent(
+                constants.ETCD_CLUSTER, constants.ETCD_CLUSTER, cluster.to_json()
+            )
+            cluster_watcher.Watcher(self._job_env, cluster)
+            self._etcd.remove_server(constants.ETCD_CLUSTER, constants.ETCD_CLUSTER)
             time.sleep(constants.ETCD_TTL)
-        except exceptions.EdlTableError as e:
+        except exceptions.EdlTableError:
             pass
 
     def test_watcher_ids_changed(self):
         cluster = edl_cluster.Cluster()
         print("cluster 0 ids:", cluster.to_json(), cluster.get_pods_ids_list())
-        self._etcd.set_server_permanent(constants.ETCD_CLUSTER,
-                                        constants.ETCD_CLUSTER,
-                                        cluster.to_json())
+        self._etcd.set_server_permanent(
+            constants.ETCD_CLUSTER, constants.ETCD_CLUSTER, cluster.to_json()
+        )
         watcher = cluster_watcher.Watcher(self._job_env, cluster)
 
         pod = edl_pod.Pod()
         cluster._pods.append(pod)
         print("cluster 1 ids:", cluster.to_json(), cluster.get_pods_ids_list())
-        self._etcd.set_server_permanent(constants.ETCD_CLUSTER,
-                                        constants.ETCD_CLUSTER,
-                                        cluster.to_json())
+        self._etcd.set_server_permanent(
+            constants.ETCD_CLUSTER, constants.ETCD_CLUSTER, cluster.to_json()
+        )
         time.sleep(constants.ETCD_TTL)
         self.assertTrue(watcher.changed)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

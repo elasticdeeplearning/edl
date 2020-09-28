@@ -33,28 +33,38 @@ class TestClusterGenerator(etcd_test_base.EtcdTestBase):
         pod.from_env(job_env)
         server = pod_server.PodServer(self._job_env, pod)
         server.start()
-        self._etcd.set_server_permanent(constants.ETCD_POD_RESOURCE,
-                                        pod.get_id(), pod.to_json())
-        self._etcd.set_server_permanent(constants.ETCD_POD_STATUS,
-                                        pod.get_id(), pod.to_json())
-        print("set permanent:",
-              self._etcd.get_full_path(constants.ETCD_POD_RESOURCE,
-                                       pod.get_id()))
+        self._etcd.set_server_permanent(
+            constants.ETCD_POD_RESOURCE, pod.get_id(), pod.to_json()
+        )
+        self._etcd.set_server_permanent(
+            constants.ETCD_POD_STATUS, pod.get_id(), pod.to_json()
+        )
+        print(
+            "set permanent:",
+            self._etcd.get_full_path(constants.ETCD_POD_RESOURCE, pod.get_id()),
+        )
 
         edl_status.save_pod_status_to_etcd(
-            self._etcd, pod.get_id(), edl_status.Status.INITIAL, timeout=15)
-        print("set permanent:", self._etcd.get_full_path(
-            constants.ETCD_POD_STATUS, pod.get_id()))
+            self._etcd, pod.get_id(), edl_status.Status.INITIAL, timeout=15
+        )
+        print(
+            "set permanent:",
+            self._etcd.get_full_path(constants.ETCD_POD_STATUS, pod.get_id()),
+        )
 
         return pod, server
 
     def test_barrier(self):
         pod_0, server_0 = self._register_pod(self._job_env)
-        self._etcd.set_server_permanent(constants.ETCD_POD_RANK,
-                                        constants.ETCD_POD_LEADER,
-                                        pod_0.get_id())
-        print("set permanent:", self._etcd.get_full_path(
-            constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER))
+        self._etcd.set_server_permanent(
+            constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER, pod_0.get_id()
+        )
+        print(
+            "set permanent:",
+            self._etcd.get_full_path(
+                constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER
+            ),
+        )
 
         pod_1, server_1 = self._register_pod(self._job_env)
 
@@ -63,21 +73,19 @@ class TestClusterGenerator(etcd_test_base.EtcdTestBase):
 
         try:
             client = pod_server_client.Client(pod_0.endpoint)
-            cluster_0 = client.barrier(
-                self._job_env.job_id, pod_0.get_id(), timeout=0)
+            cluster_0 = client.barrier(self._job_env.job_id, pod_0.get_id(), timeout=0)
 
             self.assertNotEqual(cluster_0, None)
-        except EdlBarrierError as e:
+        except EdlBarrierError:
             pass
-        except:
+        except Exception:
             sys.exit(1)
         finally:
             generater.stop()
 
         try:
-            cluster_1 = client.barrier(
-                self._job_env.job_id, pod_1.get_id(), timeout=15)
-        except:
+            cluster_1 = client.barrier(self._job_env.job_id, pod_1.get_id(), timeout=15)
+        except Exception:
             sys.exit(1)
         finally:
             generater.stop()
@@ -85,5 +93,5 @@ class TestClusterGenerator(etcd_test_base.EtcdTestBase):
         self.assertNotEqual(cluster_1, None)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

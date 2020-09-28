@@ -14,4 +14,3 @@ ADD script/k8s_tools.py /root
 RUN chmod +x /usr/bin/paddle_k8s
 
 COPY ctr /workspace/ctr
-

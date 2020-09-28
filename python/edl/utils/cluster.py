@@ -34,11 +34,13 @@ class Cluster(json_serializable.Serializable):
 
     def __str__(self):
         return "pods:{} job_stage:{} status:{}".format(
-            [str(pod) for pod in self._pods], self._stage, self._status)
+            [str(pod) for pod in self._pods], self._stage, self._status
+        )
 
     def details(self):
         return "pods:{} job_stage:{} status:{}".format(
-            [pod.details() for pod in self._pods], self._stage, self._status)
+            [pod.details() for pod in self._pods], self._stage, self._status
+        )
 
     def update_pods(self, cluster):
         self._pods = copy.copy(cluster.pods)
@@ -67,8 +69,9 @@ class Cluster(json_serializable.Serializable):
         r = []
         for pod in self._pods:
             ep = "{}:{}".format(pod.addr, pod.port)
-            assert pod.port is not None and  pod.addr is not None, \
-                "{} not a valid endpoint".format(ep)
+            assert (
+                pod.port is not None and pod.addr is not None
+            ), "{} not a valid endpoint".format(ep)
             r.append(ep)
 
         return r
@@ -116,7 +119,8 @@ class Cluster(json_serializable.Serializable):
             pod = edl_pod.Pod()
             if i != int(key):
                 raise exceptions.EdlRankError(
-                    "rank:{} is not exists in {}".format(i, d))
+                    "rank:{} is not exists in {}".format(i, d)
+                )
             pod.from_json(value)
             pods.append(pod)
 
@@ -164,7 +168,8 @@ def wait_to_load_from_etcd(etcd, timeout=60):
     if cluster is None:
         raise exceptions.EdlTableError(
             "can't load cluster from etcd path:{}".format(
-                etcd.get_full_path(constants.ETCD_CLUSTER,
-                                   constants.ETCD_CLUSTER)))
+                etcd.get_full_path(constants.ETCD_CLUSTER, constants.ETCD_CLUSTER)
+            )
+        )
 
     return cluster

@@ -94,8 +94,11 @@ def deserialize(pb_status):
     try:
         cls = getattr(thismodule, pb_status.type)(pb_status.detail)
     except Exception as e:
-        raise Exception("type:{} detail:{} meets error:{}".format(
-            pb_status.type, pb_status.detail, str(e)))
+        raise Exception(
+            "type:{} detail:{} meets error:{}".format(
+                pb_status.type, pb_status.detail, str(e)
+            )
+        )
     raise cls
 
 
