@@ -13,6 +13,7 @@ repos:
     rev: v3.2.0
     hooks:
     -   id: trailing-whitespace
+        exclude: \.(md|rst)$
     -   id: check-docstring-first
     -   id: check-json
     -   id: check-added-large-files
@@ -40,6 +41,6 @@ repos:
     hooks:
     -   id: shellcheck
         name: shellcheck
-        entry: bash .tools/shellcheck.sh
+        entry: shellcheck
         language: system
         files: \.sh$
