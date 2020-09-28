@@ -36,4 +36,4 @@ repos:
     hooks:
     -   id: flake8
         exclude: ^(\.tools\/|example\/|k8s\/)
-        args: ['--max-line-length=100']
+        args: ['--max-line-length=100', '--extend-ignore=E203']

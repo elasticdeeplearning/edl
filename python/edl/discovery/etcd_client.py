@@ -248,7 +248,7 @@ class EtcdClient(object):
 
     def get_server_name_from_full_path(self, path, service_name):
         d = "/{}/{}/nodes/".format(self._root, service_name)
-        return path[len(d):]
+        return path[len(d) :]
 
     @_handle_errors
     def lock(self, service_name, server, ttl=10):
