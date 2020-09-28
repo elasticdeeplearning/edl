@@ -36,3 +36,10 @@ repos:
     -   id: flake8
         exclude: ^(\.tools\/|example\/|k8s\/)
         args: ['--max-line-length=100', '--extend-ignore=E203']
+-   repo: local
+    hooks:
+    -   id: shellcheck
+        name: shellcheck
+        entry: bash .tools/shellcheck.sh
+        language: system
+        files: \.sh$
