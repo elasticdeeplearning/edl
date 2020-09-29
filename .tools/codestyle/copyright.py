@@ -73,7 +73,7 @@ def _check_copyright(path):
     head=[]
     try:
         with open(path) as f:
-            head = [next(f) for x in range(3)]
+            head = [next(f) for x in range(4)]
     except StopIteration:
         pass
 
@@ -85,7 +85,7 @@ def _check_copyright(path):
 
 def generate_copyright(path, comment_mark):
     original_contents = io.open(path, encoding="utf-8").readlines()
-    head = original_contents[0:3]
+    head = original_contents[0:4]
 
     insert_line_no=0
     for i, line in enumerate(head):
