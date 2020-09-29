@@ -28,7 +28,7 @@ repos:
     hooks:
     -   id: copyright_checker
         name: copyright_checker
-        entry: python .tools/codestyle/copyright.hook
+        entry: python .tools/codestyle/copyright.py
         language: system
         files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|py|sh)$
 -   repo: https://gitlab.com/pycqa/flake8
@@ -44,3 +44,4 @@ repos:
         entry: shellcheck
         language: system
         files: .sh$
+        exclude: ^(\.tools\/|example\/|k8s\/)
