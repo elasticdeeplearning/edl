@@ -9,41 +9,28 @@ cd "${BASEDIR}"
 # 2.7 is deprecated
 # ./build.sh 2.7
 
-#function check_style() {
-#    trap 'abort' 0
-#    set -e
-#
-#    if [ -x "$(command -v gimme)" ]; then
-#    	eval "$(GIMME_GO_VERSION=1.8.3 gimme)"
-#    fi
-#
-#
-#    pip install cpplint pylint pytest astroid isort
-#    # set up go environment for running gometalinter
-#    mkdir -p $GOPATH/src/github.com/PaddlePaddle/
-#    ln -sf ${PADDLE_ROOT} $GOPATH/src/github.com/PaddlePaddle/Paddle
-#
-#    pre-commit install
-#    clang-format --version
-#
-#    commit_files=on
-#    for file_name in `git diff --numstat upstream/$BRANCH |awk '{print $NF}'`;do
-#        if ! pre-commit run --files $file_name ; then
-#            git diff
-#            commit_files=off
-#        fi
-#    done
-#
-#    if [ $commit_files == 'off' ];then
-#        echo "code format error"
-#        exit 1
-#    fi
-#    trap : 0
-#}
-#
-#upstream_url='https://github.com/elasticdeeplearning/edl'
-#git remote remove upstream
-#git remote add upstream $upstream_url.git
-#check_style
+function abort(){
+    echo "Your change doesn't follow Edl's code style." 1>&2
+    echo "Please use pre-commit to check what is wrong." 1>&2
+    exit 1
+}
+
+function check_style() {
+    trap 'abort' 0
+    set -e
+
+    changed_files="$(git diff --name-only upstream/develop)"
+    echo "$changed_files" | xargs pre-commit run --files
+
+    trap : 0
+}
+
+pushd "${BASEDIR}/../"
+upstream_url='https://github.com/elasticdeeplearning/edl'
+git remote remove upstream
+git remote add upstream $upstream_url
+git fetch upstream develop
+check_style
+popd
 
 ./build.sh 3.7

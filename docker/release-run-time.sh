@@ -25,7 +25,7 @@ done
 echo -e "\n${GREEN} Begin to release ${RED} edl docker ${version} ${NC}\n"
 
 unset GREP_OPTIONS
-BASEDIR=$(dirname $(readlink -f $0))
-cd ${BASEDIR}
+BASEDIR="$(dirname "$(readlink -f "${0}")")"
+cd "${BASEDIR}"
 
-bash ./build-runtime.sh $version
+bash ./build-runtime.sh "$version"

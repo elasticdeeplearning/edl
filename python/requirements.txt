@@ -1,3 +1,0 @@
-flask
-pathlib2
-psutil

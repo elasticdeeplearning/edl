@@ -9,17 +9,17 @@ for w in {1..10}
 do
     for T in {1..20}
     do
-        wf=$((echo scale=1 ; echo $w / 10 ) | bc )
-        Tf=$((echo scale=1 ; echo $T ) | bc )
+        wf=$( (echo scale=1 ; echo $w / 10 ) | bc )
+        Tf=$( (echo scale=1 ; echo $T ) | bc )
         python3.6 -u distill.py \
             --fixed_teacher $fixed_teacher \
             --opt=AdamW \
-            --s_weight $wf \
+            --s_weight "$wf" \
             --train_range 10 \
             --LR 1e-4 \
             --kl 0 \
-            --T $Tf \
-            --epoch_num 20 > log/d_w${wf}_T${Tf}.log 2>&1
+            --T "$Tf" \
+            --epoch_num 20 > log/"d_w${wf}_T${Tf}".log 2>&1
     done
 done
 

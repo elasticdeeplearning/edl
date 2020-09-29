@@ -43,4 +43,4 @@ repos:
         name: shellcheck
         entry: shellcheck
         language: system
-        files: \.sh$
+        files: .sh$

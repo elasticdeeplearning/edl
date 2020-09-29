@@ -62,7 +62,7 @@ setup(
     author_email='guru4elephant@gmail.com',
     install_requires=REQUIRED_PACKAGES,
     packages=packages,
-    python_requires='>=2.7',
+    python_requires='>=3.7',
     # PyPI package information.
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -70,11 +70,7 @@ setup(
         'Intended Audience :: Education',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Mathematics',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',

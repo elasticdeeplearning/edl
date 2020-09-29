@@ -17,7 +17,7 @@ which python
 python ./run_codegen.py
 
 # generate python compatabile path
-sed -i -r 's/^import (.+_pb2.*)/from . import \1/g' *_pb2*.py
+sed -i -r 's/^import (.+_pb2.*)/from . import \1/g' ./*_pb2*.py
 
 # import os
 mv pod_server*.py data_server*.py common*.py ../utils/

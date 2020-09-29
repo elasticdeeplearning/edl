@@ -20,6 +20,10 @@ ADD ./docker/requirements.txt /root/paddle_edl/requirements.txt
 RUN python3.7 -m pip install pip==20.1.1
 RUN python3.7 -m pip install --upgrade setuptools
 RUN python3.7 -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+ADD ./docker/dev_requirements.txt /root/paddle_edl/dev_requirements.txt
+RUN python3.7 -m pip install -r /root/paddle_edl/dev_requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
 # python 2.7 is deprecated
 # RUN python -m pip install pip==20.1.1
 # RUN python -m pip install -r /root/paddle_edl/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
@@ -54,4 +58,4 @@ RUN rm -f /usr/bin/python /usr/bin/pip /usr/local/bin/pip && \
     ln -s /usr/local/bin/pip3.7 /usr/bin/pip && \
     ln -s /usr/local/bin/pip3.7 /usr/local/bin/pip
 
-RUN apt-get update && apt-get install shellcheck
+RUN apt-get update && apt-get install -y shellcheck  clang-format-3.8
