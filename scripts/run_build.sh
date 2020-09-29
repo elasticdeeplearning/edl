@@ -19,9 +19,11 @@ function abort(){
 function check_style() {
     trap 'abort' 0
 
+    set +e
     upstream_url='https://github.com/elasticdeeplearning/edl'
     git remote remove upstream
     git remote add upstream $upstream_url
+    set -e
     git fetch upstream develop
 
     pre-commit install

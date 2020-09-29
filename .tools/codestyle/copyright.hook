@@ -91,6 +91,8 @@ def lang_type(filename):
 
 
 PYTHON_ENCODE = re.compile("^[ \t\v]*#.*?coding[:=][ \t]*([-_.a-zA-Z0-9]+)")
+COPYRIGHT = re.compile("^[ \t\v]*#[ \t]?COPYRIGHT[ \t]?[0-9]{4}")
+SHEBANG = re.compile("^[ \t\v]*#[ \t]\!")
 
 
 def main(argv=None):
