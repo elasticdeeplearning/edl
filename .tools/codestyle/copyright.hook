@@ -43,7 +43,7 @@ else:
 
 
 def generate_copyright(template, lang='C'):
-    if lang == 'Python' or lang == 'Bash':
+    if lang == 'Python' or lang == 'shell':
         LANG_COMMENT_MARK = '#'
     else:
         LANG_COMMENT_MARK = "//"
@@ -66,7 +66,7 @@ def lang_type(filename):
     if filename.endswith(".py"):
         return "Python"
     if filename.endswith(".sh"):
-    	return "Bash"
+    	return "shell"
     elif filename.endswith(".h"):
         return "C"
     elif filename.endswith(".c"):

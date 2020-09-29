@@ -3,6 +3,7 @@ set -e
 unset GREP_OPTIONS
 BASEDIR=$(dirname "$(readlink -f "${0}")")
 
+
 echo "base_dir:${BASEDIR}"
 cd "${BASEDIR}"
 
@@ -17,8 +18,13 @@ function abort(){
 
 function check_style() {
     trap 'abort' 0
-    set -e
 
+    upstream_url='https://github.com/elasticdeeplearning/edl'
+    git remote remove upstream
+    git remote add upstream $upstream_url
+    git fetch upstream develop
+
+    pre-commit install
     changed_files="$(git diff --name-only upstream/develop)"
     echo "$changed_files" | xargs pre-commit run --files
 
@@ -26,11 +32,8 @@ function check_style() {
 }
 
 pushd "${BASEDIR}/../"
-upstream_url='https://github.com/elasticdeeplearning/edl'
-git remote remove upstream
-git remote add upstream $upstream_url
-git fetch upstream develop
 check_style
 popd
+
 
 ./build.sh 3.7
