@@ -2,7 +2,7 @@
 EDL project aims to supported PaddlePaddle's distributed training, current owner and contributors are as follows:
 - Owner: [guru4elephant](https://github.com/guru4elephant)
 
-## Contributors:
+## Contributors: 
 - [Yancey1898](https://github.com/Yancey1989)
 - [gonweibao](https://github.com/gongweibao)
 - [helinwang](https://github.com/helinwang)

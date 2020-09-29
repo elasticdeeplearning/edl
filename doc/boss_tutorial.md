@@ -7,7 +7,7 @@ flexible and scalable deep learning platform, which is originally developed by
 Baidu scientists and engineers for the purpose of applying deep learning to many
 products at Baidu.
 
-Fluid is the latest version of PaddlePaddle, it describes the model for training
+Fluid is the latest version of PaddlePaddle, it describes the model for training 
 or inference using the representation of "Program".
 
 PaddlePaddle Elastic Deep Learning (EDL) is a clustering project which leverages
@@ -39,7 +39,7 @@ to manage the cluster training jobs and an auto-scaler to scale the job's comput
 - Intended audience
 
     People who are interested in deep learning system architecture.
-
+  
 ## Prerequisites
 
 - [Install Docker](https://docs.docker.com/install/)
@@ -143,7 +143,7 @@ the training process and example output.
     append file for current trainer: dataset/mnist/mnist-train-00012.pickle
     append file for current trainer: dataset/mnist/mnist-train-00014.pickle
     ('processing file: ', 'dataset/mnist/mnist-train-00000.pickle')
-    Epoch: 0, Batch: 10, Test Loss: 0.24518635296, Acc: 0.923899995804
+    Epoch: 0, Batch: 10, Test Loss: 0.24518635296, Acc: 0.923899995804 
     ```
 
 1. Inference

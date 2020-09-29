@@ -33,7 +33,7 @@ python -m paddle_serving_server_gpu.serve \
 ### 2.2 运行蒸馏训练
 训练启动命令如下，use_distill_service设置训练为蒸馏训练，distill_teachers设置本地固定teacher地址用于训练。
 ``` bash
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=0 
 python train_with_fleet.py --use_distill_service True --distill_teachers 127.0.0.1:9292
 ```
 

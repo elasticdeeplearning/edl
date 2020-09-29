@@ -6,22 +6,22 @@ This article illustrates how to change the train program to an EDL program, and 
 The main changes are:
 
 - `load_checkpoint`  should be added at the beginning of training and
-- `save_checkpoint` added at the end of every epoch.
+- `save_checkpoint` added at the end of every epoch.  
    the checkpoint should be on a distributed file system such as HDFS so all trainers can download from it. A complete example is [here](https://github.com/elasticdeeplearning/edl/tree/develop/example/collective/resnet50)
 
 ```
 fs=HDFSClient(args.hdfs_name, args.hdfs_ugi,20*60*1000, 3 * 1000)
-
+        
 train_status =TrainStatus()
 tmp_s = fleet.load_checkpoint(exe, args.checkpoint, fs=fs, trainer_id=trainer_id)
 if tmp_s is not None:
    train_status = tmp_s
-
+        
 for pass_id in range(train_status.next(), params["num_epochs"]):
     train()
-
+    
     if trainer_id == 0:
-        saved_status = TrainStatus(pass_id)
+        saved_status = TrainStatus(pass_id)    
         fleet.save_checkpoint(exe, train_status=saved_status,
             path=args.checkpoint, fs=fs)
 ```
@@ -31,7 +31,7 @@ The epoch's number is stored in `train_status` and the epoch number will be rest
 ## Start Resnet50 demo training multiple nodes:
 
 1. Start a JobServer on one node which generates changing scripts.
-
+ 
 ```
 node_ips="192.168.10.1,192.168.10.2"
 python -u paddle_edl.demo.collective.job_server_demo \
@@ -64,7 +64,7 @@ python -u paddle_edl.demo.collective.job_client_demo \
     --pod_path ./resnet50_pod \
     ./train_pretrain.sh
 ```
-
+ 
 
 ## On Kubernetes
 

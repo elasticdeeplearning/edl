@@ -60,14 +60,14 @@ In addition to the teacher and student, a discovery service and a database is re
 The teacher service will be registered in the database, and discovery service query teacher from database.
 ``` bash
 redis-server
-```
+``` 
 2. Deploy distill discovery service. The service also provides a balanced function.
 ``` bash
 python -m paddle_edl.distill.redis.balance_server \
   --db_endpoints REDIS_HOST:REDIS_PORT \
   --server DISCOVERY_IP:DISCOVERY_PORT
 ```
-3. Register teacher to database. You can register or stop teacher any time.
+3. Register teacher to database. You can register or stop teacher any time. 
 ``` bash
 python -m paddle_edl.distill.redis.server_register \
   --db_endpoints REDIS_HOST:REDIS_PORT \
@@ -75,11 +75,11 @@ python -m paddle_edl.distill.redis.server_register \
   --server TEACHER_IP:TEACHER_PORT
 ```
 4. Use `set_dynamic_teacher` get dynamic teacher from discovery service.
-``` python
+``` python 
 dr = DistillReader(ins=reader_ins, predicts=teacher_predicts)
 dr.set_dynamic_teacher(DISCOVERY_IP:DISCOVERY_PORT, TEACHER_SERVICE_NAME)
 train_reader = dr.set_sample_list_generator(train_reader)
-```
+``` 
 The run student code.
 ``` python
 python train_with_fleet.py --use_distill_service True

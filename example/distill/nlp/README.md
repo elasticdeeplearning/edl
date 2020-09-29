@@ -1,5 +1,5 @@
 # ERNIE distillation
-We show how to distill knowledge from ERNIE to a mini model: BOW and other models on Chinese sentiment task.
+We show how to distill knowledge from ERNIE to a mini model: BOW and other models on Chinese sentiment task. 
 
 ## Quick start
 ### Download dataset
@@ -14,7 +14,7 @@ nohup python -u ./fine_tune.py > finetune.log 2>&1 &
 ```
 
 When the job completes, the directories needed for distillation: `ernie_senti_server` and `ernie_senti_client` will be generated.
-
+ 
 ### Or download the teacher model directly
 You can also download the teacher model directly and then you needn't generate the model yourself.
 
@@ -41,7 +41,7 @@ python -u distill.py --fixed_teacher 127.0.0.1:19290
 ```
 
 ### Result
-| model | dev dataset(acc) | test dataset(acc) |
-| :----: | :-----: | :----: |
-| BOW     |  0.901    | 0.908 |
+| model | dev dataset(acc) | test dataset(acc) | 
+| :----: | :-----: | :----: | 
+| BOW     |  0.901    | 0.908 | 
 | BOW + distillation | 0.905 | 0.915 |
