@@ -66,7 +66,7 @@ def _get_comment_mark(path):
 
 
 RE_ENCODE = re.compile(r"^[ \t\v]*#.*?coding[:=]", re.IGNORECASE)
-RE_COPYRIGHT = re.compile(r"^[ \t\v]*#[ \t]*Copyright \(c\) \d{4}")
+RE_COPYRIGHT = re.compile(r"^[ \t\v]*#[ \t]*Copyright \(c\) \d{4}", re.IGNORECASE)
 RE_SHEBANG = re.compile(r"^[ \t\v]*#[ \t]?\!")
 
 def _check_copyright(path):
