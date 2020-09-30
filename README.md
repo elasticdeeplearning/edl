@@ -5,7 +5,18 @@
     <br>
 <p>
 
-<a href="https://bestpractices.coreinfrastructure.org/projects/4299"><img src="https://bestpractices.coreinfrastructure.org/projects/4299/badge"></a>
+
+<p align="center">
+    <br>
+        <a href="https://bestpractices.coreinfrastructure.org/projects/4299"><img src="https://bestpractices.coreinfrastructure.org/projects/4299/badge"></a>
+        <img alt="Issues" src="https://img.shields.io/github/issues/elasticdeeplearning/edl">
+        <img alt="Forks" src="https://img.shields.io/github/forks/elasticdeeplearning/edl">
+        <img alt="Stars" src="https://img.shields.io/github/stars/elasticdeeplearning/edl">
+        <img alt="License" src="https://img.shields.io/github/license/elasticdeeplearning/edl">
+    <br>
+<p>
+
+
 
 <h2 align="center">Motivation</h2>
 
