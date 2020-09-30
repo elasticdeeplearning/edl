@@ -1,4 +1,19 @@
 #!/bin/bash
+
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 set -e
 export LD_LIBRARY_PATH=/root/go/soft/env/cuda-9.0/lib64:/root/go/soft/cuda10-cudnn7.6.5.32/lib64:$LD_LIBRARY_PATH:/usr/lib64/:/usr/local/lib/
 export CUDA_VISIBLE_DEVICES=7
@@ -7,19 +22,19 @@ fixed_teacher="127.0.0.1:19290,127.0.0.1:19291,127.0.0.1:19292,127.0.0.1:19293,1
 
 for w in {1..10}
 do
-    for T in {1..20} 
+    for T in {1..20}
     do
-        wf=$((echo scale=1 ; echo $w / 10 ) | bc )
-        Tf=$((echo scale=1 ; echo $T ) | bc )
+        wf=$( (echo scale=1 ; echo $w / 10 ) | bc )
+        Tf=$( (echo scale=1 ; echo $T ) | bc )
         python3.6 -u distill.py \
             --fixed_teacher $fixed_teacher \
             --opt=AdamW \
-            --s_weight $wf \
+            --s_weight "$wf" \
             --train_range 10 \
             --LR 1e-4 \
             --kl 0 \
-            --T $Tf \
-            --epoch_num 20 > log/d_w${wf}_T${Tf}.log 2>&1
+            --T "$Tf" \
+            --epoch_num 20 > log/"d_w${wf}_T${Tf}".log 2>&1
     done
 done
 

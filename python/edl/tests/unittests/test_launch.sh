@@ -1,4 +1,19 @@
 #!/bin/bash
+
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 set -e
 unset https_proxy http_proxy
 
@@ -6,9 +21,9 @@ name=${TEST_TARGET_NAME}
 TEST_TIMEOUT=${TEST_TIMEOUT}
 
 # rm flag file
-rm -f ${name}_*.log
+rm -f "${name}"_*.log
 
-nohup etcd > ${name}_etcd.log 2>&1 &
+nohup etcd > "${name}_etcd.log" 2>&1 &
 etcd_pid=$!
 
 echo "etcd_pid:${etcd_pid} ${name}_etcd.log"
@@ -19,7 +34,7 @@ if [[ ${TEST_TIMEOUT}"x" == "x" ]]; then
 fi
 
 # start the unit test
-run_time=$(( $TEST_TIMEOUT - 10 ))
+run_time=$(( TEST_TIMEOUT - 10 ))
 echo "run_time: ${run_time}"
 
 export PADDLE_JOB_ID="test_success_job"
@@ -35,16 +50,16 @@ python del_from_etcd.py
 # all success----
 export CUDA_VISIBLE_DEVICES=0
 export PADDLE_DEMO_EXIT_CODE=0
-timeout -s SIGKILL ${run_time} python -m edl.collective.launch --log_dir 00 launch_demo.py > ${name}_run_00.log 2>&1 &
+timeout -s SIGKILL "${run_time}" python -m edl.collective.launch --log_dir 00 launch_demo.py > "${name}_run_00.log" 2>&1 &
 pid_00=$!
 
 export CUDA_VISIBLE_DEVICES=1
 export PADDLE_DEMO_EXIT_CODE=0
-timeout -s SIGKILL ${run_time} python -m edl.collective.launch --log_dir 01 launch_demo.py > ${name}_run_01.log 2>&1 &
+timeout -s SIGKILL "${run_time}" python -m edl.collective.launch --log_dir 01 launch_demo.py > "${name}_run_01.log" 2>&1 &
 pid_01=$!
 
 key="/${PADDLE_JOB_ID}/job_flag/nodes/job_status"
-value=`etcdctl get ${key}`
+value="$(etcdctl get "${key}")"
 echo "job complete flag:${value}"
 
 job_flag=True
@@ -61,10 +76,10 @@ if [[ $job_flag == "True" ]]; then
 fi
 
 echo "cat ${name}_run_00.log"
-cat ${name}_run_00.log
+cat "${name}_run_00.log"
 
 echo "cat ${name}_run_01.log"
-cat ${name}_run_01.log
+cat "${name}_run_01.log"
 
 
 set +e

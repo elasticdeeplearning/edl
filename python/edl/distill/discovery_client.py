@@ -26,7 +26,8 @@ from ..discovery.server_alive import is_server_alive
 
 logging.basicConfig(
     level=logging.DEBUG,
-    format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
+    format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s",
+)
 
 
 def _handle_errors(f):
@@ -38,8 +39,9 @@ def _handle_errors(f):
             try:
                 return f(*args, **kwargs)
             except grpc.RpcError as e:
-                logging.warning('grpc failed with {0}: {1}'.format(e.code(
-                ), e.details()))
+                logging.warning(
+                    "grpc failed with {0}: {1}".format(e.code(), e.details())
+                )
 
     return functools.wraps(f)(handler)
 
@@ -78,29 +80,36 @@ class DiscoveryClient(object):
         }
 
     def _error(self, response):
-        logging.error('client={} service={} error code={}'.format(
-            self._client, self._service_name, response.status.code))
+        logging.error(
+            "client={} service={} error code={}".format(
+                self._client, self._service_name, response.status.code
+            )
+        )
         assert False
 
     def _process_ok(self, response):
         if not self._is_registered:
             self._is_registered = True
-            logging.debug('client={} register success'.format(self._client))
+            logging.debug("client={} register success".format(self._client))
 
         if response.version > self._version:
             self._ret_servers = response.servers
             self._version = response.version
-            logging.info('service version={} servers={}'.format(
-                self._version, self._ret_servers))
+            logging.info(
+                "service version={} servers={}".format(self._version, self._ret_servers)
+            )
 
         if response.discovery_version > self._discovery_version:
             self._discovery_servers = response.discovery_servers
             self._discovery_version = response.discovery_version
-            logging.info('discovery_version={} servers={}'.format(
-                self._discovery_version, self._discovery_servers))
+            logging.info(
+                "discovery_version={} servers={}".format(
+                    self._discovery_version, self._discovery_servers
+                )
+            )
 
     def _process_no_ready(self, response):
-        logging.info('discovery server={} is not ready'.format(self._discover))
+        logging.info("discovery server={} is not ready".format(self._discover))
         pass
 
     def _process_redirect(self, response):
@@ -112,14 +121,17 @@ class DiscoveryClient(object):
         self._discovery_version = response.discovery_version
         self._version = 0
 
-        logging.info('redirect discovery server, old={} new={}'.format(
-            old_discover, self._discover))
+        logging.info(
+            "redirect discovery server, old={} new={}".format(
+                old_discover, self._discover
+            )
+        )
 
         # reconnect
         self._connect()
 
     def _process_already_register(self, response):
-        logging.info('already register')
+        logging.info("already register")
         pass
 
     def _process_unregistered(self, response):
@@ -142,12 +154,14 @@ class DiscoveryClient(object):
             client=self._client,
             service_name=self._service_name,
             require_num=self._require_num,
-            token=self._token)
+            token=self._token,
+        )
 
         logging.debug(
-            'register client={} service_name={} require_num={} token={}'.
-            format(self._client, self._service_name, self._require_num,
-                   self._token))
+            "register client={} service_name={} require_num={} token={}".format(
+                self._client, self._service_name, self._require_num, self._token
+            )
+        )
 
         response = self._stub_register(register_request)
         self._process_response(response)
@@ -160,7 +174,8 @@ class DiscoveryClient(object):
             beat_request = discovery.HeartBeatRequest(
                 client=self._client,
                 version=self._version,
-                discovery_version=self._discovery_version)
+                discovery_version=self._discovery_version,
+            )
             response = self._stub_heartbeat(beat_request)
             self._process_response(response)
 
@@ -172,7 +187,7 @@ class DiscoveryClient(object):
         sid = hex(id(channel))
         time_stamp = int(time.time() * 1000)
         # FIXME. client_uuid=ip-pid-_channel_id-timestamp, need a better method?
-        self._client = '{}-{}-{}-{}'.format(ip, pid, sid, time_stamp)
+        self._client = "{}-{}-{}-{}".format(ip, pid, sid, time_stamp)
 
     def _connect_server(self, server):
         channel = None
@@ -186,8 +201,10 @@ class DiscoveryClient(object):
                     self._gen_client(client_addr, channel)
                 break
             logging.warning(
-                'discovery server={} is not alive, failed_count={}'.format(
-                    server, i + 1))
+                "discovery server={} is not alive, failed_count={}".format(
+                    server, i + 1
+                )
+            )
             time.sleep(0.1 * (i + 1))
 
         return channel
@@ -210,10 +227,9 @@ class DiscoveryClient(object):
                 if channel is not None:
                     break
 
-        assert channel is not None, 'connect with discovery failed'
+        assert channel is not None, "connect with discovery failed"
         self._channel = channel
-        self._stub = distill_discovery_pb2_grpc.DiscoveryServiceStub(
-            self._channel)
+        self._stub = distill_discovery_pb2_grpc.DiscoveryServiceStub(self._channel)
 
     def start(self, daemon=True):
         if self._channel is not None:
@@ -242,9 +258,8 @@ class DiscoveryClient(object):
         return self._ret_servers
 
 
-if __name__ == '__main__':
-    client = DiscoveryClient(['127.0.0.1:50051', '127.0.0.1:50052'],
-                             'TestService', 4)
+if __name__ == "__main__":
+    client = DiscoveryClient(["127.0.0.1:50051", "127.0.0.1:50052"], "TestService", 4)
     # client = DiscoveryClient(['127.0.0.1:50051'], 'TestService2', 4)
     client.start(daemon=True)
     for i in range(1000):

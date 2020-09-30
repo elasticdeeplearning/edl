@@ -20,15 +20,15 @@ from .redis_store import RedisStore
 
 logging.basicConfig(
     level=logging.DEBUG,
-    format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
+    format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s",
+)
 
 
 class ServiceTable(object):
-    def __init__(self, ip='127.0.0.1', port=6379, passwd=None,
-                 backend='redis'):
-        if backend is 'redis':
+    def __init__(self, ip="127.0.0.1", port=6379, passwd=None, backend="redis"):
+        if backend == "redis":
             self._store = RedisStore(ip, port, passwd)
-        elif backend is 'etcd':
+        elif backend == "etcd":
             # Todo
             self._store = RedisStore(ip, port, passwd)
         self._fd_to_service_name = {}
@@ -64,8 +64,10 @@ class ServiceTable(object):
             # not register
             return []
 
-        if service_name not in self._service_name_to_servers or \
-                self._service_name_to_update.get(service_name, False):
+        if (
+            service_name not in self._service_name_to_servers
+            or self._service_name_to_update.get(service_name, False)
+        ):
             self._refresh_service(service_name)
 
         return list(self._fd_to_servers[fd])
@@ -74,8 +76,7 @@ class ServiceTable(object):
         self._fd_to_servers[fd] = set()
         self._fd_to_version[fd] = 0
         self._fd_to_max_num[fd] = num
-        print('fd={}, service_name={}, max_num={}'.format(fd, service_name,
-                                                          num))
+        print("fd={}, service_name={}, max_num={}".format(fd, service_name, num))
         self._fd_to_service_name[fd] = service_name
         with self._mutex:
             if service_name not in self._service_name_to_fds:
@@ -126,7 +127,7 @@ class ServiceTable(object):
         servers = []
         for s in server_infos:
             try:
-                server = s['server']
+                server = s["server"]
                 servers.append(server)
             except KeyError:
                 # when get service, server may expired
@@ -139,8 +140,11 @@ class ServiceTable(object):
         add_servers = set(servers) - set(old_servers)
 
         # no change
-        if len(rm_servers) == 0 and len(add_servers) == 0 and \
-                not self._service_name_to_update.get(service_name, False):
+        if (
+            len(rm_servers) == 0
+            and len(add_servers) == 0
+            and not self._service_name_to_update.get(service_name, False)
+        ):
             return
         self._service_name_to_update[service_name] = False
         update_fd = set()
@@ -148,7 +152,7 @@ class ServiceTable(object):
         # remove server
         for server in rm_servers:
             if server not in self._server_to_fds:
-                sys.stdout.write('{} not in server_to_fds'.format(server))
+                sys.stdout.write("{} not in server_to_fds".format(server))
                 continue
             # remove server in fd
             for fd in self._server_to_fds[server]:
@@ -157,8 +161,7 @@ class ServiceTable(object):
                     # update fd
                     update_fd.add(fd)
                 except KeyError:
-                    sys.stdout.write('{} not in fd={} servers'.format(server,
-                                                                      fd))
+                    sys.stdout.write("{} not in fd={} servers".format(server, fd))
             # remove server to fds
             del self._server_to_fds[server]
 
@@ -173,7 +176,7 @@ class ServiceTable(object):
         # print('fd_num={}'.format(fd_num))
         server_num = len(self._service_name_to_servers[service_name])
         if server_num == 0:
-            print('service={} server_num=0'.format(service_name))
+            print("service={} server_num=0".format(service_name))
             for fd in update_fd:
                 self._fd_to_version[fd] += 1
             return
@@ -182,8 +185,11 @@ class ServiceTable(object):
         server_max_connect = int((fd_num + server_num - 1) / server_num)
         fd_max_connect = max(1, int(server_num / fd_num))
         # fd_max_connect = int((server_num + fd_num - 1) / fd_num)
-        print('fd_num={}, server_num={}, smax={}, mcon={}'.format(
-            fd_num, server_num, server_max_connect, fd_max_connect))
+        print(
+            "fd_num={}, server_num={}, smax={}, mcon={}".format(
+                fd_num, server_num, server_max_connect, fd_max_connect
+            )
+        )
 
         # server_conn = []  # [(num, server)]
         # rebalance
@@ -195,12 +201,12 @@ class ServiceTable(object):
                 fd = self._server_to_fds[server].pop()
                 self._fd_to_servers[fd].remove(server)
                 update_fd.add(fd)
-                print('pop fd={} server={}'.format(fd, server))
+                print("pop fd={} server={}".format(fd, server))
         try:
             fds = self._service_name_to_fds[service_name]
             for fd in fds:
                 max_connect = min(fd_max_connect, self._fd_to_max_num[fd])
-                logging.info('fd={} max_connect={}'.format(fd, max_connect))
+                logging.info("fd={} max_connect={}".format(fd, max_connect))
                 if fd not in self._fd_to_servers:
                     self._fd_to_servers[fd] = set()
                 # limit connect of fd
@@ -208,7 +214,7 @@ class ServiceTable(object):
                     server = self._fd_to_servers[fd].pop()
                     self._server_to_fds[server].remove(fd)
                     update_fd.add(fd)
-                    logging.info('pop1 fd={} server={}'.format(fd, server))
+                    logging.info("pop1 fd={} server={}".format(fd, server))
 
             # fd greed connect with server
             for fd in fds:
@@ -224,9 +230,9 @@ class ServiceTable(object):
                     self._fd_to_servers[fd].add(server)
                     self._server_to_fds[server].add(fd)
                     update_fd.add(fd)
-                    logging.info('add fd={} server={}'.format(fd, server))
+                    logging.info("add fd={} server={}".format(fd, server))
         except Exception as e:
-            sys.stderr.write(str(e) + '\n')
+            sys.stderr.write(str(e) + "\n")
 
         for fd in update_fd:
             self._fd_to_version[fd] += 1
@@ -245,8 +251,7 @@ class ServiceTable(object):
             # rm service_name
             rm_service_names = set(old_service_names) - set(service_names)
             for service_name in rm_service_names:
-                sys.stderr.write('Remove monitoring service={}\n'.format(
-                    service_name))
+                sys.stderr.write("Remove monitoring service={}\n".format(service_name))
                 try:
                     del self._service_name_to_servers[service_name]
                 except KeyError:
@@ -259,7 +264,7 @@ class ServiceTable(object):
             try:
                 self._refresh()
             except Exception as e:
-                sys.stderr.write(str(e) + '\n')
+                sys.stderr.write(str(e) + "\n")
                 time.sleep(6)
 
     def start(self):

@@ -34,61 +34,61 @@ def parse_args():
     @retval ArgumentParser
     """
     parser = argparse.ArgumentParser(
-        description='''start paddle training using multi-process mode.''')
+        description="""start paddle training using multi-process mode."""
+    )
 
     parser.add_argument("--nodes_range", type=str, default=None, help="")
 
     parser.add_argument("--nproc_per_node", type=int, default=None, help="")
 
     parser.add_argument(
-        "--etcd_endpoints", type=str, default=None, help="etcd endpoints")
+        "--etcd_endpoints", type=str, default=None, help="etcd endpoints"
+    )
 
     parser.add_argument(
-        "--job_id", type=str, default=None, help="The identify id of this job")
+        "--job_id", type=str, default=None, help="The identify id of this job"
+    )
 
     parser.add_argument(
         "--log_level",
         type=int,
         default=20,
-        help="Logging level, default is logging.INFO")
+        help="Logging level, default is logging.INFO",
+    )
 
     parser.add_argument(
         "--log_dir",
         type=str,
         default="./log",
-        help="The path for each process's log.If it's not set, the log will printed to default pipe."
+        help="The path for each process's log.If it's not set, \
+        the log will printed to default pipe.",
     )
 
     parser.add_argument(
-        "--hdfs_name",
-        type=str,
-        default=None,
-        help="The hdfs_name used for edl.")
+        "--hdfs_name", type=str, default=None, help="The hdfs_name used for edl."
+    )
 
     parser.add_argument(
-        "--hdfs_ugi",
-        type=str,
-        default=None,
-        help="The hdfs_ugi used for edl.")
+        "--hdfs_ugi", type=str, default=None, help="The hdfs_ugi used for edl."
+    )
 
     # checkpoint will saved here
     parser.add_argument(
-        "--hdfs_path",
-        type=str,
-        default=None,
-        help="The hdfs_path used for edl.")
+        "--hdfs_path", type=str, default=None, help="The hdfs_path used for edl."
+    )
 
-    #positional
+    # positional
     parser.add_argument(
         "training_script",
         type=str,
         help="The full path to the single GPU training "
         "program/script to be launched in parallel, "
         "followed by all the arguments for the "
-        "training script")
+        "training script",
+    )
 
-    #rest from the training program
-    parser.add_argument('training_script_args', nargs=argparse.REMAINDER)
+    # rest from the training program
+    parser.add_argument("training_script_args", nargs=argparse.REMAINDER)
     return parser.parse_args()
 
 

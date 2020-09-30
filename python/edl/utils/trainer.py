@@ -26,8 +26,8 @@ class Trainer(json_serializable.Serializable):
 
     def __str__(self):
         s = "id:{} rank_in_pod:{} gpus:{} endpoint:{} global_rank:{}".format(
-            self._ids, self._rank_in_pod, self._gpus, self._endpoint,
-            self._global_rank)
+            self._ids, self._rank_in_pod, self._gpus, self._endpoint, self._global_rank
+        )
 
         return s
 

@@ -34,9 +34,11 @@ class TestRegister(etcd_test_base.EtcdTestBase):
 
             ttl = constants.ETCD_TTL
             register1 = resource_pods.Register(
-                self._job_env, pod_id="0", pod_json=pod0.to_json(), ttl=ttl)
+                self._job_env, pod_id="0", pod_json=pod0.to_json(), ttl=ttl
+            )
             register2 = resource_pods.Register(
-                self._job_env, pod_id="1", pod_json=pod1.to_json(), ttl=ttl)
+                self._job_env, pod_id="1", pod_json=pod1.to_json(), ttl=ttl
+            )
 
             # check if the ttl is valid
             time.sleep(ttl + 2)
@@ -61,5 +63,5 @@ class TestRegister(etcd_test_base.EtcdTestBase):
         self.assertEqual(len(pods_dict), 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

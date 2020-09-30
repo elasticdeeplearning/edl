@@ -40,7 +40,8 @@ class Watcher(object):
 
         # assign value
         self._etcd = etcd_client.EtcdClient(
-            self._job_env.etcd_endpoints, root=self._job_id)
+            self._job_env.etcd_endpoints, root=self._job_id
+        )
         self._etcd.init()
 
         self._t_watcher = threading.Thread(target=self._watcher)
@@ -49,8 +50,7 @@ class Watcher(object):
     def _watcher(self):
         while not self._stop.is_set():
             # if cluster changed?
-            new_cluster = edl_cluster.wait_to_load_from_etcd(
-                self._etcd, timeout=60)
+            new_cluster = edl_cluster.wait_to_load_from_etcd(self._etcd, timeout=60)
             with self._lock:
                 self._new_cluster = new_cluster
 
@@ -82,8 +82,11 @@ class Watcher(object):
 
         if old_stage != new_stage or old_ids != new_ids:
             logger.info(
-                "_is_world_changed find changed, old_stage:{} new_stage:{} old_ids:{} new_ids:{}".
-                format(old_stage, new_stage, old_ids, new_ids))
+                "_is_world_changed find changed, \
+                old_stage:{} new_stage:{} old_ids:{} new_ids:{}".format(
+                    old_stage, new_stage, old_ids, new_ids
+                )
+            )
             with self._lock:
                 self._changed = True
 
@@ -111,7 +114,7 @@ class Watcher(object):
 
     def is_stopped(self):
         with self._lock:
-            return self._t_watcher == None
+            return self._t_watcher is None
 
     def __exit__(self):
         self.stop()

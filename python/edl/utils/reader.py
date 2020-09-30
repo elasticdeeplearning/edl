@@ -57,12 +57,13 @@ def load_from_etcd(self, etcd, reader_name, pod_id, timeout=60):
         value = etcd.get_value(path, pod_id)
 
     if value is None:
-        raise exceptions.EdlTableError("path:{}".format(
-            etcd.get_full_path(path, pod_id)))
+        raise exceptions.EdlTableError(
+            "path:{}".format(etcd.get_full_path(path, pod_id))
+        )
 
     meta = ReaderMeta()
     meta.from_json(value)
-    logger.debug("get reader:".format(meta))
+    logger.debug("get reader:{}".format(meta))
     return meta
 
 
@@ -70,8 +71,9 @@ def check_dist_readers(etcd):
     servers = etcd.get_service(constants.ETCD_READER)
 
     if len(servers) <= 0:
-        raise exceptions.EdlTableError("table:{} has no readers".format(
-            constants.ETCD_READER))
+        raise exceptions.EdlTableError(
+            "table:{} has no readers".format(constants.ETCD_READER)
+        )
 
     readers = {}
     for s in servers:
@@ -82,13 +84,16 @@ def check_dist_readers(etcd):
 
     cluster = edl_cluster.get_cluster(etcd)
     if cluster is None:
-        raise exceptions.EdlTableError("table:{} has no readers".format(
-            constants.ETCD_CLUSTER))
+        raise exceptions.EdlTableError(
+            "table:{} has no readers".format(constants.ETCD_CLUSTER)
+        )
 
     if cluster.get_pods_ids_set() != set(readers.keys()):
         raise exceptions.EdlTableError(
-            "reader_ids:{} != cluster_pod_ids:{}".format(reader_ids.keys(
-            ), cluster.get_pods_ids_set()))
+            "reader_ids:{} != cluster_pod_ids:{}".format(
+                readers.keys(), cluster.get_pods_ids_set()
+            )
+        )
 
     logger.debug("get readers:{}".format(readers))
     return readers

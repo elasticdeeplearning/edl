@@ -49,7 +49,7 @@ def chunk_to_string(rs):
     return ret
 
 
-def bytes_to_string(o, codec='utf-8'):
+def bytes_to_string(o, codec="utf-8"):
     if o is None:
         return None
 

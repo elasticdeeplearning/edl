@@ -8,9 +8,9 @@ spec:
   replicas: 1
   template:
     metadata:
-      name: etcd 
+      name: etcd
       labels:
-        app: etcd 
+        app: etcd
     spec:
       hostNetwork: true
       containers:
