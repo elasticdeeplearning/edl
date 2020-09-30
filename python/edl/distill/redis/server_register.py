@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import threading
 import socket
 import time
 
@@ -21,14 +20,14 @@ class ServerRegister(object):
     def __init__(self, ip, port, service_name, store):
         self._ip = ip
         self._port = port
-        self._server = ip + ':' + str(port)
+        self._server = ip + ":" + str(port)
         self._service_name = service_name
         self._store = store
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def _get_info(self):
         # Todo
-        info = '{cpu:10%, gpu:20%, net:1}'
+        info = "{cpu:10%, gpu:20%, net:1}"
         return info
 
     def _register(self, ttl=180):
@@ -39,8 +38,7 @@ class ServerRegister(object):
 
         if ttl <= 0:
             raise
-        self._store.set_server(self._service_name, self._server,
-                               self._get_info())
+        self._store.set_server(self._service_name, self._server, self._get_info())
         print("register success")
 
     def _is_alive(self):
@@ -51,7 +49,7 @@ class ServerRegister(object):
             s.connect((self._ip, self._port))
             s.shutdown(socket.SHUT_RDWR)
             alive = True
-        except:
+        except Exception:
             alive = False
         finally:
             s.close()
@@ -64,8 +62,9 @@ class ServerRegister(object):
         while failed_count < retry:
             while self._is_alive():
                 if failed_count != 0:
-                    self._store.set_server(self._service_name, self._server,
-                                           self._get_info())
+                    self._store.set_server(
+                        self._service_name, self._server, self._get_info()
+                    )
                 ret = self._store.refresh(self._service_name, self._server)
                 if ret is False:
                     break
@@ -84,53 +83,59 @@ class ServerRegister(object):
         # self._thread.start()
 
 
-if __name__ == '__main__':
-    import sys
+if __name__ == "__main__":
     from .redis_store import RedisStore
 
     import argparse
-    parser = argparse.ArgumentParser(description='Server Register')
+
+    parser = argparse.ArgumentParser(description="Server Register")
     parser.add_argument(
-        '--db_endpoints',
+        "--db_endpoints",
         type=str,
-        default='127.0.0.1:6379',
-        help='database endpoints, e.g. 127.0.0.1:6379 [default: %(default)s]')
+        default="127.0.0.1:6379",
+        help="database endpoints, e.g. 127.0.0.1:6379 [default: %(default)s]",
+    )
     parser.add_argument(
-        '--db_passwd',
+        "--db_passwd",
         type=str,
         default=None,
-        help='detabase password [default: %(default)s]')
+        help="detabase password [default: %(default)s]",
+    )
     parser.add_argument(
-        '--db_type',
+        "--db_type",
         type=str,
-        default='redis',
-        help='database type, only support redis for now [default: %(default)s]')
+        default="redis",
+        help="database type, only support redis for now [default: %(default)s]",
+    )
     parser.add_argument(
-        '--service_name',
+        "--service_name",
         type=str,
-        help='service name where the server is located',
-        required=True)
+        help="service name where the server is located",
+        required=True,
+    )
     parser.add_argument(
-        '--server',
+        "--server",
         type=str,
-        help='endpoint of the server, e.g. 127.0.0.1:8888',
-        required=True)
+        help="endpoint of the server, e.g. 127.0.0.1:8888",
+        required=True,
+    )
     # TODO. service_token
     parser.add_argument(
-        '--service_token',
+        "--service_token",
         type=str,
         default=None,
-        help='service token, which the same can register [default: %(default)s]'
+        help="service token, which the same can register [default: %(default)s]",
     )
 
     args = parser.parse_args()
     server = args.server
-    db_endpoints = args.db_endpoints.split(',')
+    db_endpoints = args.db_endpoints.split(",")
 
-    redis_ip_port = db_endpoints[0].split(':')
-    server_ip_port = server.split(':')
+    redis_ip_port = db_endpoints[0].split(":")
+    server_ip_port = server.split(":")
 
     store = RedisStore(redis_ip_port[0], int(redis_ip_port[1]))
-    register = ServerRegister(server_ip_port[0],
-                              int(server_ip_port[1]), args.service_name, store)
+    register = ServerRegister(
+        server_ip_port[0], int(server_ip_port[1]), args.service_name, store
+    )
     register.start()

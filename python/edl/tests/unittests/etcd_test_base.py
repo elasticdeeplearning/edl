@@ -46,7 +46,7 @@ class EtcdTestBase(unittest.TestCase):
             "PADDLE_ETCD_ENDPOINTS": "127.0.0.1:2379",
             "PADDLE_EDLNODES_RANAGE": "2:2",
             "CUDA_VISIBLE_DEVICES": "0",
-            "PADDLE_TRAINER_PORTS": "6670"
+            "PADDLE_TRAINER_PORTS": "6670",
         }
         os.environ.pop("https_proxy", None)
         os.environ.pop("http_proxy", None)

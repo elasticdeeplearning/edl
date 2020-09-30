@@ -45,7 +45,7 @@ class ProcessWrapper(object):
 
     def is_stopped(self):
         with self._lock:
-            return self._worker == None
+            return self._worker is None
 
     def __exit__(self):
         self.stop()

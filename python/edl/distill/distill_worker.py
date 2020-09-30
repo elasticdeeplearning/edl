@@ -28,7 +28,8 @@ from ..discovery.server_alive import is_server_alive
 
 logging.basicConfig(
     level=logging.INFO,
-    format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
+    format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 # only for local test.
@@ -43,9 +44,9 @@ def _is_server_alive(server):
 
 
 class ServerItem(object):
-    PENDING = 'pending'
-    ERROR = 'error'
-    FINISHED = 'finished'
+    PENDING = "pending"
+    ERROR = "error"
+    FINISHED = "finished"
 
     def __init__(self, server_id, server, stop_event_id, state=PENDING):
         self.server_id = server_id
@@ -54,9 +55,16 @@ class ServerItem(object):
         self.state = state
 
 
-def predict_manage_worker(process, server_queue, server_result_queue,
-                          require_num, predict_stop_events, get_servers_fun,
-                          stop_event, predict_cond):
+def predict_manage_worker(
+    process,
+    server_queue,
+    server_result_queue,
+    require_num,
+    predict_stop_events,
+    get_servers_fun,
+    stop_event,
+    predict_cond,
+):
     """ thread that manage predict worker """
     num_shutdown_process = [0]
 
@@ -93,17 +101,17 @@ def predict_manage_worker(process, server_queue, server_result_queue,
             # set stop event
             if not predict_stop_events[stop_event_id].is_set():
                 predict_stop_events[stop_event_id].set()
-                logger.info('Removing server={}'.format(server))
+                logger.info("Removing server={}".format(server))
 
         # Add servers
         while len(add_servers) != 0:
             if idle_predict_num == 0:
                 break
-            assert idle_predict_num > 0, 'idle_predict_num must > 0'
+            assert idle_predict_num > 0, "idle_predict_num must > 0"
 
             server = add_servers.pop()
             if not _is_server_alive(server):
-                logger.warning('server={} is not alive'.format(server))
+                logger.warning("server={} is not alive".format(server))
                 continue
 
             idle_predict_num -= 1
@@ -112,7 +120,7 @@ def predict_manage_worker(process, server_queue, server_result_queue,
             server_queue.put(server_item)
             server_to_item[server] = server_item
             server_id += 1
-            logger.info('Adding server={}'.format(server))
+            logger.info("Adding server={}".format(server))
 
         try:
             # server job stop, return back stop_event_id
@@ -125,10 +133,12 @@ def predict_manage_worker(process, server_queue, server_result_queue,
             predict_stop_events[stop_event_id].clear()
             # directly use count
             idle_predict_num += 1
-            assert idle_predict_num <= require_num, \
-                'idle_predict_num={} must <= require_num={}'.format(
-                    idle_predict_num, require_num)
-            logger.info('Removed server={}'.format(server_result_item.server))
+            assert (
+                idle_predict_num <= require_num
+            ), "idle_predict_num={} must <= require_num={}".format(
+                idle_predict_num, require_num
+            )
+            logger.info("Removed server={}".format(server_result_item.server))
         except queue.Empty:
             pass
 
@@ -208,8 +218,11 @@ class PaddlePredictServer(PredictServer):
             client.connect([self._server])
             self.client = client
         except Exception as e:
-            logger.error('Exception when connect server={}, Exception is:'.
-                         format(str(self._server)))
+            logger.error(
+                "Exception when connect server={}, Exception is:".format(
+                    str(self._server)
+                )
+            )
             logger.error(str(e))
             return False
 
@@ -220,9 +233,11 @@ class PaddlePredictServer(PredictServer):
             if feed_name in self.client.get_feed_names():
                 self._predict_feed_idxs.append(feed_idx)
                 self._predict_feed_shapes[feed_name] = tuple(
-                    self.client.feed_shapes_[feed_name])
+                    self.client.feed_shapes_[feed_name]
+                )
                 self._predict_feed_size[feed_name] = reduce(
-                    lambda x, y: x * y, self._predict_feed_shapes[feed_name])
+                    lambda x, y: x * y, self._predict_feed_shapes[feed_name]
+                )
         return True
 
     def _preprocess(self, feed_data):
@@ -245,7 +260,7 @@ class PaddlePredictServer(PredictServer):
                 feed_map[feed_name] = data
             feed_map_list.append(feed_map)
 
-        logger.debug('predict feed_map_list len={}'.format(len(feed_map_list)))
+        logger.debug("predict feed_map_list len={}".format(len(feed_map_list)))
         return feed_map_list
 
     def _postprocess(self, fetch_map_list, batch_size):
@@ -256,7 +271,7 @@ class PaddlePredictServer(PredictServer):
         for fetch_name in self._fetchs:
             batch_fetch_data = fetch_map_list[fetch_name]
             for batch_idx, fetch_data in enumerate(batch_fetch_data):
-                predict_data[batch_idx] += (fetch_data, )
+                predict_data[batch_idx] += (fetch_data,)
         return predict_data
 
     def predict(self, feed_data):
@@ -265,29 +280,31 @@ class PaddlePredictServer(PredictServer):
         self._has_predict = True
         self._time_line.reset()
         feed_map_list = self._preprocess(feed_data)
-        self._time_line.record('predict_preprocess')
+        self._time_line.record("predict_preprocess")
 
         fetch_map_list = None
         for i in range(self._max_failed_times):
             try:
                 fetch_map_list = self.client.predict(
-                    feed=feed_map_list, fetch=self._fetchs)
+                    feed=feed_map_list, fetch=self._fetchs
+                )
                 if fetch_map_list is None:
-                    raise Exception('fetch_map_list should not be None')
+                    raise Exception("fetch_map_list should not be None")
                 break
             except Exception as e:
-                logger.warning('Failed {} times with server={}'.format(
-                    i + 1, self._server))
-                logger.warning('Exception:\n{}'.format(str(e)))
+                logger.warning(
+                    "Failed {} times with server={}".format(i + 1, self._server)
+                )
+                logger.warning("Exception:\n{}".format(str(e)))
                 # time.sleep(0.1 * (i + 1))
 
-        self._time_line.record('real_predict')
+        self._time_line.record("real_predict")
 
         if fetch_map_list is None:
             return False, None
 
         predict_data = self._postprocess(fetch_map_list, len(feed_data))
-        self._time_line.record('postprocess')
+        self._time_line.record("postprocess")
         return True, predict_data
 
     def __del__(self):
@@ -296,11 +313,12 @@ class PaddlePredictServer(PredictServer):
             if self.client is not None and self._has_predict:
                 self.client.release()
         except Exception as e:
-            logger.critical('Release client failed with server={}, '
-                            'there may be an unknown error'.format(
-                                self._server))
-            logger.critical('Exception:\n{}'.format(str(e)))
-        logger.warning('Stopped predict server={}'.format(self._server))
+            logger.critical(
+                "Release client failed with server={}, "
+                "there may be an unknown error".format(self._server)
+            )
+            logger.critical("Exception:\n{}".format(str(e)))
+        logger.warning("Stopped predict server={}".format(self._server))
 
 
 class _TestNopPaddlePredictServer(PaddlePredictServer):
@@ -315,10 +333,23 @@ class _TestNopPaddlePredictServer(PaddlePredictServer):
         pass
 
 
-def predict_worker(server_queue, server_result_queue, working_predict_count,
-                   in_queue, out_queue, feeds, fetchs, conf_file, stop_events,
-                   predict_lock, global_finished_task, predict_cond):
-    signal_exit = [False, ]
+def predict_worker(
+    server_queue,
+    server_result_queue,
+    working_predict_count,
+    in_queue,
+    out_queue,
+    feeds,
+    fetchs,
+    conf_file,
+    stop_events,
+    predict_lock,
+    global_finished_task,
+    predict_cond,
+):
+    signal_exit = [
+        False,
+    ]
 
     # Define signal handler function
     def predict_signal_handle(signum, frame):
@@ -342,26 +373,49 @@ def predict_worker(server_queue, server_result_queue, working_predict_count,
                 return
 
             # predict
-            success = predict_loop(server_item, working_predict_count,
-                                   in_queue, out_queue, feeds, fetchs,
-                                   conf_file, stop_events, predict_lock,
-                                   global_finished_task, predict_cond)
+            success = predict_loop(
+                server_item,
+                working_predict_count,
+                in_queue,
+                out_queue,
+                feeds,
+                fetchs,
+                conf_file,
+                stop_events,
+                predict_lock,
+                global_finished_task,
+                predict_cond,
+            )
 
             server_item.state = ServerItem.FINISHED if success else ServerItem.ERROR
             server_result_queue.put(server_item)
-            logger.info('Stopped server={}'.format(server_item.server))
-    except Exception as e:
+            logger.info("Stopped server={}".format(server_item.server))
+    except Exception:
         if signal_exit[0] is True:
             pass
         else:
             six.reraise(*sys.exc_info())
 
 
-def predict_loop(server_item, working_predict_count, in_queue, out_queue,
-                 feeds, fetchs, conf_file, stop_events, predict_lock,
-                 global_finished_task, predict_cond):
-    logger.info('connect server={}'.format(server_item.server))
-    predict_server = PaddlePredictServer if _NOP_PREDICT_TEST is False else _TestNopPaddlePredictServer
+def predict_loop(
+    server_item,
+    working_predict_count,
+    in_queue,
+    out_queue,
+    feeds,
+    fetchs,
+    conf_file,
+    stop_events,
+    predict_lock,
+    global_finished_task,
+    predict_cond,
+):
+    logger.info("connect server={}".format(server_item.server))
+    predict_server = (
+        PaddlePredictServer
+        if _NOP_PREDICT_TEST is False
+        else _TestNopPaddlePredictServer
+    )
     client = predict_server(server_item.server, conf_file, feeds, fetchs)
     if not client.connect():
         return False
@@ -375,7 +429,7 @@ def predict_loop(server_item, working_predict_count, in_queue, out_queue,
     # predict loop
     while not stop_event.is_set():
         data = in_queue.get()
-        time_line.record('get_data')
+        time_line.record("get_data")
 
         # Poison
         if isinstance(data, _PoisonPill):
@@ -395,24 +449,30 @@ def predict_loop(server_item, working_predict_count, in_queue, out_queue,
                 if working_predict_count.value == 1:
                     if poison_pill.predict_count == poison_pill.feed_count:
                         working_predict_count.value -= 1
-                        logger.debug('pid={} write poison to complete queue'.
-                                     format(os.getpid()))
+                        logger.debug(
+                            "pid={} write poison to complete queue".format(os.getpid())
+                        )
                         all_worker_done = True
                     else:
                         # NOTE. some predict worker failed,
                         # there are still tasks that have not been processed.
-                        assert poison_pill.predict_count < poison_pill.feed_count, \
-                            "if failed, predict_count={} must < feed_count={}".\
-                            format(poison_pill.predict_count, poison_pill.feed_count)
+                        assert (
+                            poison_pill.predict_count < poison_pill.feed_count
+                        ), "if failed, predict_count={} must < feed_count={}".format(
+                            poison_pill.predict_count, poison_pill.feed_count
+                        )
 
                         in_queue.put(poison_pill)  # write back poison pill
                         continue  # continue process failed task
                 else:  # not last process
-                    logger.debug('pid={} write poison back to ready'.format(
-                        os.getpid()))
-                    assert poison_pill.predict_count <= poison_pill.feed_count, \
-                        "predict_count={} must <= feed_count={}".format(poison_pill.predict_count,
-                                                                        poison_pill.feed_count)
+                    logger.debug(
+                        "pid={} write poison back to ready".format(os.getpid())
+                    )
+                    assert (
+                        poison_pill.predict_count <= poison_pill.feed_count
+                    ), "predict_count={} must <= feed_count={}".format(
+                        poison_pill.predict_count, poison_pill.feed_count
+                    )
                     working_predict_count.value -= 1
 
             with predict_cond:
@@ -431,7 +491,7 @@ def predict_loop(server_item, working_predict_count, in_queue, out_queue,
             continue
 
         success, out_data = client_predict(client, data)
-        time_line.record('predict')
+        time_line.record("predict")
 
         if not success:
             with predict_lock:
@@ -447,7 +507,7 @@ def predict_loop(server_item, working_predict_count, in_queue, out_queue,
 
         out_queue.put(out_data)
         finished_task += 1
-        time_line.record('put_data')
+        time_line.record("put_data")
 
     # disconnect with server
     with predict_lock:
@@ -484,15 +544,24 @@ class ReaderType(object):
     BATCH = 2
 
 
-def reader_worker(reader, reader_type, teacher_batch_size, out_queue,
-                  stop_event, task_semaphore, reader_cond):
+def reader_worker(
+    reader,
+    reader_type,
+    teacher_batch_size,
+    out_queue,
+    stop_event,
+    task_semaphore,
+    reader_cond,
+):
     # Use task_semaphore to keep order.
     # e.g. If semaphore is 4, reader send task(0, 1, 2, 3),
     # consumer may recv out-of-order task(3, 1, 2) before task(0), consumer will store then,
     # when task(0) is completed and consumer recv it, it will release semaphore,
     # reader go on working.
 
-    signal_exit = [False, ]
+    signal_exit = [
+        False,
+    ]
 
     def reader_signal_handle(signum, frame):
         signal_exit[0] = True
@@ -505,14 +574,13 @@ def reader_worker(reader, reader_type, teacher_batch_size, out_queue,
     read_func_map = {
         ReaderType.SAMPLE: read_sample,
         ReaderType.SAMPLE_LIST: read_sample_list,
-        ReaderType.BATCH: read_batch
+        ReaderType.BATCH: read_batch,
     }
     read_func = read_func_map[reader_type]
 
     try:
         while not stop_event.is_set():
-            task_size = read_func(reader, teacher_batch_size, out_queue,
-                                  task_semaphore)
+            task_size = read_func(reader, teacher_batch_size, out_queue, task_semaphore)
 
             poison_pill = _PoisonPill(task_size)
             with reader_cond:
@@ -521,7 +589,7 @@ def reader_worker(reader, reader_type, teacher_batch_size, out_queue,
                     break
                 # wait next reader iter
                 reader_cond.wait()
-    except Exception as e:
+    except Exception:
         if signal_exit[0] is True:
             pass
         else:
@@ -537,7 +605,7 @@ def read_sample(reader, teacher_batch_size, out_queue, task_semaphore):
         # read_data: (img, label)
         slot_data = tuple()
         for slot in read_data:
-            slot_data += (np.asarray(slot), )
+            slot_data += (np.asarray(slot),)
         send_data.append(slot_data)
 
         sample_size += 1
@@ -575,14 +643,13 @@ def read_sample_list(reader, teacher_batch_size, out_queue, task_semaphore):
             # sample_data: (img, label)
             slot_data = tuple()
             for slot in sample_data:
-                slot_data += (np.asarray(slot), )
+                slot_data += (np.asarray(slot),)
             send_data.append(slot_data)
 
             sample_size += 1
             if sample_size == teacher_batch_size:
                 task_semaphore.acquire()
-                task = Task(
-                    task_id=task_id, batch_id=batch_id, batch_size=batch_size)
+                task = Task(task_id=task_id, batch_id=batch_id, batch_size=batch_size)
                 out_queue.put((task, send_data))
 
                 task_id += 1
@@ -594,8 +661,7 @@ def read_sample_list(reader, teacher_batch_size, out_queue, task_semaphore):
         # remain
         if sample_size != 0:
             task_semaphore.acquire()
-            task = Task(
-                task_id=task_id, batch_id=batch_id, batch_size=batch_size)
+            task = Task(task_id=task_id, batch_id=batch_id, batch_size=batch_size)
             out_queue.put((task, send_data))
 
             task_id += 1
@@ -621,14 +687,13 @@ def read_batch(reader, teacher_batch_size, out_queue, task_semaphore):
         for i in range(batch_size):
             slot_data = tuple()
             for j in range(slot_size):
-                slot_data += (np.asarray(read_data[j][i]), )
+                slot_data += (np.asarray(read_data[j][i]),)
             send_data.append(slot_data)
 
             sample_size += 1
             if sample_size == teacher_batch_size:
                 task_semaphore.acquire()
-                task = Task(
-                    task_id=task_id, batch_id=batch_id, batch_size=batch_size)
+                task = Task(task_id=task_id, batch_id=batch_id, batch_size=batch_size)
                 out_queue.put((task, send_data))
 
                 task_id += 1
@@ -640,8 +705,7 @@ def read_batch(reader, teacher_batch_size, out_queue, task_semaphore):
         # remain
         if sample_size != 0:
             task_semaphore.acquire()
-            task = Task(
-                task_id=task_id, batch_id=batch_id, batch_size=batch_size)
+            task = Task(task_id=task_id, batch_id=batch_id, batch_size=batch_size)
             out_queue.put((task, send_data))
 
             task_id += 1
@@ -657,7 +721,7 @@ def fetch_out(reader_type, in_queue, stop_event, task_semaphore):
     fetch_func_map = {
         ReaderType.SAMPLE: fetch_sample,
         ReaderType.SAMPLE_LIST: fetch_sample_list,
-        ReaderType.BATCH: fetch_batch
+        ReaderType.BATCH: fetch_batch,
     }
     fetch_func = fetch_func_map[reader_type]
 
@@ -677,9 +741,11 @@ def fetch_out(reader_type, in_queue, stop_event, task_semaphore):
         fetch_data = in_queue.get()
         if isinstance(fetch_data, _PoisonPill):
             poison_pill = fetch_data
-            assert poison_pill.feed_count == poison_pill.predict_count, \
-                "poison_pill feed_count={} != predict_count={}". \
-                format(poison_pill.feed_count, poison_pill.predict_count)
+            assert (
+                poison_pill.feed_count == poison_pill.predict_count
+            ), "poison_pill feed_count={} != predict_count={}".format(
+                poison_pill.feed_count, poison_pill.predict_count
+            )
 
             if recv_id.val == poison_pill.predict_count:
                 return
@@ -693,12 +759,13 @@ def fetch_out(reader_type, in_queue, stop_event, task_semaphore):
                 # From time order, we must want predict_out_queue be ([img0], [img1], poison_pill)
                 # But in fact predict_out_queue may be Queue([img1], poison_pill, [img0]),
                 # for the queue.put() is unordered in multi process.
-                logger.debug('fetch is unordered!!!')
+                logger.debug("fetch is unordered!!!")
                 in_queue.put(poison_pill)  # write back poison
                 continue
 
-        for data in fetch_func(fetch_data, store_data, recv_id, task_semaphore,
-                               samples):
+        for data in fetch_func(
+            fetch_data, store_data, recv_id, task_semaphore, samples
+        ):
             yield data
 
 
@@ -719,8 +786,7 @@ def fetch_sample(fetch_data, store_data, recv_id, task_semaphore, samples):
             break
 
 
-def fetch_sample_list(fetch_data, store_data, recv_id, task_semaphore,
-                      samples):
+def fetch_sample_list(fetch_data, store_data, recv_id, task_semaphore, samples):
     # data: [(img, label, predict), (img, label, predict), ..]
     task, data = fetch_data
 
@@ -771,7 +837,7 @@ def fetch_batch(fetch_data, store_data, recv_id, task_semaphore, samples):
                     slot = []
                     for j in range(batch_size):
                         slot.append(samples.samples[j][i])
-                    batch_data += (np.array(slot), )
+                    batch_data += (np.array(slot),)
 
                 # out_data: (img[batch, shape], label[batch, shape], sample[batch, shape])
                 yield batch_data

@@ -19,13 +19,9 @@ from edl.utils.log_utils import logger
 
 
 class Register(object):
-    def __init__(self,
-                 etcd_endpoints,
-                 job_id,
-                 service,
-                 server,
-                 info,
-                 ttl=constants.ETCD_TTL):
+    def __init__(
+        self, etcd_endpoints, job_id, service, server, info, ttl=constants.ETCD_TTL
+    ):
         self._service = service
         self._server = server
         self._stop = threading.Event()
@@ -36,18 +32,23 @@ class Register(object):
         self._ttl = ttl
 
         self._etcd = etcd_client.EtcdClient(
-            endpoints=etcd_endpoints, root=job_id, timeout=ttl)
+            endpoints=etcd_endpoints, root=job_id, timeout=ttl
+        )
         self._etcd.init()
 
         try:
-            self._etcd.set_server_not_exists(
-                service, server, self._info, ttl=ttl)
-            logger.info("register pod:{} in etcd path:{}".format(
-                info, self._etcd.get_full_path(service, server)))
+            self._etcd.set_server_not_exists(service, server, self._info, ttl=ttl)
+            logger.info(
+                "register pod:{} in etcd path:{}".format(
+                    info, self._etcd.get_full_path(service, server)
+                )
+            )
         except Exception as e:
             logger.fatal(
-                "connect to etcd:{} error:{} service:{} server:{} info:{}".
-                format(etcd_endpoints, e, service, server, info))
+                "connect to etcd:{} error:{} service:{} server:{} info:{}".format(
+                    etcd_endpoints, e, service, server, info
+                )
+            )
             raise e
 
         self._t_register = threading.Thread(target=self._refresher)
@@ -59,8 +60,11 @@ class Register(object):
                 self._etcd.refresh(self._service, self._server)
                 time.sleep(self._ttl / 2)
             except Exception as e:
-                logger.fatal("register meet error and exit! class:{} error:{}".
-                             format(self.__class__.__name__, e))
+                logger.fatal(
+                    "register meet error and exit! class:{} error:{}".format(
+                        self.__class__.__name__, e
+                    )
+                )
                 # if refresher stopped, the pod will exit from the cluster
                 break
 
@@ -76,7 +80,7 @@ class Register(object):
 
     def is_stopped(self):
         with self._lock:
-            return self._t_register == None
+            return self._t_register is None
 
     def __exit__(self):
         self.stop()

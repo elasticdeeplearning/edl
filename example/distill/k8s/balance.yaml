@@ -8,9 +8,9 @@ spec:
   replicas: 1
   template:
     metadata:
-      name: balance 
+      name: balance
       labels:
-        app: balance 
+        app: balance
     spec:
       hostNetwork: true
       containers:

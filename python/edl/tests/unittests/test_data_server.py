@@ -49,7 +49,8 @@ class TestDataServer(unittest.TestCase):
             trainer_env=self._trainer_env,
             reader_name=self._reader_name,
             file_list=self._file_list,
-            local_reader=None)
+            local_reader=None,
+        )
         self._data_server.start(addr="127.0.0.1")
         logger.info("start data server:{}".format(self._data_server.endpoint))
 
@@ -64,7 +65,8 @@ class TestDataServer(unittest.TestCase):
             self._reader_name,
             self._pod_id,
             self._file_list,
-            timeout=60)
+            timeout=60,
+        )
         self.assertEqual(len(file_list), len(self._file_list))
 
         for ele in file_list:
@@ -78,25 +80,27 @@ class TestDataServer(unittest.TestCase):
             pod_id=self._pod_id,
             dataserver_endpoint=self._data_server.endpoint,
             batch_data_ids=["0", "1"],
-            timeout=60)
+            timeout=60,
+        )
         data = client.get_batch_data_meta(
             reader_leader_endpoint=self._data_server.endpoint,
             reader_name=self._reader_name,
             pod_id=self._pod_id,
-            timeout=60)
+            timeout=60,
+        )
 
         self.assertEqual(len(data), 1)
         self.assertEqual(len(data[0].batch_data_ids), 2)
         for batch_data_id in data[0].batch_data_ids:
             self.assertTrue(batch_data_id in ["0", "1"])
 
-    #TODO(gongwb): add test_get_batch_data
+    # TODO(gongwb): add test_get_batch_data
     """
     def test_get_batch_data(self):
         pass
     """
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     log_utils.get_logger(log_level=10)
     unittest.main()

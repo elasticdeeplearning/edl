@@ -89,26 +89,29 @@ class EdlNotLeaderError(EdlException):
     pass
 
 
-def deserialize(s):
+def deserialize(pb_status):
     thismodule = sys.modules[__name__]
     try:
-        cls = getattr(thismodule, s.type)(s.detail)
+        cls = getattr(thismodule, pb_status.type)(pb_status.detail)
     except Exception as e:
-        raise Exception("type:{} detail:{}".format(s.type, s.detail))
-    #print(type(cls))
+        raise Exception(
+            "type:{} detail:{} meets error:{}".format(
+                pb_status.type, pb_status.detail, str(e)
+            )
+        )
     raise cls
 
 
-def serialize(e):
-    s = common_pb2.Status()
-    s.type = e.__class__.__name__
-    s.detail = str(e)
-    return s
+def serialize_to_pb_status(exception):
+    pb_status = common_pb2.Status()
+    pb_status.type = exception.__class__.__name__
+    pb_status.detail = str(exception)
+    return pb_status
 
 
-def serialize(res, e, stack_info=None):
-    res.status.type = e.__class__.__name__
+def serialize(pb_response, exception, stack_info=None):
+    pb_response.status.type = exception.__class__.__name__
     if stack_info is not None:
-        res.status.detail = str(e) + stack_info
+        pb_response.status.detail = str(exception) + stack_info
     else:
-        res.status.detail = str(e)
+        pb_response.status.detail = str(exception)

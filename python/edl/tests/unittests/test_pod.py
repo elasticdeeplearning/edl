@@ -30,5 +30,5 @@ class TestPod(etcd_test_base.EtcdTestBase):
         self.assertEqual(pod, pod2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

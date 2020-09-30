@@ -22,17 +22,15 @@ from edl.utils.log_utils import logger
 def handle_errors_until_timeout(f):
     def handler(*args, **kwargs):
         begin = time.time()
-        #print(f.__name__, "args:", args, "kwargs:", kwargs)
-        timeout = kwargs['timeout']
+        timeout = kwargs["timeout"]
         while True:
             try:
                 return f(*args, **kwargs)
-            except exceptions.EdlDataEndError as e:
+            except exceptions.EdlDataEndError:
                 raise exceptions.EdlDataEndError
             except exceptions.EdlException as e:
                 if time.time() - begin >= timeout:
-                    logger.warning("{} execute timeout:{}".format(f.__name__,
-                                                                  timeout))
+                    logger.warning("{} execute timeout:{}".format(f.__name__, timeout))
                     raise e
 
                 time.sleep(3)

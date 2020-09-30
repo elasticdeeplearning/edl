@@ -24,8 +24,8 @@ import os
 class Client(object):
     RECV_SIZE = 4096
     HEAD_SIZE = 8  # 8bytes, 64bit
-    HEAD_FORMAT = '!4si'
-    CRC_CODE = b'\xCB\xEF\x00\x00'
+    HEAD_FORMAT = "!4si"
+    CRC_CODE = b"\xCB\xEF\x00\x00"
 
     def __init__(self, endpoints, service_name, require_num, token=None):
         """
@@ -35,7 +35,7 @@ class Client(object):
             require_num(int): require max teacher
             token(str):
         """
-        ip, port = endpoints[0].split(':')
+        ip, port = endpoints[0].split(":")
         self._ip = ip
         self._port = int(port)
 
@@ -74,47 +74,48 @@ class Client(object):
     def _register(self, require_num=1):
         seq = 0
         msg = {
-            'type': 'register',
-            'service_name': self._service_name,
-            'seq': seq,
-            'num': require_num
+            "type": "register",
+            "service_name": self._service_name,
+            "seq": seq,
+            "num": require_num,
         }
         self._send_msg(msg)
         msg = self._recv_msg()
-        if msg['type'] != 'register' or int(msg['seq']) != seq + 1:
+        if msg["type"] != "register" or int(msg["seq"]) != seq + 1:
             assert False
 
-        response_num = msg['num']
-        servers = msg['servers']
+        servers = msg["servers"]
         return servers
 
     def _heartbeat(self):
         while self._need_stop is False:
             time.sleep(2)
-            msg = {'type': 'heartbeat', 'version': self._version}
+            msg = {"type": "heartbeat", "version": self._version}
             self._send_msg(msg)
             msg = self._recv_msg()
 
-            if msg['type'] == 'heartbeat':
-                #print('heartbeat')
+            if msg["type"] == "heartbeat":
+                # print('heartbeat')
                 continue
-            elif msg['type'] == 'servers_change':
+            elif msg["type"] == "servers_change":
                 self._is_update = True
                 try:
-                    self._version = int(msg['version'])
+                    self._version = int(msg["version"])
                 except KeyError:
                     # compatible with old balance server
                     pass
-                self.teacher_list = msg['servers']
+                self.teacher_list = msg["servers"]
                 sys.stderr.write(
-                    '[INFO] service change version={} teachers={}\n'.format(
-                        self._version, str(self.teacher_list)))
+                    "[INFO] service change version={} teachers={}\n".format(
+                        self._version, str(self.teacher_list)
+                    )
+                )
 
     def get_teacher_list(self):
-        '''
+        """
         return (is_update, servers)
         is_update: is update after last query
-        '''
+        """
         is_update = self._is_update
         self._is_update = False
         return is_update, self.teacher_list
@@ -126,8 +127,10 @@ class Client(object):
         try:
             self.client.connect((self._ip, self._port))
         except socket.error:
-            sys.stderr.write('ERROR: connect with balance server failed, '
-                             'please check if balance server is alive\n')
+            sys.stderr.write(
+                "ERROR: connect with balance server failed, "
+                "please check if balance server is alive\n"
+            )
             os._exit(-1)
         # self.client.settimeout(6)
 
@@ -145,8 +148,8 @@ class Client(object):
         self.client.close()
 
 
-if __name__ == '__main__':
-    client = Client(['127.0.0.1:9379'], 'TestService', 4)
+if __name__ == "__main__":
+    client = Client(["127.0.0.1:9379"], "TestService", 4)
     teacher_list = client.start()
     print(teacher_list)
     time.sleep(100)

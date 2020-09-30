@@ -29,7 +29,7 @@ class TestMasterClient(unittest.TestCase):
     def test_add_dataset(self):
         dataset = master_pb2.DataSet()
         dataset.name = "train"
-        for t in get_file_list('./test_file_list.txt'):
+        for t in get_file_list("./test_file_list.txt"):
             dataset.file_list.append(t[0])
 
         res = self._client.add_dataset(dataset)
@@ -39,6 +39,6 @@ class TestMasterClient(unittest.TestCase):
         assert res.type == "DuplicateInitDataSet", "must error"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logger = get_logger(10)
     unittest.main()

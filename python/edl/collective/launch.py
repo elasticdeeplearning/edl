@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-paddle.distributed.launch is a module that spawns multiple distributed 
+paddle.distributed.launch is a module that spawns multiple distributed
 process on each training node for gpu training.
 """
 
@@ -50,11 +50,10 @@ def main():
     pod = edl_pod.Pod()
     pod.from_env(job_env)
 
-    launcher = edl_launcher.Launcher(
-        job_env=job_env, pod=pod, etcd=etcd, args=args)
+    launcher = edl_launcher.Launcher(job_env=job_env, pod=pod, etcd=etcd, args=args)
     launcher.init()
     launcher.launch()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

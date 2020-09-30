@@ -7,11 +7,11 @@ metadata:
 spec:
   containers:
   - name: paddleserving
-    image: hub.baidubce.com/ctr/paddleserving:latest 
+    image: hub.baidubce.com/ctr/paddleserving:latest
     workingDir: /serving
     command: ['/bin/bash']
     args: ['run.sh']
-    ports: 
+    ports:
     - containerPort: 8010
       name: serving
 

@@ -11,7 +11,7 @@ spec:
     workingDir: /serving
     command: ['/bin/bash']
     args: ['run.sh']
-    ports: 
+    ports:
     - containerPort: 8010
       name: serving
 

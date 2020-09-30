@@ -24,7 +24,6 @@ from edl.utils import log_utils
 from edl.utils.data_server import DataServer
 from edl.utils.dataset import TxtDataReader
 from edl.utils.string_utils import bytes_to_string
-from edl.utils.utils import *
 
 os.environ["https_proxy"] = ""
 os.environ["http_proxy"] = ""
@@ -42,7 +41,8 @@ class TestDataServer(unittest.TestCase):
             port=port,
             data_set_reader=TxtDataReader,
             file_list="./test_file_list.txt",
-            master=None)
+            master=None,
+        )
         print("start data server:", endpoint)
         time.sleep(3)
         return data_server, endpoint
@@ -60,7 +60,7 @@ class TestDataServer(unittest.TestCase):
         a = ["a0", "a1", "a2"]
         b = ["b0", "b1", "b2"]
         request = data_server_pb2.DataRequest()
-        for t in file_utils.read_txt_lines('./test_file_list.txt'):
+        for t in file_utils.read_txt_lines("./test_file_list.txt"):
             request.idx_in_list = t[1]
             request.file_path = t[0]
             chunk = common_pb2.Chunk()
@@ -72,13 +72,15 @@ class TestDataServer(unittest.TestCase):
             f_d = response.file
             if f_d.file_path == "data_server/a.txt":
                 assert f_d.idx_in_list == 0, "f_d.idx_in_list:{}".format(
-                    f_d.idx_in_list)
+                    f_d.idx_in_list
+                )
                 for c in f_d.data:
                     for r in c.records:
                         assert bytes_to_string(r.data) == a[r.record_no]
             elif f_d.file_path == "data_server/b.txt":
                 assert f_d.idx_in_list == 1, "f_d.idx_in_list:{}".format(
-                    f_d.idx_in_list)
+                    f_d.idx_in_list
+                )
                 for c in f_d.data:
                     for r in c.records:
                         assert bytes_to_string(r.data) == b[r.record_no]
@@ -92,7 +94,7 @@ class TestDataServer(unittest.TestCase):
         stub = data_server_pb2_grpc.DataServerStub(channel)
 
         request = data_server_pb2.DataRequest()
-        for t in file_utils.read_txt_lines('./test_file_list.txt'):
+        for t in file_utils.read_txt_lines("./test_file_list.txt"):
             request.idx_in_list = t[1]
             request.file_path = t[0]
             chunk = common_pb2.Chunk()
@@ -112,6 +114,6 @@ class TestDataServer(unittest.TestCase):
         self._shut_down(data_server, stub)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logger = log_utils.get_logger(10)
     unittest.main()

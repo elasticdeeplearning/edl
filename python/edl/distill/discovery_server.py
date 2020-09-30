@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import distill_discovery_pb2
 from . import distill_discovery_pb2_grpc
 import grpc
 import logging
@@ -22,7 +21,8 @@ from .balance_table import BalanceTable
 
 logging.basicConfig(
     level=logging.INFO,
-    format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s")
+    format="[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s",
+)
 
 
 class DiscoveryServicer(distill_discovery_pb2_grpc.DiscoveryServiceServicer):
@@ -35,8 +35,11 @@ class DiscoveryServicer(distill_discovery_pb2_grpc.DiscoveryServiceServicer):
         service_name = request.service_name
         require_num = request.require_num
         token = request.token
-        logging.info('client={}, service_name={}, require_num={} token={}'.
-                     format(client, service_name, require_num, token))
+        logging.info(
+            "client={}, service_name={}, require_num={} token={}".format(
+                client, service_name, require_num, token
+            )
+        )
 
         return self._table.register_client(client, service_name, require_num)
 
@@ -48,53 +51,55 @@ class DiscoveryServicer(distill_discovery_pb2_grpc.DiscoveryServiceServicer):
 
 
 def serve(server, worker_num, db_endpoints):
-    discovery_server = grpc.server(
-        futures.ThreadPoolExecutor(max_workers=worker_num))
+    discovery_server = grpc.server(futures.ThreadPoolExecutor(max_workers=worker_num))
     balance_table = BalanceTable(server, db_endpoints)
 
     distill_discovery_pb2_grpc.add_DiscoveryServiceServicer_to_server(
-        DiscoveryServicer(balance_table), discovery_server)
+        DiscoveryServicer(balance_table), discovery_server
+    )
     discovery_server.add_insecure_port(server)
     discovery_server.start()
     discovery_server.wait_for_termination()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description='Discovery server with balance')
+    parser = argparse.ArgumentParser(description="Discovery server with balance")
     parser.add_argument(
-        '--server',
+        "--server",
         type=str,
-        default='127.0.0.1:7001',
-        help='endpoint of the server, e.g. 127.0.0.1:8888 [default: %(default)s]'
+        default="127.0.0.1:7001",
+        help="endpoint of the server, e.g. 127.0.0.1:8888 [default: %(default)s]",
     )
     parser.add_argument(
-        '--worker_num',
+        "--worker_num",
         type=int,
         default=1,
-        help='worker num of server [default: %(default)s]')
-    parser.add_argument(
-        '--db_endpoints',
-        type=str,
-        default='127.0.0.1:2379',
-        help='database endpoints, e.g. 127.0.0.1:2379,127.0.0.1:2380 [default: %(default)s]'
+        help="worker num of server [default: %(default)s]",
     )
     parser.add_argument(
-        '--db_passwd',
+        "--db_endpoints",
+        type=str,
+        default="127.0.0.1:2379",
+        help="database endpoints, e.g. 127.0.0.1:2379,127.0.0.1:2380 [default: %(default)s]",
+    )
+    parser.add_argument(
+        "--db_passwd",
         type=str,
         default=None,
-        help='detabase password [default: %(default)s]')
+        help="detabase password [default: %(default)s]",
+    )
     parser.add_argument(
-        '--db_type',
+        "--db_type",
         type=str,
-        default='etcd',
-        help='database type, only support etcd for now [default: %(default)s]')
+        default="etcd",
+        help="database type, only support etcd for now [default: %(default)s]",
+    )
 
     args = parser.parse_args()
     server = args.server
     worker_num = args.worker_num
-    db_endpoints = args.db_endpoints.split(',')
+    db_endpoints = args.db_endpoints.split(",")
 
     serve(server, worker_num, db_endpoints)

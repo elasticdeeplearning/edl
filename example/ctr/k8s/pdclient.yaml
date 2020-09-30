@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: pdservingclient
-  labels: 
+  labels:
     app: pdservingclient
 spec:
   containers:
