@@ -30,7 +30,8 @@
 
 ### Release Verified Model Training Scripts based on EDL API
 - NLP models and CV models trained based on GPU will be verified.
-  Bert/Ernie and Resnet50 for classification will be considered currently.
+- Bert/Ernie and Resnet50 for classification will be considered currently.
+- Provide Documentation about deployment on Baidu Cloud.
 
 ### Release 0.4.0
 - Features above will be released
