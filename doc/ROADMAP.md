@@ -49,6 +49,6 @@
 - Features above will be released
 
 ## 2020-12
-- More Application on EDL
+- More Applications on EDL
 - More machine learning tools integrated.
 
