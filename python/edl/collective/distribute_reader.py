@@ -34,6 +34,7 @@ class Reader(object):
     ):
         self._file_list = file_list
         assert isinstance(self._file_list, list), "file_list must be a list"
+        self._state = state
 
         self._name = unique_name.generator("_dist_reader_")
 
@@ -58,8 +59,8 @@ class Reader(object):
 
     def stop(self):
         if self._generater:
-            self._accesser.terminate()
-            self._accesser.join()
+            self._generater.terminate()
+            self._generater.join()
             self._generater = None
 
         if self._accesser:
@@ -70,13 +71,12 @@ class Reader(object):
     def __exit__(self):
         self.stop()
 
-    @staticmethod
-    def _check_processor(process, error_queue):
-        if process.is_alive():
+    def _check(self, proc, error_queue):
+        if self.proc.is_alive():
             return True
 
-        process.join()
-        exitcode = process.exitcode
+        self.proc.join()
+        exitcode = self.proc.exitcode
         if exitcode == 0:
             return False
 
@@ -85,26 +85,32 @@ class Reader(object):
         else:
             raise exceptions.EdlAccessDataError("process exit:{}".format(exitcode))
 
-    def __iter__(self):
+    def _start_generator(self):
         args = batch_data_generator.Args()
-        self._generater = multiprocessing.Process(
+        self._generator = multiprocessing.Process(
             target=batch_data_generator.generate, args=args
         )
         self._generator.start()
 
+    def _start_accesser(self):
         args = batch_data_accesser.Args()
         self._accesser = multiprocessing.Process(
-            batch_data_accesser.access_batch_data, args=args,
+            batch_data_accesser.generate, args=(args)
         )
 
-        while True:
-            self._check_processor(self._generater, self._generater_error_queue)
+    def __iter__(self):
+        self._start_generator()
+        self._start_accesser()
 
-            if not self._check_process(self._accesser, self._accesser_error_queue):
+        while True:
+            if not self._check(self._accesser, self._accesser_error_queue):
+                break
+
+            if not self._check(self._generator, self._generater_error_queue):
                 break
 
             try:
-                b = self._accesser_out_queue.pop(60)
+                b = self._accesser_out_queue.pop(10)
             except multiprocessing.Queue.Empty:
                 continue
 

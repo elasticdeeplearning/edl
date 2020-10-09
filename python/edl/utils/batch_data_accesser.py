@@ -14,12 +14,13 @@
 from __future__ import print_function
 
 import sys
+import os
 import threading
+
 from edl.uitls import reader as edl_reader
 from edl.utils import data_server
 from edl.utils import data_server_client
 from edl.utils import etcd_db
-from edl.utils import log_utils
 
 logger = None
 
@@ -39,22 +40,21 @@ class Accesser(object):
     3. get batch_data_meta from data_server_leader
     4. get batch_data by batch_data_meta
     """
-    def __init__(self, reader_leader_endpoint, reader_name, trainer_env,
-                 input_queue, out_queue, queue_size):
-        self._reader_leader_endpoint = reader_leader_endpoint
+    def __init__(self, args):
+        self._reader_leader_endpoint = args.reader_leader_endpoint
 
-        self._reader_name = reader_name
-        self._trainer_env = trainer_env
+        self._reader_name = argsreader_name
+        self._trainer_env = argstrainer_env
         self._etcd = None
 
         # BatchData
-        self._input_queue = input_queue
-        self._out_queue = out_queue
+        self._input_queue = argsinput_queue
+        self._out_queue = argsout_queue
         # batch_data_id => BatchData
         self._cache = {}
 
         # pb.BatchDataRequest queue
-        self._req_queue = threading.Queue(queue_size)
+        self._req_queue = threading.Queue(args.queue_size)
 
         self._data_server = None
 
@@ -101,8 +101,6 @@ class Accesser(object):
         self._t_generater.start()
         self._t_accesser.start()
 
-
-
     def _access(self):
         while not self._stop.set():
             res = self._client.get_balanced_batch_data(
@@ -148,13 +146,14 @@ class Accesser(object):
 
 def generate(args):
     log_file_name = "edl_data_generator_{}.log".format(os.getpid())
+    from edl.utils import log_utils
     global logger
     logger = log_utils.get_logger(log_level=20, log_file_name=log_file_name)
+    logger.info("args:{}".format(args))
 
     try:
-        a = Accesser(reader_leader, reader_name, trainer_env, input_queue,
-                         out_queue, cache_capcity)
-        a.start()
+        accesser = Accesser(args)
+        accesser.start()
     except:
         import traceback
         args.error_queue.put(traceback.format_exc())

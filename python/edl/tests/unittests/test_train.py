@@ -34,11 +34,6 @@ class TestDataReader(etcd_test_base.EtcdTestBase):
                 self._data[idx].append(rec)
 
     def _train(self, state):
-        # learning_rate = 1.0
-        # start_program = None
-        # main_program = None
-        # exe = None
-
         reader = edl.DistributeReader(
             state=state,
             file_list=self._file_list,
@@ -53,13 +48,13 @@ class TestDataReader(etcd_test_base.EtcdTestBase):
             edl.notify_end_one_epoch(state)
 
     def test_data_reader(self):
-        exe = None
-        main_program = None
+        # learning_rate = 1.0
         start_program = None
+        main_program = None
+        exe = None
         optimizer = None
-        state = edl.PaddleState(
-            exe, start_program, main_program, optimizer, max_epoch_num=5
-        )
+
+        state = edl.PaddleState(exe, start_program, main_program, optimizer)
         state.register_adjust_function([adjust])
         self._train(state)
 
