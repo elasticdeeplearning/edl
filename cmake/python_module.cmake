@@ -41,4 +41,3 @@ function(find_python_module module)
     set(PY_${module_upper}_FOUND ${PY_${module_upper}_FOUND} PARENT_SCOPE)
     set(PY_${module_upper}_VERSION ${PY_${module_upper}_VERSION} PARENT_SCOPE)
 endfunction(find_python_module)
-

@@ -101,7 +101,7 @@ class Collector(object):
         #     {
         #       "master":  [],
         #       "pserver": [],
-        #       "trainer": [] 
+        #       "trainer": []
         #     }
         # }
         self._job_phases = {}

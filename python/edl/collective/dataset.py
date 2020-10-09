@@ -15,8 +15,8 @@
 
 class FileSplitter(object):
     """
-    This the interface user should inherit. It will let's the framework knows the data file it's
-    processing.
+    This the interface user should inherit.
+    It will let's the framework knows the data file it's processing.
     TxtDataReader is an example.
     """
 

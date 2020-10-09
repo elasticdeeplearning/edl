@@ -54,8 +54,7 @@ class Client(client_base.Client):
                 return cluster
 
             if time.time() - begin > timeout:
-                message = "job_id:{} pod_id:{} barrier time out".format(job_id,
-                                                                        pod_id)
+                message = "job_id:{} pod_id:{} barrier time out".format(job_id, pod_id)
                 logger.info(message)
                 exceptions.deserialize(res.status)
             time.sleep(1)

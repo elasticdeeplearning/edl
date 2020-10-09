@@ -16,10 +16,12 @@ import logging
 
 logger = logging.getLogger("root")
 logger.propagate = False
-g_logger_set=False
+g_logger_set = False
+
 
 def get_logger(log_level, name="root", log_file_name=None):
     global g_logger_set
+    global logger
     if g_logger_set:
         return logger
     g_logger_set = True
@@ -32,7 +34,8 @@ def get_logger(log_level, name="root", log_file_name=None):
 
     log_handler = logging.StreamHandler()
     log_format = logging.Formatter(
-        '%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s')
+        "%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s"
+    )
     log_handler.setFormatter(log_format)
     logger.addHandler(log_handler)
 

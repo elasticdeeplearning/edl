@@ -64,8 +64,7 @@ class TestState(etcd_test_base.EtcdTestBase):
     def test_state(self):
         user_defined = UserDefined()
 
-        state = edl_state.State(
-            total_batch_size=1000, user_defined=user_defined)
+        state = edl_state.State(total_batch_size=1000, user_defined=user_defined)
         state._model_path = "model_path"
         state._data_checkpoint = self._generate_data_checkpoint()
         state._train_status = self._generate_train_status()
@@ -74,13 +73,15 @@ class TestState(etcd_test_base.EtcdTestBase):
 
         # save
         pod_id = "0"
-        self._etcd.set_server_permanent(constants.ETCD_POD_RANK,
-                                        constants.ETCD_POD_LEADER, pod_id)
+        self._etcd.set_server_permanent(
+            constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER, pod_id
+        )
         edl_state.save_to_etcd(self._etcd, pod_id, state, timeout=10)
 
         # load
         state2 = edl_state.load_from_etcd(
-            self._etcd, state.name, user_defined=user_defined, timeout=10)
+            self._etcd, state.name, user_defined=user_defined, timeout=10
+        )
         print("state2", state2)
 
         # compare
@@ -89,13 +90,14 @@ class TestState(etcd_test_base.EtcdTestBase):
         # only leader can write state
         try:
             pod_id = "1"
-            self._etcd.set_server_permanent(constants.ETCD_POD_RANK,
-                                            constants.ETCD_POD_LEADER, pod_id)
+            self._etcd.set_server_permanent(
+                constants.ETCD_POD_RANK, constants.ETCD_POD_LEADER, pod_id
+            )
             edl_state.save_to_etcd(self._etcd, pod_id, state, timeout=10)
             self.assertFalse(True)
-        except:
+        except Exception:
             pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

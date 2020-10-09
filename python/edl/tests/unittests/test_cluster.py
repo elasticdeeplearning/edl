@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import unittest
 from edl.tests.unittests import etcd_test_base
 from edl.utils import cluster as edl_cluster
@@ -30,5 +29,5 @@ class TestCluster(etcd_test_base.EtcdTestBase):
         self.assertEqual(cluster, cluster2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -20,7 +20,6 @@ import json
 import threading
 import sys
 from six.moves.queue import Queue
-import time
 
 
 def set_keepalive_linux(sock, after_idle_sec=30, interval_sec=10, max_fails=6):
@@ -41,8 +40,8 @@ class Server(object):
     _WRITE = select.EPOLLOUT | select.EPOLLHUP | select.EPOLLERR
     RECV_SIZE = 4096
     HEAD_SIZE = 8  # 8bytes, 64bit
-    HEAD_FORMAT = '!4si'
-    CRC_CODE = b'\xCB\xEF\x00\x00'
+    HEAD_FORMAT = "!4si"
+    CRC_CODE = b"\xCB\xEF\x00\x00"
 
     def __init__(self, ip, port):
         self._ip = ip
@@ -79,11 +78,12 @@ class Server(object):
             fd, msg = self._request_queue.get()
             crc_code, length = struct.unpack_from(self.HEAD_FORMAT, msg)
             if length != len(msg):
-                sys.stderr.write('length={} != msg_length={}, close\n'.format(
-                    length, len(msg)))
+                sys.stderr.write(
+                    "length={} != msg_length={}, close\n".format(length, len(msg))
+                )
                 self.close_conn(fd)
                 continue
-            msg = json.loads(msg[self.HEAD_SIZE:].decode())
+            msg = json.loads(msg[self.HEAD_SIZE :].decode())
             self._process_msg(fd, msg)
 
     def _enqueue_request(self, fd):
@@ -115,7 +115,7 @@ class Server(object):
         size = self.HEAD_SIZE + len(msg)
 
         msg = struct.pack(self.HEAD_FORMAT, self.CRC_CODE, size) + msg
-        assert len(msg) == size, 'Error with response msg'
+        assert len(msg) == size, "Error with response msg"
         # self._response_queue.put((fd, msg))
 
         # Fixme. response multi msg?
@@ -133,8 +133,8 @@ class Server(object):
         fd = client.fileno()
         self._epoll.register(fd, self._READ)
         self._clients[fd] = client
-        self._requests[fd] = b''
-        self._responses[fd] = b''
+        self._requests[fd] = b""
+        self._responses[fd] = b""
 
     def _handle_in(self, fd):
         try:
@@ -158,7 +158,6 @@ class Server(object):
 
     def _handle_out(self, fd):
         response = self._responses[fd]
-        size = len(response)
         try:
             send_size = self._clients[fd].send(response)
         except socket.error as e:
@@ -181,12 +180,12 @@ class Server(object):
     def close_conn(self, fd):
         try:
             ip, port = self._clients[fd].getpeername()
-            sys.stderr.write('close conn={}\n'.format(ip + ':' + str(port)))
+            sys.stderr.write("close conn={}\n".format(ip + ":" + str(port)))
             self._epoll.unregister(fd)
             self._clients[fd].close()
         except Exception as e:
-            sys.stderr.write('Exception when close fd={}\n'.format(fd))
-            sys.stderr.write(str(e) + '\n')
+            sys.stderr.write("Exception when close fd={}\n".format(fd))
+            sys.stderr.write(str(e) + "\n")
         del self._clients[fd]
         del self._requests[fd]
         del self._responses[fd]
@@ -217,55 +216,54 @@ class Server(object):
 
 
 class BalanceServer(Server):
-    def __init__(self, ip='127.0.0.1', port=9379, table=None):
+    def __init__(self, ip="127.0.0.1", port=9379, table=None):
         super(BalanceServer, self).__init__(ip, port)
         self._table = table
         self._handle_func = {
-            'register': self._handle_register,
-            'heartbeat': self._handle_heartbeat
+            "register": self._handle_register,
+            "heartbeat": self._handle_heartbeat,
         }
 
     def _handle_register(self, fd, msg):
         # Todo
         # store.set_client()
-        require_num = int(msg['num'])
-        self._table.add_service_name(fd, msg['service_name'], require_num)
+        require_num = int(msg["num"])
+        self._table.add_service_name(fd, msg["service_name"], require_num)
         servers = self._table.get_servers(fd, require_num)
 
         client = self._clients[fd]
         ip, port = client.getpeername()
-        sys.stderr.write('register addr={} service_name={} num={}\n'.format(
-            ip + ':' + str(port), msg['service_name'], require_num))
+        sys.stderr.write(
+            "register addr={} service_name={} num={}\n".format(
+                ip + ":" + str(port), msg["service_name"], require_num
+            )
+        )
 
         # response
         msg = {
-            'type': 'register',
-            'seq': int(msg['seq']) + 1,
-            'servers': servers,
-            'num': len(servers)
+            "type": "register",
+            "seq": int(msg["seq"]) + 1,
+            "servers": servers,
+            "num": len(servers),
         }
         self._enqueue_response(fd, msg)
 
     def _handle_heartbeat(self, fd, msg):
         version = 0
         try:
-            version = int(msg['version'])
+            version = int(msg["version"])
         except KeyError:
             # compatible old client
             pass
         new_version, servers = self._table.is_servers_update(fd, version)
         if new_version > version:
-            msg = {
-                'type': 'servers_change',
-                'servers': servers,
-                'version': new_version
-            }
+            msg = {"type": "servers_change", "servers": servers, "version": new_version}
         else:
-            msg = {'type': 'heartbeat'}
+            msg = {"type": "heartbeat"}
         self._enqueue_response(fd, msg)
 
     def _process_msg(self, fd, msg):
-        type = msg['type']
+        type = msg["type"]
         func = self._handle_func[type]
         func(fd, msg)
 
@@ -278,50 +276,55 @@ class BalanceServer(Server):
         super(BalanceServer, self).server_forever()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from .service_table import ServiceTable
 
     import argparse
-    parser = argparse.ArgumentParser(
-        description='Discovery server with balance')
+
+    parser = argparse.ArgumentParser(description="Discovery server with balance")
     parser.add_argument(
-        '--server',
+        "--server",
         type=str,
-        default='0.0.0.0:7001',
-        help='endpoint of the server, e.g. 127.0.0.1:8888 [default: %(default)s]'
+        default="0.0.0.0:7001",
+        help="endpoint of the server, e.g. 127.0.0.1:8888 [default: %(default)s]",
     )
     parser.add_argument(
-        '--worker_num',
+        "--worker_num",
         type=int,
         default=1,
-        help='worker num of server [default: %(default)s]')
-    parser.add_argument(
-        '--db_endpoints',
-        type=str,
-        default='127.0.0.1:6379',
-        help='database endpoints, e.g. 127.0.0.1:2379,127.0.0.1:2380 [default: %(default)s]'
+        help="worker num of server [default: %(default)s]",
     )
     parser.add_argument(
-        '--db_passwd',
+        "--db_endpoints",
+        type=str,
+        default="127.0.0.1:6379",
+        help="database endpoints, e.g. 127.0.0.1:2379,127.0.0.1:2380 [default: %(default)s]",
+    )
+    parser.add_argument(
+        "--db_passwd",
         type=str,
         default=None,
-        help='detabase password [default: %(default)s]')
+        help="detabase password [default: %(default)s]",
+    )
     parser.add_argument(
-        '--db_type',
+        "--db_type",
         type=str,
-        default='redis',
-        help='database type, only support redis for now [default: %(default)s]')
+        default="redis",
+        help="database type, only support redis for now [default: %(default)s]",
+    )
 
     args = parser.parse_args()
     server = args.server
     worker_num = args.worker_num
-    db_endpoints = args.db_endpoints.split(',')
+    db_endpoints = args.db_endpoints.split(",")
 
-    redis_ip_port = db_endpoints[0].split(':')
-    server_ip_port = server.split(':')
+    redis_ip_port = db_endpoints[0].split(":")
+    server_ip_port = server.split(":")
 
-    table = ServiceTable(redis_ip_port[0],
-                         int(redis_ip_port[1]))  # connect redis ip:port
-    balance_server = BalanceServer(server_ip_port[0],
-                                   int(server_ip_port[1]), table)  # listen
+    table = ServiceTable(
+        redis_ip_port[0], int(redis_ip_port[1])
+    )  # connect redis ip:port
+    balance_server = BalanceServer(
+        server_ip_port[0], int(server_ip_port[1]), table
+    )  # listen
     balance_server.server_forever()

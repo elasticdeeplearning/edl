@@ -29,38 +29,25 @@
 
 from grpc_tools import protoc
 import pkg_resources
-import os
 import sys
 
 print("run code gen python verion:", sys.version_info)
 
 # python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. data_server.proto
-protoc.main((
-    '',
-    '-I.',
-    '--python_out=.',
-    '--grpc_python_out=.',
-    'common.proto', ))
+protoc.main(("", "-I.", "--python_out=.", "--grpc_python_out=.", "common.proto",))
 
-protoc.main((
-    '',
-    '-I.',
-    '--python_out=.',
-    '--grpc_python_out=.',
-    'pod_server.proto', ))
+protoc.main(("", "-I.", "--python_out=.", "--grpc_python_out=.", "pod_server.proto",))
 
-protoc.main((
-    '',
-    '-I.',
-    '--python_out=.',
-    '--grpc_python_out=.',
-    'data_server.proto', ))
+protoc.main(("", "-I.", "--python_out=.", "--grpc_python_out=.", "data_server.proto",))
 
-proto_include = pkg_resources.resource_filename('grpc_tools', '_proto')
-protoc.main((
-    '',
-    '-I.',
-    '-I{}'.format(proto_include),
-    '--python_out=.',
-    '--grpc_python_out=.',
-    'distill_discovery.proto', ))
+proto_include = pkg_resources.resource_filename("grpc_tools", "_proto")
+protoc.main(
+    (
+        "",
+        "-I.",
+        "-I{}".format(proto_include),
+        "--python_out=.",
+        "--grpc_python_out=.",
+        "distill_discovery.proto",
+    )
+)

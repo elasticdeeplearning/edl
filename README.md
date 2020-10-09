@@ -5,6 +5,19 @@
     <br>
 <p>
 
+
+<p align="center">
+    <br>
+        <a href="https://bestpractices.coreinfrastructure.org/projects/4299"><img src="https://bestpractices.coreinfrastructure.org/projects/4299/badge"></a>
+        <img alt="Issues" src="https://img.shields.io/github/issues/elasticdeeplearning/edl">
+        <img alt="Forks" src="https://img.shields.io/github/forks/elasticdeeplearning/edl">
+        <img alt="Stars" src="https://img.shields.io/github/stars/elasticdeeplearning/edl">
+        <img alt="License" src="https://img.shields.io/github/license/elasticdeeplearning/edl">
+    <br>
+<p>
+
+
+
 <h2 align="center">Motivation</h2>
 
 Computing resources on cloud such as [Amazon AWS](https://aws.amazon.com/cn/)、[Baidu Cloud](https://cloud.baidu.com/) have multi-tenancy. Deep learning model training and inference with elastic resources will be common on cloud. We propose Elastic Deep Learning (EDL) that makes training and inference of deep learning models on cloud easier and more efficient.

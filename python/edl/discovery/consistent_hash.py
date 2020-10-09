@@ -37,7 +37,7 @@ class _ConsistentHashData(object):
     def _add_node(self, node):
         # NOTE. this func is not sort
         for i in range(self._virtual_num):
-            vnode = '{}-v{}'.format(node, i)
+            vnode = "{}-v{}".format(node, i)
             slot = self._get_slot(vnode)
 
             # Fix slot hash conflict, the probability
@@ -65,7 +65,7 @@ class _ConsistentHashData(object):
         self._nodes.remove(node)
 
         for i in range(self._virtual_num):
-            vnode = '{}-v{}'.format(node, i)
+            vnode = "{}-v{}".format(node, i)
             slot = self._get_slot(vnode)
             # NOTE. if hash conflict, may be another node
             if node == self._slot_to_node[slot]:
@@ -97,10 +97,10 @@ class _ConsistentHashData(object):
 
     @staticmethod
     def _get_slot(key):
-        if sys.version_info < (3, ):
+        if sys.version_info < (3,):
             return int(hashlib.md5(key).hexdigest(), 16)
         else:
-            return int(hashlib.md5(key.encode('utf-8')).hexdigest(), 16)
+            return int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
 
 
 class ConsistentHash(object):

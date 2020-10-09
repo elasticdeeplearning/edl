@@ -58,10 +58,8 @@ class Launcher(object):
     def init(self):
         # update pod status
         edl_status.save_pod_status_to_etcd(
-            self._etcd,
-            self._pod.get_id(),
-            edl_status.Status.INITIAL,
-            timeout=30)
+            self._etcd, self._pod.get_id(), edl_status.Status.INITIAL, timeout=30
+        )
 
         # launch pod server
         self._pod_server = pod_server.PodServer(self._job_env, self._pod)
@@ -81,19 +79,19 @@ class Launcher(object):
                 logger.debug("barrier on leader:{}".format(leader))
 
                 client = pod_server_client.Client(leader.endpoint)
-                cluster = client.barrier(self._job_env.job_id,
-                                         self._pod.get_id())
+                cluster = client.barrier(self._job_env.job_id, self._pod.get_id())
                 return cluster
             except Exception as e:
                 if time.time() - log_time > 30:
                     logger.info("wait to barrier now!")
                     log_time = time.time()
-                logger.debug("barrier error:{} {}".format(
-                    e, traceback.format_exc()))
+                logger.debug("barrier error:{} {}".format(e, traceback.format_exc()))
 
             if time.time() - start > timeout:
-                message = "wait to barrier with all error:{} leader:[{}] current pod:[{}]".format(
-                    traceback.format_exc(), leader, self._pod.pod_id)
+                message = "wait to barrier with all error:{} \
+                    leader:[{}] current pod:[{}]".format(
+                    traceback.format_exc(), leader, self._pod.pod_id
+                )
                 raise exceptions.EdlBarrierError(message)
 
             time.sleep(3)
@@ -109,23 +107,24 @@ class Launcher(object):
         if not self._trainer_flag:
             logger.fatal("local_trainers meets error and local pod exit!")
 
-        local_flag = self._trainer_flag & self._leader_register_flag & self._barrier_flag & self._resource_register_flag
+        local_flag = (
+            self._trainer_flag
+            & self._leader_register_flag
+            & self._barrier_flag
+            & self._resource_register_flag
+        )
         edl_status.save_pod_flag_to_etcd(
-            etcd=self._etcd,
-            pod_id=self._pod.get_id(),
-            flag=local_flag,
-            timeout=15)
+            etcd=self._etcd, pod_id=self._pod.get_id(), flag=local_flag, timeout=15
+        )
 
-        if self._leader_register is not None and self._leader_register.is_leader(
-        ):
+        if self._leader_register is not None and self._leader_register.is_leader():
             if resource_pods.wait_resource(
-                    etcd=self._etcd, pod_id=self._pod.pod_id, timeout=60):
+                etcd=self._etcd, pod_id=self._pod.pod_id, timeout=60
+            ):
                 job_flag = local_flag & self._barrier_flag
                 edl_status.save_job_flag_to_etcd(
-                    etcd=self._etcd,
-                    pod_id=self._pod.pod_id,
-                    flag=job_flag,
-                    timeout=15)
+                    etcd=self._etcd, pod_id=self._pod.pod_id, flag=job_flag, timeout=15
+                )
                 logger.info("set job status:{} ok!".format(job_flag))
 
         logger.info("end _exit")
@@ -143,8 +142,11 @@ class Launcher(object):
     def _check_and_update_local_pod(self):
         pods_ids = self._cluster.get_pods_ids_set()
         if self._pod.pod_id not in pods_ids:
-            logger.info("self pod_id:{} not in cluster, so this pod exit!".
-                        format(self._pod.pod_id, pods_ids))
+            logger.info(
+                "self pod_id:{} not in cluster:{}, so this pod exit!".format(
+                    self._pod.pod_id, pods_ids
+                )
+            )
             return False
         self._pod = self._cluster.get_pod_by_id(self._pod.pod_id)
         logger.info("update local pod:{}".format(self._pod))
@@ -157,17 +159,18 @@ class Launcher(object):
 
     def _launch(self):
         self._resource_register = resource_pods.Register(
-            job_env=self._job_env,
-            pod_id=self._pod.pod_id,
-            pod_json=self._pod.to_json())
+            job_env=self._job_env, pod_id=self._pod.pod_id, pod_json=self._pod.to_json()
+        )
 
         generator = cluster_generator.Generator(
-            job_env=self._job_env, pod_id=self._pod.get_id())
+            job_env=self._job_env, pod_id=self._pod.get_id()
+        )
 
         self._leader_register = leader_pod.Register(
             job_env=self._job_env,
             pod_id=self._pod.get_id(),
-            cluster_generator=generator)
+            cluster_generator=generator,
+        )
 
         self._cluster = self._barrier(timeout=600)
 
@@ -176,14 +179,13 @@ class Launcher(object):
 
         # update pod status
         edl_status.save_pod_status_to_etcd(
-            self._etcd,
-            self._pod.get_id(),
-            edl_status.Status.RUNNING,
-            timeout=15)
+            self._etcd, self._pod.get_id(), edl_status.Status.RUNNING, timeout=15
+        )
 
         # watcher after barrier
         self._watcher = cluster_watcher.Watcher(
-            job_env=self._job_env, cluster=self._cluster)
+            job_env=self._job_env, cluster=self._cluster
+        )
 
         self._procs = edl_train_process.start(
             job_env=self._job_env,
@@ -191,7 +193,8 @@ class Launcher(object):
             pod=self._pod,
             training_script=self._args.training_script,
             training_script_args=self._args.training_script_args,
-            log_dir=self._args.log_dir)
+            log_dir=self._args.log_dir,
+        )
 
         self._trainer_flag = True
         self._register_flag = True
@@ -199,7 +202,8 @@ class Launcher(object):
         while True:
             # check local status first
             alive, self._trainer_flag = edl_train_process.watch(
-                self._procs, self._pod.trainers_num)
+                self._procs, self._pod.trainers_num
+            )
             if not alive or not self._trainer_flag:
                 break
 
@@ -227,7 +231,8 @@ class Launcher(object):
                     return
 
                 self._watcher = cluster_watcher.Watcher(
-                    job_env=self._job_env, cluster=self._cluster)
+                    job_env=self._job_env, cluster=self._cluster
+                )
 
                 self._procs = edl_train_process.start(
                     job_env=self._job_env,
@@ -235,7 +240,8 @@ class Launcher(object):
                     pod=self._pod,
                     training_script=self._args.training_script,
                     training_script_args=self._args.training_script_args,
-                    log_dir=self._args.log_dir)
+                    log_dir=self._args.log_dir,
+                )
 
             time.sleep(3)
 

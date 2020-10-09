@@ -69,8 +69,11 @@ class PodData(object):
             else:
                 break
 
-        logger.debug("batch_data_ids:{}, queue:{}".format(
-            len(self._batch_data_ids), len(self._queue)))
+        logger.debug(
+            "batch_data_ids:{}, queue:{}".format(
+                len(self._batch_data_ids), len(self._queue)
+            )
+        )
         return a
 
     def put(self, data_server_endpoint, batch_data_ids):
@@ -81,8 +84,11 @@ class PodData(object):
             self._queue.append(batch_data_id)
             self._batch_data_ids.add(batch_data_id)
 
-        logger.debug("batch_data_ids:{}, queue:{}".format(
-            len(self._batch_data_ids), len(self._queue)))
+        logger.debug(
+            "batch_data_ids:{}, queue:{}".format(
+                len(self._batch_data_ids), len(self._queue)
+            )
+        )
 
 
 class PodsData(object):
@@ -148,7 +154,7 @@ class PodsData(object):
             dst.producer_pod_id = src._pod_id
             dst.data_server_endpoint = src._data_server_endpoint
 
-            pop_num = (src.get_size() - avg_num)
+            pop_num = src.get_size() - avg_num
             ids = src.pop(pop_num)
             if len(ids) <= 0:
                 continue
@@ -173,8 +179,11 @@ class PodsData(object):
 
             self._barrier_ids.add(pod_id)
             if (self._barrier_ids | self._reach_data_end_ids) != self._pod_ids:
-                logger.debug("barrier_ids:{} readch_data_end_ids:{}".format(
-                    len(self._barrier_ids), len(self._reach_data_end_ids)))
+                logger.debug(
+                    "barrier_ids:{} readch_data_end_ids:{}".format(
+                        len(self._barrier_ids), len(self._reach_data_end_ids)
+                    )
+                )
                 return
 
             avg_num = total / len(self._pod_ids)
@@ -195,17 +204,22 @@ class PodsData(object):
                 if len(ids) >= avg_num:
                     dst.batch_data_ids.extend(ids)
                     self._balanced_batch_data[pod_id].append(dst)
-                    logger.debug("balance_data_ids:{}".format(
-                        len(self._balanced_batch_data[pod_id])))
+                    logger.debug(
+                        "balance_data_ids:{}".format(
+                            len(self._balanced_batch_data[pod_id])
+                        )
+                    )
                 else:
                     need_num = avg_num - len(ids)
-                    ret = self._get_batch_data_id_from_others(avg_num,
-                                                              need_num)
+                    ret = self._get_batch_data_id_from_others(avg_num, need_num)
                     if len(ret) <= 0:
                         continue
                     self._balanced_batch_data[pod_id].extend(ret)
-                    logger.debug("balance_data_ids:{}".format(
-                        len(self._balanced_batch_data[pod_id])))
+                    logger.debug(
+                        "balance_data_ids:{}".format(
+                            len(self._balanced_batch_data[pod_id])
+                        )
+                    )
 
             self._barrier_ids = set()
 
@@ -234,8 +248,7 @@ class PodsData(object):
 
 
 class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
-    def __init__(self, trainer_env, reader_name, file_list, pod_ids,
-                 local_reader):
+    def __init__(self, trainer_env, reader_name, file_list, pod_ids, local_reader):
         self._lock = threading.Lock()
         self._trainer_env = trainer_env
         # string list
@@ -251,7 +264,9 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
         if self._trainer_env.global_rank != 0:
             raise exceptions.EdlNotLeaderError(
                 "This server rank:{} is not Leader".format(
-                    self._trainer_env.global_rank))
+                    self._trainer_env.global_rank
+                )
+            )
 
     # only leader can do this
     def ReportBatchDataMeta(self, request, context):
@@ -262,12 +277,13 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
             self._check_reader_name(request.reader_name)
 
             if len(request.batch_data_ids) > 0:
-                self._pod_data.put(request.pod_id,
-                                   request.data_server_endpoint,
-                                   request.batch_data_ids)
+                self._pod_data.put(
+                    request.pod_id, request.data_server_endpoint, request.batch_data_ids
+                )
 
         except Exception as e:
             import traceback
+
             exceptions.serialize(res, e, traceback.format_exc())
         return res
 
@@ -281,6 +297,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
             self._pod_data.set_data_end(request.pod_id)
         except Exception as e:
             import traceback
+
             exceptions.serialize(res, e, traceback.format_exc())
         return res
 
@@ -295,6 +312,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
             self._pod_data.pop(request.pod_id, res.data, timeout=60)
         except Exception as e:
             import traceback
+
             exceptions.serialize(res, e, traceback.format_exc())
         return res
 
@@ -307,6 +325,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
                 res.datas.append(b)
         except Exception as e:
             import traceback
+
             exceptions.serialize(res, e, traceback.format_exc())
         return res
 
@@ -314,17 +333,20 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
         for i, ele in enumerate(file_list):
             if self._file_list[i] != ele.path:
                 raise exceptions.EdlFileListNotMatchError(
-                    "client:{} server:{}".format(file_list, self._file_list))
+                    "client:{} server:{}".format(file_list, self._file_list)
+                )
 
     def _check_pod_id(self, pod_id):
         if pod_id not in self._pod_ids:
             raise exceptions.EdlPodIDNotExistError(
-                "pod_id:{} not exist in {}".format(pod_id, self._pod_ids))
+                "pod_id:{} not exist in {}".format(pod_id, self._pod_ids)
+            )
 
     def _check_reader_name(self, reader_name):
         if reader_name != self._reader_name:
-            raise exceptions.EdlReaderNameError("{} not equal {}".format(
-                reader_name, self._reader_name))
+            raise exceptions.EdlReaderNameError(
+                "{} not equal {}".format(reader_name, self._reader_name)
+            )
 
     # only leader can do this
     def GetFileList(self, request, context):
@@ -365,22 +387,30 @@ class Server(object):
     def start(self, addr, cache_capcity=1000, max_workers=100, concurrency=20):
         server = grpc.server(
             futures.ThreadPoolExecutor(max_workers=max_workers),
-            options=[('grpc.max_send_message_length', 1024 * 1024 * 1024),
-                     ('grpc.max_receive_message_length', 1024 * 1024 * 1024)],
-            maximum_concurrent_rpcs=concurrency)
+            options=[
+                ("grpc.max_send_message_length", 1024 * 1024 * 1024),
+                ("grpc.max_receive_message_length", 1024 * 1024 * 1024),
+            ],
+            maximum_concurrent_rpcs=concurrency,
+        )
         data_server_pb2_grpc.add_DataServerServicer_to_server(
             DataServerServicer(
                 trainer_env=self._trainer_env,
                 reader_name=self._reader_name,
                 file_list=self._file_list,
                 pod_ids=self._trainer_env.pod_ids,
-                local_reader=self._local_reader),
-            server)
+                local_reader=self._local_reader,
+            ),
+            server,
+        )
 
         self._addr = addr
-        self._port = server.add_insecure_port('{}:0'.format(addr))
-        assert self._port > 0, "data server start on endpoint:{} error, selected port is {}".format(
-            endpoint, self._port)
+        self._port = server.add_insecure_port("{}:0".format(addr))
+        assert (
+            self._port > 0
+        ), "data server start on addr:{} error, selected port is {}".format(
+            addr, self._port
+        )
         self._endpoint = "{}:{}".format(self._addr, self._port)
 
         server.start()

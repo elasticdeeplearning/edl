@@ -22,9 +22,9 @@ from .log_utils import logger
 def get_gpus():
     cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES")
     if cuda_visible_devices is None or cuda_visible_devices == "":
-        selected_gpus = [x.strip() for x in selected_gpus.split(',')]
+        selected_gpus = [x.strip() for x in cuda_visible_devices.split(",")]
     else:
-        selected_gpus = cuda_visible_devices.split(',')
+        selected_gpus = cuda_visible_devices.split(",")
 
     logger.info("get selected_gpus:{}".format(selected_gpus))
     return selected_gpus
@@ -43,55 +43,66 @@ class JobEnv(object):
             ports = os.getenv("PADDLE_TRAINER_PORTS", "")
             self._trainer_ports = ports.split(",")
 
-            assert len(ports) >= len(self._gpus), \
-                "port num:{} must large than gpus:{}".format(len(self._trainer_ports), len(self._gpus))
+            assert len(ports) >= len(
+                self._gpus
+            ), "port num:{} must large than gpus:{}".format(
+                len(self._trainer_ports), len(self._gpus)
+            )
             logger.info("get ports from env:{}".format(self._trainer_ports))
         else:
             assert len(self._gpus) > 0, "gpus must be visible, now:{}".format(
-                self._gpus)
-            self._trainer_ports = list(
-                network_utils.find_free_ports(len(self._gpus)))
-            logger.info("get ports from unused:{} now gpus:{}".format(
-                self._trainer_ports, self._gpus))
+                self._gpus
+            )
+            self._trainer_ports = list(network_utils.find_free_ports(len(self._gpus)))
+            logger.info(
+                "get ports from unused:{} now gpus:{}".format(
+                    self._trainer_ports, self._gpus
+                )
+            )
 
     def _get_hdfs(self, args):
         # hdfs
-        self._hdfs_home = get_from_dict_or_env(args, "hdfs_home",
-                                               "PADDLE_EDL_HDFS_HOME")
-        self._hdfs_name = get_from_dict_or_env(args, "hdfs_name",
-                                               "PADDLE_EDL_HDFS_NAME")
-        self._hdfs_path = get_from_dict_or_env(args, "hdfs_path",
-                                               "PADDLE_EDL_HDFS_PATH")
-        self._hdfs_ugi = get_from_dict_or_env(args, "hdfs_ugi",
-                                              "PADDLE_EDL_HDFS_UGI")
+        self._hdfs_home = get_from_dict_or_env(
+            args, "hdfs_home", "PADDLE_EDL_HDFS_HOME"
+        )
+        self._hdfs_name = get_from_dict_or_env(
+            args, "hdfs_name", "PADDLE_EDL_HDFS_NAME"
+        )
+        self._hdfs_path = get_from_dict_or_env(
+            args, "hdfs_path", "PADDLE_EDL_HDFS_PATH"
+        )
+        self._hdfs_ugi = get_from_dict_or_env(args, "hdfs_ugi", "PADDLE_EDL_HDFS_UGI")
 
     def _get_nodes_ranges(self, args):
         # nodes range
-        self._nodes_range = get_from_dict_or_env(args, "nodes_range",
-                                                 "PADDLE_EDLNODES_RANAGE")
+        self._nodes_range = get_from_dict_or_env(
+            args, "nodes_range", "PADDLE_EDLNODES_RANAGE"
+        )
         assert self._nodes_range is not None, "nodes range must set"
         a = self._nodes_range.split(":")
         assert len(a) == 2, "nodes_range not a valid format:{}".format(
-            self._nodes_range)
+            self._nodes_range
+        )
         self._min_nodes = int(a[0])
         self._max_nodes = int(a[1])
 
     def _get_gpus(self, args):
         # selected gpus
         self._gpus = get_gpus()
-        assert self._gpus != None, "can't get gpu info of this machine"
+        assert self._gpus is not None, "can't get gpu info of this machine"
 
         # proc per node
-        nproc_per_node = get_from_dict_or_env(args, "nproc_per_node",
-                                              "PADDLE_EDL_NPROC_PERNODE")
+        nproc_per_node = get_from_dict_or_env(
+            args, "nproc_per_node", "PADDLE_EDL_NPROC_PERNODE"
+        )
         if nproc_per_node is None or nproc_per_node == "":
             self._nproc_per_node = len(self._gpus)
         else:
             self._nproc_per_node = int(nproc_per_node)
 
-        assert len(
-            self._gpus
-        ) >= self._nproc_per_node, "gpu's num must larger than procs need to run"
+        assert (
+            len(self._gpus) >= self._nproc_per_node
+        ), "gpu's num must larger than procs need to run"
 
     def __init__(self, args):
         # run platform
@@ -102,8 +113,9 @@ class JobEnv(object):
         assert self._job_id, "job_id must has valid value "
 
         # etcd
-        etcd_endpoints = get_from_dict_or_env(args, "etcd_endpoints",
-                                              "PADDLE_ETCD_ENDPOINTS")
+        etcd_endpoints = get_from_dict_or_env(
+            args, "etcd_endpoints", "PADDLE_ETCD_ENDPOINTS"
+        )
         assert etcd_endpoints != "", "etcd_endpoints must has valid value "
         self._etcd_endpoints = etcd_endpoints.split(",")
 
@@ -113,18 +125,21 @@ class JobEnv(object):
         self._get_gpus(args)
         self._get_ports(args)
 
-        #self._up_limit_nodes = int(
-        #    os.getenv("PADDLE_EDL_UP_LIMIT_NODES", 1024))
+        # self._up_limit_nodes = int(
+        #     os.getenv("PADDLE_EDL_UP_LIMIT_NODES", 1024))
 
         # assert hdfs value
         if not self._ce_test:
-            assert len(self._hdfs_home) > 3 and \
-                len(self._hdfs_name) > 6 and \
-                len(self._hdfs_ugi) > 3 and \
-                len(self._hdfs_path) > 0, "hdfs environ must set"
+            assert (
+                len(self._hdfs_home) > 3
+                and len(self._hdfs_name) > 6
+                and len(self._hdfs_ugi) > 3
+                and len(self._hdfs_path) > 0
+            ), "hdfs environ must set"
         else:
-            assert len(self._hdfs_home) > 3 and \
-                len(self._hdfs_path) > 0, "hdfs environ must set"
+            assert (
+                len(self._hdfs_home) > 3 and len(self._hdfs_path) > 0
+            ), "hdfs environ must set"
 
     @property
     def gpus(self):
@@ -155,7 +170,6 @@ class JobEnv(object):
         return self._max_nodes
 
     def __str__(self):
-        d = vars(self)
         s = ""
         for k, v in six.iteritems(vars(self)):
             s += "{}:{} ".format(k, v)
@@ -164,7 +178,7 @@ class JobEnv(object):
 
 class TrainerEnv(object):
     """
-    Parse all envs when edl_launch starts a trainer. 
+    Parse all envs when edl_launch starts a trainer.
     """
 
     def __init__(self, args=None):

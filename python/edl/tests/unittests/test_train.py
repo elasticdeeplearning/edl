@@ -14,50 +14,55 @@
 
 import unittest
 import edl
-from edl.utils.log_utils import logger
+from edl.tests.unittests import etcd_test_base
+from edl.collective import dataset
+
 
 def adjust():
-    learing_rate = learning_rate * edl.size()
+    learing_rate = 1.0 * edl.size()  # noqa: F841
+
 
 class TestDataReader(etcd_test_base.EtcdTestBase):
     def _read_data(self):
         self._file_list = ["./data_server/a.txt", "./data_server/b.txt"]
         self._data = {}
         for idx, p in enumerate(self._file_list):
-            s = TxtFileSplitter(p)
-            m = FileMeta()
-            for r in s:
-                if idx not in d:
+            reader = dataset.TxtFileSplitter(p)
+            for rec in reader:
+                if idx not in self._data:
                     self._data[idx] = []
-                record = ((p), (r[0], r[1:]))
-                self._data[idx].append(
-                    record)  #[(path),(rec_no, splitted_fiels)]...
+                self._data[idx].append(rec)
 
     def _train(self, state):
-        learning_rate = 1.0
-        start_program = None
-        main_program = None
-        exe = None
+        # learning_rate = 1.0
+        # start_program = None
+        # main_program = None
+        # exe = None
 
         reader = edl.DistributeReader(
             state=state,
             file_list=self._file_list,
-            file_splitter_cls=TxtFileSplitter,
-            batch_size=1)
+            file_splitter_cls=dataset.TxtFileSplitter,
+            batch_size=1,
+        )
 
         for epoch in range(state.epoch, 5):
             for meta, batch in reader:
-                print("epoch_no:",epoch)
+                print("epoch_no:", epoch)
                 edl.notify_end_one_batch(meta, state)
             edl.notify_end_one_epoch(state)
 
     def test_data_reader(self):
+        exe = None
+        main_program = None
+        start_program = None
+        optimizer = None
         state = edl.PaddleState(
-            exe, start_program, main_program, optimizer, max_epoch_num=5)
+            exe, start_program, main_program, optimizer, max_epoch_num=5
+        )
         state.register_adjust_function([adjust])
         self._train(state)
 
 
-if __name__ == '__main__':
-
+if __name__ == "__main__":
     unittest.main()

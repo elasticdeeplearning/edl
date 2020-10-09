@@ -34,8 +34,7 @@ class TestEtcd(unittest.TestCase):
         assert len(servers) == 2, "must two servers"
 
         for server_meta in servers:
-            value = local_servers[string_utils.bytes_to_string(
-                server_meta.server)]
+            value = local_servers[string_utils.bytes_to_string(server_meta.server)]
             assert value == string_utils.bytes_to_string(server_meta.info)
 
     def refresh(self):
@@ -68,12 +67,18 @@ class TestEtcd(unittest.TestCase):
 
         def watch_call_back(add_servers, rm_servers):
             for server_meta in add_servers:
-                print('put server:{} value:{}'.format(server_meta.server,
-                                                      server_meta.info))
+                print(
+                    "put server:{} value:{}".format(
+                        server_meta.server, server_meta.info
+                    )
+                )
                 events.append(server_meta)
             for server_meta in rm_servers:
-                print('delete server:{} value:{}'.format(server_meta.server,
-                                                         server_meta.info))
+                print(
+                    "delete server:{} value:{}".format(
+                        server_meta.server, server_meta.info
+                    )
+                )
                 events.append(server_meta)
 
         watch_id = self.etcd.watch_service("job_2", watch_call_back)
@@ -88,8 +93,8 @@ class TestEtcd(unittest.TestCase):
 
         print("events len:", len(events))
         assert len(events) == 1
-        assert string_utils.bytes_to_string(events[0].server) == '127.0.0.1:1'
-        assert string_utils.bytes_to_string(events[0].info) == 'first'
+        assert string_utils.bytes_to_string(events[0].server) == "127.0.0.1:1"
+        assert string_utils.bytes_to_string(events[0].info) == "first"
 
     def test_lease(self):
         self.add()
@@ -100,13 +105,12 @@ class TestEtcd(unittest.TestCase):
             time.sleep(2)
 
     def test_permanent(self):
-        self.etcd.set_server_not_exists(
-            "job_permanent", "127.0.0.1:1", "first", ttl=6)
+        self.etcd.set_server_not_exists("job_permanent", "127.0.0.1:1", "first", ttl=6)
         self.etcd.set_server_permanent("job_permanent", "127.0.0.1:1", "first")
         time.sleep(10)
         servers = self.etcd.get_service("job_permanent")
         assert len(servers) == 1, "server must exist"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
