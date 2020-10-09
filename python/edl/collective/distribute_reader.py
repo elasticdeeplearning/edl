@@ -24,23 +24,17 @@ from edl.utils.log_utils import logger
 
 class Reader(object):
     def __init__(
-        self,
-        state,
-        file_list,
-        file_splitter_cls,
-        batch_size,
-        # fields,
-        cache_capcity=100,
+        self, state, file_list, file_splitter_cls, batch_size, cache_capcity=100,
     ):
         self._file_list = file_list
-        assert isinstance(self._file_list, list), "file_list must be a list"
+        assert isinstance(self._file_list, list), "file_list must be a list of string"
         self._state = state
 
         self._name = unique_name.generator("_dist_reader_")
 
         self._cls = file_splitter_cls
         self._batch_size = batch_size
-        # self._fields = fields
+
         assert self._batch_size > 0, "batch size must > 0"
         self._cache_capcity = cache_capcity
 
@@ -57,16 +51,19 @@ class Reader(object):
         self._accesser_out_queue = multiprocessing.Queue(self._cache_capcity)
         self._accesser_error_queue = multiprocessing.Queue()
 
-    def stop(self):
-        if self._generater:
-            self._generater.terminate()
-            self._generater.join()
-            self._generater = None
+        self._logger_no = 0
 
-        if self._accesser:
-            self._accesser.terminate()
-            self._accesser.join()
-            self._accesser = None
+    def _terminate_process(self, proc):
+        if proc is None:
+            return
+
+        proc.terminate()
+        proc.join()
+        proc = None
+
+    def stop(self):
+        self._terminate_process(self._generator)
+        self._terminate_process(self._accesser)
 
     def __exit__(self):
         self.stop()
@@ -81,12 +78,22 @@ class Reader(object):
             return False
 
         if len(error_queue) > 0:
-            raise exceptions.EdlAccessDataError(error_queue[0])
+            raise exceptions.EdlDataProcessError(error_queue[0])
         else:
-            raise exceptions.EdlAccessDataError("process exit:{}".format(exitcode))
+            raise exceptions.EdlDataProcessError("process exit:{}".format(exitcode))
 
     def _start_generator(self):
         args = batch_data_generator.Args()
+        args.state = self._state
+        args.reader_leader_endpoint = self._reader_leader.endpoint
+        args.reader_name = self._reader_leader.name
+        args.pod_id = self._pod_id
+        args.all_file_list = self._file_list
+        args.splitter_cls = self._splitter_cls
+        args.out_queue = self._generater_out_queue
+        args.error_queue = self._generater_error_queue
+        args.loger_name = "{}_generator_{}.log".format(self._name, self._logger_no)
+
         self._generator = multiprocessing.Process(
             target=batch_data_generator.generate, args=args
         )
@@ -94,13 +101,23 @@ class Reader(object):
 
     def _start_accesser(self):
         args = batch_data_accesser.Args()
+        args.reader_leader_endpoint = self._reader_leader.endpoint
+        args.reader_name = self._reader_leader.name
+        args.input_queue = self._generater_out_queue
+        args.trainer_env = self._trainer_env
+        args.out_queue = self._accesser_out_queue
+        args.queue_size = self._cache_capcity
+        args.loger_name = "{}_accesser_{}.log".format(self._name, self._logger_no)
+
         self._accesser = multiprocessing.Process(
             batch_data_accesser.generate, args=(args)
         )
+        self._accesser.start()
 
     def __iter__(self):
         self._start_generator()
         self._start_accesser()
+        self._logger_no += 1
 
         while True:
             if not self._check(self._accesser, self._accesser_error_queue):
@@ -115,6 +132,6 @@ class Reader(object):
                 continue
 
             if b is None:
-                logger.info("{} reach data end".format(self._name))
+                logger.info("distributed reader {} reach data end".format(self._name))
                 break
             yield {"meta": b[0], "data": b[1]}

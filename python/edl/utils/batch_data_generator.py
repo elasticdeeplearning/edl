@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import print_function
-import os
 from edl.utils import data_server_client
 from edl.utils import data_server_pb2
 from edl.utils import edl_process
@@ -20,16 +19,18 @@ from edl.utils import edl_process
 
 logger = None
 
+
 class Args(object):
     def __init__(self):
         self.state = None
-        self.reader_leader_endpoint= None
-        self.reader_name= None
-        self.pod_id= None
-        self.all_files_list= None
-        self.splitter_cls= None
-        self.out_queue= None
-        self.error_queue= None
+        self.reader_leader_endpoint = None
+        self.reader_name = None
+        self.pod_id = None
+        self.all_files_list = None
+        self.splitter_cls = None
+        self.out_queue = None
+        self.error_queue = None
+
 
 class Generator(edl_process.ProcessWrapper):
     """
@@ -50,7 +51,6 @@ class Generator(edl_process.ProcessWrapper):
         self._file_list = args.all_files_list
         self._splitter_cls = args.splitter_cls
         self._data_queue = args.out_queue
-        self._error_queue = args.error_queue
         self._batch_data_ids = []
 
     def _get_file_list(self, timeout=60):
@@ -59,7 +59,9 @@ class Generator(edl_process.ProcessWrapper):
             leader_endpoint=self._leader_endpoint,
             reader_name=self._reader_name,
             pod_id=self._pod_id,
-            file_list=self._file_list)
+            file_list=self._file_list,
+            timeout=timeout,
+        )
 
     def _generate_batch_data(self):
         self._batch_data_id += 1
@@ -77,7 +79,9 @@ class Generator(edl_process.ProcessWrapper):
                     reader_name=self._name,
                     pod_id=self._trainer_env.pod_id,
                     dataserver_endpoint=self._data_server.endpoint,
-                    batch_data_ids=batch_data_ids)
+                    batch_data_ids=self._batch_data_ids,
+                )
+                self._batch_data_ids = []
                 return
 
         if len(self._batch_data_ids) <= report_size - 1:
@@ -89,7 +93,8 @@ class Generator(edl_process.ProcessWrapper):
             reader_name=self._name,
             pod_id=self._trainer_env.pod_id,
             dataserver_endpoint=self._data_server.endpoint,
-            batch_data_ids=self._batch_data_ids)
+            batch_data_ids=self._batch_data_ids,
+        )
         self._batch_data_ids = []
 
     def _read_batch_data(self):
@@ -101,15 +106,14 @@ class Generator(edl_process.ProcessWrapper):
             assert self._file_list[ele.idx] == ele.path
             logger.info("begin process file {}:{}".format(ele.idx, ele.path))
 
-            for record in self._splitter_cls(ele.path):
-                fields = record
-
+            for fields in self._splitter_cls(ele.path):
                 rec = data_server_pb2.Record()
                 rec.record_no = fields[0]
-                assert isinstance(rec.record_no,int), \
-                    "first element of splitter_cls must be the record index of this file"
+                assert isinstance(
+                    rec.record_no, int
+                ), "first element of splitter_cls must be the record index of this file"
 
-                #FIXME(gongwb) filter it
+                # FIXME(gongwb) filter it
                 for field in fields[1:]:
                     rec.field_data.append(field)
                 batch_data.records.append(rec)
@@ -131,18 +135,22 @@ class Generator(edl_process.ProcessWrapper):
         self._client.reach_data_end(
             reader_leader_endpoint=self._reader_leader_endpoint,
             reader_name=self._name,
-            pod_id=self._trainer_env.pod_id)
+            pod_id=self._trainer_env.pod_id,
+            timeout=60,
+        )
 
-def generate(args)
-    log_file_name = "edl_data_generator_{}.log".format(os.getpid())
+
+def generate(args):
     from edl.utils import log_utils
+
     global logger
-    logger = log_utils.get_logger(log_level=20, log_file_name=log_file_name)
+    logger = log_utils.get_logger(log_level=20, log_file_name=args.loger_file_name)
     logger.info("args:{}".format(args))
 
     try:
         generator = Generator(args)
         generator.read_batch_data()
-    except:
+    except Exception:
         import traceback
+
         args.error_queue.put(traceback.format_exc())

@@ -13,8 +13,6 @@
 # limitations under the License.
 from __future__ import print_function
 
-import sys
-import os
 import threading
 
 from edl.uitls import reader as edl_reader
@@ -24,32 +22,35 @@ from edl.utils import etcd_db
 
 logger = None
 
+
 class Args(object):
     def __init__(self):
-        self.reader_leader_endpoint= None
-        self.reader_name= None
-        self.trainer_env= None
-        self.input_queue= None
-        self.out_queue= None
-        self.queue_size= None
+        self.reader_leader_endpoint = None
+        self.reader_name = None
+        self.trainer_env = None
+        self.input_queue = None
+        self.out_queue = None
+        self.queue_size = None
+        self.error_queue = None
+
 
 class Accesser(object):
     """
     1. get data from batch_data_generator
-    2. report batch_data_meta to data_server_leader
-    3. get batch_data_meta from data_server_leader
-    4. get batch_data by batch_data_meta
+    2. get batch_data_meta from data_server_leader
+    3. get batch_data by batch_data_meta
     """
+
     def __init__(self, args):
         self._reader_leader_endpoint = args.reader_leader_endpoint
 
-        self._reader_name = argsreader_name
-        self._trainer_env = argstrainer_env
-        self._etcd = None
+        self._reader_name = args.reader_name
+        self._trainer_env = args.trainer_env
+        # self._etcd = None
 
         # BatchData
-        self._input_queue = argsinput_queue
-        self._out_queue = argsout_queue
+        self._input_queue = args.input_queue
+        self._out_queue = args.out_queue
         # batch_data_id => BatchData
         self._cache = {}
 
@@ -59,9 +60,9 @@ class Accesser(object):
         self._data_server = None
 
         self._stop = threading.Event()
-        self._t_reporter = threading.Thread(target=self.report)
-        self._t_generater = threading.Thread(target=self.generate)
-        self._t_accesser = threading.Thread(target=self.access)
+        # self._t_reporter = threading.Thread(target=self._report)
+        self._t_generater = threading.Thread(target=self._generate)
+        self._t_accesser = threading.Thread(target=self._access)
 
         self._client = data_server_client.Client()
 
@@ -73,40 +74,47 @@ class Accesser(object):
             self.__exit__()
 
     def __exit__(self):
-        if self._t_generater is None:
+        # if self._t_reporter is not None:
+        #    self._t_reporter.join()
+
+        if self._t_generater is not None:
             self._t_generater.join()
 
-        if self._t_accesser is None:
+        if self._t_accesser is not None:
             self._t_accesser.join()
 
-        self._t_accesser=None
-        self._t_generater=None
+        # self._t_reporter = None
+        self._t_accesser = None
+        self._t_generater = None
 
     def _start(self):
         self._data_server = data_server.Server(self)
         self._data_server.start()
 
-        self._etcd = etcd_db.get_global_etcd(
-            self._trainer_env.etcd_endpoint, job_id=self._trainer_env.job_id)
+        etcd = etcd_db.get_global_etcd(
+            self._trainer_env.etcd_endpoint, job_id=self._trainer_env.job_id
+        )
 
         edl_reader.save_to_etcd(
-            self._etcd,
+            etcd,
             reader_name=self._reader_name,
             pod_id=self._trainer_env.pod_id,
             data_server_endpoint=self._data_server.endpoint,
-            timeout=30)
+            timeout=30,
+        )
 
         self._client.connect(self._reader_leader_endpoint)
-        self._t_reporter.start()
+        # self._t_reporter.start()
         self._t_generater.start()
         self._t_accesser.start()
 
     def _access(self):
         while not self._stop.set():
-            res = self._client.get_balanced_batch_data(
+            res = self._client.get_batch_data_meta(
                 reader_leader_endpoint=self._reader_leader_endpoint,
                 reader_name=self._name,
-                pod_id=self._trainer_env.pod_id)
+                pod_id=self._trainer_env.pod_id,
+            )
 
             self._req_queue.put(res)
 
@@ -145,15 +153,16 @@ class Accesser(object):
 
 
 def generate(args):
-    log_file_name = "edl_data_generator_{}.log".format(os.getpid())
     from edl.utils import log_utils
+
     global logger
-    logger = log_utils.get_logger(log_level=20, log_file_name=log_file_name)
+    logger = log_utils.get_logger(log_level=20, log_file_name=args.loger_file_name)
     logger.info("args:{}".format(args))
 
     try:
         accesser = Accesser(args)
         accesser.start()
-    except:
+    except Exception:
         import traceback
+
         args.error_queue.put(traceback.format_exc())
