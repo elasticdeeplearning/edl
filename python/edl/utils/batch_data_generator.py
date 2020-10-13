@@ -14,7 +14,6 @@
 from __future__ import print_function
 from edl.utils import data_server_client
 from edl.utils import data_server_pb2
-from edl.utils import edl_process
 
 
 logger = None
@@ -32,7 +31,7 @@ class Args(object):
         self.error_queue = None
 
 
-class Generator(edl_process.ProcessWrapper):
+class Generator(object):
     """
     1. get file_list from data_server_leader
     2. parse files of file_list and put BatchData to out_quque

@@ -14,7 +14,7 @@
 from __future__ import print_function
 
 import multiprocessing
-from edl.uitls import reader as edl_reader
+from edl.utils import reader as edl_reader
 from edl.utils import batch_data_generator
 from edl.utils import batch_data_accesser
 from edl.utils import exceptions
@@ -68,7 +68,7 @@ class Reader(object):
     def __exit__(self):
         self.stop()
 
-    def _check(self, proc, error_queue):
+    def _check_proc(self, proc, error_queue):
         if self.proc.is_alive():
             return True
 
@@ -79,8 +79,9 @@ class Reader(object):
 
         if len(error_queue) > 0:
             raise exceptions.EdlDataProcessError(error_queue[0])
-        else:
-            raise exceptions.EdlDataProcessError("process exit:{}".format(exitcode))
+            return
+
+        raise exceptions.EdlDataProcessError("process exit:{}".format(exitcode))
 
     def _start_generator(self):
         args = batch_data_generator.Args()
@@ -93,6 +94,7 @@ class Reader(object):
         args.out_queue = self._generater_out_queue
         args.error_queue = self._generater_error_queue
         args.loger_name = "{}_generator_{}.log".format(self._name, self._logger_no)
+        logger.debug("start generator args {}".format(args))
 
         self._generator = multiprocessing.Process(
             target=batch_data_generator.generate, args=args
@@ -108,6 +110,7 @@ class Reader(object):
         args.out_queue = self._accesser_out_queue
         args.queue_size = self._cache_capcity
         args.loger_name = "{}_accesser_{}.log".format(self._name, self._logger_no)
+        logger.debug("start accesser args {}".format(args))
 
         self._accesser = multiprocessing.Process(
             batch_data_accesser.generate, args=(args)
@@ -120,10 +123,10 @@ class Reader(object):
         self._logger_no += 1
 
         while True:
-            if not self._check(self._accesser, self._accesser_error_queue):
+            if not self._check_proc(self._accesser, self._accesser_error_queue):
                 break
 
-            if not self._check(self._generator, self._generater_error_queue):
+            if not self._check_proc(self._generator, self._generater_error_queue):
                 break
 
             try:

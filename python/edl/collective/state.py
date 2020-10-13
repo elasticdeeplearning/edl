@@ -21,7 +21,7 @@ from edl.utils import string_utils
 from edl.utils import train_status as edl_train_status
 from edl.utils import unique_name
 from edl.utils import env as edl_env
-from edl.utils import etcd_client
+from edl.discovery import etcd_client
 
 
 class DataCheckpoint(json_serializable.Serializable):

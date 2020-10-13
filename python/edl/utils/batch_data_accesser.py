@@ -15,7 +15,7 @@ from __future__ import print_function
 
 import threading
 
-from edl.uitls import reader as edl_reader
+from edl.utils import reader as edl_reader
 from edl.utils import data_server
 from edl.utils import data_server_client
 from edl.utils import etcd_db
