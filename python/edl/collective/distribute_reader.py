@@ -16,7 +16,7 @@ from __future__ import print_function
 import multiprocessing
 import sys
 import threading
-from edl.uitls import reader as edl_reader
+from edl.utils import reader as edl_reader
 from edl.utils import env as edl_env
 from edl.utils import state as edl_state
 
