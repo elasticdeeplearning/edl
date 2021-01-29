@@ -97,7 +97,7 @@ class Client(object):
 
     @error_utils.handle_errors_until_timeout
     def reach_data_end(self, reader_leader_endpoint, reader_name, pod_id, timeout=60):
-        conn = self.connect(reader_leader_endpoint, timeout=30)
+        conn = self._connect(reader_leader_endpoint, timeout=30)
 
         req = data_server_pb2.ReachDataEndRequest()
         req.reader_name = reader_name

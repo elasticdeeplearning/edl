@@ -22,7 +22,7 @@ from edl.utils import state as edl_state
 
 from edl.utils import data_server
 from edl.utils import data_server_pb2
-from edl.utils import edl_process
+from edl.utils import process as edl_process
 from edl.utils import data_server_client
 from edl.utils import etcd_db
 from edl.utils.log_utils import logger
@@ -150,10 +150,10 @@ class DataAccesser(object):
         self._t_generater = threading.Thread(target=self.generate)
         self._t_accesser = threading.Thread(target=self.access)
 
-        self._client = data_server_client.DataServerClient()
+        self._client = data_server_client.Client()
 
     def start(self):
-        self._client.connect(self._reader_leader_endpoint)
+        self._client._connect(self._reader_leader_endpoint)
         self._t_reporter.start()
         self._t_generater.start()
         self._t_accesser.start()
@@ -177,7 +177,7 @@ class DataAccesser(object):
 
             self._client.report_batch_data_meta(
                 reader_leader_endpoint=self._reader_leader_endpoint,
-                reader_name=self._name,
+                reader_name=self._reader_name,
                 pod_id=self._trainer_env.pod_id,
                 dataserver_endpoint=self._data_server.endpoint,
                 batch_data_ids=batch_data_ids,
@@ -188,7 +188,7 @@ class DataAccesser(object):
         while not self._stop.set() and len(batch_data_ids) > 0:
             self._client.report_batch_data_meta(
                 reader_leader_endpoint=self._reader_leader_endpoint,
-                reader_name=self._name,
+                reader_name=self._reader_name,
                 pod_id=self._trainer_env.pod_id,
                 dataserver_endpoint=self._data_server.endpoint,
                 batch_data_ids=batch_data_ids,
@@ -196,15 +196,15 @@ class DataAccesser(object):
 
         self._client.reach_data_end(
             reader_leader_endpoint=self._reader_leader_endpoint,
-            reader_name=self._name,
+            reader_name=self._reader_name,
             pod_id=self._trainer_env.pod_id,
         )
 
     def _access(self):
         while not self._stop.set():
-            res = self._client.get_balanced_batch_data(
+            res = self._client.get_batch_data_meta(
                 reader_leader_endpoint=self._reader_leader_endpoint,
-                reader_name=self._name,
+                reader_name=self._reader_name,
                 pod_id=self._trainer_env.pod_id,
             )
 
@@ -219,7 +219,7 @@ class DataAccesser(object):
         Read BatchData from local or remote by BatchDataRequest
         """
         if self._trainer_env.pod_id != req.producer_pod_id:
-            return (req, self._client.get_batch_data(req))
+            return (req, self._client.get_batch_data(self._reader_leader_endpoint, req))
 
         return (req, self.get_local_batch_data(req))
 
