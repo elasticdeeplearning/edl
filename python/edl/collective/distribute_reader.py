@@ -60,9 +60,9 @@ class DataGenerator(edl_process.ProcessWrapper):
         self._data_queue = out_queue
 
     def _get_file_list(self, timeout=60):
-        client = data_server_client.DataServerClient()
+        client = data_server_client.Client()
         return client.get_file_list(
-            leader_endpoint=self._leader_endpoint,
+            reader_leader_endpoint=self._leader_endpoint,
             reader_name=self._reader_name,
             pod_id=self._pod_id,
             file_list=self._file_list,
@@ -322,7 +322,7 @@ class Reader(object):
             self._trainer_env.endpoints, self._trainer_env.job_id
         )
         # reader meta
-        self._reader_leader = edl_reader.load_from_ectd(
+        self._reader_leader = edl_reader.load_from_etcd(
             self._etcd, self._trainer_env.pod_leader_id, timeout=60
         )
 
