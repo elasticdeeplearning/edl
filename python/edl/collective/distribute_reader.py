@@ -151,6 +151,7 @@ class DataAccesser(object):
         self._t_accesser = threading.Thread(target=self.access)
 
         self._client = data_server_client.Client()
+        self._lock = threading.Lock()
 
     def start(self):
         self._client._connect(self._reader_leader_endpoint)
