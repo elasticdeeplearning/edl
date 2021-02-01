@@ -62,12 +62,9 @@ class PodData(object):
 
     def pop(self, num):
         a = []
-        while len(self._queue) > 0:
-            if (num > 0 and len(a) < num) or num <= 0:
-                batch_data_id = self._queue.popleft()
-                a.append(batch_data_id)
-            else:
-                break
+        while len(self._queue) > 0 and ((num > 0 and len(a) < num) or num <= 0):
+            batch_data_id = self._queue.popleft()
+            a.append(batch_data_id)
 
         logger.debug(
             "batch_data_ids:{}, queue:{}".format(
