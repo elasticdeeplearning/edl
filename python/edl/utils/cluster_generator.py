@@ -203,7 +203,7 @@ class Generator(object):
             len(inited) > 0
             and current_cluster.get_pods_nranks() < self._job_env.max_nodes
         ):
-            train_status = edl_train_status.load_from_etcd(self._etcd, timeout=30)
+            train_status = edl_train_status.load_from_etcd(self._etcd, self._pod_id, timeout=30)
             if (
                 train_status == edl_train_status.TrainStatus.INITIAL
                 or train_status == edl_train_status.TrainStatus.RUNNING
