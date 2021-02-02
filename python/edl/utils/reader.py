@@ -77,9 +77,9 @@ def check_dist_readers(etcd):
     for s in servers:
         r = ReaderMeta.from_json(s.value)
 
-        readers[r.key] = r
+        readers[r._pod_id] = r
 
-    cluster = edl_cluster.get_cluster(etcd)
+    cluster = edl_cluster.wait_to_load_from_etcd(etcd)
     if cluster is None:
         raise exceptions.EdlTableError(
             "table:{} has no readers".format(constants.ETCD_CLUSTER)
