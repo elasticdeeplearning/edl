@@ -93,6 +93,10 @@ class EdlNotFoundLeader(EdlException):
     pass
 
 
+class EdlAccessDataError(EdlException):
+    pass
+
+
 def deserialize(pb_status):
     thismodule = sys.modules[__name__]
     try:
