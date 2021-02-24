@@ -245,7 +245,7 @@ class Launcher(object):
 
             time.sleep(3)
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_value, traceback):
         if self._leader_register is not None:
             self._leader_register.stop()
 

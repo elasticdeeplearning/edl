@@ -343,7 +343,7 @@ class Reader(object):
             self._accesser.join()
             self._accesser = None
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
 
     def _check_accesser(self):
