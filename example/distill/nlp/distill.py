@@ -30,7 +30,7 @@ import os
 import sys
 from paddle_serving_client import Client
 from paddle_serving_app.reader import ChineseBertReader
-from model import CNN, AdamW, evaluate_student, KL, BOW, KL_T
+from model import CNN, AdamW, evaluate_student, KL, BOW, KL_T, model_factory
 
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument(
@@ -53,7 +53,9 @@ parser.add_argument("--train_range", type=int, default=10, help="train range")
 parser.add_argument(
     "--use_data_au", type=int, default=1, help="use data augmentation")
 parser.add_argument(
-    "--T", type=float, default=2.0, help="weight of student in loss")
+    "--T", type=float, default=None, help="weight of student in loss")
+parser.add_argument(
+    "--model", type=str, default="BOW", help="student model name")
 args = parser.parse_args()
 print("parsed args:", args)
 
@@ -63,19 +65,16 @@ g_max_test_acc = []
 
 def train_with_distill(train_reader, dev_reader, word_dict, test_reader,
                        epoch_num):
-    boundaries = [2250 * 2, 2250 * 4, 2250 * 6]
-    values = [1e-4, 1.5e-4, 2.5e-4, 4e-4]
-    lr = D.PiecewiseDecay(boundaries, values, 0)
-    model = BOW(word_dict)
+    model = model_factory(args.model, word_dict)
     if args.opt == "Adam":
         opt = F.optimizer.Adam(
-            learning_rate=lr,
+            learning_rate=model.lr(steps_per_epoch=2250),
             parameter_list=model.parameters(),
             regularization=F.regularizer.L2Decay(
                 regularization_coeff=args.weight_decay))
     else:
         opt = AdamW(
-            learning_rate=lr,
+            learning_rate=model.lr(steps_per_epoch=2250),
             parameter_list=model.parameters(),
             weight_decay=args.weight_decay)
 
@@ -101,30 +100,34 @@ def train_with_distill(train_reader, dev_reader, word_dict, test_reader,
                                                   ) * loss_kd
             else:
                 loss_kd = KL_T(logits_s, logits_t, args.T)
-                loss = args.T * args.T * (args.s_weight * loss_ce +
-                                          (1.0 - args.s_weight) * loss_kd)
+                loss = args.T * args.T * (loss_ce + loss_kd)
+                #loss_kd = KL(logits_s, logits_t)
+                #loss = loss_ce +  loss_kd
 
             loss = L.reduce_mean(loss)
             loss.backward()
-            if step % 10 == 0:
+            if step % 100 == 0:
+                print("stduent logits:", logits_s)
+                print("teatcher logits:", logits_t)
                 print('[step %03d] distill train loss %.5f lr %.3e' %
                       (step, loss.numpy(), opt.current_step_lr()))
             opt.minimize(loss)
             model.clear_gradients()
         f1, acc = evaluate_student(model, dev_reader)
-        print('student on dev f1 %.5f acc %.5f' % (f1, acc))
+        print('student on dev f1 %.5f acc %.5f epoch_no %d' % (f1, acc, epoch))
 
         if max_dev_acc < acc:
             max_dev_acc = acc
 
         f1, acc = evaluate_student(model, test_reader)
-        print('student on test f1 %.5f acc %.5f' % (f1, acc))
+        print('student on test f1 %.5f acc %.5f epoch_no %d' %
+              (f1, acc, epoch))
 
         if max_test_acc < acc:
             max_test_acc = acc
 
-    g_max_dev_acc.append(g_max_dev_acc)
-    g_max_test_acc.append(g_max_test_acc)
+    g_max_dev_acc.append(max_dev_acc)
+    g_max_test_acc.append(max_test_acc)
 
 
 def ernie_reader(s_reader, key_list):
@@ -155,10 +158,7 @@ def ernie_reader(s_reader, key_list):
     return reader
 
 
-if __name__ == "__main__":
-    place = F.CUDAPlace(0)
-    D.guard(place).__enter__()
-
+def train():
     ds = ChnSentiCorp()
     word_dict = ds.student_word_dict("./data/vocab.bow.txt")
     batch_size = 16
@@ -195,14 +195,21 @@ if __name__ == "__main__":
         input_files, word_dict, batch_size=batch_size)
     dr_t = dr.set_batch_generator(ernie_reader(dr_train_reader, feed_keys))
 
+    train_with_distill(
+        dr_t, dev_reader, word_dict, test_reader, epoch_num=args.epoch_num)
+
+
+if __name__ == "__main__":
+    place = F.CUDAPlace(0)
+    D.guard(place).__enter__()
+
     for i in range(args.train_range):
-        train_with_distill(
-            dr_t, dev_reader, word_dict, test_reader, epoch_num=args.epoch_num)
+        train()
 
-    arr = np.array(g_max_dev_acc)
-    print("max_dev_acc:", arr, "average:", np.average(arr), "train_args:",
-          args)
+        arr = np.array(g_max_dev_acc)
+        print("max_dev_acc:", arr, "average:", np.average(arr), "train_args:",
+              args)
 
-    arr = np.array(g_max_test_acc)
-    print("max_test_acc:", arr, "average:", np.average(arr), "train_args:",
-          args)
+        arr = np.array(g_max_test_acc)
+        print("max_test_acc:", arr, "average:", np.average(arr), "train_args:",
+              args)

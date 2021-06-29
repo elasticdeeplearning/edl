@@ -30,6 +30,8 @@ import os
 import sys
 from paddle_serving_client import Client
 from paddle_serving_app.reader import ChineseBertReader
+from lstm import LSTM
+from nets import GRU
 
 
 class AdamW(F.optimizer.AdamOptimizer):
@@ -66,12 +68,15 @@ def KL_T(logits_s, logits_t, T=2.0):
     return loss
 
 
-def evaluate_student(model, test_reader):
+def evaluate_student(model, test_reader, batch_size=None):
     all_pred, all_label = [], []
     with D.base._switch_tracer_mode_guard_(is_train=False):
         model.eval()
         for step, (ids_student, labels, _) in enumerate(test_reader()):
-            _, logits = model(ids_student)
+            if batch_size is not None:
+                _, logits = model(ids_student, batch_size=batch_size)
+            else:
+                _, logits = model(ids_student)
             pred = L.argmax(logits, -1)
             all_pred.extend(pred.numpy())
             all_label.extend(labels.numpy())
@@ -105,6 +110,13 @@ class BOW(D.Layer):
             loss = None
         return loss, logits
 
+    def lr(self, steps_per_epoch):
+        values = [1e-4, 1.5e-4, 2.5e-4, 4e-4]
+        boundaries = [
+            steps_per_epoch * 2, steps_per_epoch * 4, steps_per_epoch * 6
+        ]
+        return D.PiecewiseDecay(boundaries, values, 0)
+
 
 class CNN(D.Layer):
     def __init__(self, word_dict):
@@ -133,3 +145,19 @@ class CNN(D.Layer):
         else:
             loss = None
         return loss, logits
+
+    def lr(self, steps_per_epoch=None):
+        return 1e-4
+
+
+def model_factory(model_name, word_dict):
+    if model_name == "BOW":
+        return BOW(word_dict)
+    elif model_name == "CNN":
+        return CNN(word_dict)
+    elif model_name == "LSTM":
+        return LSTM(word_dict)
+    elif model_name == "GRU":
+        return GRU(word_dict)
+    else:
+        assert False, "not supported model name:{}".format(model_name)
