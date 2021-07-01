@@ -16,13 +16,13 @@ from __future__ import print_function
 import multiprocessing
 import sys
 import threading
-from edl.uitls import reader as edl_reader
+from edl.utils import reader as edl_reader
 from edl.utils import env as edl_env
 from edl.utils import state as edl_state
 
 from edl.utils import data_server
 from edl.utils import data_server_pb2
-from edl.utils import edl_process
+from edl.utils import process as edl_process
 from edl.utils import data_server_client
 from edl.utils import etcd_db
 from edl.utils.log_utils import logger
@@ -60,9 +60,9 @@ class DataGenerator(edl_process.ProcessWrapper):
         self._data_queue = out_queue
 
     def _get_file_list(self, timeout=60):
-        client = data_server_client.DataServerClient()
+        client = data_server_client.Client()
         return client.get_file_list(
-            leader_endpoint=self._leader_endpoint,
+            reader_leader_endpoint=self._leader_endpoint,
             reader_name=self._reader_name,
             pod_id=self._pod_id,
             file_list=self._file_list,
@@ -150,10 +150,11 @@ class DataAccesser(object):
         self._t_generater = threading.Thread(target=self.generate)
         self._t_accesser = threading.Thread(target=self.access)
 
-        self._client = data_server_client.DataServerClient()
+        self._client = data_server_client.Client()
+        self._lock = threading.Lock()
 
     def start(self):
-        self._client.connect(self._reader_leader_endpoint)
+        self._client._connect(self._reader_leader_endpoint)
         self._t_reporter.start()
         self._t_generater.start()
         self._t_accesser.start()
@@ -177,7 +178,7 @@ class DataAccesser(object):
 
             self._client.report_batch_data_meta(
                 reader_leader_endpoint=self._reader_leader_endpoint,
-                reader_name=self._name,
+                reader_name=self._reader_name,
                 pod_id=self._trainer_env.pod_id,
                 dataserver_endpoint=self._data_server.endpoint,
                 batch_data_ids=batch_data_ids,
@@ -188,7 +189,7 @@ class DataAccesser(object):
         while not self._stop.set() and len(batch_data_ids) > 0:
             self._client.report_batch_data_meta(
                 reader_leader_endpoint=self._reader_leader_endpoint,
-                reader_name=self._name,
+                reader_name=self._reader_name,
                 pod_id=self._trainer_env.pod_id,
                 dataserver_endpoint=self._data_server.endpoint,
                 batch_data_ids=batch_data_ids,
@@ -196,15 +197,15 @@ class DataAccesser(object):
 
         self._client.reach_data_end(
             reader_leader_endpoint=self._reader_leader_endpoint,
-            reader_name=self._name,
+            reader_name=self._reader_name,
             pod_id=self._trainer_env.pod_id,
         )
 
     def _access(self):
         while not self._stop.set():
-            res = self._client.get_balanced_batch_data(
+            res = self._client.get_batch_data_meta(
                 reader_leader_endpoint=self._reader_leader_endpoint,
-                reader_name=self._name,
+                reader_name=self._reader_name,
                 pod_id=self._trainer_env.pod_id,
             )
 
@@ -219,7 +220,7 @@ class DataAccesser(object):
         Read BatchData from local or remote by BatchDataRequest
         """
         if self._trainer_env.pod_id != req.producer_pod_id:
-            return (req, self._client.get_batch_data(req))
+            return (req, self._client.get_batch_data(self._reader_leader_endpoint, req))
 
         return (req, self.get_local_batch_data(req))
 
@@ -322,7 +323,7 @@ class Reader(object):
             self._trainer_env.endpoints, self._trainer_env.job_id
         )
         # reader meta
-        self._reader_leader = edl_reader.load_from_ectd(
+        self._reader_leader = edl_reader.load_from_etcd(
             self._etcd, self._trainer_env.pod_leader_id, timeout=60
         )
 
@@ -342,7 +343,7 @@ class Reader(object):
             self._accesser.join()
             self._accesser = None
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
 
     def _check_accesser(self):

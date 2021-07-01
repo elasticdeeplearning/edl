@@ -82,5 +82,5 @@ class Register(object):
         with self._lock:
             return self._t_register is None
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_value, traceback):
         self.stop()

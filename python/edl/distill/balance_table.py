@@ -434,7 +434,7 @@ class BalanceTable(object):
 
         self._db.refresh(service_name, self._discovery_server)  # before watch, refresh
         # NOTE. start from revision + 1, that is after get_service
-        watch_id = self._db.watch_service(  # noqa: F841
+        self._db.watch_service(  # noqa: F841
             service_name, call_back, start_revision=revision + 1
         )
 

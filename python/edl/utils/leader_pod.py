@@ -130,7 +130,7 @@ class Register(object):
             self._generate_cluster.stop()
             logger.info("pod:{} leader_register stopped".format(self._pod_id))
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
 
     def is_stopped(self):

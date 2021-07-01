@@ -33,14 +33,13 @@ class ReaderMeta(object):
         }
         return json.dumps(d)
 
-    def from_json(self, s):
+    @classmethod
+    def from_json(cls, s):
         d = json.loads(s)
-        self._name = d["name"]
-        self._pod_id = d["pod_id"]
-        self._endpoint = d["endpoint"]
+        return cls(d["name"], d["pod_id"], d["endpoint"])
 
     def __str_(self):
-        return self._to_json()
+        return self.to_json()
 
 
 @error_utils.handle_errors_until_timeout
@@ -61,8 +60,7 @@ def load_from_etcd(self, etcd, reader_name, pod_id, timeout=60):
             "path:{}".format(etcd.get_full_path(path, pod_id))
         )
 
-    meta = ReaderMeta()
-    meta.from_json(value)
+    meta = ReaderMeta.from_json(value)
     logger.debug("get reader:{}".format(meta))
     return meta
 
@@ -77,12 +75,11 @@ def check_dist_readers(etcd):
 
     readers = {}
     for s in servers:
-        r = ReaderMeta()
-        r.from_json(s.value)
+        r = ReaderMeta.from_json(s.value)
 
-        readers[r.key] = r
+        readers[r._pod_id] = r
 
-    cluster = edl_cluster.get_cluster(etcd)
+    cluster = edl_cluster.wait_to_load_from_etcd(etcd)
     if cluster is None:
         raise exceptions.EdlTableError(
             "table:{} has no readers".format(constants.ETCD_CLUSTER)

@@ -89,9 +89,6 @@ class _ConsistentHashData(object):
 
     def get_node_nodes(self, key):
         # return node, nodes, version
-        if len(self._nodes) == 0:
-            return None, self._nodes, self._version
-
         node = self.get_node(key)
         return node, self._nodes, self._version
 

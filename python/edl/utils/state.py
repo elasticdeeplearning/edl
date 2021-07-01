@@ -108,7 +108,7 @@ class TrainStatus(json_serializable.Serializable):
         return self.get_epoch_attr(self._epoch_no)
 
     def update_current_epoch_attr(self, epoch_attr):
-        return self._update_epoch_attr(self._epoch_no, epoch_attr)
+        return self.update_epoch_attr(self._epoch_no, epoch_attr)
 
 
 class State(json_serializable.Serializable):
@@ -160,11 +160,11 @@ class State(json_serializable.Serializable):
 
     @property
     def total_batch_size(self):
-        return self._defaults["total_batch_size"]
+        return self._default["total_batch_size"]
 
     @total_batch_size.setter
     def total_batch_size(self, size):
-        self._defaults["total_batch_size"] = size
+        self._default["total_batch_size"] = size
 
 
 @error_utils.handle_errors_until_timeout
