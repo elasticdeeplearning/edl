@@ -372,7 +372,7 @@ class DataServerServicer(data_server_pb2_grpc.DataServerServicer):
             return res
 
 
-class DataServer(object):
+class Server(object):
     def __init__(self, trainer_env, reader_name, file_list, local_reader):
         self._server = None
         self._addr = None

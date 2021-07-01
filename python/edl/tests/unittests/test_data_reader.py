@@ -13,34 +13,91 @@
 # limitations under the License.
 
 import unittest
-from edl.collective.data_reader import DistributedDataReader
-from edl.collective.dataset import TxtFileSplitter
+import os
+
+from edl.collective import distribute_reader
+from edl.collective import dataset
+from edl.tests.unittests import etcd_trainer_test_base
+from edl.collective import state as edl_state
 
 
-class TestDataReader(unittest.TestCase):
+class Args(object):
+    def __init__(self):
+        self.job_id = None
+        self.pod_id = None
+        self.global_rank = None
+        self.rank_in_pod = None
+        self.trainer_endpoints = None
+        self.pod_ids = None
+        self.gpu_id = "0"
+
+
+class TestDataReader(etcd_trainer_test_base.EtcdTestBase):
+    def _init_args(self, pod_id, global_rank, rank_in_pod):
+        args = etcd_trainer_test_base.Args()
+        self.job_id = self._job_id
+        self.pod_id = str(pod_id)
+        self.global_rank = str(global_rank)
+        self.rank_in_pod = str(rank_in_pod)
+        self.trainer_endpoints = None
+        self.pod_ids = "0,1"
+        self.gpu_id = "0"
+
+        return args
+
+    def _update_env(self, pod_id, global_rank, rank_in_pod):
+        args = self._init_args(pod_id, global_rank, rank_in_pod)
+        proc_env = {
+            "PADDLE_JOB_ID": args.job_id,
+            "PADDLE_POD_ID": args.pod_id,
+            "EDL_POD_LEADER_ID": "0",
+            "PADDLE_ETCD_ENDPOINTS": "127.0.0.1:2379",
+            "PADDLE_TRAINER_ID": args.global_rank,
+            "PADDLE_TRAINER_RANK_IN_POD": args.rank_in_pod,
+            "EDL_POD_IDS": args.pod_ids,
+            "PADDLE_TRAINER_ENDPOINTS": args.trainer_endpoints,
+            "PADDLE_EDL_HDFS_HOME": "/usr/local/hadoop-2.7.7",
+            "PADDLE_EDL_HDFS_NAME": "",
+            "PADDLE_EDL_HDFS_UGI": "",
+            "PADDLE_EDL_HDFS_PATH": "hdfs://{}".format(args.job_id),
+            "PADDLE_EDL_ONLY_FOR_CE_TEST": "1",
+            "PADDLE_EDL_FS_CACHE": ".{}".format(args.job_id),
+            "PADDLE_EDL_SAVE_CHECKPOINT_INTER": "0",
+            "CUDA_VISIBLE_DEVICES": args.gpu_id,
+        }
+        os.environ.pop("https_proxy", None)
+        os.environ.pop("http_proxy", None)
+        os.environ.update(proc_env)
+
     def setUp(self):
+        self._job_id = "test_data_reader"
+        super(TestDataReader, self).setUp(self._job_id)
+
         self._file_list = ["./data_server/a.txt", "./data_server/b.txt"]
         self._data = {}
         for idx, p in enumerate(self._file_list):
-            s = TxtFileSplitter(p)
-            for r in s:
+            reader = dataset.TxtFileSplitter(p)
+            for rec in reader:
                 if idx not in self._data:
                     self._data[idx] = []
-                d = ((p), (r[0], r[1:]))
-                self._data[idx].append(d)  # [(path),(rec_no, splitted_fiels)]...
+                self._data[idx].append(rec)
 
     def test_data_reader(self):
-        reader1 = DistributedDataReader(
+        self._update_env(pod_id="0", global_rank=0, rank_in_pod=0)
+        state = edl_state.PaddleState(total_batch_size=1)
+        reader1 = distribute_reader.Reader(
+            state=state,
             file_list=self._file_list,
-            file_splitter_cls=TxtFileSplitter,
-            splitted_data_field=["line"],
+            file_splitter_cls=dataset.TxtFileSplitter,
             batch_size=1,
         )
 
-        reader2 = DistributedDataReader(
+        self._update_env(pod_id="1", global_rank=1, rank_in_pod=0)
+        state = edl_state.PaddleState(total_batch_size=1)
+        reader2 = distribute_reader.Reader(
+            state=state,
             file_list=self._file_list,
-            file_splitter_cls=TxtFileSplitter,
-            splitted_data_field=["line"],
+            file_splitter_cls=dataset.TxtFileSplitter,
             batch_size=1,
         )
 

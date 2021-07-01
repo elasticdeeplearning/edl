@@ -81,7 +81,7 @@ class EdlFileListNotMatchError(EdlException):
     pass
 
 
-class EdlDataGenerateError(EdlException):
+class EdlDataProcessError(EdlException):
     pass
 
 

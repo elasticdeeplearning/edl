@@ -21,23 +21,23 @@ from edl.utils.log_utils import logger
 
 class ReaderMeta(object):
     def __init__(self, name, pod_id, data_server_endpoint):
-        self._name = name
-        self._pod_id = pod_id
-        self._endpoint = data_server_endpoint
+        self.name = name
+        self.pod_id = pod_id
+        self.endpoint = data_server_endpoint
 
     def to_json(self):
         d = {
-            "name": self._name,
-            "pod_id": self._pod_id,
-            "endpoint": self._endpoint,
+            "name": self.name,
+            "pod_id": self.pod_id,
+            "endpoint": self.endpoint,
         }
         return json.dumps(d)
 
     def from_json(self, s):
         d = json.loads(s)
-        self._name = d["name"]
-        self._pod_id = d["pod_id"]
-        self._endpoint = d["endpoint"]
+        self.name = d["name"]
+        self.pod_id = d["pod_id"]
+        self.endpoint = d["endpoint"]
 
     def __str_(self):
         return self._to_json()
@@ -67,7 +67,7 @@ def load_from_etcd(self, etcd, reader_name, pod_id, timeout=60):
     return meta
 
 
-def check_dist_readers(etcd):
+def check_readers(etcd):
     servers = etcd.get_service(constants.ETCD_READER)
 
     if len(servers) <= 0:

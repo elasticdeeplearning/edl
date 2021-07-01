@@ -20,6 +20,8 @@ from edl.utils import json_serializable
 from edl.utils import string_utils
 from edl.utils import train_status as edl_train_status
 from edl.utils import unique_name
+from edl.utils import env as edl_env
+from edl.discovery import etcd_client
 
 
 class DataCheckpoint(json_serializable.Serializable):
@@ -113,6 +115,9 @@ class TrainStatus(json_serializable.Serializable):
 
 class State(json_serializable.Serializable):
     def __init__(self, total_batch_size, user_defined=None):
+        # unique
+        self._name = unique_name.generator("_edl_state_")
+
         # interface
         self._default = {
             "total_batch_size": total_batch_size,  # user inputs
@@ -121,10 +126,30 @@ class State(json_serializable.Serializable):
         self._adjust_func = []
 
         # internal
-        self._name = unique_name.generator("_edl_state_")
         self._model_path = None
         self._data_checkpoint = DataCheckpoint()
         self._train_status = TrainStatus()
+
+        self._restore_from_etcd()
+
+    def _restore_from_etcd(self):
+        train_env = edl_env.TrainerEnv()
+        etcd = etcd_client.EtcdClient(train_env.etcd_endpoints, root=train_env.job_id)
+        etcd.init()
+
+        state = load_from_etcd(
+            etcd=etcd,
+            state_name=self._state.name,
+            user_defined=self._user_defined,
+            timeout=60,
+        )
+
+        self._default = state._default
+        self._user_defined = state._user_defined
+        self._adjust_func = state._adjust_func
+        self._model_apth = state._model_path
+        self._data_checkpoint = state._data_checkpoint
+        self._train_status = state._train_status
 
     def from_json(self, json_str):
         d = json.loads(json_str)

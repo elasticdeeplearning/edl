@@ -126,7 +126,7 @@ class Client(object):
             exceptions.deserialize(res.status)
 
         logger.debug(
-            "pod client get_balanced_batch_data meta:{}".format(
+            "pod client get_batch_data_meta:{}".format(
                 pb_utils.batch_data_meta_response_to_string(res)
             )
         )
