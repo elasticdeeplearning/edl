@@ -8,6 +8,6 @@ paddle-serving-client
 paddle-serving-server-gpu
 paddlepaddle-gpu==1.8.0.post107
 pathlib2==2.3.5
-protobuf==3.8.0
+protobuf==3.15.0
 psutil
 redis
