@@ -1,5 +1,5 @@
 etcd3==0.12.0
-flask==1.1.2
+flask==2.3.2
 grpcio==1.28.1
 grpcio_tools==1.28.1
 kubernetes
